@@ -1,0 +1,18 @@
+schema: modifier/v1
+id: add_countersunk_holes
+category: mounting
+description: >
+  Vertical through-holes with conical countersinks so flat-head screws seat
+  flush. Applies only to a mounting surface; hole positions define fastener
+  keepout regions downstream cuts must respect.
+applies_to: [mounting_surface]
+forbidden_targets:
+  [soft_contact_surface, high_stress_region, retaining_flexure, seal_surface]
+params:
+  count: {type: count, default: 2, min: 1, max: 4}
+  screw: {type: choice, choices: [M3, M4, M5], default: M4}
+  spacing: {type: length, default: 50mm, min: 10mm}
+provides_features: [countersunk_screw_holes]
+validators:
+  - topology.screw_holes_open
+  - topology.countersinks_present

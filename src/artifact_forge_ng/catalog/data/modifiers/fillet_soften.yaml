@@ -1,0 +1,12 @@
+schema: modifier/v1
+id: fillet_soften
+category: aesthetic
+description: >
+  Best-effort softening of exposed external edges. Never applied to seal or
+  contact surfaces (their radii are owned by the surface style).
+applies_to: [mounting_surface, aesthetic_lightening]
+forbidden_targets: [seal_surface, fastener_keepout]
+params:
+  radius: {type: length, default: 1.5mm, min: 0.5mm, max: 4mm}
+provides_features: []
+validators: []

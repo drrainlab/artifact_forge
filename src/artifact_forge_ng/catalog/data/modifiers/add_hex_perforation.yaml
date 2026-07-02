@@ -1,0 +1,19 @@
+schema: modifier/v1
+id: add_hex_perforation
+category: lightweighting
+description: >
+  Recessed hex lightening field. Centers are computed in the Form IR and
+  filtered against every keepout region BEFORE any geometry is cut, so a hex
+  cell can never touch a screw zone or stress root.
+applies_to: [aesthetic_lightening]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   retaining_flexure, seal_surface, mounting_surface]
+params:
+  cell_d: {type: length, default: 5mm, min: 3mm, max: 10mm}
+  density: {type: number, default: 0.35, min: 0.1, max: 0.65}
+provides_features: [hex_perforation]
+validators:
+  - form.hex_field_in_safe_zone
+  - region.keepouts_preserved
+  - topology.hex_field_present

@@ -1,0 +1,133 @@
+schema: archetype/v1
+id: underdesk_cable_clip_v2_molded
+version: 1
+object_class: underdesk_cable_clip
+description: >
+  Molded asymmetric side-entry cable clip for underside desk mounting: a
+  continuous shell flowing from a flat screw flange through a blended neck
+  into an asymmetric side-opening hook. The upper (short, stop) and lower
+  (long, tapered flex) lips are independently dimensioned profile features,
+  so lower_lip_len > upper_lip_len is real, measurable geometry.
+
+provides_features:
+  - asymmetric_side_hook
+  - side_facing_mouth
+  - through_cavity
+  - mounting_flange
+  - retaining_lower_lip
+  - rounded_contact_edges
+  - molded_side_profile
+
+# Declaration order is resolution order: a later parameter's expr bounds may
+# reference any earlier parameter's final clamped value. Ranges transcribed
+# from the proven v1 generator clamps (generators.py:788-819).
+parameters:
+  bundle_d:
+    {type: length, default: 20mm, min: 8mm, max: 40mm,
+     role: functional, exposed: true,
+     description: cable bundle diameter the cradle must hold}
+  wall:
+    {type: length, default: 3.5mm, min: 2mm, max: 6mm,
+     role: manufacturing,
+     description: constant shell wall thickness}
+  mouth_gap:
+    {type: length, default: 10mm, min: 4mm, max: expr(bundle_d * 0.7),
+     role: functional, exposed: true,
+     description: throat opening; must stay narrower than the bundle}
+  upper_lip_len:
+    {type: length, default: 6mm, min: 3mm, max: 12mm,
+     role: functional, exposed: true,
+     description: short fixed stop lip above the mouth}
+  lower_lip_len:
+    {type: length, default: 15mm, min: expr(upper_lip_len * 1.6), max: 30mm,
+     role: functional, exposed: true,
+     description: long tapered flex lip below the mouth — the retainer}
+  flange_l:
+    {type: length, default: 70mm, min: 40mm, max: 140mm, role: assembly}
+  flange_w:
+    {type: length, default: 30mm, min: 16mm, max: 60mm, role: assembly}
+  flange_t:
+    {type: length, default: 5mm, min: 4mm, max: 10mm, role: manufacturing}
+  neck_drop:
+    {type: length, default: 8mm, min: 3mm, max: 20mm, role: aesthetic}
+  screw_count:
+    {type: count, default: 2, min: 1, max: 4, role: assembly}
+  screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+  screw_spacing:
+    {type: length, default: 50mm, min: 10mm, max: expr(flange_l - 10.0),
+     role: assembly}
+  clearance:
+    {type: length, default: 0.8mm, min: 0.2mm, max: 2mm, role: manufacturing,
+     description: radial cavity clearance around the bundle}
+
+derived:
+  cavity_r: expr((bundle_d + 2 * clearance) / 2)
+  outer_r: expr(cavity_r + wall)
+
+constraints:
+  - mouth_gap < bundle_d * 0.7
+  - lower_lip_len >= upper_lip_len * 1.6
+  - wall >= printer.min_wall
+  - screw_spacing < flange_l
+
+form:
+  type: section_extrude
+  section: molded_side_hook
+  plane: YZ
+  width_axis: X
+
+regions:
+  - {id: flange, role: mounting_surface, editable: true}
+  - {id: screw_zones, role: fastener_keepout, editable: false}
+  - {id: cable_contact, role: soft_contact_surface, editable: false}
+  - {id: snap_root, role: high_stress_region, editable: false,
+     forbidden_modifiers: [add_hex_perforation]}
+  - {id: lower_lip, role: retaining_flexure, editable: false,
+     forbidden_modifiers: [add_hex_perforation]}
+  - {id: perforation_safe_zone, role: aesthetic_lightening, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.profile_closed
+  - form.profile_smooth
+  - form.mouth_opens_sideways
+  - form.mouth_gap_matches
+  - form.lower_lip_longer_than_upper
+  - form.not_symmetric_c_ring
+  - form.flange_above_cradle
+  - form.wall_thickness
+  - form.regions_present
+  - form.contact_edges_rounded
+  - topology.single_connected_solid
+  - topology.cavity_open
+  - topology.mouth_opens_sideways
+  - topology.asymmetric_lips_geometry
+  - topology.flange_above_cradle
+
+forbidden_forms:
+  - symmetric_c_ring
+  - closed_ring
+  - downward_entry
+  - boxy_rectangular_hook
+
+allowed_modifiers:
+  - add_countersunk_holes
+  - add_hex_perforation
+  - fillet_soften
+
+contract:
+  must_have:
+    - asymmetric_side_hook
+    - side_facing_mouth
+    - through_cavity
+    - mounting_flange
+    - retaining_lower_lip
+  must_not_have:
+    - symmetric_c_ring
+    - closed_ring
+    - downward_entry
+  invariants:
+    - mouth_gap < bundle_d * 0.7
+    - lower_lip_len > upper_lip_len * 1.5

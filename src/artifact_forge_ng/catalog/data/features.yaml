@@ -1,0 +1,61 @@
+schema: features/v1
+# The feature vocabulary — the ONLY ids that may appear in
+# provides_features / requested_features / contract.must_have.
+# A feature counts as BUILT iff every check in verified_by PASSed.
+features:
+  - id: asymmetric_side_hook
+    description: side-entry hook whose lower retaining lip is measurably longer than the upper stop lip
+    verified_by:
+      - form.not_symmetric_c_ring
+      - form.lower_lip_longer_than_upper
+      - form.mouth_opens_sideways
+      - topology.asymmetric_lips_geometry
+      - topology.mouth_opens_sideways
+
+  - id: side_facing_mouth
+    description: cradle mouth opens sideways (+Y), not downward, not closed
+    verified_by:
+      - form.mouth_opens_sideways
+      - form.mouth_gap_matches
+      - topology.mouth_opens_sideways
+
+  - id: through_cavity
+    description: continuous cable cavity across the full part width
+    verified_by:
+      - form.profile_closed
+      - topology.cavity_open
+
+  - id: mounting_flange
+    description: flat top mounting flange above the body
+    verified_by:
+      - form.flange_above_cradle
+      - topology.flange_above_cradle
+
+  - id: retaining_lower_lip
+    description: long tapered lower flex lip that retains the bundle
+    verified_by:
+      - form.lower_lip_longer_than_upper
+
+  - id: rounded_contact_edges
+    description: cable-contact surfaces are rounded, never sharp
+    verified_by:
+      - form.contact_edges_rounded
+
+  - id: countersunk_screw_holes
+    description: vertical screw holes with conical countersinks in the flange
+    verified_by:
+      - topology.screw_holes_open
+      - topology.countersinks_present
+
+  - id: hex_perforation
+    description: decorative hex lightening field confined to the safe zone
+    verified_by:
+      - form.hex_field_in_safe_zone
+      - region.keepouts_preserved
+      - topology.hex_field_present
+
+  - id: molded_side_profile
+    description: smooth molded section profile, not a boxy primitive assembly
+    verified_by:
+      - form.profile_smooth
+      - form.wall_thickness

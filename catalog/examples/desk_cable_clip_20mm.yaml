@@ -1,0 +1,51 @@
+schema: product/v1
+id: desk_cable_clip_20mm
+archetype: underdesk_cable_clip_v2_molded@1
+strict: true
+
+requested_features:
+  - asymmetric_side_hook
+  - side_facing_mouth
+  - through_cavity
+  - mounting_flange
+  - retaining_lower_lip
+  - rounded_contact_edges
+  - molded_side_profile
+  - countersunk_screw_holes
+  - hex_perforation
+
+params:
+  bundle_d: 20mm
+  mouth_gap: 10mm
+  upper_lip_len: 6mm
+  lower_lip_len: 15mm
+  wall: 3.2mm
+  flange_l: 70mm
+  flange_w: 30mm
+  flange_t: 5mm
+  screw_spacing: 50mm
+  screw: M4
+
+style:
+  surface: molded_utility_part
+  softness: 0.75
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
+
+modifiers:
+  - id: add_countersunk_holes
+    target: flange
+    params:
+      count: 2
+      screw: M4
+      spacing: 50mm
+  - id: add_hex_perforation
+    target: perforation_safe_zone
+    params:
+      cell_d: 5mm
+      density: 0.35
