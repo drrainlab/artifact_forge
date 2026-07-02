@@ -7,7 +7,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from ..core.findings import Finding, Level, Status
+from ..core.findings import Finding, Status
 from ..pipeline import PipelineFailure, run_pre_cad
 from .solids import compile_part
 
@@ -20,33 +20,7 @@ def run_build(product_path: Path, out_dir: Path, strict_flag: bool | None) -> di
 
     geometry, log = compile_part(state.form)
 
-    solids = geometry.solid_count()
-    valid = geometry.is_valid()
-    state.report.extend(
-        [
-            Finding(
-                check="topology.single_connected_solid",
-                status=Status.PASS if solids == 1 else Status.FAIL,
-                level=Level.TOPOLOGY,
-                message=f"{solids} solid body(ies)",
-                critical=True,
-                measured=float(solids),
-                limit=1.0,
-            ),
-            Finding(
-                check="topology.valid_solid",
-                status=Status.PASS if valid else Status.FAIL,
-                level=Level.TOPOLOGY,
-                message="BRep valid" if valid else "BRep check failed",
-                critical=True,
-            ),
-        ]
-    )
-
-    # Geometry-level validators (topology probes, regions, manufacturing,
-    # honesty report) attach here in Milestone D.
-    findings_extra = _run_geometry_validators(state, geometry)
-    state.report.extend(findings_extra)
+    state.report.extend(_run_geometry_validators(state, geometry))
 
     target = out_dir / state.instance.id
     stl = geometry.export_stl(target / "part.stl")
