@@ -1,0 +1,19 @@
+schema: modifier/v1
+id: add_zip_tie_slots
+category: interface
+description: >
+  A pair of through slots flanking the region center — a zip tie threads
+  down one, under the bridge, up the other. Fails loudly if the pair
+  cannot clear the keepouts.
+applies_to: [mounting_surface, aesthetic_lightening]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   retaining_flexure, seal_surface]
+params:
+  tie_w: {type: length, default: 4.8mm, min: 2.5mm, max: 10mm}
+  tie_t: {type: length, default: 1.6mm, min: 1mm, max: 2.6mm}
+  bridge_w: {type: length, default: 8mm, min: 5mm, max: 20mm}
+provides_features: [tie_slots]
+validators:
+  - form.cuts_respect_keepouts
+  - topology.cutout_present

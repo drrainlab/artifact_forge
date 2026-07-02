@@ -1,0 +1,21 @@
+schema: modifier/v1
+id: add_magnet_pockets
+category: interface
+description: >
+  Blind pockets for press-in disc magnets, entered from the chosen face
+  (bottom = hidden mounting magnets, printed face stays closed). The skin
+  past the blind end is verified intact.
+applies_to: [mounting_surface, aesthetic_lightening]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   retaining_flexure, seal_surface]
+params:
+  magnet_d: {type: length, default: 6mm, min: 3mm, max: 15mm}
+  magnet_h: {type: length, default: 2mm, min: 1mm, max: 5mm}
+  fit_clearance: {type: length, default: 0.15mm, min: 0.05mm, max: 0.4mm}
+  count: {type: count, default: 2, min: 1, max: 6}
+  face: {type: choice, choices: [bottom, top], default: bottom}
+provides_features: [magnet_pockets]
+validators:
+  - form.cuts_respect_keepouts
+  - topology.pockets_present

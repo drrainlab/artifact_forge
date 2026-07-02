@@ -38,7 +38,8 @@ def add_magnet_pockets(
                 f"{pw.depth:.1f} mm plate",
             )
         ]
-    inner = pw.window.shrunk(d / 2.0 + 2.0)
+    min_web = form.params.get("min_web", 3.0)
+    inner = pw.window.shrunk(d / 2.0 + max(2.0, min_web + 0.5))
     if inner.width < 0 or inner.height < 0:
         return [fail(use.id, "region too small for magnet pockets")]
     along_u = inner.width >= inner.height

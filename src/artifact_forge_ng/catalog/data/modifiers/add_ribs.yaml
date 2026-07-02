@@ -1,0 +1,20 @@
+schema: modifier/v1
+id: add_ribs
+category: structural
+description: >
+  ADDITIVE stiffening ribs across the target region's short dimension —
+  the additive half of the modifier kernel. Ribs skip keepouts (a rib over
+  a countersink buries the head) and are verified WELDED by a
+  solid-fraction probe.
+applies_to: [mounting_surface, aesthetic_lightening, high_stress_region]
+forbidden_targets:
+  [soft_contact_surface, retaining_flexure, seal_surface, fastener_keepout]
+params:
+  count: {type: count, default: 3, min: 1, max: 8}
+  rib_w: {type: length, default: 2.5mm, min: 1.6mm, max: 6mm}
+  rib_h: {type: length, default: 3mm, min: 1.5mm, max: 8mm}
+  edge_margin: {type: length, default: 3mm, min: 2mm, max: 12mm}
+provides_features: [stiffening_ribs]
+validators:
+  - topology.ribs_present
+  - topology.single_connected_solid

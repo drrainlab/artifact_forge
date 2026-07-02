@@ -48,12 +48,6 @@ def _pattern_centers(prefix: str, ctx: dict, choices: dict) -> list[tuple[float,
     )
 
 
-def _zone_box(centers: list[tuple[float, float]], pad: float, z0: float, z1: float) -> Box3:
-    xs = [c[0] for c in centers]
-    ys = [c[1] for c in centers]
-    return Box3(min(xs) - pad, min(ys) - pad, z0, max(xs) + pad, max(ys) + pad, z1)
-
-
 def build_form(
     resolved: ResolvedParams,
     archetype: ArchetypeSpec,
@@ -81,13 +75,17 @@ def build_form(
         cs_face = choices.get(f"{prefix}_cs_face", "top")
         holes.extend(holes_from_centers(centers, t, t, screw, cs_face))
         head_r = screw_spec(screw)["head"] / 2.0
-        zones.append(
-            Region(
-                f"pattern_{prefix}_zone",
-                RegionRole.FASTENER_KEEPOUT,
-                _zone_box(centers, head_r + KEEPOUT_CLEARANCE, 0.0, t),
+        # Per-hole keepout regions — a bounding box around a bolt CIRCLE
+        # would falsely wall off the whole center of the plate.
+        for i, (hx, hy) in enumerate(centers):
+            zones.append(
+                Region(
+                    f"pattern_{prefix}_hole_{i}",
+                    RegionRole.FASTENER_KEEPOUT,
+                    Box3(hx - head_r - KEEPOUT_CLEARANCE, hy - head_r - KEEPOUT_CLEARANCE, 0.0,
+                         hx + head_r + KEEPOUT_CLEARANCE, hy + head_r + KEEPOUT_CLEARANCE, t),
+                )
             )
-        )
 
     bores = []
     bore_d = ctx.get("bore_d", 0.0)
@@ -98,16 +96,15 @@ def build_form(
 
     regions = [
         Region("plate_face", RegionRole.MOUNTING_SURFACE, Box3(u0, v0, 0.0, u1, v1, t)),
+        # Always present (the archetype declares it); with a central bore
+        # the bore itself becomes a keepout, so fields flow around it.
+        Region(
+            "center_zone",
+            RegionRole.AESTHETIC_LIGHTENING,
+            Box3(-length / 6, -width_ / 6, 0.0, length / 6, width_ / 6, t),
+        ),
         *zones,
     ]
-    if bore_d <= 1e-6:
-        regions.append(
-            Region(
-                "center_zone",
-                RegionRole.AESTHETIC_LIGHTENING,
-                Box3(-length / 6, -width_ / 6, 0.0, length / 6, width_ / 6, t),
-            )
-        )
 
     screws = [choices.get("a_screw", "M4"), choices.get("b_screw", "M3")]
     max_head_r = max(screw_spec(s)["head"] for s in screws) / 2.0

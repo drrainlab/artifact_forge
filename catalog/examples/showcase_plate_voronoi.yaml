@@ -1,0 +1,62 @@
+schema: product/v1
+id: showcase_plate_voronoi
+archetype: adapter_plate_v1@1
+strict: true
+
+# Modifier-kernel showcase: one plate, three region-safe transformations —
+# a deterministic voronoi lightening field in the center zone, hidden
+# magnet pockets and a zip-tie slot pair on the plate face. Every cut and
+# every rib answers to the keepouts around the two hole patterns.
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - voronoi_field
+  - magnet_pockets
+  - tie_slots
+
+params:
+  plate_l: 120mm
+  plate_w: 80mm
+  thickness: 6mm
+  corner_r: 8mm
+  a_kind: circle
+  a_count: 4
+  a_bc_d: 60mm
+  a_screw: M4
+  a_cs_face: top
+  b_kind: none
+  bore_d: 0mm
+
+style:
+  surface: molded_utility_part
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
+
+# Order matters and is safe: earlier cuts become keepouts for later
+# modifiers, so the voronoi field (last) flows around the slots and pockets.
+modifiers:
+  - id: add_magnet_pockets
+    target: plate_face
+    params:
+      magnet_d: 8mm
+      magnet_h: 3mm
+      count: 2
+      face: bottom
+  - id: add_zip_tie_slots
+    target: plate_face
+    params:
+      tie_w: 4.8mm
+      bridge_w: 10mm
+  - id: add_voronoi_field
+    target: center_zone
+    params:
+      seed: 7
+      sites: 14
+      min_ligament: 1.8mm
+      cut_mode: through

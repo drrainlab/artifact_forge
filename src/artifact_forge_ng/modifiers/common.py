@@ -106,4 +106,28 @@ def derive_keepouts(
                 clearance=clearance,
             )
         )
+    # Modifiers compose in instance order: everything an EARLIER applicator
+    # already cut becomes a keepout for later ones — two modifiers can never
+    # silently eat the same material.
+    for i, cut in enumerate(form.cutboxes):
+        b = cut.box
+        keepouts.append(
+            Region2D(
+                f"prior_cut_{cut.name}",
+                RegionRole.FASTENER_KEEPOUT,
+                Rect2D(b.x0, b.y0, b.x1, b.y1),
+                clearance=clearance,
+            )
+        )
+    for i, bore in enumerate(form.bores):
+        if bore.axis != "Z":
+            continue
+        keepouts.append(
+            Region2D(
+                f"prior_bore_{bore.name}",
+                RegionRole.FASTENER_KEEPOUT,
+                Circle2D(Pt(bore.center[0], bore.center[1]), bore.d / 2.0),
+                clearance=clearance,
+            )
+        )
     return keepouts

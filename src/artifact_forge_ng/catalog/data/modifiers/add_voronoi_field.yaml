@@ -1,0 +1,26 @@
+schema: modifier/v1
+id: add_voronoi_field
+category: pattern_field
+description: >
+  Organic voronoi lightening field. The seed is an explicit parameter — the
+  same YAML always yields the same cells. Cells are Lloyd-relaxed, shrunk
+  by half the ligament (webs are a guaranteed minimum, not an accident) and
+  filtered against every keepout before any geometry is cut.
+applies_to: [aesthetic_lightening]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   retaining_flexure, seal_surface, mounting_surface]
+params:
+  seed: {type: count, default: 42, min: 0, max: 999999,
+         description: "stable seed — same YAML, same object"}
+  sites: {type: count, default: 18, min: 4, max: 48}
+  min_ligament: {type: length, default: 1.6mm, min: 1mm, max: 5mm}
+  edge_margin: {type: length, default: 3mm, min: 2mm, max: 16mm}
+  relax_iterations: {type: count, default: 2, min: 0, max: 6}
+  cut_mode: {type: choice, choices: [through, recess], default: through}
+  recess_depth: {type: length, default: 1.2mm, min: 0.6mm, max: 3mm}
+provides_features: [voronoi_field]
+validators:
+  - form.min_ligament_ok
+  - region.keepouts_preserved
+  - topology.hex_field_present

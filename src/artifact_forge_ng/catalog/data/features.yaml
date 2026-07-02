@@ -162,3 +162,32 @@ features:
     verified_by:
       - form.cuts_respect_keepouts
       - topology.cutout_present
+
+  - id: voronoi_field
+    description: deterministic voronoi lightening cells with guaranteed webs
+    verified_by:
+      - form.min_ligament_ok
+      - topology.hex_field_present
+
+  - id: grid_slots
+    description: parallel slot field clear of keepouts
+    verified_by:
+      - form.min_ligament_ok
+      - topology.hex_field_present
+
+  - id: magnet_pockets
+    description: blind magnet pockets with intact skins
+    verified_by:
+      - form.cuts_respect_keepouts
+      - topology.pockets_present
+
+  - id: tie_slots
+    description: zip-tie slot pair through the plate
+    verified_by:
+      - form.cuts_respect_keepouts
+      - topology.cutout_present
+
+  - id: stiffening_ribs
+    description: welded-on stiffening ribs, verified present
+    verified_by:
+      - topology.ribs_present

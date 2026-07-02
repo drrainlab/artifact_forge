@@ -1,0 +1,21 @@
+schema: modifier/v1
+id: add_grid_slot_field
+category: pattern_field
+description: >
+  Parallel slot field (vent/lightening slats) across the target region;
+  each slot survives only if fully clear of every keepout.
+applies_to: [aesthetic_lightening]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   retaining_flexure, seal_surface, mounting_surface]
+params:
+  slot_w: {type: length, default: 4mm, min: 2mm, max: 12mm}
+  web: {type: length, default: 2.5mm, min: 1.2mm, max: 8mm}
+  edge_margin: {type: length, default: 4mm, min: 2mm, max: 16mm}
+  cut_mode: {type: choice, choices: [through, recess], default: through}
+  recess_depth: {type: length, default: 1.2mm, min: 0.6mm, max: 3mm}
+provides_features: [grid_slots]
+validators:
+  - form.min_ligament_ok
+  - region.keepouts_preserved
+  - topology.hex_field_present

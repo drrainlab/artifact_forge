@@ -75,3 +75,25 @@ src/artifact_forge_ng/
 
 Примеры: `catalog/examples/*.yaml` — все строятся `forge build` в pass/A.
 Пара кронштейн+чашка стыкуется: датум `arm_tip` ↔ bolt-circle `mount_bc`.
+
+## Модификаторы (Modifier Kernel v1)
+
+Typed, region-bound трансформации над Form IR — модификатор не имеет права
+ломать продуктовую топологию. Архетип владеет функцией, модификатор —
+адаптацией. Каждый: читает целевой регион → выводит keepouts (защищённые
+регионы + отверстия + **вырезы более ранних модификаторов**) → эмитит
+IR-фичи → компилятор режет/приваривает ровно их → валидаторы подтверждают
+→ только после PASS фича считается built.
+
+| Модификатор | Тип | Гарантия |
+|---|---|---|
+| `add_hex_perforation` | field | web между ячейками ≥ wall_gap (меряется!) |
+| `add_grid_slot_field` | field | слоты целиком вне keepouts |
+| `add_voronoi_field` | field | **стабильный seed** (тот же YAML → тот же объект), Lloyd-релаксация, лигамент ≥ min_ligament |
+| `add_magnet_pockets` | interface | глухие карманы, кожа за дном проверяется целой |
+| `add_zip_tie_slots` | interface | пара сквозных слотов, fail если keepout мешает |
+| `add_ribs` | structural (**аддитивный**) | рёбра приварены (weld-правило) и подтверждены пробой |
+
+`cut_mode: through | recess` у всех полей. Функциональные подстройки
+(mouth_gap и т.п.) — это YAML-патчи repair-слоя, НЕ модификаторы.
+Bio-organic SurfaceStyle — следующая итерация.
