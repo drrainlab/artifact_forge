@@ -1,0 +1,33 @@
+schema: product/v1
+id: adapter_plate_router_mount
+archetype: adapter_plate_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - central_bore
+
+params:
+  plate_l: 90mm
+  plate_w: 60mm
+  thickness: 5mm
+  corner_r: 6mm
+  a_kind: line
+  a_count: 2
+  a_spacing: 64mm
+  a_screw: M4
+  a_cs_face: top
+  b_kind: circle
+  b_count: 4
+  b_bc_d: 40mm
+  b_screw: M3
+  b_cs_face: bottom
+  bore_d: 12mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid

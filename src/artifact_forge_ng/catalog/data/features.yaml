@@ -60,3 +60,106 @@ features:
     verified_by:
       - form.profile_smooth
       - form.wall_thickness
+
+  # -- phase-5 vocabulary -----------------------------------------------------
+  - id: hole_pattern
+    description: parametric fastener hole pattern (line / grid / bolt circle)
+    verified_by:
+      - form.min_web_between_holes
+      - form.holes_within_outline
+      - topology.screw_holes_open
+      - topology.countersinks_present
+
+  - id: central_bore
+    description: central through-bore
+    verified_by:
+      - topology.bores_open
+
+  - id: mounting_plate_body
+    description: one solid rounded mounting plate
+    verified_by:
+      - form.profile_closed
+      - topology.single_connected_solid
+
+  - id: cable_slots
+    description: open-topped cable slots with circular resting cavities
+    verified_by:
+      - form.slots_open_topped
+      - form.teeth_count_matches
+      - topology.slots_open
+
+  - id: slot_retention_throats
+    description: slot throats narrower than the cable, snapping it in
+    verified_by:
+      - form.slot_throat_retention
+
+  - id: tie_tunnel
+    description: closed tunnel a zip tie threads through
+    verified_by:
+      - form.tunnel_fits_tie
+      - topology.tunnel_open
+
+  - id: surface_mount_base
+    description: flat adhesive/screw mounting base faces
+    verified_by:
+      - form.regions_present
+
+  - id: hook_bay
+    description: open-topped J-hook bay
+    verified_by:
+      - form.bay_open_top
+      - topology.bay_open
+
+  - id: tip_lip
+    description: upturned retaining lip at the hook tip
+    verified_by:
+      - form.tip_lip_present
+
+  - id: wide_contact_band
+    description: wide, rounded contact band for soft items
+    verified_by:
+      - form.regions_present
+      - form.contact_edges_rounded
+
+  - id: cantilever_arm
+    description: cantilever arm welded into the mounting plate
+    verified_by:
+      - topology.single_connected_solid
+      - topology.flange_above_cradle
+
+  - id: wiring_channel
+    description: continuous internal wiring channel from plate to arm tip
+    verified_by:
+      - form.channel_inside_walls
+      - form.cuts_respect_keepouts
+      - topology.bores_open
+      - topology.channel_continuous
+
+  - id: socket_cavity
+    description: revolved cavity holding a standard lamp socket insert
+    verified_by:
+      - form.revolve_profile_clear_of_axis
+      - topology.revolve_cavity_open
+
+  - id: cable_exit
+    description: central cable exit through the cup base
+    verified_by:
+      - form.revolve_profile_clear_of_axis
+      - topology.revolve_cavity_open
+
+  - id: device_rest
+    description: tilted device slot with rounded contact surfaces
+    verified_by:
+      - form.device_slot_fits
+      - form.contact_edges_rounded
+
+  - id: stable_footprint
+    description: part+device center of mass stays inside the base
+    verified_by:
+      - form.stability_footprint
+
+  - id: charging_cutout
+    description: cable cutout through the lip and slot floor
+    verified_by:
+      - form.cuts_respect_keepouts
+      - topology.cutout_present

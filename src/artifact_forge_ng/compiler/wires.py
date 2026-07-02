@@ -29,15 +29,18 @@ def wire_from_loop(loop: ProfileLoop, plane: str) -> cq.Workplane:
     return wp.close()
 
 
-def extrude_section_profile(profile: SectionProfile, width: float) -> cq.Workplane:
-    """Extrude the (already molded) section along its width axis.
+#: cadquery's named "XZ" plane has normal -Y; plane_mapping puts the width
+#: along +axis, so XZ sections extrude NEGATIVE to land in [0, +width].
+_EXTRUDE_SIGN = {"YZ": 1.0, "XY": 1.0, "XZ": -1.0}
 
-    For plane YZ the workplane normal is +X, so ``extrude(width)`` spans
-    x in [0, width] — exactly the ``plane_mapping`` convention.
-    """
-    solid = wire_from_loop(profile.outer, profile.plane).extrude(width)
+
+def extrude_section_profile(profile: SectionProfile, width: float) -> cq.Workplane:
+    """Extrude the (already molded) section along its width axis, spanning
+    [0, width] on the positive side per the ``plane_mapping`` convention."""
+    span = _EXTRUDE_SIGN[profile.plane] * width
+    solid = wire_from_loop(profile.outer, profile.plane).extrude(span)
     for void in profile.voids:
-        cutter = wire_from_loop(void, profile.plane).extrude(width)
+        cutter = wire_from_loop(void, profile.plane).extrude(span)
         solid = solid.cut(cutter)
     return solid
 

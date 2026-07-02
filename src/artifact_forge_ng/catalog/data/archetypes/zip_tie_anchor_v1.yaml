@@ -1,0 +1,79 @@
+schema: archetype/v1
+id: zip_tie_anchor_v1
+version: 1
+object_class: zip_tie_anchor
+description: >
+  Surface-mount zip-tie anchor: a molded omega bridge over the mounting
+  face; the tie threads through the tunnel along the anchor and cinches the
+  bundle against the bridge. Adhesive by default, screw variant adds two
+  countersunk flange holes.
+
+provides_features:
+  - tie_tunnel
+  - surface_mount_base
+  - countersunk_screw_holes
+
+parameters:
+  tie_w:
+    {type: length, default: 4.8mm, min: 2.5mm, max: 10mm,
+     role: functional, exposed: true,
+     description: zip tie width (4.8 = common mid-size tie)}
+  tie_t:
+    {type: length, default: 1.6mm, min: 1mm, max: 2.6mm, role: functional}
+  clearance:
+    {type: length, default: 0.4mm, min: 0.2mm, max: 1mm, role: manufacturing}
+  wall:
+    {type: length, default: 2.4mm, min: 1.6mm, max: 5mm, role: manufacturing}
+  flange_w:
+    {type: length, default: 8mm, min: 5mm, max: 20mm, role: assembly,
+     description: flat flange either side of the bridge}
+  base_t:
+    {type: length, default: expr(wall), min: 1.6mm, max: 5mm, role: structural}
+  width:
+    {type: length, default: 10mm, min: 6mm, max: 25mm, role: functional,
+     exposed: true, description: anchor length along the tie}
+  mount:
+    {type: choice, choices: [adhesive, screw], default: adhesive,
+     role: assembly, exposed: true}
+  screw:
+    {type: choice, choices: [M3, M4], default: M3, role: assembly}
+
+constraints:
+  - base_t >= printer.min_wall
+  - flange_w >= 5
+
+form:
+  type: section_extrude
+  section: omega_tunnel
+  plane: YZ
+  width_axis: X
+
+regions:
+  - {id: base_faces, role: mounting_surface, editable: true}
+  - {id: tunnel, role: soft_contact_surface, editable: false}
+  - {id: bridge, role: high_stress_region, editable: false,
+     forbidden_modifiers: [add_hex_perforation]}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.tunnel_fits_tie
+  - topology.single_connected_solid
+  - topology.tunnel_open
+  - topology.screw_holes_open
+  - topology.countersinks_present
+
+forbidden_forms:
+  - blocked_tunnel
+  - boxy_rectangular_hook
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - tie_tunnel
+    - surface_mount_base
+  must_not_have:
+    - blocked_tunnel
+  invariants:
+    - tie_w + 2 * clearance < 2 * (flange_w + wall) + tie_w

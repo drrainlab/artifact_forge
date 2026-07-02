@@ -1,0 +1,109 @@
+schema: archetype/v1
+id: adapter_plate_v1
+version: 1
+object_class: adapter_plate
+description: >
+  Universal adapter/mounting plate: a rounded-rectangle plate carrying up to
+  two independent fastener hole patterns (line, grid or bolt circle — e.g.
+  device holes on one standard, wall/VESA holes on another) and an optional
+  central bore. Web thickness between all holes and to every edge is
+  verified analytically before CAD.
+
+provides_features:
+  - mounting_plate_body
+  - hole_pattern
+  - central_bore
+
+parameters:
+  plate_l:
+    {type: length, default: 80mm, min: 30mm, max: 200mm,
+     role: functional, exposed: true}
+  plate_w:
+    {type: length, default: 50mm, min: 20mm, max: 200mm,
+     role: functional, exposed: true}
+  thickness:
+    {type: length, default: 5mm, min: 3mm, max: 12mm, role: manufacturing}
+  corner_r:
+    {type: length, default: 4mm, min: 0.5mm,
+     max: "expr(min(plate_l, plate_w) * 0.25)", role: aesthetic}
+  min_web:
+    {type: length, default: 3mm, min: 2mm, max: 8mm, role: manufacturing,
+     description: minimum material web between holes and to edges}
+  bore_d:
+    {type: length, default: 0mm, min: 0mm,
+     max: "expr(min(plate_l, plate_w) - 16)",
+     role: functional, exposed: true, description: 0 = no central bore}
+
+  a_kind:
+    {type: choice, choices: [line, grid, circle], default: line,
+     role: assembly, exposed: true}
+  a_count:
+    {type: count, default: 2, min: 1, max: 8, role: assembly}
+  a_nx: {type: count, default: 2, min: 1, max: 4, role: assembly}
+  a_ny: {type: count, default: 2, min: 1, max: 4, role: assembly}
+  a_spacing:
+    {type: length, default: 40mm, min: 8mm, max: expr(plate_l - 12),
+     role: assembly, exposed: true}
+  a_bc_d:
+    {type: length, default: 40mm, min: 16mm,
+     max: "expr(min(plate_l, plate_w) - 12)", role: assembly}
+  a_cx: {type: length, default: 0mm, min: -80mm, max: 80mm, role: assembly}
+  a_cy: {type: length, default: 0mm, min: -80mm, max: 80mm, role: assembly}
+  a_screw:
+    {type: choice, choices: [M2, M2.5, M3, M4, M5], default: M4, role: assembly}
+  a_cs_face: {type: choice, choices: [top, bottom], default: top, role: assembly}
+
+  b_kind:
+    {type: choice, choices: [none, line, grid, circle], default: none,
+     role: assembly, exposed: true}
+  b_count:
+    {type: count, default: 4, min: 1, max: 8, role: assembly}
+  b_nx: {type: count, default: 2, min: 1, max: 4, role: assembly}
+  b_ny: {type: count, default: 2, min: 1, max: 4, role: assembly}
+  b_spacing:
+    {type: length, default: 20mm, min: 8mm, max: expr(plate_l - 12),
+     role: assembly}
+  b_bc_d:
+    {type: length, default: 40mm, min: 16mm,
+     max: "expr(min(plate_l, plate_w) - 12)", role: assembly}
+  b_cx: {type: length, default: 0mm, min: -80mm, max: 80mm, role: assembly}
+  b_cy: {type: length, default: 0mm, min: -80mm, max: 80mm, role: assembly}
+  b_screw:
+    {type: choice, choices: [M2, M2.5, M3, M4, M5], default: M3, role: assembly}
+  b_cs_face: {type: choice, choices: [top, bottom], default: bottom, role: assembly}
+
+constraints:
+  - thickness >= printer.min_wall
+  - corner_r < min(plate_l, plate_w) / 2
+
+form:
+  type: section_extrude
+  section: rounded_plate
+  plane: XY
+  width_axis: Z
+
+regions:
+  - {id: plate_face, role: mounting_surface, editable: true}
+  - {id: pattern_a_zone, role: fastener_keepout, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.single_connected_solid
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.bores_open
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - hole_pattern
+  must_not_have: []
+  invariants:
+    - min_web >= 2.0

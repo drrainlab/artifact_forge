@@ -1,0 +1,21 @@
+schema: product/v1
+id: desk_comb_5x4mm
+archetype: cable_comb_v1@1
+strict: true
+
+requested_features:
+  - cable_slots
+  - slot_retention_throats
+  - rounded_contact_edges
+
+params:
+  cable_d: 4mm
+  slot_count: 5
+  depth: 12mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid

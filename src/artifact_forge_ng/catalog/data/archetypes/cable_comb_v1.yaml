@@ -1,0 +1,84 @@
+schema: archetype/v1
+id: cable_comb_v1
+version: 1
+object_class: cable_comb
+description: >
+  Desk cable comb: a molded bar whose top edge carries N open slots. Each
+  slot is a circular resting cavity (cable diameter + clearance) reached
+  through a throat narrower than the cable, so a pushed-in cable snaps past
+  and stays. The throat width is set exactly by the cavity arc's endpoint
+  angles — measured, not hoped for. Adhesive mount.
+
+provides_features:
+  - cable_slots
+  - slot_retention_throats
+  - rounded_contact_edges
+  - surface_mount_base
+
+parameters:
+  cable_d:
+    {type: length, default: 4mm, min: 2mm, max: 10mm,
+     role: functional, exposed: true,
+     description: single cable diameter each slot holds}
+  slot_count:
+    {type: count, default: 5, min: 2, max: 12, role: functional, exposed: true}
+  clearance:
+    {type: length, default: 0.3mm, min: 0.1mm, max: 1mm, role: manufacturing}
+  wall:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: manufacturing}
+  throat_w:
+    {type: length, default: expr(cable_d * 0.7), min: 1.5mm,
+     max: expr(cable_d * 0.9), role: functional,
+     description: narrower than the cable — the snap retention (v1 entry_gap)}
+  pitch:
+    {type: length, default: expr(cable_d + 2 * clearance + 2 * wall + 1),
+     min: expr(cable_d + 2 * clearance + wall), max: 30mm, role: functional}
+  base_h:
+    {type: length, default: 6mm, min: 4mm, max: 15mm, role: structural}
+  depth:
+    {type: length, default: 12mm, min: 8mm, max: 30mm, role: functional,
+     description: bar depth along the cable run}
+  end_margin:
+    {type: length, default: 5mm, min: 3mm, max: 15mm, role: aesthetic}
+
+constraints:
+  - throat_w < cable_d
+  - base_h >= wall
+  - pitch * (slot_count - 1) + 2 * (end_margin + wall + cable_d / 2 + clearance) <= 220
+
+form:
+  type: section_extrude
+  section: cable_comb_bar
+  plane: XZ
+  width_axis: Y
+
+regions:
+  - {id: base_bar, role: mounting_surface, editable: true}
+  - {id: cable_slots, role: soft_contact_surface, editable: false}
+  - {id: teeth, role: high_stress_region, editable: false,
+     forbidden_modifiers: [add_hex_perforation]}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.slots_open_topped
+  - form.slot_throat_retention
+  - form.teeth_count_matches
+  - form.contact_edges_rounded
+  - topology.single_connected_solid
+  - topology.slots_open
+
+forbidden_forms:
+  - closed_slot
+  - boxy_rectangular_hook
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - cable_slots
+    - slot_retention_throats
+  must_not_have:
+    - closed_slot
+  invariants:
+    - throat_w < cable_d

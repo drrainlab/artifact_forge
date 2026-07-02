@@ -1,0 +1,23 @@
+schema: product/v1
+id: zip_anchor_48_screw
+archetype: zip_tie_anchor_v1@1
+strict: true
+
+requested_features:
+  - tie_tunnel
+  - surface_mount_base
+  - countersunk_screw_holes
+
+params:
+  tie_w: 4.8mm
+  tie_t: 1.6mm
+  width: 12mm
+  mount: screw
+  screw: M3
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid

@@ -171,6 +171,59 @@ def countersinks_present(geometry: Geometry, form: PartForm) -> Finding:
     )
 
 
+@register_probe("topology.tunnel_open")
+def tunnel_open(geometry: Geometry, form: PartForm) -> Finding:
+    """The tie tunnel must be void along the extrusion axis (omega frame:
+    tunnel centered at y=0, z in [0, tunnel_h])."""
+    f = form.frame
+    th, tw = f.get("tunnel_h"), f.get("tunnel_w")
+    if th is None or tw is None:
+        return _finding("topology.tunnel_open", False, "frame declares no tunnel")
+    probe = channel_probe(
+        [(-2.0, 0.0, th / 2.0), (form.width + 2.0, 0.0, th / 2.0)],
+        d=0.8 * min(tw, th),
+    )
+    frac = solid_fraction(geometry.workplane, probe)
+    return _finding(
+        "topology.tunnel_open",
+        frac < 0.05,
+        f"tunnel probe solid fraction {frac:.3f}",
+        measured=frac,
+        limit=0.05,
+    )
+
+
+@register_probe("topology.slots_open")
+def slots_open(geometry: Geometry, form: PartForm) -> Finding:
+    """Per comb slot: the cable channel along the width axis is void, and
+    the throat is void from above (comb frame: x = u, y = width, z = v)."""
+    f = form.frame
+    count = int(f.get("slot_count", 0))
+    if count == 0:
+        return _finding("topology.slots_open", False, "frame declares no slots")
+    cable_d = form.params.get("cable_d", f["cavity_r"])
+    blocked = []
+    for i in range(count):
+        cx, cv = f[f"slot_cx_{i}"], f["cavity_cv"]
+        run = channel_probe(
+            [(cx, -2.0, cv), (cx, form.width + 2.0, cv)], d=cable_d * 0.8
+        )
+        run_frac = solid_fraction(geometry.workplane, run)
+        tw = f["throat_w"]
+        throat = box_probe(
+            cx - tw * 0.25, form.width * 0.25, f["cavity_cv"] + f["cavity_r"] * 0.5,
+            cx + tw * 0.25, form.width * 0.75, f["total_h"] + 2.0,
+        )
+        throat_frac = solid_fraction(geometry.workplane, throat)
+        if run_frac > 0.05 or throat_frac > 0.35:
+            blocked.append(f"slot {i} (run {run_frac:.2f}, throat {throat_frac:.2f})")
+    return _finding(
+        "topology.slots_open",
+        not blocked,
+        "all slots open" if not blocked else "blocked: " + "; ".join(blocked),
+    )
+
+
 @register_probe("topology.bores_open")
 def bores_open(geometry: Geometry, form: PartForm) -> Finding:
     if not form.bores:
