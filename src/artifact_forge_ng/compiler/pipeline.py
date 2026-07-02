@@ -30,6 +30,8 @@ def run_build(product_path: Path, out_dir: Path, strict_flag: bool | None) -> di
     out["compile"] = {
         "holes_bored": log.holes_bored,
         "holes_countersunk": log.holes_countersunk,
+        "bores_cut": log.bores_cut,
+        "boxes_cut": log.boxes_cut,
         "field_cut": log.field_cut,
         "blends_applied": log.blends_applied,
         "blends_skipped": log.blends_skipped,

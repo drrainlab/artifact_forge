@@ -12,6 +12,9 @@ from .booleans import cut_keep_solid
 
 _AXIS_PLANES = {"X": "YZ", "Y": "XZ", "Z": "XY"}
 _AXIS_INDEX = {"X": 0, "Y": 1, "Z": 2}
+#: cadquery's named "XZ" plane has normal -Y — extrude NEGATIVE to go +Y
+#: (the same trap as extrude_section_profile; one convention, one fix).
+_AXIS_SIGN = {"X": 1.0, "Y": -1.0, "Z": 1.0}
 
 
 def cut_bore(body: cq.Workplane, bore: BoreFeature) -> tuple[cq.Workplane, bool]:
@@ -22,7 +25,7 @@ def cut_bore(body: cq.Workplane, bore: BoreFeature) -> tuple[cq.Workplane, bool]
     cutter = (
         cq.Workplane(_AXIS_PLANES[bore.axis], origin=tuple(origin))
         .circle(bore.d / 2.0)
-        .extrude(length)
+        .extrude(_AXIS_SIGN[bore.axis] * length)
     )
     return cut_keep_solid(body, cutter)
 

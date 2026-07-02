@@ -173,6 +173,52 @@ def countersinks_present(geometry: Geometry, form: PartForm) -> Finding:
     )
 
 
+@register_probe("topology.revolve_cavity_open")
+def revolve_cavity_open(geometry: Geometry, form: PartForm) -> Finding:
+    """The revolved cavity + cable exit must be void along the axis, end to
+    end (below the base through above the rim)."""
+    f = form.frame
+    exit_r = f.get("exit_r")
+    if exit_r is None:
+        return _finding("topology.revolve_cavity_open", False, "frame declares no exit")
+    probe = channel_probe(
+        [(0.0, 0.0, -2.0), (0.0, 0.0, f["height"] + 2.0)], d=1.6 * exit_r
+    )
+    frac = solid_fraction(geometry.workplane, probe)
+    return _finding(
+        "topology.revolve_cavity_open",
+        frac < 0.05,
+        f"axis probe solid fraction {frac:.3f}",
+        measured=frac,
+        limit=0.05,
+    )
+
+
+@register_probe("topology.channel_continuous")
+def channel_continuous(geometry: Geometry, form: PartForm) -> Finding:
+    """The wiring channel must be void along its declared L-path (frame
+    keys channel_x / channel_entry_u / channel_z / channel_exit_u)."""
+    f = form.frame
+    needed = ("channel_x", "channel_entry_u", "channel_z", "channel_exit_u")
+    if any(k not in f for k in needed):
+        return _finding(
+            "topology.channel_continuous", False, "frame declares no channel path"
+        )
+    d = form.params.get("channel_d", 6.0)
+    x, entry_u, z_c, exit_u = (f[k] for k in needed)
+    top_z = f.get("flange_t", 5.0) + 2.0
+    path = [(x, entry_u, top_z), (x, entry_u, z_c), (x, exit_u + 2.0, z_c)]
+    probe = channel_probe(path, d=0.8 * d)
+    frac = solid_fraction(geometry.workplane, probe)
+    return _finding(
+        "topology.channel_continuous",
+        frac < 0.05,
+        f"L-path solid fraction {frac:.3f}",
+        measured=frac,
+        limit=0.05,
+    )
+
+
 @register_probe("topology.bay_open")
 def bay_open(geometry: Geometry, form: PartForm) -> Finding:
     """The J-hook entry window between lip tip and plate underside must be

@@ -1,0 +1,99 @@
+schema: archetype/v1
+id: lamp_bracket_v1
+version: 1
+object_class: lamp_bracket
+description: >
+  Ceiling/under-shelf lamp bracket: a screw-mounted plate, a cantilever arm
+  with an optional root gusset, and a CONTINUOUS wiring channel — vertical
+  entry through the plate near the root, horizontal run exiting the arm
+  tip. The channel is verified void along its full L-path on the compiled
+  solid. The arm tip carries the datum a lamp_socket_cup_v1 mounts onto
+  (match the cup's mount_bc to the arm width).
+
+provides_features:
+  - cantilever_arm
+  - wiring_channel
+  - mounting_flange
+  - countersunk_screw_holes
+
+# Ranges transcribed from the proven v1 bracket generator.
+parameters:
+  arm_len:
+    {type: length, default: 160mm, min: 60mm, max: 190mm,
+     role: functional, exposed: true}
+  arm_w:
+    {type: length, default: 22mm, min: 12mm, max: 40mm, role: structural}
+  arm_h:
+    {type: length, default: 22mm, min: 12mm, max: 40mm, role: structural}
+  plate_l:
+    {type: length, default: 70mm, min: 50mm, max: 140mm, role: assembly}
+  plate_w:
+    {type: length, default: 46mm, min: 30mm, max: 80mm, role: assembly}
+  plate_t:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: manufacturing}
+  gusset:
+    {type: bool, default: true, role: structural}
+  gusset_len:
+    {type: length, default: 34mm, min: 15mm, max: expr(arm_len * 0.4),
+     role: structural}
+  gusset_drop:
+    {type: length, default: expr(arm_h * 0.6), min: 0mm, max: 30mm,
+     role: structural}
+  channel_d:
+    {type: length, default: 8mm, min: 4mm,
+     max: "expr(min(arm_w, arm_h) - 4)", role: functional, exposed: true,
+     description: wiring channel bore (v1 clamp — leaves >= 2mm wall)}
+  screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+  screw_count:
+    {type: count, default: 2, min: 2, max: 4, role: assembly}
+  screw_spacing:
+    {type: length, default: expr(arm_w + 20), min: expr(arm_w + 13),
+     max: expr(plate_l - 10), role: assembly}
+
+constraints:
+  - channel_d <= min(arm_w, arm_h) - 4
+  - arm_len + plate_w / 2 <= 210
+
+form:
+  type: section_extrude
+  section: bracket_arm_side
+  plane: YZ
+  width_axis: X
+
+regions:
+  - {id: plate, role: mounting_surface, editable: true}
+  - {id: screw_zones, role: fastener_keepout, editable: false}
+  - {id: arm_root, role: high_stress_region, editable: false,
+     forbidden_modifiers: [add_hex_perforation]}
+  - {id: arm_tip_face, role: mounting_surface, editable: false}
+  - {id: channel_zone, role: soft_contact_surface, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.channel_inside_walls
+  - form.cuts_respect_keepouts
+  - form.flange_above_cradle
+  - form.screw_access_clear
+  - topology.single_connected_solid
+  - topology.flange_above_cradle
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.bores_open
+  - topology.channel_continuous
+
+forbidden_forms:
+  - blocked_channel
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - cantilever_arm
+    - wiring_channel
+    - mounting_flange
+  must_not_have:
+    - blocked_channel
+  invariants:
+    - channel_d <= min(arm_w, arm_h) - 4

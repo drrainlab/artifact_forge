@@ -1,0 +1,86 @@
+schema: archetype/v1
+id: lamp_socket_cup_v1
+version: 1
+object_class: lamp_socket_cup
+description: >
+  Revolved cup holding a standard lamp socket insert (E27 or GU10 preset;
+  any explicit inner_d overrides the preset). Central cable exit through
+  the base is profile-native; bolt-circle mounting holes seat their heads
+  INSIDE the cup, so it screws flat onto a bracket arm tip or any plate.
+  Mounts inverted for a hanging lamp — the geometry is orientation-free.
+
+provides_features:
+  - socket_cavity
+  - cable_exit
+  - hole_pattern
+  - countersunk_screw_holes
+
+parameters:
+  socket:
+    {type: choice, choices: [e27, gu10], default: e27,
+     role: functional, exposed: true}
+  inner_d:
+    {type: length, default: 0mm, min: 0mm, max: 60mm, role: functional,
+     exposed: true, description: socket housing bore; 0 = derive from preset}
+  depth:
+    {type: length, default: 0mm, min: 0mm, max: 60mm, role: functional,
+     description: cavity depth; 0 = derive from preset}
+  fit_clearance:
+    {type: length, default: 0.3mm, min: 0.1mm, max: 1mm, role: manufacturing}
+  wall:
+    {type: length, default: 2.8mm, min: 2mm, max: 6mm, role: manufacturing}
+  base_t:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: structural}
+  exit_d:
+    {type: length, default: 8mm, min: 5mm, max: 14mm, role: functional,
+     exposed: true, description: central cable exit through the base}
+  min_web:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: manufacturing}
+  screw:
+    {type: choice, choices: [M3, M4], default: M3, role: assembly}
+  screw_count:
+    {type: count, default: 2, min: 2, max: 3, role: assembly}
+  mount_bc:
+    {type: length, default: 24mm, min: expr(exit_d + 14), max: 44mm,
+     role: assembly, description: bolt-circle diameter of the base holes}
+
+constraints:
+  - wall >= printer.min_wall
+  - exit_d >= 5
+
+form:
+  type: profile_revolve
+  section: revolved_cup
+  plane: XZ
+  width_axis: Y
+
+regions:
+  - {id: mount_face, role: mounting_surface, editable: true}
+  - {id: socket_seat, role: soft_contact_surface, editable: false}
+  - {id: base_web, role: high_stress_region, editable: false,
+     forbidden_modifiers: [add_hex_perforation]}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.revolve_profile_clear_of_axis
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.single_connected_solid
+  - topology.revolve_cavity_open
+  - topology.screw_holes_open
+  - topology.countersinks_present
+
+forbidden_forms:
+  - profile_crosses_axis
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - socket_cavity
+    - cable_exit
+  must_not_have:
+    - profile_crosses_axis
+  invariants:
+    - exit_d < inner_d or inner_d == 0

@@ -1,0 +1,25 @@
+schema: product/v1
+id: shelf_lamp_bracket
+archetype: lamp_bracket_v1@1
+strict: true
+
+requested_features:
+  - cantilever_arm
+  - wiring_channel
+  - mounting_flange
+  - countersunk_screw_holes
+
+params:
+  arm_len: 160mm
+  arm_w: 22mm
+  arm_h: 22mm
+  channel_d: 8mm
+  screw: M4
+  screw_count: 2
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
