@@ -81,6 +81,8 @@ regions:
      forbidden_modifiers: [add_hex_perforation]}
   - {id: rest_root, role: high_stress_region, editable: false,
      forbidden_modifiers: [add_hex_perforation]}
+  - {id: base_lightening, role: aesthetic_lightening, editable: true,
+     description: rear base deck behind the rest — safe to perforate}
 
 surface_style: molded_utility_part
 
@@ -97,7 +99,10 @@ forbidden_forms:
   - tipping_stand
   - boxy_rectangular_hook
 
-allowed_modifiers: []
+allowed_modifiers:
+  - add_voronoi_field
+  - add_hex_perforation
+  - add_grid_slot_field
 
 contract:
   must_have:

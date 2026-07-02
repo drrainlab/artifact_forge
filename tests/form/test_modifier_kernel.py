@@ -149,3 +149,28 @@ class TestRibs:
         _, findings = build_form_with_modifiers(mutate=mutate)
         fails = [f for f in findings if f.status is Status.FAIL]
         assert fails and "skin" in fails[0].message
+
+
+class TestVoronoiOnStand:
+    """The plain phone stand takes a voronoi field on its rear base deck —
+    a non-plate host (depth from the region box), keepouts from rest_root."""
+
+    def test_field_on_rear_deck_clears_rest_root(self):
+        from artifact_forge_ng.pipeline import run_pre_cad
+
+        state = run_pre_cad(EXAMPLES / "phone_stand_voronoi.yaml", False)
+        form = state.form
+        field = [f for f in form.fields if f.pattern == "voronoi"][0]
+        assert len(field.polygons) >= 8
+        assert field.depth == pytest.approx(form.params["base_t"])  # through
+        rest_end = form.frame["rest_foot_end"]
+        lo_y = min(p[1] for poly in field.polygons for p in poly)
+        assert lo_y > rest_end + 2.0  # never into the rest root
+        assert state.report.status is not Status.FAIL
+
+    def test_std_stand_untouched(self):
+        from artifact_forge_ng.pipeline import run_pre_cad
+
+        form = run_pre_cad(EXAMPLES / "phone_stand_std.yaml", False).form
+        assert form.fields == []
+        assert form.region("base_lightening") is not None  # canvas declared

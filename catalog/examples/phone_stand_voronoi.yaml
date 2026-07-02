@@ -1,0 +1,39 @@
+schema: product/v1
+id: phone_stand_voronoi
+archetype: phone_stand_v1@1
+strict: true
+
+# The PLAIN stand with a voronoi lightening field through the rear base
+# deck. Same engineering as phone_stand_std; the field saves plastic where
+# nothing rests and nothing flexes. Mass removed behind the rest shifts the
+# part COM forward — the safe direction for the stability gate.
+
+requested_features:
+  - device_rest
+  - stable_footprint
+  - charging_cutout
+  - voronoi_field
+
+params:
+  device_w: 78mm
+  device_thickness: 11mm
+  tilt_deg: 68deg
+  base_depth: 85mm
+  charging_cutout: true
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
+
+modifiers:
+  - id: add_voronoi_field
+    target: base_lightening
+    params:
+      seed: 3
+      sites: 14
+      min_ligament: 2mm
+      edge_margin: 2.5mm
+      cut_mode: through

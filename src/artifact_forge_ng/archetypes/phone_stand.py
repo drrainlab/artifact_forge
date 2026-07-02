@@ -89,6 +89,13 @@ def build_form(
         Region("rest_root", RegionRole.HIGH_STRESS_REGION,
                Box3(0.0, u_rest - 0.5, bt - 1.0, width,
                     frame["rest_foot_end"] + 2.0, bt + 6.0)),
+        # Rear base deck behind the rest foot: the one big horizontal face
+        # that is safe to lighten — the rim stays solid, the rest root is a
+        # keepout right next door. Removing mass HERE shifts the part's COM
+        # forward, i.e. away from the rear-tipping edge.
+        Region("base_lightening", RegionRole.AESTHETIC_LIGHTENING,
+               Box3(5.0, frame["rest_foot_end"] + 3.0, 0.0,
+                    width - 5.0, ctx["base_depth"] - 6.0, bt)),
     ]
     if cutboxes:
         regions.append(

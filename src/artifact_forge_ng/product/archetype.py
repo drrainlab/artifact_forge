@@ -110,6 +110,7 @@ class RegionSpec(BaseModel):
     role: RegionRole
     editable: bool = True
     forbidden_modifiers: list[str] = []
+    description: str = ""
 
 
 class FormSpec(BaseModel):
