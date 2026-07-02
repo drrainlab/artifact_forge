@@ -85,8 +85,9 @@ def build_stand_profile(
         LineSeg(Pt(0, 0), Pt(bd, 0), tags("base_bottom", "intentional_corner")),
         LineSeg(Pt(bd, 0), Pt(bd, bt), tags("base_back", "external")),
         LineSeg(Pt(bd, bt), Pt(u_rest + t_h, bt), tags("base_top", "external")),
-        # tilted back face of the rest
-        LineSeg(Pt(u_rest + t_h, bt), top_b, tags("rest_back", "root")),
+        # tilted back face of the rest — external, non-contact: the
+        # biomorphic bow may curve it
+        LineSeg(Pt(u_rest + t_h, bt), top_b, tags("rest_back", "root", "external")),
         LineSeg(top_b, top_f, tags("rest_top", "lip_tip")),
         # device support face down into the slot
         LineSeg(top_f, Pt(u_rest, bt), tags("device_rest", "contact")),

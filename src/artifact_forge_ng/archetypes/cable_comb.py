@@ -6,7 +6,7 @@ from __future__ import annotations
 from ..form.part import PartForm
 from ..form.profiles_comb import CombParams, build_cable_comb_profile
 from ..form.regions import Box3, Region
-from ..form.style import MOLDED_UTILITY_PART, STYLES
+from ..form.style import resolve_style
 from ..product.archetype import ArchetypeSpec, RegionRole
 from ..product.instance import ProductInstance
 from ..product.resolve import ResolvedParams
@@ -20,7 +20,7 @@ def build_form(
     instance: ProductInstance,
 ) -> PartForm:
     ctx = resolved.context
-    style = STYLES.get(archetype.surface_style, MOLDED_UTILITY_PART)
+    style = resolve_style(instance, archetype)
     params = CombParams(
         cable_d=ctx["cable_d"],
         slot_count=int(round(ctx["slot_count"])),

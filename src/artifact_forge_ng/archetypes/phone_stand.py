@@ -4,10 +4,10 @@ cutout through the lip center and a cable trough across the slot floor
 
 from __future__ import annotations
 
-from ..form.part import CutBoxFeature, PartForm
+from ..form.part import CutBoxFeature, PartForm, RibFeature
 from ..form.profiles_stand import StandParams, build_stand_profile
 from ..form.regions import Box3, Region
-from ..form.style import MOLDED_UTILITY_PART, STYLES
+from ..form.style import resolve_style
 from ..product.archetype import ArchetypeSpec, RegionRole
 from ..product.instance import ProductInstance
 from ..product.resolve import ResolvedParams
@@ -21,7 +21,7 @@ def build_form(
     instance: ProductInstance,
 ) -> PartForm:
     ctx = resolved.context
-    style = STYLES.get(archetype.surface_style, MOLDED_UTILITY_PART)
+    style = resolve_style(instance, archetype)
 
     params = StandParams(
         device_thickness=ctx["device_thickness"],
@@ -38,6 +38,31 @@ def build_form(
     width = ctx["width"]
     bt = ctx["base_t"]
     u_rest = frame["u_rest"]
+
+    # Biomech vein ridges on the back face (biomorphic style only): thin
+    # bars welded ACROSS the rest, positions read from the PROFILE'S OWN
+    # back segment — so they sit on the bowed face exactly, however the
+    # organic pass curved it. Purely decorative: the device side, the slot
+    # and the base are untouched.
+    ribs = []
+    if style.vein_rhythm > 1e-6:
+        backs = [
+            s for s in profile.outer.tagged("rest_back") if s.length > 10.0
+        ]
+        if backs:
+            back = max(backs, key=lambda s: s.length)
+            count = int(round(2 + style.vein_rhythm * 6))
+            vein_w = 3.0
+            a = vein_w / 2.0 + style.vein_relief / 2.0
+            for i in range(count):
+                s_t = 0.1 + 0.8 * (i + 1) / (count + 1)
+                p = back.point_at(s_t)
+                ribs.append(
+                    RibFeature(
+                        f"vein_{i}",
+                        Box3(3.0, p.u - a, p.v - a, width - 3.0, p.u + a, p.v + a),
+                    )
+                )
 
     cutboxes = []
     if ctx.get("charging_cutout", 1.0) >= 0.5:
@@ -82,6 +107,7 @@ def build_form(
         width=width,
         style=style,
         cutboxes=cutboxes,
+        ribs=ribs,
         regions=regions,
         datums={
             "device_seat": {

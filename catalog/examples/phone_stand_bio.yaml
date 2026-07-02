@@ -1,0 +1,37 @@
+schema: product/v1
+id: phone_stand_bio
+archetype: phone_stand_v1@1
+strict: true
+
+# The biomorphic stand: same engineering (slot trig, stability gate,
+# charging cutout) — organic skin. The style block compiles into
+# CONTROLLED form passes: softened radii, outward bows on external faces,
+# vein ridges across the back. Contact surfaces and the flat base are
+# untouchable by construction.
+
+requested_features:
+  - device_rest
+  - stable_footprint
+  - charging_cutout
+  - rounded_contact_edges
+
+params:
+  device_w: 78mm
+  device_thickness: 11mm
+  tilt_deg: 68deg
+  charging_cutout: true
+
+style:
+  surface: biomorphic_utility_part
+  organicity: 0.55
+  softness: 0.75
+  asymmetry: 0.2
+  vein_rhythm: 0.45
+  seed: 11
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid

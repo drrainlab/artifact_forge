@@ -114,6 +114,11 @@ def _solve_line_arc(
                 if delta.norm() < 1e-9:
                     continue
                 t_arc = c + delta.unit().scaled(big_r)
+                # The tangency must land ON the arc — on a nearly straight
+                # (huge-radius, bowed) arc the mirror root sits a fraction
+                # of a degree PAST the endpoint and scores identically.
+                if not _arc_contains_point(arc, t_arc):
+                    continue
                 # Prefer the tightest fillet that stays near the corner.
                 score = t_line.dist(p) + t_arc.dist(p)
                 if score > 8.0 * r + 2.0:
@@ -177,14 +182,128 @@ def _fillet_line_arc(prev: Seg, nxt: Seg, r: float) -> _Fillet | None:
     return None
 
 
+def _fillet_arc_arc(prev: ArcSeg, nxt: ArcSeg, r: float) -> _Fillet | None:
+    """Tangent fillet between two arcs: the fillet center sits at distance
+    R_i +- r from each arc's center — a circle-circle intersection. Bowed
+    (nearly straight, huge-radius) arcs make this well-conditioned."""
+    p = prev.b
+    max_setback = _MAX_SETBACK_FRACTION * min(prev.length, nxt.length)
+    while r >= _MIN_FILLET_R:
+        best: tuple[float, Pt, Pt, Pt] | None = None
+        for k1 in (prev.radius - r, prev.radius + r):
+            for k2 in (nxt.radius - r, nxt.radius + r):
+                if k1 <= 0 or k2 <= 0:
+                    continue
+                d = nxt.center - prev.center
+                dist = d.norm()
+                if dist < 1e-9:
+                    continue
+                # circle-circle intersection (centers prev.center/nxt.center,
+                # radii k1/k2)
+                a = (k1 * k1 - k2 * k2 + dist * dist) / (2.0 * dist)
+                h2 = k1 * k1 - a * a
+                if h2 < 0:
+                    continue
+                h = math.sqrt(h2)
+                base = prev.center + d.unit().scaled(a)
+                for sign in (1.0, -1.0):
+                    center = base + d.unit().perp().scaled(sign * h)
+                    t1 = prev.center + (center - prev.center).unit().scaled(prev.radius)
+                    t2 = nxt.center + (center - nxt.center).unit().scaled(nxt.radius)
+                    score = t1.dist(p) + t2.dist(p)
+                    if score > 8.0 * r + 2.0:
+                        continue
+                    if not (_arc_contains_point(prev, t1) and _arc_contains_point(nxt, t2)):
+                        continue
+                    if t1.dist(p) > max_setback or t2.dist(p) > max_setback:
+                        continue
+                    if best is None or score < best[0]:
+                        best = (score, center, t1, t2)
+        if best is not None:
+            _, center, t1, t2 = best
+            ccw = prev.tangent_at_end().cross(nxt.tangent_at_start()) > 0
+            try:
+                fillet = ArcSeg(t1, t2, center, ccw, frozenset({"fillet"}))
+            except ValueError:
+                return None
+            return _Fillet(
+                _trim_arc_to(prev, t1, at_end=True),
+                fillet,
+                _trim_arc_to(nxt, t2, at_end=False),
+            )
+        r *= 0.6
+    return None
+
+
+#: Segments the organic bow may NEVER touch: flat print faces, welds, and
+#: anything a cable/device/tie actually rests against.
+_BOW_FORBIDDEN = frozenset(
+    {
+        "base", "base_bottom", "mount_face", "weld_joint", "neck_top",
+        "intentional_corner", "contact", "cable_contact", "bay_contact",
+        "mouth_upper", "mouth_lower", "mouth_corner", "throat", "slot_floor",
+        "tunnel", "tunnel_roof", "tie_contact", "device_rest", "lip_inner",
+        "socket_contact",
+    }
+)
+
+_MIN_BOW_LENGTH = 8.0
+_MAX_BOW_MM = 2.5
+
+
+def bow_external_segments(loop: ProfileLoop, style: SurfaceStyle) -> ProfileLoop:
+    """The organicity pass: long external straight segments become gentle
+    OUTWARD arcs (adding material — walls never thin), with a seeded
+    per-segment jitter for asymmetry. Runs before corner rounding, so every
+    new joint gets a proper tangent fillet."""
+    if style.bow_amplitude <= 1e-6:
+        return loop
+    import random
+
+    rng = random.Random(style.bow_seed)
+    out: list[Seg] = []
+    for seg in loop.segments:
+        jitter = 1.0 + style.bow_jitter * rng.uniform(-0.8, 0.8)
+        if (
+            not isinstance(seg, LineSeg)
+            or "external" not in seg.tags
+            or seg.tags & _BOW_FORBIDDEN
+            or seg.length < _MIN_BOW_LENGTH
+        ):
+            out.append(seg)
+            continue
+        bulge = min(style.bow_amplitude * seg.length * jitter, _MAX_BOW_MM)
+        if bulge < 0.15:
+            out.append(seg)
+            continue
+        t = seg.tangent_at_start()
+        # CCW loop: interior is left of travel, outward is right.
+        outward = Pt(t.v, -t.u)
+        mid = seg.point_at(0.5)
+        target = mid + outward.scaled(bulge)
+        half = seg.length / 2.0
+        radius = (half * half + bulge * bulge) / (2.0 * bulge)
+        center = target + outward.scaled(-radius)
+        arc = ArcSeg(seg.a, seg.b, center, ccw=True, tags=seg.tags)
+        if arc.point_at(0.5).dist(target) > 1e-3:
+            arc = ArcSeg(seg.a, seg.b, center, ccw=False, tags=seg.tags)
+        out.append(arc)
+    return ProfileLoop(out)
+
+
 def round_profile_corners(loop: ProfileLoop, style: SurfaceStyle) -> ProfileLoop:
     """Round every non-tangent, non-intentional joint; radius by joint tags.
+
+    When the style carries a bow amplitude (biomorphic), long external
+    straight segments bow outward FIRST, so their new joints are filleted
+    tangent like everything else.
 
     Walks the joint list once; a successful fillet trims both neighbours and
     inserts the arc, then skips past it (both new joints are tangent by
     construction). A corner that cannot take a fillet is left sharp for the
     smoothness validator to report.
     """
+    loop = bow_external_segments(loop, style)
     segments: list[Seg] = list(loop.segments)
     idx = 0
     while idx < len(segments):
@@ -202,6 +321,8 @@ def round_profile_corners(loop: ProfileLoop, style: SurfaceStyle) -> ProfileLoop
         r = style.corner_radius(joint_tags)
         if isinstance(prev, LineSeg) and isinstance(nxt, LineSeg):
             result = _fillet_line_line(prev, nxt, r)
+        elif isinstance(prev, ArcSeg) and isinstance(nxt, ArcSeg):
+            result = _fillet_arc_arc(prev, nxt, r)
         else:
             result = _fillet_line_arc(prev, nxt, r)
         if result is None:

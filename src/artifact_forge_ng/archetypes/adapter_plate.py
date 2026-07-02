@@ -18,7 +18,7 @@ from ..form.patterns import (
 from ..form.profiles_plate import rounded_rect_loop
 from ..form.regions import Box3, Region
 from ..form.section import SectionProfile
-from ..form.style import MOLDED_UTILITY_PART, STYLES
+from ..form.style import resolve_style
 from ..product.archetype import ArchetypeSpec, RegionRole
 from ..product.instance import ProductInstance
 from ..product.resolve import ResolvedParams
@@ -55,7 +55,7 @@ def build_form(
 ) -> PartForm:
     ctx = resolved.context
     choices = resolved.choices
-    style = STYLES.get(archetype.surface_style, MOLDED_UTILITY_PART)
+    style = resolve_style(instance, archetype)
 
     length, width_, t = ctx["plate_l"], ctx["plate_w"], ctx["thickness"]
     corner_r = ctx["corner_r"]

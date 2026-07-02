@@ -9,7 +9,7 @@ from ..core.fasteners import screw_spec
 from ..form.part import BlendDirective, HoleFeature, PartForm, PlateFeature
 from ..form.profiles_jhook import JHookParams, build_j_hook_profile
 from ..form.regions import Box3, Region
-from ..form.style import MOLDED_UTILITY_PART, STYLES
+from ..form.style import resolve_style
 from ..product.archetype import ArchetypeSpec, RegionRole
 from ..product.instance import ProductInstance
 from ..product.resolve import ResolvedParams
@@ -25,7 +25,7 @@ def build_form(
     instance: ProductInstance,
 ) -> PartForm:
     ctx = resolved.context
-    style = STYLES.get(archetype.surface_style, MOLDED_UTILITY_PART)
+    style = resolve_style(instance, archetype)
 
     hook = JHookParams(
         bay_w=ctx["bay_w"],

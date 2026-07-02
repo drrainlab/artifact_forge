@@ -10,7 +10,7 @@ from ..core.fasteners import screw_spec
 from ..form.part import BlendDirective, BoreFeature, HoleFeature, PartForm, PlateFeature
 from ..form.profiles_bracket import BracketArmParams, build_bracket_arm_profile
 from ..form.regions import Box3, Region
-from ..form.style import MOLDED_UTILITY_PART, STYLES
+from ..form.style import resolve_style
 from ..product.archetype import ArchetypeSpec, RegionRole
 from ..product.instance import ProductInstance
 from ..product.resolve import ResolvedParams
@@ -26,7 +26,7 @@ def build_form(
     instance: ProductInstance,
 ) -> PartForm:
     ctx = resolved.context
-    style = STYLES.get(archetype.surface_style, MOLDED_UTILITY_PART)
+    style = resolve_style(instance, archetype)
 
     arm = BracketArmParams(
         arm_len=ctx["arm_len"],

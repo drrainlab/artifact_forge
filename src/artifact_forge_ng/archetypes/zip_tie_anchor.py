@@ -7,7 +7,7 @@ from ..core.fasteners import screw_spec
 from ..form.part import HoleFeature, PartForm
 from ..form.profiles_omega import OmegaParams, build_omega_profile
 from ..form.regions import Box3, Region
-from ..form.style import MOLDED_UTILITY_PART, STYLES
+from ..form.style import resolve_style
 from ..product.archetype import ArchetypeSpec, RegionRole
 from ..product.instance import ProductInstance
 from ..product.resolve import ResolvedParams
@@ -24,7 +24,7 @@ def build_form(
 ) -> PartForm:
     ctx = resolved.context
     choices = resolved.choices
-    style = STYLES.get(archetype.surface_style, MOLDED_UTILITY_PART)
+    style = resolve_style(instance, archetype)
 
     params = OmegaParams(
         tie_w=ctx["tie_w"],

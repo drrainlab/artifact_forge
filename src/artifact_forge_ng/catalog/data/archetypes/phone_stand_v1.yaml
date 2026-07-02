@@ -91,6 +91,7 @@ validators:
   - form.contact_edges_rounded
   - topology.single_connected_solid
   - topology.cutout_present
+  - topology.ribs_present
 
 forbidden_forms:
   - tipping_stand
