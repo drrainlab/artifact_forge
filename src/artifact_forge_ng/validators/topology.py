@@ -122,7 +122,9 @@ def flange_above_cradle(geometry: Geometry, form: PartForm) -> Finding:
         plate.x1 - 2, plate.y1 - 2, plate.z_top - 0.2,
     )
     frac = solid_fraction(geometry.workplane, slab)
-    hook_ok = form.frame["hook_top_v"] <= plate.z_bottom + 0.1
+    # The hook body may poke into the plate by the weld overlap — that is
+    # the joint, not an embedded flange.
+    hook_ok = form.frame["hook_top_v"] <= plate.z_bottom + 0.7 + 0.1
     ok = frac > 0.5 and hook_ok
     return _finding(
         "topology.flange_above_cradle",
@@ -168,6 +170,27 @@ def countersinks_present(geometry: Geometry, form: PartForm) -> Finding:
         "topology.countersinks_present",
         not missing,
         "countersinks present" if not missing else f"no countersink at: {missing}",
+    )
+
+
+@register_probe("topology.bay_open")
+def bay_open(geometry: Geometry, form: PartForm) -> Finding:
+    """The J-hook entry window between lip tip and plate underside must be
+    void on the compiled solid."""
+    f = form.frame
+    if "lip_tip_v" not in f:
+        return _finding("topology.bay_open", False, "frame declares no bay")
+    zone = box_probe(
+        form.width * 0.25, f["bay_center_u"] - f["r_in"] * 0.5, f["lip_tip_v"] + 0.5,
+        form.width * 0.75, f["bay_center_u"] + f["r_in"] * 0.5, -0.5,
+    )
+    frac = solid_fraction(geometry.workplane, zone)
+    return _finding(
+        "topology.bay_open",
+        frac < 0.1,
+        f"entry window solid fraction {frac:.3f}",
+        measured=frac,
+        limit=0.1,
     )
 
 

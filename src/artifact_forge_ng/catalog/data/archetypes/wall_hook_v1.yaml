@@ -1,0 +1,98 @@
+schema: archetype/v1
+id: wall_hook_v1
+version: 1
+object_class: wall_hook
+description: >
+  Screw-mounted J-hook: a molded spine drops from the mounting plate into a
+  half-round bay with a tall upturned tip lip. The bay opens toward the
+  plate; almost every profile joint is tangent by construction. Mounts to a
+  wall or the underside of a shelf (orientation note only — geometry is
+  identical).
+
+provides_features:
+  - hook_bay
+  - tip_lip
+  - mounting_flange
+  - countersunk_screw_holes
+  - rounded_contact_edges
+
+parameters:
+  bay_w:
+    {type: length, default: 14mm, min: 6mm, max: 30mm,
+     role: functional, exposed: true,
+     description: bay width — what the hook holds}
+  bay_depth:
+    {type: length, default: 28mm, min: expr(bay_w / 2 + 10), max: 70mm,
+     role: functional, exposed: true}
+  wall:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: structural}
+  lip_h:
+    {type: length, default: 8mm, min: 4mm,
+     max: expr(bay_depth - bay_w / 2 - 6), role: functional, exposed: true}
+  band_w:
+    {type: length, default: 16mm, min: 10mm, max: 45mm, role: structural,
+     description: hook width along the plate}
+  plate_l:
+    {type: length, default: 44mm, min: 34mm, max: 90mm, role: assembly}
+  plate_w:
+    {type: length, default: 22mm, min: 16mm, max: 40mm, role: assembly}
+  plate_t:
+    {type: length, default: 5mm, min: 4mm, max: 9mm, role: manufacturing}
+  screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+  screw_count:
+    {type: count, default: 2, min: 1, max: 3, role: assembly}
+  screw_spacing:
+    {type: length, default: expr(band_w + 14), min: expr(band_w + 13),
+     max: expr(plate_l - 10), role: assembly}
+  mount_hint:
+    {type: choice, choices: [wall, under_desk], default: wall,
+     role: functional, description: orientation note only}
+
+constraints:
+  - lip_h < bay_depth - bay_w / 2 - 5
+  - wall >= printer.min_wall
+
+form:
+  type: section_extrude
+  section: j_hook
+  plane: YZ
+  width_axis: X
+
+regions:
+  - {id: plate, role: mounting_surface, editable: true}
+  - {id: screw_zones, role: fastener_keepout, editable: false}
+  - {id: bay_contact, role: soft_contact_surface, editable: false}
+  - {id: hook_root, role: high_stress_region, editable: false,
+     forbidden_modifiers: [add_hex_perforation]}
+  - {id: tip_lip, role: retaining_flexure, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.tip_lip_present
+  - form.bay_open_top
+  - form.flange_above_cradle
+  - form.screw_access_clear
+  - form.contact_edges_rounded
+  - topology.single_connected_solid
+  - topology.bay_open
+  - topology.flange_above_cradle
+  - topology.screw_holes_open
+  - topology.countersinks_present
+
+forbidden_forms:
+  - closed_bay
+  - boxy_rectangular_hook
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - hook_bay
+    - tip_lip
+    - mounting_flange
+  must_not_have:
+    - closed_bay
+  invariants:
+    - lip_h < bay_depth - bay_w / 2 - 5

@@ -12,7 +12,7 @@ from ..form.part import PartForm
 from ..product.archetype import ArchetypeSpec
 from ..product.instance import ProductInstance
 from ..product.resolve import ResolvedParams
-from . import adapter_plate, cable_comb, underdesk_cable_clip, zip_tie_anchor
+from . import adapter_plate, cable_comb, j_hook, underdesk_cable_clip, zip_tie_anchor
 
 FormBuilder = Callable[[ResolvedParams, ArchetypeSpec, ProductInstance], PartForm]
 
@@ -21,6 +21,7 @@ FORM_BUILDERS: dict[str, FormBuilder] = {
     adapter_plate.SECTION_NAME: adapter_plate.build_form,
     cable_comb.SECTION_NAME: cable_comb.build_form,
     zip_tie_anchor.SECTION_NAME: zip_tie_anchor.build_form,
+    j_hook.SECTION_NAME: j_hook.build_form,
 }
 
 

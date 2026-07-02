@@ -1,0 +1,25 @@
+schema: product/v1
+id: underdesk_headphone_hook
+archetype: headphone_hook_v1@1
+strict: true
+
+requested_features:
+  - hook_bay
+  - tip_lip
+  - wide_contact_band
+  - mounting_flange
+  - countersunk_screw_holes
+
+params:
+  bay_w: 34mm
+  bay_depth: 50mm
+  lip_h: 12mm
+  band_w: 28mm
+  screw: M4
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid

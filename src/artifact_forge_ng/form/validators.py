@@ -350,6 +350,7 @@ register_probe("form.hex_field_in_safe_zone")(lambda form, ctx: check_hex_field_
 from . import (  # noqa: E402,F401
     checks_cuts,
     checks_holes,
+    checks_jhook,
     checks_revolve,
     checks_slots,
     checks_tunnel,
