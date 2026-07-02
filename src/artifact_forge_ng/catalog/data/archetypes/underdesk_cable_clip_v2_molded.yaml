@@ -11,6 +11,7 @@ description: >
 
 provides_features:
   - asymmetric_side_hook
+  - countersunk_screw_holes
   - side_facing_mouth
   - through_cavity
   - mounting_flange
@@ -108,6 +109,8 @@ validators:
   - topology.mouth_opens_sideways
   - topology.asymmetric_lips_geometry
   - topology.flange_above_cradle
+  - topology.screw_holes_open
+  - topology.countersinks_present
 
 forbidden_forms:
   - symmetric_c_ring

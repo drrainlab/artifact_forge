@@ -68,4 +68,5 @@ def apply_field_with_keepouts(
         pattern="hex",
         window=window,
         keepouts=tuple(keepouts),
+        min_ligament=wall_gap,
     )

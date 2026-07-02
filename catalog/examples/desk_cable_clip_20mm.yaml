@@ -38,14 +38,8 @@ manufacturing:
   support_policy: avoid
 
 modifiers:
-  - id: add_countersunk_holes
-    target: flange
-    params:
-      count: 2
-      screw: M4
-      spacing: 50mm
   - id: add_hex_perforation
     target: perforation_safe_zone
     params:
       cell_d: 5mm
-      density: 0.35
+      wall_gap: 1.5mm

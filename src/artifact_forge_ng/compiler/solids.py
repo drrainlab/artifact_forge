@@ -41,6 +41,7 @@ class CompileLog:
     holes_countersunk: int = 0
     bores_cut: int = 0
     boxes_cut: int = 0
+    ribs_welded: int = 0
     field_cut: bool = False
     blends_applied: list[float] = field(default_factory=list)
     blends_skipped: int = 0
@@ -72,6 +73,18 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
 
     for plate in form.plates:
         mass = weld(mass, _build_plate(plate), what=plate.name)
+
+    for rib in form.ribs:
+        b = rib.box
+        bar = (
+            cq.Workplane(
+                "XY", origin=((b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, b.z0)
+            )
+            .rect(b.x1 - b.x0, b.y1 - b.y0)
+            .extrude(b.z1 - b.z0)
+        )
+        mass = weld(mass, bar, what=rib.name)
+    log.ribs_welded = len(form.ribs)
 
     for blend in form.blends:
         mass, applied = safe_fillet_ladder(

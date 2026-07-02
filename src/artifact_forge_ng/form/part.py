@@ -50,34 +50,47 @@ class HoleFeature:
 
 @dataclass(frozen=True)
 class FieldFeature:
-    """A resolved perforation field: explicit cell centers, already
-    filtered against every keepout — countable, checkable, no guessing."""
+    """A resolved perforation field, already filtered against every keepout
+    — countable, checkable, no guessing. Two cell spellings: hex/slot
+    ``centers`` (uniform cutter per center) or explicit ``polygons``
+    (voronoi and friends; convex, one cutter per polygon)."""
 
     plane_z: float  # top face z the cells are cut from
     centers: tuple[tuple[float, float], ...]
-    cell: float  # hexagon across-flats size
+    cell: float  # hexagon across-flats size (centers mode)
     depth: float
     pattern: str = "hex"
     window: Rect2D | None = None
     keepouts: tuple[Region2D, ...] = ()
+    #: Explicit convex cell polygons in (x, y); used when pattern="voronoi"
+    #: or "slots". Vertices are final — the ligament shrink already happened.
+    polygons: tuple[tuple[tuple[float, float], ...], ...] = ()
+    #: Guaranteed minimum web between cells (validated, not hoped).
+    min_ligament: float = 0.0
 
 
 @dataclass(frozen=True)
 class BoreFeature:
     """An axis-aligned cylindrical cut (a wiring channel leg, a central
-    bore). ``span`` is the axis-coordinate range of the cut; verification
-    reuses the swept-cylinder channel probe along the same span."""
+    bore, a blind pocket). ``span`` is the axis-coordinate range of the
+    cut; ``overshoot`` extends the cutter past each span end — (1, 0) makes
+    a blind pocket entered from the low end. Verification reuses the
+    swept-cylinder channel probe along the same span."""
 
     name: str
     axis: str  # "X" | "Y" | "Z"
     center: tuple[float, float, float]  # any point on the bore axis
     d: float
     span: tuple[float, float]
+    overshoot: tuple[float, float] = (1.0, 1.0)
 
-    def path(self, overshoot: float = 1.0) -> list[tuple[float, float, float]]:
-        """The probe polyline along the bore (with overshoot past both ends)."""
+    def path(self, probe_overshoot: float = 1.0) -> list[tuple[float, float, float]]:
+        """The probe polyline along the bore. A blind end (overshoot 0) is
+        probed slightly SHORT of the floor so the probe measures the pocket,
+        not the material beneath it."""
         x, y, z = self.center
-        lo, hi = self.span[0] - overshoot, self.span[1] + overshoot
+        lo = self.span[0] - (probe_overshoot if self.overshoot[0] > 0 else -0.4)
+        hi = self.span[1] + (probe_overshoot if self.overshoot[1] > 0 else -0.4)
         if self.axis == "X":
             return [(lo, y, z), (hi, y, z)]
         if self.axis == "Y":
@@ -96,6 +109,21 @@ class CutBoxFeature:
     def __post_init__(self) -> None:
         if not self.box.finite:
             raise ValueError(f"CutBoxFeature {self.name!r} box must be finite")
+
+
+@dataclass(frozen=True)
+class RibFeature:
+    """An ADDITIVE bar welded onto a face — the additive half of the
+    modifier kernel (stiffening ribs, bosses). The box is the rib's full
+    extent; it must overlap its host by the weld rule and is verified
+    present by a solid-fraction probe."""
+
+    name: str
+    box: Box3
+
+    def __post_init__(self) -> None:
+        if not self.box.finite:
+            raise ValueError(f"RibFeature {self.name!r} box must be finite")
 
 
 @dataclass(frozen=True)
@@ -122,6 +150,7 @@ class PartForm:
     holes: list[HoleFeature] = field(default_factory=list)
     bores: list[BoreFeature] = field(default_factory=list)
     cutboxes: list[CutBoxFeature] = field(default_factory=list)
+    ribs: list[RibFeature] = field(default_factory=list)
     fields: list[FieldFeature] = field(default_factory=list)
     regions: list[Region] = field(default_factory=list)
     blends: list[BlendDirective] = field(default_factory=list)

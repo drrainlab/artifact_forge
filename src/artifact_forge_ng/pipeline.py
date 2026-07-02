@@ -150,10 +150,17 @@ def run_pre_cad(product_path: Path, strict_flag: bool | None) -> PipelineState:
     form: PartForm | None = None
     if resolved.ok:
         form = builder(resolved, archetype, instance)
+        # The modifier kernel: typed, region-bound transformations applied
+        # AFTER the archetype owns the product's function; their validators
+        # run with the form checks right below.
+        from .modifiers import apply_modifiers
+
+        modifier_defs = catalog.modifiers_for(instance)
+        report.extend(
+            apply_modifiers(form, instance.modifiers, modifier_defs, archetype)
+        )
         modifier_checks = tuple(
-            name
-            for mod in catalog.modifiers_for(instance).values()
-            for name in mod.validators
+            name for mod in modifier_defs.values() for name in mod.validators
         )
         report.extend(validate_form(form, archetype, modifier_checks))
 

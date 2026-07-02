@@ -346,7 +346,7 @@ def cutout_present(geometry: Geometry, form: PartForm) -> Finding:
 
 @register_probe("topology.hex_field_present")
 def hex_field_present(geometry: Geometry, form: PartForm) -> Finding:
-    fields = [f for f in form.fields if f.centers]
+    fields = [f for f in form.fields if f.centers or f.polygons]
     if not fields:
         return Finding(
             check="topology.hex_field_present",
@@ -356,17 +356,93 @@ def hex_field_present(geometry: Geometry, form: PartForm) -> Finding:
         )
     import math
 
-    field = fields[0]
-    r = field.cell / math.sqrt(3.0) * 0.4
-    cu, cv = field.centers[len(field.centers) // 2]
-    probe = box_probe(
-        cu - r, cv - r, field.plane_z - field.depth, cu + r, cv + r, field.plane_z
-    )
-    frac = solid_fraction(geometry.workplane, probe)
+    empty = []
+    for field in fields:
+        if field.centers:
+            r = field.cell / math.sqrt(3.0) * 0.4
+            cu, cv = field.centers[len(field.centers) // 2]
+        else:
+            poly = field.polygons[len(field.polygons) // 2]
+            cu = sum(p[0] for p in poly) / len(poly)
+            cv = sum(p[1] for p in poly) / len(poly)
+            r = 0.3 * math.sqrt(
+                max(1e-9, abs(sum(
+                    p[0] * q[1] - q[0] * p[1]
+                    for p, q in zip(poly, poly[1:] + poly[:1])
+                )) / 2.0)
+            )
+        probe = box_probe(
+            cu - r, cv - r, field.plane_z - field.depth * 0.9,
+            cu + r, cv + r, field.plane_z,
+        )
+        frac = solid_fraction(geometry.workplane, probe)
+        if frac > 0.3:
+            empty.append(f"{field.pattern} (fill {frac:.2f})")
     return _finding(
         "topology.hex_field_present",
-        frac < 0.3,
-        f"sampled hex cell solid fraction {frac:.2f}",
-        measured=frac,
-        limit=0.3,
+        not empty,
+        "all fields cut real material" if not empty else "uncut: " + ", ".join(empty),
+    )
+
+
+@register_probe("topology.ribs_present")
+def ribs_present(geometry: Geometry, form: PartForm) -> Finding:
+    if not form.ribs:
+        return Finding(
+            check="topology.ribs_present",
+            status=Status.PASS,
+            level=Level.TOPOLOGY,
+            message="no ribs declared",
+        )
+    missing = []
+    for rib in form.ribs:
+        b = rib.box
+        mx, my = (b.x1 - b.x0) * 0.2, (b.y1 - b.y0) * 0.2
+        core = box_probe(
+            b.x0 + mx, b.y0 + my, b.z0 + 0.3, b.x1 - mx, b.y1 - my, b.z1 - 0.3
+        )
+        frac = solid_fraction(geometry.workplane, core)
+        if frac < 0.85:
+            missing.append(f"{rib.name} (fill {frac:.2f})")
+    return _finding(
+        "topology.ribs_present",
+        not missing,
+        "all ribs welded" if not missing else "missing ribs: " + ", ".join(missing),
+    )
+
+
+@register_probe("topology.pockets_present")
+def pockets_present(geometry: Geometry, form: PartForm) -> Finding:
+    """Blind pockets (bores with a zero-overshoot end): void along the
+    pocket, but the skin PAST the blind end must still be solid."""
+    pockets = [b for b in form.bores if 0.0 in b.overshoot]
+    if not pockets:
+        return Finding(
+            check="topology.pockets_present",
+            status=Status.PASS,
+            level=Level.TOPOLOGY,
+            message="no blind pockets declared",
+        )
+    problems = []
+    for pocket in pockets:
+        probe = channel_probe(pocket.path(), d=pocket.d * 0.8)
+        frac = solid_fraction(geometry.workplane, probe)
+        if frac > 0.1:
+            problems.append(f"{pocket.name} not cut (fill {frac:.2f})")
+            continue
+        # skin check: 0.4mm past the blind end must be material
+        x, y, z = pocket.center
+        if pocket.axis == "Z":
+            blind_hi = pocket.overshoot[1] == 0.0
+            z_probe = pocket.span[1] + 0.3 if blind_hi else pocket.span[0] - 0.3
+            skin = box_probe(
+                x - pocket.d * 0.2, y - pocket.d * 0.2, z_probe - 0.15,
+                x + pocket.d * 0.2, y + pocket.d * 0.2, z_probe + 0.15,
+            )
+            if solid_fraction(geometry.workplane, skin) < 0.7:
+                problems.append(f"{pocket.name} pierced through its skin")
+    return _finding(
+        "topology.pockets_present",
+        not problems,
+        "all pockets cut, skins intact" if not problems else "; ".join(problems),
     )

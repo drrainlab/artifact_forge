@@ -66,6 +66,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.holes_within_outline", Level.FORM, "every hole keeps the minimum web to the outline"),
         _decl("form.cuts_respect_keepouts", Level.FORM, "no bore or box cut intersects a keepout region"),
         _decl("form.device_slot_fits", Level.FORM, "measured device slot fits the declared device thickness at tilt"),
+        _decl("form.min_ligament_ok", Level.FORM, "webs between field cells meet the declared minimum ligament"),
         # -- topology level: probed on the compiled solid ---------------------
         _decl("topology.single_connected_solid", Level.TOPOLOGY, "exactly one connected valid solid"),
         _decl("topology.cavity_open", Level.TOPOLOGY, "the cable cavity is a real void along the cable axis"),
@@ -83,6 +84,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.revolve_cavity_open", Level.TOPOLOGY, "the revolved cavity is void along the axis end to end"),
         _decl("topology.cutout_present", Level.TOPOLOGY, "every declared box cut removed material"),
         _decl("topology.bay_open", Level.TOPOLOGY, "the hook bay entry gap is void on the compiled solid"),
+        _decl("topology.ribs_present", Level.TOPOLOGY, "every declared rib welded on as real material"),
+        _decl("topology.pockets_present", Level.TOPOLOGY, "every blind pocket removed material without piercing through"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),

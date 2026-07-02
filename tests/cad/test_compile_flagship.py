@@ -36,6 +36,9 @@ def build(bundle_d: float | None = None, **param_overrides):
     assert resolved.ok, [f.message for f in resolved.findings]
     builder = builder_for(archetype)
     form = builder(resolved, archetype, instance)
+    from artifact_forge_ng.modifiers import apply_modifiers
+
+    apply_modifiers(form, instance.modifiers, catalog.modifiers_for(instance), archetype)
     geometry, log = compile_part(form)
     return geometry, log, form
 

@@ -16,11 +16,9 @@ desk-side face stays flat.
 from __future__ import annotations
 
 from ..core.fasteners import screw_spec
-from ..form.fields import apply_field_with_keepouts
 from ..form.part import BlendDirective, HoleFeature, PartForm, PlateFeature
 from ..form.profiles import SideHookParams, build_molded_side_hook_profile
-from ..form.regions import Box3, Circle2D, Rect2D, Region, Region2D
-from ..form.section import Pt
+from ..form.regions import Box3, Region
 from ..form.style import MOLDED_UTILITY_PART, STYLES
 from ..product.archetype import ArchetypeSpec, RegionRole
 from ..product.instance import ProductInstance
@@ -90,50 +88,9 @@ def build_form(
         for x in xs
     ]
 
-    # -- keepouts for the perforation field (plate-face plane: u=x, v=y) ----
-    keepouts = [
-        Region2D(
-            name=f"screw_zone_{i}",
-            role=RegionRole.FASTENER_KEEPOUT,
-            shape=Circle2D(Pt(x, 0.0), head_r + KEEPOUT_CLEARANCE),
-            clearance=0.0,
-        )
-        for i, x in enumerate(xs)
-    ]
-    # The neck welds into the flange underside — never perforate into it.
-    keepouts.append(
-        Region2D(
-            name="neck_weld",
-            role=RegionRole.HIGH_STRESS_REGION,
-            shape=Rect2D(0.0, frame["neck_u0"], width, frame["neck_u1"]),
-            clearance=1.0,
-        )
-    )
-
-    fields = []
-    hex_use = next((m for m in instance.modifiers if m.id == "add_hex_perforation"), None)
-    if hex_use is not None:
-        from ..core.values import parse_value
-
-        cell = 5.0
-        raw_cell = hex_use.params.get("cell_d")
-        if raw_cell is not None:
-            v = parse_value(raw_cell, "length", where="cell_d")
-            if v.kind == "literal" and v.literal:
-                cell = v.literal
-        window = Rect2D(fx0, flange.y0, fx1, flange.y1)
-        fields.append(
-            apply_field_with_keepouts(
-                window=window,
-                keepouts=keepouts,
-                cell=cell,
-                wall_gap=1.5,
-                margin=max(4.0, cell),
-                plane_z=flange.z_top,
-                depth=ft,
-            )
-        )
-
+    # Fields (hex perforation etc.) are no longer hand-wired here: the
+    # generic modifier kernel applies them to the perforation_safe_zone,
+    # deriving keepouts from the protected regions below (incl. neck_weld).
     vc = frame["cavity_center_v"]
     r_i = frame["r_cavity"]
     wall_u = frame["wall_outer_u"]
@@ -152,6 +109,12 @@ def build_form(
                Box3(0.0, wall_u - ctx["wall"], vc - band - 2.0, width, wall_u + 2.0, vc - m)),
         Region("lower_lip", RegionRole.RETAINING_FLEXURE,
                Box3(0.0, wall_u, vc - band - 1.0, width, frame["lower_lip_tip_u"], vc - m + 0.5)),
+        # The neck welds into the flange underside — never perforate into
+        # it. Declared as a real region so the modifier kernel's generic
+        # keepout derivation protects it.
+        Region("neck_weld", RegionRole.HIGH_STRESS_REGION,
+               Box3(0.0, frame["neck_u0"] - 1.0, -2.0, width,
+                    frame["neck_u1"] + 1.0, flange.z_top)),
         Region("perforation_safe_zone", RegionRole.AESTHETIC_LIGHTENING,
                Box3(fx0, flange.y0, flange.z_top - ft, fx1, flange.y1, flange.z_top)),
     ]
@@ -187,7 +150,6 @@ def build_form(
         style=style,
         plates=[flange],
         holes=holes,
-        fields=fields,
         regions=regions,
         blends=blends,
         datums=datums,

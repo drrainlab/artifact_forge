@@ -109,7 +109,7 @@ class TestInstanceValidation:
     def test_modifier_on_forbidden_region_fails(self, catalog):
         inst = load_instance(EXAMPLES / "desk_cable_clip_20mm.yaml")
         bad = inst.model_dump(by_alias=True)
-        bad["modifiers"][1]["target"] = "snap_root"  # high-stress: forbidden
+        bad["modifiers"][0]["target"] = "snap_root"  # high-stress: forbidden
         from artifact_forge_ng.product.instance import ProductInstance
 
         inst = ProductInstance.model_validate(bad)
@@ -119,7 +119,7 @@ class TestInstanceValidation:
     def test_modifier_param_out_of_range_fails(self, catalog):
         inst = load_instance(EXAMPLES / "desk_cable_clip_20mm.yaml")
         bad = inst.model_dump(by_alias=True)
-        bad["modifiers"][1]["params"]["cell_d"] = "25mm"  # max is 10mm
+        bad["modifiers"][0]["params"]["cell_d"] = "25mm"  # max is 10mm
         from artifact_forge_ng.product.instance import ProductInstance
 
         inst = ProductInstance.model_validate(bad)

@@ -28,6 +28,7 @@ def test_golden_validate_passes():
         "cable_contact",
         "snap_root",
         "lower_lip",
+        "neck_weld",
         "perforation_safe_zone",
     }
     assert out["status"] == "pass"

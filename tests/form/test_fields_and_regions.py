@@ -65,7 +65,11 @@ def flagship_form():
     assert resolved.ok
     builder = builder_for(archetype)
     assert builder is not None
-    return builder(resolved, archetype, instance), archetype
+    form = builder(resolved, archetype, instance)
+    from artifact_forge_ng.modifiers import apply_modifiers
+
+    apply_modifiers(form, instance.modifiers, catalog.modifiers_for(instance), archetype)
+    return form, archetype
 
 
 class TestFlagshipForm:

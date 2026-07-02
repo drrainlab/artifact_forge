@@ -20,8 +20,10 @@ _AXIS_SIGN = {"X": 1.0, "Y": -1.0, "Z": 1.0}
 def cut_bore(body: cq.Workplane, bore: BoreFeature) -> tuple[cq.Workplane, bool]:
     idx = _AXIS_INDEX[bore.axis]
     origin = list(bore.center)
-    origin[idx] = bore.span[0] - 1.0
-    length = (bore.span[1] + 1.0) - (bore.span[0] - 1.0)
+    lo = bore.span[0] - bore.overshoot[0]
+    hi = bore.span[1] + bore.overshoot[1]
+    origin[idx] = lo
+    length = hi - lo
     cutter = (
         cq.Workplane(_AXIS_PLANES[bore.axis], origin=tuple(origin))
         .circle(bore.d / 2.0)

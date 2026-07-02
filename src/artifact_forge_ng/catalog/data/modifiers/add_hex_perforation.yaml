@@ -11,9 +11,14 @@ forbidden_targets:
    retaining_flexure, seal_surface, mounting_surface]
 params:
   cell_d: {type: length, default: 5mm, min: 3mm, max: 10mm}
-  density: {type: number, default: 0.35, min: 0.1, max: 0.65}
+  wall_gap: {type: length, default: 1.5mm, min: 1mm, max: 4mm,
+             description: web left between cells}
+  edge_margin: {type: length, default: 5mm, min: 3mm, max: 16mm}
+  cut_mode: {type: choice, choices: [through, recess], default: through}
+  recess_depth: {type: length, default: 1.2mm, min: 0.6mm, max: 3mm}
 provides_features: [hex_perforation]
 validators:
   - form.hex_field_in_safe_zone
+  - form.min_ligament_ok
   - region.keepouts_preserved
   - topology.hex_field_present
