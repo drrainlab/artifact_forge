@@ -45,6 +45,12 @@ class Patch(VersionedModel):
     #: skin. Classification feeds the edit report, not different code paths.
     type: str = "functional"  # functional | manufacturing | structural | style
     reason: str = ""
+    #: Migration target: rebuild the SAME product on a sibling archetype
+    #: (same object_class — a different archetype is a different product,
+    #: not an edit). Params/modifiers/requested features that the target
+    #: does not know are dropped; the preserve contract then PROVES the
+    #: functional identity survived the move.
+    archetype: str | None = None
     #: Names that MUST come out of the rebuild unchanged: parameter names
     #: (resolved values compared numerically) and/or feature ids (must
     #: still be BUILT after). Verified by the edit pipeline — a violated
@@ -76,18 +82,46 @@ def apply_patch(
     catalog: Catalog,
 ) -> ProductInstance:
     """Pure: returns a NEW validated instance; the input is untouched."""
+    target = archetype
+    if patch.archetype is not None:
+        target = catalog.archetypes.get(patch.archetype)
+        if target is None:
+            raise PatchError(
+                f"patch migrates to unknown archetype {patch.archetype!r}"
+            )
+        if target.object_class != archetype.object_class:
+            raise PatchError(
+                f"migration {archetype.id!r} -> {target.id!r} crosses object "
+                f"classes ({archetype.object_class!r} -> "
+                f"{target.object_class!r}) — that is a new product, not an edit"
+            )
     for name in patch.preserve:
-        if name not in archetype.parameters and name not in catalog.features:
+        if name not in target.parameters and name not in catalog.features:
             raise PatchError(
                 f"preserve entry {name!r} is neither a parameter of "
-                f"{archetype.id!r} nor a feature in the vocabulary"
+                f"{target.id!r} nor a feature in the vocabulary"
             )
+    # Relative deltas resolve against the SOURCE archetype's semantics.
     current = resolve_params(archetype, instance)
     data = instance.model_dump(by_alias=True, exclude_none=False)
+    if patch.archetype is not None:
+        data["archetype"] = target.ref
+        data["params"] = {
+            k: v for k, v in data.get("params", {}).items()
+            if k in target.parameters
+        }
+        data["requested_features"] = [
+            f for f in data.get("requested_features", [])
+            if f in target.provides_features
+        ]
+        data["modifiers"] = [
+            m for m in data.get("modifiers", [])
+            if m["id"] in target.allowed_modifiers
+        ]
     params: dict[str, Any] = dict(data.get("params", {}))
 
     for name, raw in patch.params.items():
-        spec = archetype.parameters.get(name)
+        spec = target.parameters.get(name)
         if spec is None:
             raise PatchError(f"patch targets unknown parameter {name!r}")
         if spec.role in LOCKED_ROLES:

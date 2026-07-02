@@ -22,23 +22,57 @@ def env():
 
 
 class TestIntents:
-    def test_make_support_free_patch(self, env):
+    def test_make_support_free_is_a_migration(self, env):
         catalog, instance, archetype = env
         patch = INTENTS["make_support_free"].build_patch(instance, archetype)
         assert patch.type == "manufacturing"
-        assert patch.params == {"cavity_roof": "teardrop"}
+        assert patch.archetype == "underdesk_cable_clip_v3_sideprint"
         assert patch.manufacturing == {"support_policy": "none"}
         assert "bundle_d" in patch.preserve
         assert "asymmetric_side_hook" in patch.preserve
+        # mounting_flange does not exist on the target — the intent must
+        # not promise to preserve it
+        assert "mounting_flange" not in patch.preserve
 
-    def test_apply_produces_teardrop_instance(self, env):
+    def test_apply_migrates_to_sideprint(self, env):
         catalog, instance, archetype = env
         patch = INTENTS["make_support_free"].build_patch(instance, archetype)
         edited = apply_patch(instance, patch, archetype, catalog)
-        assert edited.params["cavity_roof"] == "teardrop"
+        assert edited.archetype_id == "underdesk_cable_clip_v3_sideprint"
         assert edited.manufacturing.support_policy == "none"
+        # params the target does not know are dropped, shared ones carried
+        assert "flange_l" not in edited.params
+        assert edited.params["bundle_d"] == "20mm"
+        # the hex modifier is not allowed on the target — dropped
+        assert all(m.id != "add_hex_perforation" for m in edited.modifiers)
+        assert "mounting_flange" not in edited.requested_features
         # the original untouched
-        assert "cavity_roof" not in instance.params
+        assert instance.archetype_id == "underdesk_cable_clip_v2_molded"
+
+    def test_migration_to_unknown_archetype_rejected(self, env):
+        catalog, instance, archetype = env
+        patch = Patch(schema="patch/v1", archetype="warp_drive_clip_v9")
+        with pytest.raises(PatchError, match="unknown archetype"):
+            apply_patch(instance, patch, archetype, catalog)
+
+    def test_migration_across_object_class_rejected(self, env):
+        catalog, instance, archetype = env
+        stand = load_instance(EXAMPLES / "phone_stand_std.yaml")
+        target_id = stand.archetype_id
+        patch = Patch(schema="patch/v1", archetype=target_id)
+        with pytest.raises(PatchError, match="object class"):
+            apply_patch(instance, patch, archetype, catalog)
+
+    def test_teardrop_still_available_as_manual_patch(self, env):
+        """The teardrop cavity stays a legal manufacturing patch on v2 —
+        it fixes the cavity overhang for those who WANT flange-down."""
+        catalog, instance, archetype = env
+        patch = Patch(
+            schema="patch/v1", type="manufacturing",
+            params={"cavity_roof": "teardrop"},
+        )
+        edited = apply_patch(instance, patch, archetype, catalog)
+        assert edited.params["cavity_roof"] == "teardrop"
 
     def test_not_applicable_refuses(self, env):
         catalog, _, _ = env

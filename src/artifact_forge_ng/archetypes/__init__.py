@@ -20,6 +20,7 @@ from . import (
     lamp_socket_cup,
     phone_stand,
     underdesk_cable_clip,
+    underdesk_cable_clip_sideprint,
     zip_tie_anchor,
 )
 
@@ -27,6 +28,7 @@ FormBuilder = Callable[[ResolvedParams, ArchetypeSpec, ProductInstance], PartFor
 
 FORM_BUILDERS: dict[str, FormBuilder] = {
     underdesk_cable_clip.SECTION_NAME: underdesk_cable_clip.build_form,
+    underdesk_cable_clip_sideprint.SECTION_NAME: underdesk_cable_clip_sideprint.build_form,
     adapter_plate.SECTION_NAME: adapter_plate.build_form,
     cable_comb.SECTION_NAME: cable_comb.build_form,
     zip_tie_anchor.SECTION_NAME: zip_tie_anchor.build_form,

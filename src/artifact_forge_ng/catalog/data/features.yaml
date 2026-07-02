@@ -191,3 +191,17 @@ features:
     description: welded-on stiffening ribs, verified present
     verified_by:
       - topology.ribs_present
+
+  - id: rear_mounting_tongue
+    description: in-profile rear mounting tongue — the flange lives inside the extruded section, screws along it behind the hook
+    verified_by:
+      - form.mount_face_flat
+      - form.screw_access_clear
+      - topology.screw_holes_open
+      - topology.countersinks_present
+
+  - id: support_free_by_construction
+    description: constant-section extrusion exported profile-on-bed — zero overhangs by construction, not by tuning
+    verified_by:
+      - form.constant_section
+      - manufacturing.overhang

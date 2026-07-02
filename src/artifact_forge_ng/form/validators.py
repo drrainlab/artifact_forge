@@ -269,8 +269,15 @@ def check_screw_access_clear(form: PartForm) -> Finding:
     if not form.holes:
         return _finding("form.screw_access_clear", True, "no fastener holes")
     lo, hi = form.section.outer.bbox()
-    # Hook floor-plan: full extrusion width in X, profile u-range in Y.
-    hook = Rect2D(0.0, lo.u, form.width, hi.u)
+    # Hook floor-plan: full extrusion width in X, profile u-range in Y. A
+    # builder whose profile CONTAINS the mounting surface (the sideprint
+    # tongue) narrows the blocking footprint to the hook via frame keys.
+    hook = Rect2D(
+        0.0,
+        form.frame.get("hook_y0", lo.u),
+        form.width,
+        form.frame.get("hook_y1", hi.u),
+    )
     head_r = form.frame.get("screw_head_r", 3.5)
     access_r = head_r + 1.5  # head seat + driver wobble
     blocked = []
@@ -328,6 +335,80 @@ def check_hex_field_in_safe_zone(form: PartForm) -> Finding:
     )
 
 
+def check_mount_face_flat(form: PartForm) -> Finding:
+    """The in-profile mounting face (the sideprint tongue's desk side) must
+    be ONE flat horizontal edge at the profile's very top, spanning the
+    whole beam — a bowed or broken mount face rocks against the desk."""
+    from .section import LineSeg as _Line
+
+    _, hi = form.section.outer.bbox()
+    flats = [
+        s
+        for s in form.section.outer.tagged("mount_face")
+        if isinstance(s, _Line)
+        and abs(s.a.v - s.b.v) < 1e-6
+        and abs(s.a.v - hi.v) < 1e-6
+    ]
+    if not flats:
+        return _finding(
+            "form.mount_face_flat", False,
+            "no flat mount_face edge at the profile top", critical=True,
+        )
+    span = sum(s.length for s in flats)
+    u0 = form.frame.get("tongue_u0")
+    u1 = form.frame.get("beam_u1")
+    need = (u1 - u0) - 2.0 if u0 is not None and u1 is not None else span
+    ok = span >= need - 1e-6
+    return _finding(
+        "form.mount_face_flat",
+        ok,
+        f"flat mount face spans {span:.1f} of {need:.1f} required",
+        critical=True,
+        measured=span,
+        limit=need,
+    )
+
+
+#: A transverse hole wider than this cannot be trusted to bridge when it
+#: prints as a horizontal bore in the side orientation.
+MAX_TRANSVERSE_HOLE_D = 9.0
+
+
+def check_constant_section(form: PartForm) -> Finding:
+    """Is the part a PURE extrusion of its section? Plates, ribs, box cuts,
+    bores and fields all break section constancy — with none of them, every
+    print layer in the side orientation is the same shape, which is what
+    makes 'no overhangs by construction' a provable claim rather than a
+    heuristic. Small transverse screw holes are allowed: they print as
+    short horizontal bores that FDM bridges natively."""
+    from ..core.fasteners import screw_spec as _spec
+
+    breakers: list[str] = []
+    if form.kind != "section_extrude":
+        breakers.append(f"kind={form.kind}")
+    for label, items in (
+        ("plates", form.plates), ("ribs", form.ribs),
+        ("cutboxes", form.cutboxes), ("bores", form.bores),
+        ("fields", form.fields),
+    ):
+        if items:
+            breakers.append(f"{label} x{len(items)}")
+    wide = [
+        h.screw for h in form.holes
+        if _spec(h.screw)["clear"] + 1.0 > MAX_TRANSVERSE_HOLE_D
+    ]
+    if wide:
+        breakers.append(f"holes too wide to bridge sideways: {wide}")
+    return _finding(
+        "form.constant_section",
+        not breakers,
+        "pure constant-section extrusion"
+        + (f" with {len(form.holes)} small transverse hole(s)" if form.holes else "")
+        if not breakers
+        else "section constancy broken by: " + ", ".join(breakers),
+    )
+
+
 # -- registry wiring ---------------------------------------------------------
 # Every form check registers under its KNOWN_CHECKS name with the uniform
 # implementation signature (PartForm, FormCheckContext) -> Finding. The
@@ -348,6 +429,8 @@ register_probe("form.regions_present")(
 register_probe("form.contact_edges_rounded")(lambda form, ctx: check_contact_edges_rounded(form))
 register_probe("form.screw_access_clear")(lambda form, ctx: check_screw_access_clear(form))
 register_probe("form.hex_field_in_safe_zone")(lambda form, ctx: check_hex_field_in_safe_zone(form))
+register_probe("form.mount_face_flat")(lambda form, ctx: check_mount_face_flat(form))
+register_probe("form.constant_section")(lambda form, ctx: check_constant_section(form))
 
 # Import the phase-5 check modules so their registrations run — anything
 # importing validate_form gets the full form-check registry.

@@ -128,13 +128,12 @@ def build_side_open_obround_cavity(p: SideHookParams) -> SideOpenObroundCavity:
     )
 
 
-def build_molded_side_hook_profile(
-    p: SideHookParams, style: SurfaceStyle
-) -> tuple[SectionProfile, dict[str, float]]:
-    """The flagship section: one closed loop containing the side-open
-    cavity, both lips, the wall and the neck — then the molded rounding
-    pass. Returns the profile and its frame."""
-    f = side_hook_frame(p)
+def _side_hook_body(p: SideHookParams, f: dict[str, float]) -> tuple[list[Seg], Pt, Pt]:
+    """The hook itself — from the neck's mouth-side junction ``j1`` around
+    both lips, the cavity and the outer bottom, back to the rear junction
+    ``j0``. Shared VERBATIM by the v2 (welded flange plate) and v3
+    (in-profile tongue) builders, so the two variants hold a cable with the
+    exact same geometry. Returns (segments, j0, j1)."""
     r_i, r_o = f["r_cavity"], f["r_outer"]
     center = Pt(f["cavity_center_u"], f["cavity_center_v"])
     m, band = f["mouth_half"], f["lip_band"]
@@ -151,10 +150,8 @@ def build_molded_side_hook_profile(
         f["lower_lip_tip_u"], vc - m - p.lip_t * p.lower_lip_taper
     )
     n0, n1 = f["neck_u0"], f["neck_u1"]
-    v_top = f["weld_top_v"]
     j0 = Pt(n0, _outer_v(f, n0))
     j1 = Pt(n1, _outer_v(f, n1))
-    n_tl, n_tr = Pt(n0, v_top), Pt(n1, v_top)
 
     def tags(*names: str) -> frozenset[str]:
         return frozenset(names)
@@ -195,8 +192,6 @@ def build_molded_side_hook_profile(
         ]
 
     segments: list[Seg] = [
-        # down the neck's mouth-side edge onto the hook's outer circle
-        LineSeg(n_tr, j1, tags("neck", "root")),
         # outer wall, upper mouth side (short way down to the lip band)
         ArcSeg(j1, a_o, center, ccw=False, tags=tags("hook_outer", "root", "external")),
         # upper lip: top edge out, tip down, inner (mouth-top) edge back
@@ -211,16 +206,94 @@ def build_molded_side_hook_profile(
         LineSeg(b_i, t_l_i, tags("lower_lip", "mouth_lower", "mouth_corner")),
         LineSeg(t_l_i, t_l_o, tags("lower_lip", "lip_tip")),
         LineSeg(t_l_o, b_o, tags("lower_lip", "lower_lip_outer", "root")),
-        # outer wall the long way around bottom and back up to the neck
+        # outer wall the long way around bottom, ending at the rear junction
         *outer_bottom,
-        LineSeg(j0, n_tl, tags("neck", "root")),
+    ]
+    return segments, j0, j1
+
+
+def _tags(*names: str) -> frozenset[str]:
+    return frozenset(names)
+
+
+def build_molded_side_hook_profile(
+    p: SideHookParams, style: SurfaceStyle
+) -> tuple[SectionProfile, dict[str, float]]:
+    """The flagship (v2) section: the shared hook body closed by a short
+    neck whose flat top welds into a separate flange PLATE — then the
+    molded rounding pass. Returns the profile and its frame."""
+    f = side_hook_frame(p)
+    body, j0, j1 = _side_hook_body(p, f)
+    n0, n1 = f["neck_u0"], f["neck_u1"]
+    v_top = f["weld_top_v"]
+    n_tl, n_tr = Pt(n0, v_top), Pt(n1, v_top)
+
+    segments: list[Seg] = [
+        # down the neck's mouth-side edge onto the hook's outer circle
+        LineSeg(n_tr, j1, _tags("neck", "root")),
+        *body,
+        LineSeg(j0, n_tl, _tags("neck", "root")),
         # neck top: welds into the flange plate — an intentional corner pair
-        LineSeg(n_tl, n_tr, tags("neck_top", "weld_joint")),
+        LineSeg(n_tl, n_tr, _tags("neck_top", "weld_joint")),
     ]
 
     loop = round_profile_corners(ProfileLoop(segments), style)
     profile = SectionProfile(
         name="molded_side_hook",
+        outer=loop,
+        plane="YZ",
+        width_axis="X",
+        features={"cavity": build_side_open_obround_cavity(p)},
+    )
+    return profile, f
+
+
+def build_tongue_side_hook_profile(
+    p: SideHookParams, tongue_u0: float, tongue_t: float, style: SurfaceStyle
+) -> tuple[SectionProfile, dict[str, float]]:
+    """The v3 SIDEPRINT section: the same hook body, but the mounting
+    flange is an in-profile TONGUE running behind the hook (u < 0) — screws
+    land along the tongue where a driver clears the hook. Because every
+    feature lives in this one section, the part is a true constant-section
+    extrusion: printed profile-on-bed (extrusion axis vertical) it has NO
+    overhangs by construction — every layer is the same shape."""
+    f = side_hook_frame(p)
+    if tongue_u0 >= f["neck_u0"] - 1.0:
+        raise ValueError(
+            f"tongue_u0 {tongue_u0:g} must reach behind the neck "
+            f"(< {f['neck_u0'] - 1.0:g})"
+        )
+    body, j0, j1 = _side_hook_body(p, f)
+    n0, n1 = f["neck_u0"], f["neck_u1"]
+    beam_tr = Pt(n1, tongue_t)  # mount face meets the mouth-side drop edge
+    heel = Pt(n0, 0.0)  # tongue underside meets the neck's rear edge
+    back_b, back_t = Pt(tongue_u0, 0.0), Pt(tongue_u0, tongue_t)
+
+    segments: list[Seg] = [
+        # one straight edge: beam right side continuing down the neck
+        LineSeg(beam_tr, j1, _tags("neck", "root")),
+        *body,
+        LineSeg(j0, heel, _tags("neck", "root")),
+        # tongue underside — the screw heads seat here (countersinks)
+        LineSeg(heel, back_b, _tags("tongue_bottom", "root", "external")),
+        LineSeg(back_b, back_t, _tags("tongue_back", "external")),
+        # the desk-contact face: stays dead flat, corners intentional
+        LineSeg(back_t, beam_tr, _tags("mount_face", "intentional_corner")),
+    ]
+
+    loop = round_profile_corners(ProfileLoop(segments), style)
+    f = dict(f)
+    f.update(
+        tongue_u0=tongue_u0,
+        tongue_t=tongue_t,
+        beam_u1=n1,
+        # The driver-blocking footprint is the HOOK only, not the tongue —
+        # screw access measures against these instead of the profile bbox.
+        hook_y0=-f["r_outer"],
+        hook_y1=f["lower_lip_tip_u"],
+    )
+    profile = SectionProfile(
+        name="tongue_side_hook",
         outer=loop,
         plane="YZ",
         width_axis="X",

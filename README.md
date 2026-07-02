@@ -128,8 +128,20 @@ uv run forge edit catalog/examples/desk_cable_clip_20mm.yaml \
 Патчи типизированы (functional / manufacturing / structural / style) и несут
 **preserve-контракт**: перечисленные параметры обязаны выйти из пересборки
 численно идентичными, а фичи — validator-built. Нарушение = провал правки
-(проверяется, а не обещается). Intents v1: `make_support_free` (teardrop-
-полость: самонесущий 45° потолок вместо мостящегося круглого — крюк глубже
-на ~0.4R, функция бит-в-бит), `make_biomorphic`, `remove_perforation`,
+(проверяется, а не обещается). Intents v1: `make_support_free`, `make_biomorphic`, `remove_perforation`,
 `make_stronger`. Выход: самодостаточный отредактированный YAML + STL +
 `edit_report.yaml` (preserved / changed / printability before-after).
+
+Патч умеет **миграцию между архетипами** одного object_class:
+`make_support_free` на клипсе переводит её на
+`underdesk_cable_clip_v3_sideprint` — вариант, где крепёжный фланец лежит
+ВНУТРИ экструдируемого профиля (язык назад за крюк, саморезы вдоль языка).
+Деталь становится константной экструзией, а `print_orientation:
+side_profile` запекает в STL ориентацию «профилем на стол, ось экструзии
+вверх» — у такой печати ноль нависаний **by construction** (каждый слой —
+одна и та же фигура), что проверяется `form.constant_section` и честным
+`manufacturing.overhang`. Тот же валидатор честен и про v2 фланцем вниз:
+мостящийся круглый потолок полости И консольные губы (урок реальной
+слайсер-сессии). Trade-off тоже в отчёте: изгиб губ идёт поперёк слоёв —
+3+ периметра. Teardrop-полость (`cavity_roof: teardrop`) остаётся ручным
+патчем для тех, кто хочет печатать фланцем вниз.

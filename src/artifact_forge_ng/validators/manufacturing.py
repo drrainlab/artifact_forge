@@ -57,41 +57,99 @@ def min_wall(geometry: Geometry, form: PartForm) -> Finding:
     )
 
 
+#: Lip ledges shorter than this print acceptably without support even as
+#: horizontal cantilevers (a few sagging perimeter loops, cosmetic only).
+LIP_CANTILEVER_OK = 8.0
+
+
 @register_probe("manufacturing.overhang")
 def overhang(geometry: Geometry, form: PartForm) -> Finding:
-    """Printed flange-down, a ROUND cavity ceiling is a bridged circular
-    span whose lowest quadrant approaches 90-degree overhang — small spans
-    bridge, larger ones sag. A TEARDROP cavity is self-supporting at 45
-    degrees by construction. Heuristics documented, replaceable by mesh
-    analysis."""
-    if form.frame.get("cavity_teardrop", 0.0) >= 0.5:
+    """Overhang honesty, per PRINT ORIENTATION.
+
+    side_profile: a constant-section extrusion printed profile-on-bed has
+    zero overhangs BY CONSTRUCTION — every layer is the same shape. The
+    claim is only made when the section really is constant (no plates,
+    ribs, cuts or fields; small transverse holes bridge natively).
+
+    flange-down (the side-hook family default): two distinct problems —
+    the cavity roof (round = bridged circular span, teardrop = self-
+    supporting 45deg) AND the lips, which print as horizontal cantilever
+    ledges hanging over the mouth. A slicer will ask for supports under a
+    long lower lip no matter what the cavity roof does; the honest fix is
+    the sideprint variant, not more chamfers. Lesson from a real slicer
+    session: the first version of this check modeled only the cavity."""
+    if form.print_orientation == "side_profile":
+        breakers = [
+            label
+            for label, items in (
+                ("plates", form.plates), ("ribs", form.ribs),
+                ("cutboxes", form.cutboxes), ("bores", form.bores),
+                ("fields", form.fields),
+            )
+            if items
+        ]
+        if form.kind != "section_extrude" or breakers:
+            return _finding(
+                "manufacturing.overhang", Status.WARN,
+                "side-print orientation, but the part is not a pure "
+                f"extrusion ({', '.join(breakers) or form.kind}) — "
+                "overhangs unverified",
+                suggestion="keep sideprint parts constant-section",
+            )
         return _finding(
             "manufacturing.overhang", Status.PASS,
-            "self-supporting 45deg teardrop cavity roof — no supports",
-            measured=45.0, limit=45.0,
+            "profile-on-bed: constant section along the vertical axis — no "
+            "overhangs by construction; screw holes print as short "
+            "horizontal bores. Note: lip flexure crosses layers in this "
+            "orientation — use 3+ perimeters",
+            measured=0.0, limit=45.0,
         )
+
+    problems: list[str] = []
+    worst = Status.PASS
+    suggestion = ""
+
     span = 2.0 * form.frame.get("r_cavity", 0.0)
-    if span <= 0.0:
-        return _finding(
-            "manufacturing.overhang", Status.PASS, "no cavity to bridge"
+    if span > 0.0:
+        if form.frame.get("cavity_teardrop", 0.0) >= 0.5:
+            problems.append("teardrop cavity roof self-supporting at 45deg")
+        elif span <= 12.0:
+            problems.append(f"round cavity span {span:.1f} mm — trivial bridge")
+        elif span <= 35.0:
+            problems.append(
+                f"round cavity roof spans {span:.1f} mm — relies on bridging "
+                "(near-90deg local overhang at the roof sides)"
+            )
+            worst = Status.WARN
+            suggestion = "cavity_roof: teardrop, or the sideprint variant"
+        else:
+            problems.append(f"round cavity span {span:.1f} mm needs support")
+            worst = Status.FAIL
+            suggestion = "the sideprint variant, or support_policy: allow"
+
+    lip = form.frame.get("lower_lip_tip_u", 0.0) - form.frame.get(
+        "wall_outer_u", 0.0
+    )
+    if form.frame.get("lower_lip_tip_u") is not None and lip > LIP_CANTILEVER_OK:
+        problems.append(
+            f"the {lip:.0f} mm lower lip prints as a horizontal cantilever "
+            "flange-down — slicers will ask for supports under the lips"
         )
-    if span <= 12.0:
+        if worst is Status.PASS:
+            worst = Status.WARN
+        if not suggestion:
+            suggestion = (
+                "the sideprint variant prints this hook support-free "
+                "(intent make_support_free)"
+            )
+
+    if not problems:
         return _finding(
-            "manufacturing.overhang", Status.PASS,
-            f"round cavity span {span:.1f} mm — trivial bridge",
-            measured=span, limit=12.0,
-        )
-    if span <= 35.0:
-        return _finding(
-            "manufacturing.overhang", Status.WARN,
-            f"round cavity roof spans {span:.1f} mm — relies on bridging "
-            "(near-90deg local overhang at the roof sides)",
-            measured=span, limit=12.0,
-            suggestion="cavity_roof: teardrop (the make_support_free edit)",
+            "manufacturing.overhang", Status.PASS, "no overhang-prone features"
         )
     return _finding(
-        "manufacturing.overhang", Status.FAIL,
-        f"round cavity span {span:.1f} mm needs support",
-        measured=span, limit=35.0,
-        suggestion="cavity_roof: teardrop, or support_policy: allow",
+        "manufacturing.overhang", worst,
+        "; ".join(problems),
+        measured=span if span > 0 else None,
+        suggestion=suggestion,
     )

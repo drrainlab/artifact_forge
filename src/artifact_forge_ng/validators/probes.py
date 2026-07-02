@@ -67,6 +67,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.cuts_respect_keepouts", Level.FORM, "no bore or box cut intersects a keepout region"),
         _decl("form.device_slot_fits", Level.FORM, "measured device slot fits the declared device thickness at tilt"),
         _decl("form.min_ligament_ok", Level.FORM, "webs between field cells meet the declared minimum ligament"),
+        _decl("form.mount_face_flat", Level.FORM, "the in-profile mounting face is one flat top edge spanning the tongue"),
+        _decl("form.constant_section", Level.FORM, "the part is a pure constant-section extrusion (small transverse holes allowed)"),
         # -- topology level: probed on the compiled solid ---------------------
         _decl("topology.single_connected_solid", Level.TOPOLOGY, "exactly one connected valid solid"),
         _decl("topology.cavity_open", Level.TOPOLOGY, "the cable cavity is a real void along the cable axis"),

@@ -1,0 +1,37 @@
+schema: product/v1
+id: desk_cable_clip_20mm_sideprint
+archetype: underdesk_cable_clip_v3_sideprint@1
+strict: true
+
+requested_features:
+  - asymmetric_side_hook
+  - side_facing_mouth
+  - through_cavity
+  - rear_mounting_tongue
+  - retaining_lower_lip
+  - rounded_contact_edges
+  - molded_side_profile
+  - countersunk_screw_holes
+  - support_free_by_construction
+
+params:
+  bundle_d: 20mm
+  mouth_gap: 10mm
+  upper_lip_len: 6mm
+  lower_lip_len: 15mm
+  wall: 3.2mm
+  width: 30mm
+  tongue_t: 5mm
+  screw_spacing: 22mm
+  screw: M4
+
+style:
+  surface: molded_utility_part
+  softness: 0.75
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: none

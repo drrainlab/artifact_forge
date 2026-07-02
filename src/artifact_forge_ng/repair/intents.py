@@ -55,12 +55,48 @@ def _require_param(archetype: ArchetypeSpec, param: str, intent: str) -> None:
         )
 
 
+#: Archetypes with a dedicated support-free sibling — the honest route: a
+#: manufacturing goal big enough to change the part's construction is an
+#: archetype MIGRATION, not a parameter tweak. Each entry pins the preserve
+#: list explicitly (source and target must both carry every name), because
+#: what "functionally the same" means across a migration is a design
+#: decision, not something to infer.
+SUPPORT_FREE_VARIANTS: dict[str, dict[str, object]] = {
+    "underdesk_cable_clip_v2_molded": {
+        "target": "underdesk_cable_clip_v3_sideprint",
+        "preserve": [
+            "bundle_d", "mouth_gap", "upper_lip_len", "lower_lip_len", "screw",
+            "asymmetric_side_hook", "side_facing_mouth", "through_cavity",
+            "retaining_lower_lip",
+        ],
+    },
+}
+
+
 def _make_support_free(instance: ProductInstance, archetype: ArchetypeSpec) -> Patch:
+    variant = SUPPORT_FREE_VARIANTS.get(archetype.id)
+    if variant is not None:
+        return Patch(
+            schema="patch/v1",
+            type="manufacturing",
+            reason=(
+                "migrate to the side-print variant: the mounting tongue "
+                "lives inside the extruded profile, so the part prints "
+                "profile-on-bed with zero overhangs by construction"
+            ),
+            archetype=str(variant["target"]),
+            preserve=list(variant["preserve"]),  # type: ignore[arg-type]
+            manufacturing={"support_policy": "none"},
+        )
+    # Fallback for archetypes without a sideprint sibling: a self-supporting
+    # teardrop cavity roof. Honest scope: it fixes the CAVITY overhang;
+    # other overhangs (lip cantilevers) may still want supports — the
+    # overhang validator reports what remains.
     _require_param(archetype, "cavity_roof", "make_support_free")
     return Patch(
         schema="patch/v1",
         type="manufacturing",
-        reason="print without supports, functionally identical",
+        reason="self-supporting teardrop cavity roof; remaining overhangs reported honestly",
         preserve=_functional_preserve(archetype)
         + [n for n in ("screw_spacing", "screw") if n in archetype.parameters],
         params={"cavity_roof": "teardrop"},

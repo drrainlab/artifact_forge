@@ -187,6 +187,13 @@ class PartForm:
     style: SurfaceStyle
     #: How the section becomes a solid: "section_extrude" | "profile_revolve".
     kind: str = "section_extrude"
+    #: How the part should sit on the print bed. "as_modeled" exports in the
+    #: part frame; "side_profile" bakes a rotation into the export so the
+    #: SECTION lies on the bed and the extrusion axis (X) points up — a
+    #: constant-section extrusion printed this way has zero overhangs by
+    #: construction. Validators always measure in the part frame; only the
+    #: exported STL/STEP are rotated.
+    print_orientation: str = "as_modeled"
     plates: list[PlateFeature] = field(default_factory=list)
     holes: list[HoleFeature] = field(default_factory=list)
     bores: list[BoreFeature] = field(default_factory=list)

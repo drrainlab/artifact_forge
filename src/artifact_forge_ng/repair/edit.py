@@ -112,7 +112,7 @@ def _changed(before: BuildSnapshot, after: BuildSnapshot) -> dict[str, Any]:
         and not k.startswith(("printer_", "nozzle", "layer_"))
     }
     choices = {
-        k: f"{before.choices.get(k)} -> {after.choices.get(k)}"
+        k: f"{before.choices.get(k, '(absent)')} -> {after.choices.get(k, '(absent)')}"
         for k in sorted(set(before.choices) | set(after.choices))
         if before.choices.get(k) != after.choices.get(k)
     }
@@ -134,6 +134,12 @@ def _changed(before: BuildSnapshot, after: BuildSnapshot) -> dict[str, Any]:
         changed["manufacturing"] = manufacturing
     if style:
         changed["style"] = style
+    gained = sorted(set(after.built_features) - set(before.built_features))
+    lost = sorted(set(before.built_features) - set(after.built_features))
+    if gained:
+        changed["features_gained"] = gained
+    if lost:
+        changed["features_lost"] = lost
     return changed
 
 
@@ -199,7 +205,14 @@ def run_edit(
             "reason": patch.reason,
             "preserved": verified,
             "preserve_violations": violations,
-            "changed": _changed(before, after),
+            "changed": {
+                **(
+                    {"archetype": f"{archetype.id} -> {patch.archetype}"}
+                    if patch.archetype
+                    else {}
+                ),
+                **_changed(before, after),
+            },
             "printability": {
                 "overhang_before": _overhang_view(overhang_b),
                 "overhang_after": _overhang_view(overhang_a),
