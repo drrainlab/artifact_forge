@@ -1,17 +1,33 @@
 """Form-level validators — every ``form.*`` check, measured analytically on
 the PartForm with zero CAD. These run in ``forge validate`` and gate the
 golden test; the CAD compiler is not touched until they are green.
+
+Checks self-register in KNOWN_CHECKS (validators/probes.py — stdlib-only,
+safe to import here). :func:`validate_form` is archetype-driven: three
+universal checks always run; the rest come from the archetype's own
+``validators:`` list, so a phone stand is never judged by the cable clip's
+mouth checks. A declared form check with no implementation is an honest
+ENGINE-GAP warning, mirroring the geometry-level runner.
 """
 
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 
 from ..core.findings import Finding, Level, Status
+from ..validators.probes import KNOWN_CHECKS, register_probe
 from .molded import INTENTIONAL_TAGS, joint_is_tangent
 from .part import PartForm
 from .section import ProfileLoop, Pt, Seg
 from . import silhouette
+
+
+@dataclass(frozen=True)
+class FormCheckContext:
+    """Extra inputs a form check may need beyond the PartForm itself."""
+
+    declared_region_ids: tuple[str, ...] = ()
 
 
 def _finding(
@@ -308,19 +324,73 @@ def check_hex_field_in_safe_zone(form: PartForm) -> Finding:
     )
 
 
-def validate_form(form: PartForm, declared_region_ids: list[str]) -> list[Finding]:
-    loop = form.section.outer
-    return [
-        check_profile_closed(loop),
-        check_profile_smooth(loop),
-        check_mouth_opens_sideways(form),
-        check_mouth_gap_matches(form),
-        check_lower_lip_longer(form),
-        check_not_symmetric_c_ring(form),
-        check_flange_above_cradle(form),
-        check_wall_thickness(form),
-        check_regions_present(form, declared_region_ids),
-        check_contact_edges_rounded(form),
-        check_screw_access_clear(form),
-        check_hex_field_in_safe_zone(form),
+# -- registry wiring ---------------------------------------------------------
+# Every form check registers under its KNOWN_CHECKS name with the uniform
+# implementation signature (PartForm, FormCheckContext) -> Finding. The
+# original functions stay public — tests and other archetype code call them
+# directly with their natural arguments.
+
+register_probe("form.profile_closed")(lambda form, ctx: check_profile_closed(form.section.outer))
+register_probe("form.profile_smooth")(lambda form, ctx: check_profile_smooth(form.section.outer))
+register_probe("form.mouth_opens_sideways")(lambda form, ctx: check_mouth_opens_sideways(form))
+register_probe("form.mouth_gap_matches")(lambda form, ctx: check_mouth_gap_matches(form))
+register_probe("form.lower_lip_longer_than_upper")(lambda form, ctx: check_lower_lip_longer(form))
+register_probe("form.not_symmetric_c_ring")(lambda form, ctx: check_not_symmetric_c_ring(form))
+register_probe("form.flange_above_cradle")(lambda form, ctx: check_flange_above_cradle(form))
+register_probe("form.wall_thickness")(lambda form, ctx: check_wall_thickness(form))
+register_probe("form.regions_present")(
+    lambda form, ctx: check_regions_present(form, list(ctx.declared_region_ids))
+)
+register_probe("form.contact_edges_rounded")(lambda form, ctx: check_contact_edges_rounded(form))
+register_probe("form.screw_access_clear")(lambda form, ctx: check_screw_access_clear(form))
+register_probe("form.hex_field_in_safe_zone")(lambda form, ctx: check_hex_field_in_safe_zone(form))
+
+#: Structural sanity every archetype gets whether it asks or not — mirrors
+#: the always-on manufacturing suite at geometry level.
+UNIVERSAL_FORM_CHECKS = (
+    "form.profile_closed",
+    "form.profile_smooth",
+    "form.regions_present",
+)
+
+
+def validate_form(
+    form: PartForm, archetype, extra_checks: tuple[str, ...] = ()
+) -> list[Finding]:
+    """Run the archetype's own form-level checks (plus the universal three,
+    plus ``extra_checks`` — the form-level validators the instance's
+    modifiers promised).
+
+    ``archetype`` is a loaded ArchetypeSpec (typed loosely to keep this
+    module import-light). Unknown names never reach here — the catalog
+    loader fail-fast bound them; a declared-but-unimplemented form check
+    yields an engine-gap WARN, never a silent skip.
+    """
+    ctx = FormCheckContext(
+        declared_region_ids=tuple(r.id for r in archetype.regions)
+    )
+    findings: list[Finding] = []
+    ran: set[str] = set()
+    names = list(UNIVERSAL_FORM_CHECKS) + [
+        n
+        for n in (*archetype.validators, *extra_checks)
+        if n not in UNIVERSAL_FORM_CHECKS
     ]
+    for name in names:
+        decl = KNOWN_CHECKS.get(name)
+        if decl is None or decl.level is not Level.FORM or name in ran:
+            continue
+        ran.add(name)
+        if decl.impl is None:
+            findings.append(
+                Finding(
+                    check=name,
+                    status=Status.WARN,
+                    level=Level.FORM,
+                    message=f"declared check {name!r} has no implementation — engine gap",
+                    suggestion=f"implement form check {name!r}",
+                )
+            )
+            continue
+        findings.append(decl.impl(form, ctx))
+    return findings

@@ -39,19 +39,38 @@ class PipelineState:
     report: ValidationReport
 
     def form_checks(self) -> dict[str, Any]:
+        """Family-aware summary: the side-hook block only makes sense for
+        the side-hook family; other sections get a generic frame digest."""
         if self.form is None:
             return {}
-        sil = measure(self.form.section, self.form.frame)
-        return {
-            "mouth_gap": _mm(sil.mouth_gap),
-            "mouth_direction": _direction_label(sil.mouth_direction),
-            "lower_lip_len": _mm(sil.lower_lip_len),
-            "upper_lip_len": _mm(sil.upper_lip_len),
-            "lower_lip_ratio_ok": bool(sil.lip_ratio is not None and sil.lip_ratio > 1.5),
-            "symmetric_c_ring": not sil.family_ok,
-            "flange_above_cradle": self.report.passed("form.flange_above_cradle"),
+        if self.form.section.name == "molded_side_hook":
+            sil = measure(self.form.section, self.form.frame)
+            return {
+                "mouth_gap": _mm(sil.mouth_gap),
+                "mouth_direction": _direction_label(sil.mouth_direction),
+                "lower_lip_len": _mm(sil.lower_lip_len),
+                "upper_lip_len": _mm(sil.upper_lip_len),
+                "lower_lip_ratio_ok": bool(
+                    sil.lip_ratio is not None and sil.lip_ratio > 1.5
+                ),
+                "symmetric_c_ring": not sil.family_ok,
+                "flange_above_cradle": self.report.passed("form.flange_above_cradle"),
+                "regions_present": [r.name for r in self.form.regions],
+            }
+        lo, hi = self.form.section.outer.bbox()
+        checks: dict[str, Any] = {
+            "section": self.form.section.name,
+            "profile_ok": self.report.passed("form.profile_closed"),
+            "profile_bbox": f"{hi.u - lo.u:.1f} x {hi.v - lo.v:.1f} mm",
+            "width": _mm(self.form.width),
             "regions_present": [r.name for r in self.form.regions],
         }
+        # Surface the builder's own key numbers (frame entries are the
+        # per-family measurement vocabulary).
+        for key in sorted(self.form.frame):
+            if key.startswith("report_"):
+                checks[key.removeprefix("report_")] = _mm(self.form.frame[key])
+        return checks
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -131,7 +150,12 @@ def run_pre_cad(product_path: Path, strict_flag: bool | None) -> PipelineState:
     form: PartForm | None = None
     if resolved.ok:
         form = builder(resolved, archetype, instance)
-        report.extend(validate_form(form, [r.id for r in archetype.regions]))
+        modifier_checks = tuple(
+            name
+            for mod in catalog.modifiers_for(instance).values()
+            for name in mod.validators
+        )
+        report.extend(validate_form(form, archetype, modifier_checks))
 
     return PipelineState(
         catalog=catalog,
