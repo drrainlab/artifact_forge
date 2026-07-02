@@ -243,6 +243,23 @@ class ProfileLoop:
                 pts.append(s.point_at(i / per_segment))
         return pts
 
+    def centroid(self, per_segment: int = 24) -> Pt:
+        """Area centroid of the loop, computed on a sampled polygon —
+        a documented approximation (arcs as chords), plenty for checks
+        that carry a millimetre-scale safety margin."""
+        pts = self.sample(per_segment)
+        area2 = 0.0
+        cu = 0.0
+        cv = 0.0
+        for p, q in zip(pts, pts[1:] + pts[:1]):
+            cross = p.u * q.v - q.u * p.v
+            area2 += cross
+            cu += (p.u + q.u) * cross
+            cv += (p.v + q.v) * cross
+        if abs(area2) < TOL:
+            raise ValueError("degenerate loop: zero area")
+        return Pt(cu / (3.0 * area2), cv / (3.0 * area2))
+
 
 @dataclass(frozen=True)
 class SideOpenObroundCavity:

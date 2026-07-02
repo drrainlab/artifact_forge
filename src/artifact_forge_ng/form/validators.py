@@ -237,12 +237,16 @@ def check_regions_present(form: PartForm, declared_region_ids: list[str]) -> Fin
 
 
 def check_contact_edges_rounded(form: PartForm) -> Finding:
-    """Every joint touching a cable-contact segment must be tangent after
-    the molded pass — a sharp corner on the cable path scrapes insulation."""
+    """Every joint touching a contact segment must be tangent after the
+    molded pass — a sharp corner on the contact path scrapes whatever the
+    part holds. Intentional corners (welds, flat-seat edges) are exempt."""
     loop = form.section.outer
     sharp = 0
     for prev, nxt in loop.joints():
-        touches = (prev.tags | nxt.tags) & {"cable_contact", "lip_tip"}
+        joint_tags = prev.tags | nxt.tags
+        if joint_tags & INTENTIONAL_TAGS:
+            continue
+        touches = joint_tags & {"cable_contact", "contact", "lip_tip"}
         if touches and not joint_is_tangent(prev, nxt):
             sharp += 1
     return _finding(
@@ -354,6 +358,7 @@ from . import (  # noqa: E402,F401
     checks_jhook,
     checks_revolve,
     checks_slots,
+    checks_stability,
     checks_tunnel,
 )
 

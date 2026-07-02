@@ -59,5 +59,19 @@ src/artifact_forge_ng/
   repair/      YAML-патчи + детерминированные правила + ledger
 ```
 
-Флагман: `underdesk_cable_clip_v2_molded` — асимметричная боковая клипса
-под стол (M4 countersunk, hex-перфорация в safe zone, molded-профиль).
+## Каталог (фаза 5)
+
+| Архетип | Что это | Ключевые проверки |
+|---|---|---|
+| `underdesk_cable_clip_v2_molded` | флагман: асимметричная боковая клипса под стол | not_symmetric_c_ring, mouth/lips, screw_access |
+| `adapter_plate_v1` | переходная пластина: 2 узора отверстий + борт | min_web, holes_within_outline |
+| `cable_comb_v1` | гребёнка: полость+горло на каждый кабель | slots_open, throat_retention (горло < кабеля) |
+| `zip_tie_anchor_v1` | площадка под стяжку (омега-туннель) | tunnel_fits_tie, tunnel_open |
+| `wall_hook_v1` | J-крюк на саморезы (вешалка/ключи) | tip_lip_present, bay_open |
+| `headphone_hook_v1` | широкий крюк для наушников (тот же билдер) | + wide_contact_band |
+| `lamp_socket_cup_v1` | чашка патрона E27/GU10 (revolve) | revolve_axis_clear, cavity_open |
+| `lamp_bracket_v1` | кронштейн лампы с каналом проводки | **channel_continuous по L-пути** |
+| `phone_stand_v1` | подставка для телефона | slot=f(tilt) точно, **stability_footprint (COM)** |
+
+Примеры: `catalog/examples/*.yaml` — все строятся `forge build` в pass/A.
+Пара кронштейн+чашка стыкуется: датум `arm_tip` ↔ bolt-circle `mount_bc`.

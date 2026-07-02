@@ -170,21 +170,26 @@ class TestZipTieAnchor:
         assert form.holes == []
 
 
-def test_unimplemented_form_check_is_engine_gap_not_silence(tmp_path):
+def test_unimplemented_form_check_is_engine_gap_not_silence(monkeypatch):
     """Regression for the wiring gap this phase caught live: a declared
     check with no implementation must WARN (and block built-status), never
     silently pass."""
     from artifact_forge_ng.core.findings import Level
     from artifact_forge_ng.form.validators import validate_form
     from artifact_forge_ng.archetypes import builder_for
+    from artifact_forge_ng.validators.probes import KNOWN_CHECKS, CheckDecl
 
+    name = "form.future_check_without_impl"
+    monkeypatch.setitem(
+        KNOWN_CHECKS, name, CheckDecl(name=name, level=Level.FORM, description="t")
+    )
     catalog = load_catalog()
     inst = load_instance(EXAMPLES / "desk_comb_5x4mm.yaml")
     archetype = catalog.archetypes[inst.archetype_id]
     resolved = resolve_params(archetype, inst)
     form = builder_for(archetype)(resolved, archetype, inst)
-    findings = validate_form(form, archetype, extra_checks=("form.device_slot_fits",))
-    gap = [f for f in findings if f.check == "form.device_slot_fits"]
+    findings = validate_form(form, archetype, extra_checks=(name,))
+    gap = [f for f in findings if f.check == name]
     assert gap and gap[0].status is Status.WARN
     assert "no implementation" in gap[0].message
     assert gap[0].level is Level.FORM

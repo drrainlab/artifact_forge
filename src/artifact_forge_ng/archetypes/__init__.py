@@ -18,6 +18,7 @@ from . import (
     j_hook,
     lamp_bracket,
     lamp_socket_cup,
+    phone_stand,
     underdesk_cable_clip,
     zip_tie_anchor,
 )
@@ -32,6 +33,7 @@ FORM_BUILDERS: dict[str, FormBuilder] = {
     j_hook.SECTION_NAME: j_hook.build_form,
     lamp_socket_cup.SECTION_NAME: lamp_socket_cup.build_form,
     lamp_bracket.SECTION_NAME: lamp_bracket.build_form,
+    phone_stand.SECTION_NAME: phone_stand.build_form,
 }
 
 

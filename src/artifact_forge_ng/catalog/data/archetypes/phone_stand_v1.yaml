@@ -1,0 +1,108 @@
+schema: archetype/v1
+id: phone_stand_v1
+version: 1
+object_class: phone_stand
+description: >
+  Free-standing desk phone stand: base slab, tilted back rest and a front
+  lip forming the device slot (slot width = device_thickness / sin(tilt) +
+  clearances — exact trigonometry, measured on the profile). Charging
+  cutout through the lip center with a cable trough across the slot floor.
+  The stability check proves the combined part+device center of mass stays
+  inside the base footprint BEFORE anything is printed.
+
+provides_features:
+  - device_rest
+  - stable_footprint
+  - charging_cutout
+  - rounded_contact_edges
+
+# v1-proven nominals (holders.py phone_stand_v1).
+parameters:
+  device_w:
+    {type: length, default: 78mm, min: 55mm, max: 120mm,
+     role: functional, exposed: true}
+  device_thickness:
+    {type: length, default: 11mm, min: 6mm, max: 20mm,
+     role: functional, exposed: true,
+     description: phone thickness incl. case}
+  tilt_deg:
+    {type: angle, default: 68deg, min: 45deg, max: 80deg,
+     role: functional, exposed: true,
+     description: '>= 45 keeps the back rest overhang printable'}
+  lip_h:
+    {type: length, default: 9mm, min: 5mm, max: 18mm, role: functional}
+  lip_t:
+    {type: length, default: 3.5mm, min: 2.5mm, max: 6mm, role: structural}
+  fit_clearance:
+    {type: length, default: 0.5mm, min: 0.2mm, max: 1.5mm, role: manufacturing}
+  base_t:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: structural}
+  base_depth:
+    {type: length, default: 75mm, min: 50mm, max: 120mm,
+     role: structural, exposed: true}
+  rest_len:
+    {type: length, default: 90mm, min: 60mm, max: 140mm, role: structural}
+  rest_t:
+    {type: length, default: 5mm, min: 3.5mm, max: 8mm, role: manufacturing}
+  width:
+    {type: length, default: expr(device_w * 0.85), min: 40mm, max: 120mm,
+     role: functional}
+  charging_cutout:
+    {type: bool, default: true, role: functional, exposed: true}
+  cutout_w:
+    {type: length, default: 14mm, min: 8mm, max: expr(width - 20),
+     role: functional}
+  cutout_drop:
+    {type: length, default: 3mm, min: 2mm, max: expr(base_t - 2),
+     role: functional, description: cable trough depth in the slot floor}
+  device_mass:
+    {type: number, default: 220, min: 120, max: 400, role: safety_locked,
+     description: nominal device mass (g) for the stability check}
+  device_com_len:
+    {type: length, default: 70mm, min: 40mm, max: 110mm, role: safety_locked,
+     description: device COM distance up the rest}
+  stability_margin:
+    {type: length, default: 5mm, min: 3mm, max: 15mm, role: safety_locked}
+
+constraints:
+  - lip_t + device_thickness / sin(rad(tilt_deg)) + 2 * fit_clearance + rest_t / sin(rad(tilt_deg)) < base_depth - 5
+  - cutout_w < width - 16
+
+form:
+  type: section_extrude
+  section: phone_stand_side
+  plane: YZ
+  width_axis: X
+
+regions:
+  - {id: base_bottom, role: mounting_surface, editable: true}
+  - {id: device_rest, role: soft_contact_surface, editable: false}
+  - {id: lip, role: retaining_flexure, editable: false,
+     forbidden_modifiers: [add_hex_perforation]}
+  - {id: rest_root, role: high_stress_region, editable: false,
+     forbidden_modifiers: [add_hex_perforation]}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.device_slot_fits
+  - form.stability_footprint
+  - form.cuts_respect_keepouts
+  - form.contact_edges_rounded
+  - topology.single_connected_solid
+  - topology.cutout_present
+
+forbidden_forms:
+  - tipping_stand
+  - boxy_rectangular_hook
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - device_rest
+    - stable_footprint
+  must_not_have:
+    - tipping_stand
+  invariants:
+    - tilt_deg >= 45

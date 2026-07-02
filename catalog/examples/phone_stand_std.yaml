@@ -1,0 +1,23 @@
+schema: product/v1
+id: phone_stand_std
+archetype: phone_stand_v1@1
+strict: true
+
+requested_features:
+  - device_rest
+  - stable_footprint
+  - charging_cutout
+  - rounded_contact_edges
+
+params:
+  device_w: 78mm
+  device_thickness: 11mm
+  tilt_deg: 68deg
+  charging_cutout: true
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
