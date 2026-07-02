@@ -98,10 +98,14 @@ def build_form(
         Region("plate_face", RegionRole.MOUNTING_SURFACE, Box3(u0, v0, 0.0, u1, v1, t)),
         # Always present (the archetype declares it); with a central bore
         # the bore itself becomes a keepout, so fields flow around it.
+        # Lightening zone spans the whole plate minus a solid edge band —
+        # the point of the field is saving plastic; screws/bores/prior cuts
+        # are protected by keepouts, the rim stays solid for stiffness.
         Region(
             "center_zone",
             RegionRole.AESTHETIC_LIGHTENING,
-            Box3(-length / 6, -width_ / 6, 0.0, length / 6, width_ / 6, t),
+            Box3(u0 + corner_r + 4.0, v0 + corner_r + 4.0, 0.0,
+                 u1 - corner_r - 4.0, v1 - corner_r - 4.0, t),
         ),
         *zones,
     ]

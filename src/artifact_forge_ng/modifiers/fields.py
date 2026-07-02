@@ -99,7 +99,9 @@ def add_grid_slot_field(
             for k in pw.keepouts
         )
         if clear:
-            polygons.append(tuple(rect))
+            from ..form.voronoi import chaikin
+
+            polygons.append(tuple(chaikin(rect, 2)))
         pos += pitch
     form.fields.append(
         FieldFeature(
@@ -135,6 +137,7 @@ def add_voronoi_field(
         min_ligament=ligament,
         edge_margin=params.get("edge_margin", 3.0),
         relax_iterations=int(round(params.get("relax_iterations", 2))),
+        corner_smooth=int(round(params.get("corner_smooth", 2))),
     )
     form.fields.append(
         FieldFeature(

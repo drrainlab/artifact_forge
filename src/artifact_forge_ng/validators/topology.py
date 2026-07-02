@@ -365,12 +365,11 @@ def hex_field_present(geometry: Geometry, form: PartForm) -> Finding:
             poly = field.polygons[len(field.polygons) // 2]
             cu = sum(p[0] for p in poly) / len(poly)
             cv = sum(p[1] for p in poly) / len(poly)
-            r = 0.3 * math.sqrt(
-                max(1e-9, abs(sum(
-                    p[0] * q[1] - q[0] * p[1]
-                    for p, q in zip(poly, poly[1:] + poly[:1])
-                )) / 2.0)
-            )
+            # Probe must fit INSIDE the cell — bound by the narrow bbox
+            # dimension (a long slot is much narrower than its area hints).
+            bb_w = max(p[0] for p in poly) - min(p[0] for p in poly)
+            bb_h = max(p[1] for p in poly) - min(p[1] for p in poly)
+            r = 0.3 * max(0.5, min(bb_w, bb_h))
         probe = box_probe(
             cu - r, cv - r, field.plane_z - field.depth * 0.9,
             cu + r, cv + r, field.plane_z,

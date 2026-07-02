@@ -1,0 +1,49 @@
+schema: product/v1
+id: showcase_ribs_magnets
+archetype: adapter_plate_v1@1
+strict: true
+
+# Additive showcase: stiffening ribs welded across the top face plus four
+# hidden magnet pockets from below — material added AND removed, both
+# verified by probes.
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - stiffening_ribs
+  - magnet_pockets
+
+params:
+  plate_l: 100mm
+  plate_w: 60mm
+  thickness: 5mm
+  corner_r: 6mm
+  a_kind: line
+  a_count: 2
+  a_spacing: 84mm
+  a_screw: M4
+  a_cs_face: top
+  b_kind: none
+  bore_d: 0mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
+
+modifiers:
+  - id: add_magnet_pockets
+    target: plate_face
+    params:
+      magnet_d: 6mm
+      magnet_h: 2mm
+      count: 4
+      face: bottom
+  - id: add_ribs
+    target: center_zone
+    params:
+      count: 4
+      rib_w: 3mm
+      rib_h: 3mm

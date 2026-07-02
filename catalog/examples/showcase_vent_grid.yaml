@@ -1,0 +1,41 @@
+schema: product/v1
+id: showcase_vent_grid
+archetype: adapter_plate_v1@1
+strict: true
+
+# Grid-slot showcase: a vent plate — rounded slats across the lightening
+# zone, flowing around the four corner screws.
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - grid_slots
+
+params:
+  plate_l: 110mm
+  plate_w: 70mm
+  thickness: 4mm
+  corner_r: 6mm
+  a_kind: grid
+  a_nx: 2
+  a_ny: 2
+  a_spacing: 50mm
+  a_screw: M3
+  a_cs_face: top
+  b_kind: none
+  bore_d: 0mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
+
+modifiers:
+  - id: add_grid_slot_field
+    target: center_zone
+    params:
+      slot_w: 5mm
+      web: 3mm
+      cut_mode: through

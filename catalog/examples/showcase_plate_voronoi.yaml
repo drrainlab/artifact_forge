@@ -57,6 +57,6 @@ modifiers:
     target: center_zone
     params:
       seed: 7
-      sites: 14
-      min_ligament: 1.8mm
+      sites: 26
+      min_ligament: 2mm
       cut_mode: through

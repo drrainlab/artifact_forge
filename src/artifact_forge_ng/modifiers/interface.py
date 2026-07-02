@@ -47,7 +47,9 @@ def add_magnet_pockets(
     placed = 0
     skipped = 0
     for i in range(count):
-        t = 0.5 if count == 1 else i / (count - 1)
+        # Interior distribution — candidates never sit at the window ends,
+        # where they inevitably collide with edge screws.
+        t = (i + 1) / (count + 1)
         u = inner.u0 + t * span_len if along_u else (inner.u0 + inner.u1) / 2
         v = (inner.v0 + inner.v1) / 2 if along_u else inner.v0 + t * span_len
         p = Pt(u, v)

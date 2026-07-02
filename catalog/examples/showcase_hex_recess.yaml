@@ -1,0 +1,41 @@
+schema: product/v1
+id: showcase_hex_recess
+archetype: adapter_plate_v1@1
+strict: true
+
+# Recess-mode showcase: decorative honeycomb RELIEF (1.2 mm deep, not
+# through) — surface texture without losing the plate's stiffness.
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - hex_perforation
+
+params:
+  plate_l: 100mm
+  plate_w: 65mm
+  thickness: 5mm
+  corner_r: 6mm
+  a_kind: circle
+  a_count: 4
+  a_bc_d: 52mm
+  a_screw: M3
+  a_cs_face: top
+  b_kind: none
+  bore_d: 0mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
+
+modifiers:
+  - id: add_hex_perforation
+    target: center_zone
+    params:
+      cell_d: 6mm
+      wall_gap: 1.8mm
+      cut_mode: recess
+      recess_depth: 1.2mm

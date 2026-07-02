@@ -43,7 +43,7 @@ def add_ribs(
     placed = 0
     skipped = 0
     for i in range(count):
-        t = 0.5 if count == 1 else i / (count - 1)
+        t = (i + 1) / (count + 1)  # interior distribution
         pos = (inner.u0 if along_u else inner.v0) + t * span_len
         if along_u:
             box = Box3(pos - rib_w / 2, inner.v0, pw.z_top - RIB_WELD,

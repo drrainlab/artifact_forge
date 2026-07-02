@@ -17,6 +17,8 @@ params:
   min_ligament: {type: length, default: 1.6mm, min: 1mm, max: 5mm}
   edge_margin: {type: length, default: 3mm, min: 2mm, max: 16mm}
   relax_iterations: {type: count, default: 2, min: 0, max: 6}
+  corner_smooth: {type: count, default: 2, min: 0, max: 4,
+                  description: Chaikin passes — organic rounded cells}
   cut_mode: {type: choice, choices: [through, recess], default: through}
   recess_depth: {type: length, default: 1.2mm, min: 0.6mm, max: 3mm}
 provides_features: [voronoi_field]

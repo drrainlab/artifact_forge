@@ -123,6 +123,21 @@ def _clip_line(poly: Poly, point: tuple[float, float], normal: tuple[float, floa
     return out
 
 
+def chaikin(poly: Poly, iterations: int = 2) -> Poly:
+    """Chaikin corner cutting on a closed polygon — each pass replaces every
+    vertex with two points at 1/4 and 3/4 of its edges, turning a convex
+    cell into an organic rounded blob. Cutting only moves the boundary
+    INWARD from corners, so ligaments and keepout clearances can only grow."""
+    out = list(poly)
+    for _ in range(max(0, iterations)):
+        smoothed: Poly = []
+        for p, q in zip(out, out[1:] + out[:1]):
+            smoothed.append((0.75 * p[0] + 0.25 * q[0], 0.75 * p[1] + 0.25 * q[1]))
+            smoothed.append((0.25 * p[0] + 0.75 * q[0], 0.25 * p[1] + 0.75 * q[1]))
+        out = smoothed
+    return out
+
+
 def _poly_clear_of_keepout(poly: Poly, keepout: Region2D) -> bool:
     samples: list[Pt] = []
     for p, q in zip(poly, poly[1:] + poly[:1]):
@@ -145,9 +160,10 @@ def voronoi_cells(
     edge_margin: float,
     relax_iterations: int = 2,
     min_cell_area: float = 12.0,
+    corner_smooth: int = 2,
 ) -> list[Poly]:
-    """Deterministic relaxed Voronoi cells, shrunk for the ligament and
-    filtered against keepouts."""
+    """Deterministic relaxed Voronoi cells, shrunk for the ligament,
+    filtered against keepouts and Chaikin-smoothed into organic blobs."""
     inner = window.shrunk(edge_margin)
     if inner.width <= 0 or inner.height <= 0:
         return []
@@ -170,7 +186,7 @@ def voronoi_cells(
         if len(shrunk) < 3 or _area(shrunk) < min_cell_area:
             continue
         if all(_poly_clear_of_keepout(shrunk, k) for k in keepouts):
-            out.append(shrunk)
+            out.append(chaikin(shrunk, corner_smooth))
     return out
 
 
