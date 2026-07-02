@@ -4,9 +4,10 @@ cutout through the lip center and a cable trough across the slot floor
 
 from __future__ import annotations
 
-from ..form.part import CutBoxFeature, PartForm, RibFeature
+from ..form.part import CutBoxFeature, FaceWindow, PartForm, RibFeature
 from ..form.profiles_stand import StandParams, build_stand_profile
-from ..form.regions import Box3, Region
+from ..form.section import ArcSeg
+from ..form.regions import Box3, Rect2D, Region
 from ..form.style import resolve_style
 from ..product.archetype import ArchetypeSpec, RegionRole
 from ..product.instance import ProductInstance
@@ -96,12 +97,42 @@ def build_form(
         Region("base_lightening", RegionRole.AESTHETIC_LIGHTENING,
                Box3(5.0, frame["rest_foot_end"] + 3.0, 0.0,
                     width - 5.0, ctx["base_depth"] - 6.0, bt)),
+        # The tilted back of the rest — the ORIENTED canvas (FaceWindow
+        # below carries the exact local frame). AABB here is the envelope
+        # for schema-level targeting only.
+        Region("rest_lightening", RegionRole.AESTHETIC_LIGHTENING,
+               Box3(0.0, u_rest, bt, width,
+                    frame["rest_top_u"] + ctx["rest_t"] / frame["tilt_sin"],
+                    frame["rest_top_v"])),
     ]
     if cutboxes:
         regions.append(
             Region("cutout_zone", RegionRole.AESTHETIC_LIGHTENING,
                    cutboxes[0].box)
         )
+
+    # Oriented modifier canvas on the back face: local a = X across the
+    # stand, local b = up the slope from the face's bottom edge. Solid
+    # bands are kept at the root (12 mm) and at the top (14 mm — the
+    # phone's upper edge often rests there); depth is the PERPENDICULAR
+    # rest thickness, so cut_mode 'through' pierces exactly the slab.
+    # A biomorphically BOWED back is a curved face — no flat canvas; the
+    # window is declared unusable and any field on it fails honestly.
+    back_is_straight = all(
+        not isinstance(s, ArcSeg)
+        for s in profile.outer.tagged("rest_back")
+    )
+    windows = {
+        "rest_lightening": FaceWindow(
+            origin=(0.0, u_rest + ctx["rest_t"] / frame["tilt_sin"], bt),
+            tilt_deg=ctx["tilt_deg"],
+            window=Rect2D(6.0, 12.0, width - 6.0, ctx["rest_len"] - 14.0),
+            depth=ctx["rest_t"],
+            usable=back_is_straight,
+            note="" if back_is_straight else
+                 "the biomorphic bow curved the back — no flat field canvas",
+        )
+    }
 
     frame = dict(frame)
     frame["width"] = width
@@ -115,6 +146,7 @@ def build_form(
         style=style,
         cutboxes=cutboxes,
         ribs=ribs,
+        windows=windows,
         regions=regions,
         datums={
             "device_seat": {

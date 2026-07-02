@@ -174,3 +174,49 @@ class TestVoronoiOnStand:
         form = run_pre_cad(EXAMPLES / "phone_stand_std.yaml", False).form
         assert form.fields == []
         assert form.region("base_lightening") is not None  # canvas declared
+
+
+class TestOrientedBackField:
+    """Fields on the TILTED back face via the oriented FaceWindow."""
+
+    def test_back_field_local_frame_exact(self):
+        from artifact_forge_ng.pipeline import run_pre_cad
+        import math
+
+        state = run_pre_cad(EXAMPLES / "phone_stand_voronoi_back.yaml", False)
+        form = state.form
+        field = [f for f in form.fields if f.pattern == "voronoi"][0]
+        assert field.tilt_deg == pytest.approx(68.0)
+        assert len(field.polygons) >= 10
+        # local->world: b along the slope, n along the inward normal
+        t = math.radians(68.0)
+        ox, oy, oz = field.origin
+        wx, wy, wz = field.local_to_world(0.0, 10.0, 0.0)
+        assert wy == pytest.approx(oy + 10.0 * math.cos(t))
+        assert wz == pytest.approx(oz + 10.0 * math.sin(t))
+        assert state.report.status is not Status.FAIL
+
+    def test_solid_bands_preserved(self):
+        """Top edge band (phone rest) and root band stay uncut."""
+        from artifact_forge_ng.pipeline import run_pre_cad
+
+        state = run_pre_cad(EXAMPLES / "phone_stand_voronoi_back.yaml", False)
+        field = [f for f in state.form.fields if f.pattern == "voronoi"][0]
+        rest_len = state.form.params["rest_len"]
+        bs = [p[1] for poly in field.polygons for p in poly]
+        assert min(bs) >= 12.0  # root band
+        assert max(bs) <= rest_len - 14.0  # top band
+
+    def test_bio_bowed_back_rejects_field_honestly(self):
+        """The biomorphic bow curves the back — a flat field canvas does
+        not exist and the modifier FAILS loudly, never cuts garbage."""
+        def mutate(data):
+            data["style"] = {
+                "surface": "biomorphic_utility_part", "organicity": 0.6,
+            }
+
+        _, findings = build_form_with_modifiers(
+            path=EXAMPLES / "phone_stand_voronoi_back.yaml", mutate=mutate
+        )
+        fails = [f for f in findings if f.status is Status.FAIL]
+        assert fails and "no usable window" in fails[0].message

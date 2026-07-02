@@ -370,9 +370,12 @@ def hex_field_present(geometry: Geometry, form: PartForm) -> Finding:
             bb_w = max(p[0] for p in poly) - min(p[0] for p in poly)
             bb_h = max(p[1] for p in poly) - min(p[1] for p in poly)
             r = 0.3 * max(0.5, min(bb_w, bb_h))
+        # World-space probe box at the cell's mid-depth — works for both
+        # horizontal and oriented (tilted-face) fields.
+        wx, wy, wz = field.local_to_world(cu, cv, field.depth * 0.45)
+        half = max(0.6, min(r, field.depth * 0.4))
         probe = box_probe(
-            cu - r, cv - r, field.plane_z - field.depth * 0.9,
-            cu + r, cv + r, field.plane_z,
+            wx - r, wy - half, wz - half, wx + r, wy + half, wz + half
         )
         frac = solid_fraction(geometry.workplane, probe)
         if frac > 0.3:

@@ -1,0 +1,39 @@
+schema: product/v1
+id: phone_stand_voronoi_back
+archetype: phone_stand_v1@1
+strict: true
+
+# Voronoi THROUGH THE TILTED BACK — the field is applied in the face's own
+# frame (rotated about X by the tilt), piercing exactly the rest slab.
+# Solid bands stay at the top edge (phone rest) and the root; the classic
+# perforated-stand look, engineering intact.
+
+requested_features:
+  - device_rest
+  - stable_footprint
+  - charging_cutout
+  - voronoi_field
+
+params:
+  device_w: 78mm
+  device_thickness: 11mm
+  tilt_deg: 68deg
+  rest_len: 100mm
+  charging_cutout: true
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
+
+modifiers:
+  - id: add_voronoi_field
+    target: rest_lightening
+    params:
+      seed: 9
+      sites: 16
+      min_ligament: 2.2mm
+      edge_margin: 2mm
+      cut_mode: through

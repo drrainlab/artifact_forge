@@ -83,6 +83,9 @@ regions:
      forbidden_modifiers: [add_hex_perforation]}
   - {id: base_lightening, role: aesthetic_lightening, editable: true,
      description: rear base deck behind the rest — safe to perforate}
+  - {id: rest_lightening, role: aesthetic_lightening, editable: true,
+     description: "the tilted back of the rest (oriented canvas); top edge
+       band and root stay solid"}
 
 surface_style: molded_utility_part
 

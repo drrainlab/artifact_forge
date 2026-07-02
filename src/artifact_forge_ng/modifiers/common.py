@@ -41,19 +41,37 @@ def note(modifier_id: str, message: str) -> Finding:
 
 @dataclass(frozen=True)
 class PlateWindow:
-    """A modifier's working area on a horizontal face."""
+    """A modifier's working area. Horizontal by default; when the builder
+    declared an oriented FaceWindow for the target region, ``origin``/
+    ``tilt_deg`` carry its local frame and ``window``/``keepouts`` are in
+    LOCAL (a, b) coordinates."""
 
-    window: Rect2D  # in (x, y)
+    window: Rect2D  # (x, y) horizontal, or local (a, b) when oriented
     z_top: float
     depth: float  # host material depth under the face
     keepouts: tuple[Region2D, ...]
+    origin: tuple[float, float, float] | None = None
+    tilt_deg: float = 0.0
 
 
 def plate_window(
     form: PartForm, region_name: str, keepout_clearance: float = 0.0
 ) -> PlateWindow | None:
     """Resolve a region into a top-face window plus keepouts. Returns None
-    when the region is missing or unusable (the applicator reports it)."""
+    when the region is missing or unusable (the applicator reports it).
+    An oriented FaceWindow declared by the builder wins over the AABB."""
+    face = form.windows.get(region_name)
+    if face is not None:
+        if not face.usable:
+            return None  # the applicator reports "no usable window"
+        return PlateWindow(
+            window=face.window,
+            z_top=0.0,
+            depth=face.depth,
+            keepouts=face.keepouts,
+            origin=face.origin,
+            tilt_deg=face.tilt_deg,
+        )
     region = form.region(region_name)
     if region is None:
         return None

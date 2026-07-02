@@ -67,6 +67,28 @@ class FieldFeature:
     polygons: tuple[tuple[tuple[float, float], ...], ...] = ()
     #: Guaranteed minimum web between cells (validated, not hoped).
     min_ligament: float = 0.0
+    #: Oriented field (a tilted face): cell coords are LOCAL (a, b); the
+    #: local frame is a rotation about the +X axis by ``tilt_deg`` followed
+    #: by a translation to ``origin``. None = legacy horizontal field.
+    origin: tuple[float, float, float] | None = None
+    tilt_deg: float = 0.0
+
+    def local_to_world(self, a: float, b: float, n: float = 0.0) -> tuple[float, float, float]:
+        """Map local (a, b, n) — in-plane coords + offset ALONG the cut
+        direction (into the material) — to world XYZ."""
+        import math
+
+        if self.origin is None:
+            return (a, b, self.plane_z - n)
+        t = math.radians(self.tilt_deg)
+        # local X -> world X; local Y -> (0, cos t, sin t);
+        # local Z (cut direction, into material) -> (0, -sin t, cos t)
+        ox, oy, oz = self.origin
+        return (
+            ox + a,
+            oy + b * math.cos(t) - n * math.sin(t),
+            oz + b * math.sin(t) + n * math.cos(t),
+        )
 
 
 @dataclass(frozen=True)
@@ -112,6 +134,25 @@ class CutBoxFeature:
 
 
 @dataclass(frozen=True)
+class FaceWindow:
+    """An ORIENTED modifier canvas the builder declares for a region whose
+    face is not horizontal (the phone stand's tilted back). Local frame:
+    rotate about +X by ``tilt_deg``, translate to ``origin``; local (a, b)
+    span the face, the cut direction is the face's inward normal.
+    tilt_deg = 90 is a vertical face; 0 degenerates to a horizontal one."""
+
+    origin: tuple[float, float, float]
+    tilt_deg: float
+    window: Rect2D  # in local (a, b)
+    depth: float  # material thickness along the inward normal
+    keepouts: tuple[Region2D, ...] = ()  # in local (a, b)
+    #: False when the face exists but cannot take a flat field right now
+    #: (e.g. the biomorphic bow curved it) — applicators fail honestly.
+    usable: bool = True
+    note: str = ""
+
+
+@dataclass(frozen=True)
 class RibFeature:
     """An ADDITIVE bar welded onto a face — the additive half of the
     modifier kernel (stiffening ribs, bosses). The box is the rib's full
@@ -152,6 +193,8 @@ class PartForm:
     cutboxes: list[CutBoxFeature] = field(default_factory=list)
     ribs: list[RibFeature] = field(default_factory=list)
     fields: list[FieldFeature] = field(default_factory=list)
+    #: Oriented modifier canvases, keyed by the region name they serve.
+    windows: dict[str, FaceWindow] = field(default_factory=dict)
     regions: list[Region] = field(default_factory=list)
     blends: list[BlendDirective] = field(default_factory=list)
     datums: dict[str, dict[str, Any]] = field(default_factory=dict)

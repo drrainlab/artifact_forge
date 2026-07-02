@@ -42,6 +42,10 @@ def add_hex_perforation(
         plane_z=pw.z_top,
         depth=_depth_for(cut_mode, pw.depth, params.get("recess_depth", 1.2)),
     )
+    if pw.origin is not None:
+        from dataclasses import replace
+
+        field = replace(field, origin=pw.origin, tilt_deg=pw.tilt_deg)
     form.fields.append(field)
     return [
         note(use.id, f"{len(field.centers)} hex cells ({cut_mode}) on {use.target}")
@@ -114,6 +118,8 @@ def add_grid_slot_field(
             keepouts=pw.keepouts,
             polygons=tuple(polygons),
             min_ligament=web,
+            origin=pw.origin,
+            tilt_deg=pw.tilt_deg,
         )
     )
     return [note(use.id, f"{len(polygons)} slots ({cut_mode}) on {use.target}")]
@@ -150,6 +156,8 @@ def add_voronoi_field(
             keepouts=pw.keepouts,
             polygons=tuple(tuple(c) for c in cells),
             min_ligament=ligament,
+            origin=pw.origin,
+            tilt_deg=pw.tilt_deg,
         )
     )
     return [
