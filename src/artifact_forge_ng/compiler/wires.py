@@ -40,3 +40,19 @@ def extrude_section_profile(profile: SectionProfile, width: float) -> cq.Workpla
         cutter = wire_from_loop(void, profile.plane).extrude(width)
         solid = solid.cut(cutter)
     return solid
+
+
+def revolve_section_profile(profile: SectionProfile) -> cq.Workplane:
+    """Revolve a half-section 360 degrees into a solid of revolution.
+
+    Convention: plane XZ — local x is the radial coordinate u, local y is
+    the axial coordinate v, and the revolve axis (local (0,0)->(0,1)) is the
+    global Z axis. The half-section must stay strictly on the +u side
+    (validated at the IR level by form.revolve_profile_clear_of_axis).
+    """
+    if profile.plane != "XZ":
+        raise ValueError(
+            f"profile_revolve expects plane XZ (radial, axial); got {profile.plane!r}"
+        )
+    wp = wire_from_loop(profile.outer, profile.plane)
+    return wp.revolve(360.0, (0, 0), (0, 1))

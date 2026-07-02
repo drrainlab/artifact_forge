@@ -63,6 +63,42 @@ class FieldFeature:
 
 
 @dataclass(frozen=True)
+class BoreFeature:
+    """An axis-aligned cylindrical cut (a wiring channel leg, a central
+    bore). ``span`` is the axis-coordinate range of the cut; verification
+    reuses the swept-cylinder channel probe along the same span."""
+
+    name: str
+    axis: str  # "X" | "Y" | "Z"
+    center: tuple[float, float, float]  # any point on the bore axis
+    d: float
+    span: tuple[float, float]
+
+    def path(self, overshoot: float = 1.0) -> list[tuple[float, float, float]]:
+        """The probe polyline along the bore (with overshoot past both ends)."""
+        x, y, z = self.center
+        lo, hi = self.span[0] - overshoot, self.span[1] + overshoot
+        if self.axis == "X":
+            return [(lo, y, z), (hi, y, z)]
+        if self.axis == "Y":
+            return [(x, lo, z), (x, hi, z)]
+        return [(x, y, lo), (x, y, hi)]
+
+
+@dataclass(frozen=True)
+class CutBoxFeature:
+    """An axis-aligned box cut (a charging cutout, a notch). The box must be
+    finite; keepout respect is validated at the IR level before any CAD."""
+
+    name: str
+    box: Box3
+
+    def __post_init__(self) -> None:
+        if not self.box.finite:
+            raise ValueError(f"CutBoxFeature {self.name!r} box must be finite")
+
+
+@dataclass(frozen=True)
 class BlendDirective:
     """A 3D-only blend: edges inside ``zone`` get ``radius``, with the
     safe-fillet ladder as fallback."""
@@ -80,8 +116,12 @@ class PartForm:
     section: SectionProfile
     width: float
     style: SurfaceStyle
+    #: How the section becomes a solid: "section_extrude" | "profile_revolve".
+    kind: str = "section_extrude"
     plates: list[PlateFeature] = field(default_factory=list)
     holes: list[HoleFeature] = field(default_factory=list)
+    bores: list[BoreFeature] = field(default_factory=list)
+    cutboxes: list[CutBoxFeature] = field(default_factory=list)
     fields: list[FieldFeature] = field(default_factory=list)
     regions: list[Region] = field(default_factory=list)
     blends: list[BlendDirective] = field(default_factory=list)

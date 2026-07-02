@@ -115,7 +115,7 @@ class RegionSpec(BaseModel):
 class FormSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["section_extrude", "section_sweep", "plate"]
+    type: Literal["section_extrude", "section_sweep", "plate", "profile_revolve"]
     section: str
     plane: Literal["YZ", "XZ", "XY"] = "YZ"
     width_axis: Literal["X", "Y", "Z"] = "X"

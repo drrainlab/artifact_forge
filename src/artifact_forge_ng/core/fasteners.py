@@ -28,3 +28,18 @@ def screw_spec(name: str) -> dict[str, float]:
     if key not in SCREWS:
         raise KeyError(f"unknown screw size {name!r}; known: {sorted(SCREWS)}")
     return SCREWS[key]
+
+
+#: Standard lamp-socket insert housings (nominal; any explicit inner_d in a
+#: product instance overrides the preset).
+SOCKET_INSERTS: dict[str, dict[str, float]] = {
+    "e27": {"housing_d": 40.0, "depth": 32.0},
+    "gu10": {"housing_d": 35.0, "depth": 28.0},
+}
+
+
+def socket_insert_spec(name: str) -> dict[str, float]:
+    key = name.lower()
+    if key not in SOCKET_INSERTS:
+        raise KeyError(f"unknown socket insert {name!r}; known: {sorted(SOCKET_INSERTS)}")
+    return SOCKET_INSERTS[key]

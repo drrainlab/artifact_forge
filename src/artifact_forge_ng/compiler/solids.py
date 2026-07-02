@@ -23,12 +23,13 @@ from dataclasses import dataclass, field
 import cadquery as cq
 
 from ..cad.booleans import keep_largest, weld
+from ..cad.bores import cut_bore, cut_box
 from ..cad.fillets import safe_fillet_edges, safe_fillet_ladder
 from ..cad.geometry import Geometry
 from ..cad.holes import cut_countersunk_hole
 from ..form.part import PartForm, PlateFeature
 from .fields import cut_field
-from .wires import extrude_section_profile
+from .wires import extrude_section_profile, revolve_section_profile
 
 
 @dataclass
@@ -38,6 +39,8 @@ class CompileLog:
 
     holes_bored: int = 0
     holes_countersunk: int = 0
+    bores_cut: int = 0
+    boxes_cut: int = 0
     field_cut: bool = False
     blends_applied: list[float] = field(default_factory=list)
     blends_skipped: int = 0
@@ -62,7 +65,10 @@ def _build_plate(plate: PlateFeature) -> cq.Workplane:
 def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
     log = CompileLog()
 
-    mass = extrude_section_profile(form.section, form.width)
+    if form.kind == "profile_revolve":
+        mass = revolve_section_profile(form.section)
+    else:
+        mass = extrude_section_profile(form.section, form.width)
 
     for plate in form.plates:
         mass = weld(mass, _build_plate(plate), what=plate.name)
@@ -81,6 +87,18 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
             log.notes.append(
                 f"root blend skipped in zone {blend.zone} — style defect, not fatal"
             )
+
+    for bore in form.bores:
+        mass, cut = cut_bore(mass, bore)
+        log.bores_cut += int(cut)
+        if not cut:
+            log.notes.append(f"bore {bore.name!r} could not be cut")
+
+    for cutbox in form.cutboxes:
+        mass, cut = cut_box(mass, cutbox)
+        log.boxes_cut += int(cut)
+        if not cut:
+            log.notes.append(f"box cut {cutbox.name!r} could not be applied")
 
     for hole in form.holes:
         mass, bored, sunk = cut_countersunk_hole(mass, hole)

@@ -345,6 +345,10 @@ register_probe("form.contact_edges_rounded")(lambda form, ctx: check_contact_edg
 register_probe("form.screw_access_clear")(lambda form, ctx: check_screw_access_clear(form))
 register_probe("form.hex_field_in_safe_zone")(lambda form, ctx: check_hex_field_in_safe_zone(form))
 
+# Import the phase-5 check modules so their registrations run — anything
+# importing validate_form gets the full form-check registry.
+from . import checks_cuts, checks_holes, checks_revolve  # noqa: E402,F401
+
 #: Structural sanity every archetype gets whether it asks or not — mirrors
 #: the always-on manufacturing suite at geometry level.
 UNIVERSAL_FORM_CHECKS = (

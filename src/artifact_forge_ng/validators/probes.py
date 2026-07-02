@@ -52,6 +52,20 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.contact_edges_rounded", Level.FORM, "cable-contact segments carry the contact radius"),
         _decl("form.hex_field_in_safe_zone", Level.FORM, "hex field centers avoid every keepout region"),
         _decl("form.screw_access_clear", Level.FORM, "a screwdriver reaches every screw from below without hitting the hook"),
+        # -- phase-5 form checks (impls in form/checks_*.py) ------------------
+        _decl("form.slots_open_topped", Level.FORM, "every comb slot's throat reaches the profile's top edge"),
+        _decl("form.slot_throat_retention", Level.FORM, "measured throat width is narrower than the cable (snap retention)"),
+        _decl("form.teeth_count_matches", Level.FORM, "number of slot cavities equals the declared slot count"),
+        _decl("form.tunnel_fits_tie", Level.FORM, "measured tunnel section fits the declared tie plus clearances"),
+        _decl("form.tip_lip_present", Level.FORM, "the hook tip lip rises by the declared lip height"),
+        _decl("form.bay_open_top", Level.FORM, "the hook bay entry between lip tip and plate stays open"),
+        _decl("form.channel_inside_walls", Level.FORM, "every bore keeps the minimum wall inside its host section"),
+        _decl("form.revolve_profile_clear_of_axis", Level.FORM, "the half-section never touches or crosses the revolve axis"),
+        _decl("form.stability_footprint", Level.FORM, "combined part+device COM stays inside the base footprint"),
+        _decl("form.min_web_between_holes", Level.FORM, "no two holes closer than the minimum web"),
+        _decl("form.holes_within_outline", Level.FORM, "every hole keeps the minimum web to the outline"),
+        _decl("form.cuts_respect_keepouts", Level.FORM, "no bore or box cut intersects a keepout region"),
+        _decl("form.device_slot_fits", Level.FORM, "measured device slot fits the declared device thickness at tilt"),
         # -- topology level: probed on the compiled solid ---------------------
         _decl("topology.single_connected_solid", Level.TOPOLOGY, "exactly one connected valid solid"),
         _decl("topology.cavity_open", Level.TOPOLOGY, "the cable cavity is a real void along the cable axis"),
@@ -61,6 +75,14 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.screw_holes_open", Level.TOPOLOGY, "screw holes pass through the flange"),
         _decl("topology.countersinks_present", Level.TOPOLOGY, "conical countersinks removed material at hole rims"),
         _decl("topology.hex_field_present", Level.TOPOLOGY, "hex perforation removed material in the safe zone"),
+        # -- phase-5 topology probes ------------------------------------------
+        _decl("topology.bores_open", Level.TOPOLOGY, "every declared bore is void along its span"),
+        _decl("topology.channel_continuous", Level.TOPOLOGY, "the wiring channel is void along its full L-path"),
+        _decl("topology.slots_open", Level.TOPOLOGY, "every comb slot's cavity and throat are void"),
+        _decl("topology.tunnel_open", Level.TOPOLOGY, "the tie tunnel is void along the extrusion axis"),
+        _decl("topology.revolve_cavity_open", Level.TOPOLOGY, "the revolved cavity is void along the axis end to end"),
+        _decl("topology.cutout_present", Level.TOPOLOGY, "every declared box cut removed material"),
+        _decl("topology.bay_open", Level.TOPOLOGY, "the hook bay entry gap is void on the compiled solid"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),
@@ -82,6 +104,14 @@ FORBIDDEN_FORM_DETECTORS: dict[str, str] = {
     "closed_ring": "form.mouth_opens_sideways",
     "downward_entry": "form.mouth_opens_sideways",
     "boxy_rectangular_hook": "form.profile_smooth",
+    # phase-5 families (forbidden forms stay per-archetype: a springy
+    # symmetric C is legal for a broom clip, closed_slot never is for a comb)
+    "closed_slot": "form.slots_open_topped",
+    "blocked_tunnel": "topology.tunnel_open",
+    "blocked_channel": "topology.channel_continuous",
+    "profile_crosses_axis": "form.revolve_profile_clear_of_axis",
+    "tipping_stand": "form.stability_footprint",
+    "closed_bay": "form.bay_open_top",
 }
 
 

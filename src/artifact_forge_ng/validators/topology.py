@@ -171,6 +171,57 @@ def countersinks_present(geometry: Geometry, form: PartForm) -> Finding:
     )
 
 
+@register_probe("topology.bores_open")
+def bores_open(geometry: Geometry, form: PartForm) -> Finding:
+    if not form.bores:
+        return Finding(
+            check="topology.bores_open",
+            status=Status.PASS,
+            level=Level.TOPOLOGY,
+            message="no bores declared",
+        )
+    blocked = []
+    for bore in form.bores:
+        probe = channel_probe(bore.path(), d=bore.d * 0.8)
+        frac = solid_fraction(geometry.workplane, probe)
+        if frac > 0.05:
+            blocked.append(f"{bore.name} (fill {frac:.2f})")
+    return _finding(
+        "topology.bores_open",
+        not blocked,
+        "all bores void" if not blocked else "blocked bores: " + ", ".join(blocked),
+    )
+
+
+@register_probe("topology.cutout_present")
+def cutout_present(geometry: Geometry, form: PartForm) -> Finding:
+    if not form.cutboxes:
+        return Finding(
+            check="topology.cutout_present",
+            status=Status.PASS,
+            level=Level.TOPOLOGY,
+            message="no box cuts declared",
+        )
+    solid_ones = []
+    for cut in form.cutboxes:
+        b = cut.box
+        # Probe a shrunken core of the cut so boundary fuzz doesn't count.
+        mx, my, mz = (b.x1 - b.x0) * 0.2, (b.y1 - b.y0) * 0.2, (b.z1 - b.z0) * 0.2
+        probe = box_probe(
+            b.x0 + mx, b.y0 + my, b.z0 + mz, b.x1 - mx, b.y1 - my, b.z1 - mz
+        )
+        frac = solid_fraction(geometry.workplane, probe)
+        if frac > 0.2:
+            solid_ones.append(f"{cut.name} (fill {frac:.2f})")
+    return _finding(
+        "topology.cutout_present",
+        not solid_ones,
+        "all box cuts removed material"
+        if not solid_ones
+        else "cuts missing: " + ", ".join(solid_ones),
+    )
+
+
 @register_probe("topology.hex_field_present")
 def hex_field_present(geometry: Geometry, form: PartForm) -> Finding:
     fields = [f for f in form.fields if f.centers]
