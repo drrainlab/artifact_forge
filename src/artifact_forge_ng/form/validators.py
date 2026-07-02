@@ -238,6 +238,38 @@ def check_contact_edges_rounded(form: PartForm) -> Finding:
     )
 
 
+def check_screw_access_clear(form: PartForm) -> Finding:
+    """A screwdriver approaches each screw from BELOW (-Z). The vertical
+    access cylinder around the hole must clear the hook's floor-plan
+    footprint — a hole over the hook or a lip cannot be driven at all.
+    Born from a real print: v1-style centered holes landed over the lower
+    lip."""
+    from .regions import Rect2D
+
+    if not form.holes:
+        return _finding("form.screw_access_clear", True, "no fastener holes")
+    lo, hi = form.section.outer.bbox()
+    # Hook floor-plan: full extrusion width in X, profile u-range in Y.
+    hook = Rect2D(0.0, lo.u, form.width, hi.u)
+    head_r = form.frame.get("screw_head_r", 3.5)
+    access_r = head_r + 1.5  # head seat + driver wobble
+    blocked = []
+    for hole in form.holes:
+        x, y, _ = hole.at
+        gap = hook.distance(Pt(x, y))
+        if gap < access_r:
+            blocked.append(f"({x:.1f},{y:.1f}) gap {gap:.1f} < {access_r:.1f}")
+    return _finding(
+        "form.screw_access_clear",
+        not blocked,
+        "all screws clear the hook footprint"
+        if not blocked
+        else "screws unreachable from below: " + "; ".join(blocked),
+        critical=True,
+        suggestion="" if not blocked else "increase screw_spacing / flange_l",
+    )
+
+
 def check_hex_field_in_safe_zone(form: PartForm) -> Finding:
     if not form.fields:
         return _finding(
@@ -289,5 +321,6 @@ def validate_form(form: PartForm, declared_region_ids: list[str]) -> list[Findin
         check_wall_thickness(form),
         check_regions_present(form, declared_region_ids),
         check_contact_edges_rounded(form),
+        check_screw_access_clear(form),
         check_hex_field_in_safe_zone(form),
     ]

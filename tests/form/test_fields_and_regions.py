@@ -101,3 +101,53 @@ class TestFlagshipForm:
     def test_datums_present(self, flagship_form):
         form, _ = flagship_form
         assert "flange_face" in form.datums and "mouth_center" in form.datums
+
+    def test_screws_beside_hook_and_countersink_below(self, flagship_form):
+        form, _ = flagship_form
+        from artifact_forge_ng.form.validators import check_screw_access_clear
+        from artifact_forge_ng.core.findings import Status
+
+        assert check_screw_access_clear(form).status is Status.PASS
+        for hole in form.holes:
+            x, _, _ = hole.at
+            assert x < 0 or x > form.width  # beside the hook, not over it
+            assert hole.countersink_face == "bottom"
+
+    def test_hole_over_hook_fails_access_check(self, flagship_form):
+        """The v1-style layout (hole over the lip) must FAIL the new check."""
+        from artifact_forge_ng.form.part import HoleFeature
+        from artifact_forge_ng.form.validators import check_screw_access_clear
+        from artifact_forge_ng.core.findings import Status
+
+        form, _ = flagship_form
+        bad_hole = HoleFeature(
+            at=(form.width / 2.0, 25.0, form.plates[0].z_top),  # over the lip
+            screw="M4",
+            through=form.plates[0].thickness,
+        )
+        original_holes = form.holes
+        try:
+            form.holes = [bad_hole]
+            finding = check_screw_access_clear(form)
+            assert finding.status is Status.FAIL
+            assert finding.critical
+        finally:
+            form.holes = original_holes
+
+    def test_narrow_spacing_clamped_to_driver_clearance(self, flagship_form):
+        """ТЗ regression asks ~30mm spacing; the archetype floor honestly
+        clamps it past the hook so the screws stay reachable."""
+        from artifact_forge_ng.catalog.loader import load_catalog, load_instance
+        from artifact_forge_ng.product.instance import ProductInstance
+        from artifact_forge_ng.product.resolve import resolve_params
+
+        catalog = load_catalog()
+        instance = load_instance(EXAMPLES / "desk_cable_clip_20mm.yaml")
+        data = instance.model_dump(by_alias=True)
+        data["params"]["screw_spacing"] = "30mm"
+        instance = ProductInstance.model_validate(data)
+        archetype = catalog.archetypes[instance.archetype_id]
+        resolved = resolve_params(archetype, instance)
+        assert resolved.context["screw_spacing"] == pytest.approx(
+            resolved.context["flange_w"] + 13.0
+        )

@@ -31,9 +31,15 @@ def keepouts_preserved(geometry: Geometry, form: PartForm) -> Finding:
     violated = []
     for hole in form.holes:
         x, y, z_top = hole.at
+        # Slab between the countersink recess and the far face — must stay
+        # solid apart from the bore itself.
+        if hole.countersink_face == "bottom":
+            z_lo, z_hi = z_top - hole.through + 2.2, z_top - 0.1
+        else:
+            z_lo, z_hi = z_top - hole.through + 0.1, z_top - 2.2
         zone = box_probe(
-            x - head_r - 1.5, y - head_r - 1.5, z_top - hole.through,
-            x + head_r + 1.5, y + head_r + 1.5, z_top - 2.2,
+            x - head_r - 1.5, y - head_r - 1.5, z_lo,
+            x + head_r + 1.5, y + head_r + 1.5, z_hi,
         )
         frac = solid_fraction(geometry.workplane, zone)
         if frac < 0.75:

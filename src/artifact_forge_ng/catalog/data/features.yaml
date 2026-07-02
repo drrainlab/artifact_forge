@@ -44,6 +44,7 @@ features:
   - id: countersunk_screw_holes
     description: vertical screw holes with conical countersinks in the flange
     verified_by:
+      - form.screw_access_clear
       - topology.screw_holes_open
       - topology.countersinks_present
 

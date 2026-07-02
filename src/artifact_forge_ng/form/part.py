@@ -34,12 +34,18 @@ class PlateFeature:
 
 @dataclass(frozen=True)
 class HoleFeature:
-    """A vertical fastener hole through a plate, axis -Z from the top face."""
+    """A vertical fastener hole through a plate, axis -Z from the top face.
+
+    ``countersink_face`` names where the screw HEAD seats: for an under-desk
+    part the screw enters from below, so the recess belongs on the bottom
+    face — the desk-side face must stay flat.
+    """
 
     at: tuple[float, float, float]  # top-face center (x, y, z_top)
     screw: str
     through: float  # cut depth
     countersink: bool = True
+    countersink_face: str = "bottom"  # "bottom" | "top"
 
 
 @dataclass(frozen=True)

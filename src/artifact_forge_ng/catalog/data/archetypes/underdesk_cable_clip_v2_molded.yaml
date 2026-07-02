@@ -55,8 +55,10 @@ parameters:
   screw:
     {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
   screw_spacing:
-    {type: length, default: 50mm, min: 10mm, max: expr(flange_l - 10.0),
-     role: assembly}
+    {type: length, default: 50mm, min: expr(flange_w + 13), max: expr(flange_l - 10.0),
+     role: assembly,
+     description: screws sit beside the hook along the cable axis; the floor
+       keeps a driver clear of the hook footprint}
   clearance:
     {type: length, default: 0.8mm, min: 0.2mm, max: 2mm, role: manufacturing,
      description: radial cavity clearance around the bundle}
@@ -100,6 +102,7 @@ validators:
   - form.wall_thickness
   - form.regions_present
   - form.contact_edges_rounded
+  - form.screw_access_clear
   - topology.single_connected_solid
   - topology.cavity_open
   - topology.mouth_opens_sideways

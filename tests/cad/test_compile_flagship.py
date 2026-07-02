@@ -63,11 +63,12 @@ def test_bbox_matches_ir(golden_build):
     geometry, _, form = golden_build
     lo, hi = form.section.outer.bbox()
     bb = geometry.bounding_box()
-    assert bb.xmin == pytest.approx(0.0, abs=0.5)
-    assert bb.xmax == pytest.approx(form.width, abs=0.5)
-    # section (u, v) = (y, z); flange extends y further than the hook
-    assert bb.zmin == pytest.approx(lo.v, abs=0.5)
     plate = form.plates[0]
+    # The flange runs along the cable axis, wider than the hook in X.
+    assert bb.xmin == pytest.approx(min(0.0, plate.x0), abs=0.5)
+    assert bb.xmax == pytest.approx(max(form.width, plate.x1), abs=0.5)
+    # section (u, v) = (y, z); the hook's mouth extends y past the flange
+    assert bb.zmin == pytest.approx(lo.v, abs=0.5)
     assert bb.zmax == pytest.approx(plate.z_top, abs=0.5)
     assert bb.ymax == pytest.approx(max(hi.u, plate.y1), abs=0.5)
 

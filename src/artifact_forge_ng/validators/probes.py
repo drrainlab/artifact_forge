@@ -51,6 +51,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.regions_present", Level.FORM, "all semantic regions the archetype declares exist"),
         _decl("form.contact_edges_rounded", Level.FORM, "cable-contact segments carry the contact radius"),
         _decl("form.hex_field_in_safe_zone", Level.FORM, "hex field centers avoid every keepout region"),
+        _decl("form.screw_access_clear", Level.FORM, "a screwdriver reaches every screw from below without hitting the hook"),
         # -- topology level: probed on the compiled solid ---------------------
         _decl("topology.single_connected_solid", Level.TOPOLOGY, "exactly one connected valid solid"),
         _decl("topology.cavity_open", Level.TOPOLOGY, "the cable cavity is a real void along the cable axis"),

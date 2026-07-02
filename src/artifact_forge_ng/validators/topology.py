@@ -157,9 +157,11 @@ def countersinks_present(geometry: Geometry, form: PartForm) -> Finding:
         if not hole.countersink:
             continue
         x, y, z_top = hole.at
-        band = box_probe(
-            x - head_r, y - head_r, z_top - 0.4, x + head_r, y + head_r, z_top - 0.05
-        )
+        if hole.countersink_face == "bottom":
+            z_lo, z_hi = z_top - hole.through + 0.05, z_top - hole.through + 0.4
+        else:
+            z_lo, z_hi = z_top - 0.4, z_top - 0.05
+        band = box_probe(x - head_r, y - head_r, z_lo, x + head_r, y + head_r, z_hi)
         if solid_fraction(geometry.workplane, band) > 0.9:
             missing.append(hole.at)
     return _finding(

@@ -31,12 +31,11 @@ def cut_countersunk_hole(
         return body, bored, False
     head_r = spec["head"] / 2.0
     cs_depth = min(2.0, hole.through * 0.4)
-    cone = cq.Solid.makeCone(
-        head_r + 0.3,
-        0.5,
-        cs_depth,
-        cq.Vector(x, y, z_top),
-        cq.Vector(0, 0, -1),
-    )
+    if hole.countersink_face == "bottom":
+        # Screw head seats on the underside; the desk-side face stays flat.
+        apex, direction = cq.Vector(x, y, z_top - hole.through), cq.Vector(0, 0, 1)
+    else:
+        apex, direction = cq.Vector(x, y, z_top), cq.Vector(0, 0, -1)
+    cone = cq.Solid.makeCone(head_r + 0.3, 0.5, cs_depth, apex, direction)
     body, sunk = cut_keep_solid(body, cq.Workplane(obj=cone))
     return body, bored, sunk
