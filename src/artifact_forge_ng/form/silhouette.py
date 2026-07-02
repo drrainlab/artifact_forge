@@ -11,7 +11,7 @@ import math
 from dataclasses import dataclass
 
 from .part import PartForm
-from .section import ArcSeg, LineSeg, ProfileLoop, Pt, SectionProfile, SideOpenObroundCavity
+from .section import LineSeg, ProfileLoop, Pt, SectionProfile, SideOpenObroundCavity
 
 
 @dataclass(frozen=True)
@@ -64,12 +64,27 @@ def measure_mouth_direction(profile: SectionProfile) -> tuple[float, float] | No
     return (d.u / n, d.v / n)
 
 
-def cavity_back_closed(loop: ProfileLoop) -> bool:
-    """The cavity arc must wrap well past a half-circle — an open back or a
-    shallow scoop is not a hook."""
-    arcs = [s for s in loop.tagged("cavity_inner") if isinstance(s, ArcSeg)]
-    total_sweep = sum(abs(s.sweep) for s in arcs)
-    return total_sweep >= math.radians(200)
+def cavity_back_closed(loop: ProfileLoop, center: Pt | None = None) -> bool:
+    """The cavity boundary must wrap well past a half-circle around its
+    center — an open back or a shallow scoop is not a hook. Measured as the
+    ANGULAR COVERAGE of every cavity_inner segment (arcs AND chords — a
+    teardrop's 45-degree chamfers close the bottom just as well)."""
+    segments = loop.tagged("cavity_inner")
+    if not segments:
+        return False
+    if center is None:
+        # centroid of the cavity boundary samples — good enough fallback
+        pts = [s.point_at(t / 4) for s in segments for t in range(5)]
+        center = Pt(sum(p.u for p in pts) / len(pts), sum(p.v for p in pts) / len(pts))
+    coverage = 0.0
+    steps = 16
+    for seg in segments:
+        # subdivide: the chord-endpoint angle wraps for sweeps > 180 deg
+        for i in range(steps):
+            a = seg.point_at(i / steps) - center
+            b = seg.point_at((i + 1) / steps) - center
+            coverage += abs(math.atan2(a.cross(b), a.dot(b)))
+    return coverage >= math.radians(200)
 
 
 def measure(profile: SectionProfile, frame: dict[str, float]) -> SilhouetteReport:
@@ -94,8 +109,10 @@ def measure(profile: SectionProfile, frame: dict[str, float]) -> SilhouetteRepor
         problems.append("lip lengths unmeasurable")
     elif ratio <= 1.5:
         problems.append(f"lip ratio {ratio:.2f} <= 1.5 — symmetric-ish lips")
-    if not cavity_back_closed(loop):
-        problems.append("cavity back is not closed (sweep < 200 degrees)")
+    cavity = profile.features.get("cavity")
+    cavity_center = cavity.center if isinstance(cavity, SideOpenObroundCavity) else None
+    if not cavity_back_closed(loop, cavity_center):
+        problems.append("cavity back is not closed (coverage < 200 degrees)")
 
     return SilhouetteReport(
         mouth_gap=gap,

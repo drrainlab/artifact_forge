@@ -40,8 +40,21 @@ class ModifierOps(BaseModel):
 class Patch(VersionedModel):
     SCHEMA_KIND: ClassVar[str] = "patch"
 
+    #: What KIND of edit this is — functional changes the product's job,
+    #: manufacturing its printability, structural its strength, style its
+    #: skin. Classification feeds the edit report, not different code paths.
+    type: str = "functional"  # functional | manufacturing | structural | style
     reason: str = ""
+    #: Names that MUST come out of the rebuild unchanged: parameter names
+    #: (resolved values compared numerically) and/or feature ids (must
+    #: still be BUILT after). Verified by the edit pipeline — a violated
+    #: preserve fails the edit, it is a guarantee, not a hope.
+    preserve: list[str] = []
     params: dict[str, Any] = {}
+    #: Merged over instance.manufacturing (e.g. support_policy: none).
+    manufacturing: dict[str, Any] = {}
+    #: Merged over instance.style (e.g. surface: biomorphic_utility_part).
+    style: dict[str, Any] = {}
     modifiers: ModifierOps = ModifierOps()
 
 
@@ -63,6 +76,12 @@ def apply_patch(
     catalog: Catalog,
 ) -> ProductInstance:
     """Pure: returns a NEW validated instance; the input is untouched."""
+    for name in patch.preserve:
+        if name not in archetype.parameters and name not in catalog.features:
+            raise PatchError(
+                f"preserve entry {name!r} is neither a parameter of "
+                f"{archetype.id!r} nor a feature in the vocabulary"
+            )
     current = resolve_params(archetype, instance)
     data = instance.model_dump(by_alias=True, exclude_none=False)
     params: dict[str, Any] = dict(data.get("params", {}))
@@ -92,6 +111,14 @@ def apply_patch(
         params[name] = _canonical_yaml_value(new_value, spec.type)
 
     data["params"] = params
+
+    if patch.manufacturing:
+        data["manufacturing"] = {
+            **data.get("manufacturing", {}),
+            **patch.manufacturing,
+        }
+    if patch.style:
+        data["style"] = {**data.get("style", {}), **patch.style}
 
     modifiers = [dict(m) for m in data.get("modifiers", [])]
     if patch.modifiers.remove:

@@ -63,6 +63,11 @@ parameters:
   clearance:
     {type: length, default: 0.8mm, min: 0.2mm, max: 2mm, role: manufacturing,
      description: radial cavity clearance around the bundle}
+  cavity_roof:
+    {type: choice, choices: [round, teardrop], default: round,
+     role: manufacturing,
+     description: "teardrop = self-supporting 45deg cavity bottom for
+       support-free printing (hook gets ~40% of a radius deeper)"}
 
 derived:
   cavity_r: expr((bundle_d + 2 * clearance) / 2)

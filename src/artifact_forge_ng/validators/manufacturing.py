@@ -59,26 +59,39 @@ def min_wall(geometry: Geometry, form: PartForm) -> Finding:
 
 @register_probe("manufacturing.overhang")
 def overhang(geometry: Geometry, form: PartForm) -> Finding:
-    """Printed flange-down, the cavity ceiling is a bridged circular span.
-    Heuristic thresholds (documented, replaceable by mesh analysis):
-    span <= 25 mm bridges fine; 25-35 warns; beyond that needs support."""
-    span = 2.0 * form.frame.get("r_cavity", 0.0)
-    if span <= 25.0:
+    """Printed flange-down, a ROUND cavity ceiling is a bridged circular
+    span whose lowest quadrant approaches 90-degree overhang — small spans
+    bridge, larger ones sag. A TEARDROP cavity is self-supporting at 45
+    degrees by construction. Heuristics documented, replaceable by mesh
+    analysis."""
+    if form.frame.get("cavity_teardrop", 0.0) >= 0.5:
         return _finding(
             "manufacturing.overhang", Status.PASS,
-            f"cavity bridge span {span:.1f} mm — printable without support",
-            measured=span, limit=25.0,
+            "self-supporting 45deg teardrop cavity roof — no supports",
+            measured=45.0, limit=45.0,
+        )
+    span = 2.0 * form.frame.get("r_cavity", 0.0)
+    if span <= 0.0:
+        return _finding(
+            "manufacturing.overhang", Status.PASS, "no cavity to bridge"
+        )
+    if span <= 12.0:
+        return _finding(
+            "manufacturing.overhang", Status.PASS,
+            f"round cavity span {span:.1f} mm — trivial bridge",
+            measured=span, limit=12.0,
         )
     if span <= 35.0:
         return _finding(
             "manufacturing.overhang", Status.WARN,
-            f"cavity bridge span {span:.1f} mm — expect some sag",
-            measured=span, limit=25.0,
-            suggestion="reduce bundle_d or allow supports",
+            f"round cavity roof spans {span:.1f} mm — relies on bridging "
+            "(near-90deg local overhang at the roof sides)",
+            measured=span, limit=12.0,
+            suggestion="cavity_roof: teardrop (the make_support_free edit)",
         )
     return _finding(
         "manufacturing.overhang", Status.FAIL,
-        f"cavity bridge span {span:.1f} mm needs support",
+        f"round cavity span {span:.1f} mm needs support",
         measured=span, limit=35.0,
-        suggestion="allow supports (support_policy: allow) or split the archetype",
+        suggestion="cavity_roof: teardrop, or support_policy: allow",
     )

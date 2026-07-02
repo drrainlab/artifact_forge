@@ -55,6 +55,7 @@ def build_form(
         upper_lip_len=ctx["upper_lip_len"],
         lower_lip_len=ctx["lower_lip_len"],
         neck_drop=ctx["neck_drop"],
+        cavity_roof=resolved.choices.get("cavity_roof", "round"),
     )
     profile, frame = build_molded_side_hook_profile(hook, style)
 

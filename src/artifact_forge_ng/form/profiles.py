@@ -46,6 +46,10 @@ class SideHookParams:
     neck_drop: float
     #: Lower lip tip keeps this fraction of the wall thickness (taper).
     lower_lip_taper: float = 0.7
+    #: "round" (classic circular cavity) or "teardrop" — the bottom of the
+    #: cavity becomes two 45-degree tangent chamfers meeting at a peak, so
+    #: the cavity roof is SELF-SUPPORTING when the clip prints flange-down.
+    cavity_roof: str = "round"
 
     @property
     def r_cavity(self) -> float:
@@ -79,6 +83,11 @@ def side_hook_frame(p: SideHookParams) -> dict[str, float]:
     neck_c = -0.3 * r_i
     n0 = max(neck_c - neck_w / 2.0, -r_o * 0.85)
     n1 = min(neck_c + neck_w / 2.0, r_o * 0.5)
+    teardrop = p.cavity_roof == "teardrop"
+    # Teardrop: 45-degree tangent chamfers meet at a peak sqrt(2)*r below
+    # the center — the hook grows deeper by ~0.41*r_o, the honest price of
+    # a self-supporting cavity roof.
+    hook_bot_v = vc - (r_o * math.sqrt(2.0) if teardrop else r_o)
     return {
         "r_cavity": r_i,
         "r_outer": r_o,
@@ -95,10 +104,11 @@ def side_hook_frame(p: SideHookParams) -> dict[str, float]:
         "upper_lip_v_top": vc + band,
         "lower_lip_v_bot": vc - band,
         "hook_top_v": vc + r_o,  # == -neck_drop
-        "hook_bot_v": vc - r_o,
+        "hook_bot_v": hook_bot_v,
         "neck_u0": n0,
         "neck_u1": n1,
         "weld_top_v": WELD_OVERLAP,
+        "cavity_teardrop": 1.0 if teardrop else 0.0,
     }
 
 
@@ -149,6 +159,41 @@ def build_molded_side_hook_profile(
     def tags(*names: str) -> frozenset[str]:
         return frozenset(names)
 
+    def at_angle(radius: float, deg: float) -> Pt:
+        return Pt(
+            center.u + radius * math.cos(math.radians(deg)),
+            center.v + radius * math.sin(math.radians(deg)),
+        )
+
+    inner_tags = tags("cavity_inner", "cable_contact", "mouth_corner")
+    if p.cavity_roof == "teardrop":
+        # Self-supporting cavity: the bottom quarter of the circle becomes
+        # two 45-degree TANGENT chamfers meeting at a peak sqrt(2)*r below
+        # the center (tangency at the 225/315-degree points is exact, so
+        # only the peak needs the molded pass). The outer wall follows the
+        # same teardrop at r_o — the wall stays constant by construction.
+        peak_i = Pt(center.u, vc - r_i * math.sqrt(2.0))
+        cavity_chain: list[Seg] = [
+            ArcSeg(a_i, at_angle(r_i, 225.0), center, ccw=True, tags=inner_tags),
+            LineSeg(at_angle(r_i, 225.0), peak_i, inner_tags),
+            LineSeg(peak_i, at_angle(r_i, 315.0), inner_tags),
+            ArcSeg(at_angle(r_i, 315.0), b_i, center, ccw=True, tags=inner_tags),
+        ]
+        peak_o = Pt(center.u, vc - r_o * math.sqrt(2.0))
+        outer_tags = tags("hook_outer", "root", "external")
+        outer_bottom: list[Seg] = [
+            ArcSeg(b_o, at_angle(r_o, 315.0), center, ccw=False, tags=outer_tags),
+            LineSeg(at_angle(r_o, 315.0), peak_o, outer_tags),
+            LineSeg(peak_o, at_angle(r_o, 225.0), outer_tags),
+            ArcSeg(at_angle(r_o, 225.0), j0, center, ccw=False, tags=outer_tags),
+        ]
+    else:
+        cavity_chain = [ArcSeg(a_i, b_i, center, ccw=True, tags=inner_tags)]
+        outer_bottom = [
+            ArcSeg(b_o, j0, center, ccw=False,
+                   tags=tags("hook_outer", "root", "external")),
+        ]
+
     segments: list[Seg] = [
         # down the neck's mouth-side edge onto the hook's outer circle
         LineSeg(n_tr, j1, tags("neck", "root")),
@@ -158,17 +203,16 @@ def build_molded_side_hook_profile(
         LineSeg(a_o, t_u_o, tags("upper_lip", "upper_lip_outer", "root")),
         LineSeg(t_u_o, t_u_i, tags("upper_lip", "lip_tip")),
         LineSeg(t_u_i, a_i, tags("upper_lip", "mouth_upper", "mouth_corner")),
-        # the cavity: one arc the LONG way over top, back and bottom — its
-        # endpoint angles define the mouth gap exactly
-        ArcSeg(a_i, b_i, center, ccw=True,
-               tags=tags("cavity_inner", "cable_contact", "mouth_corner")),
+        # the cavity, the LONG way over top, back and bottom — endpoint
+        # angles define the mouth gap exactly; teardrop replaces the bottom
+        *cavity_chain,
         # lower lip: inner (mouth-bottom) edge out, tip down, tapered
         # outer edge back to the wall
         LineSeg(b_i, t_l_i, tags("lower_lip", "mouth_lower", "mouth_corner")),
         LineSeg(t_l_i, t_l_o, tags("lower_lip", "lip_tip")),
         LineSeg(t_l_o, b_o, tags("lower_lip", "lower_lip_outer", "root")),
         # outer wall the long way around bottom and back up to the neck
-        ArcSeg(b_o, j0, center, ccw=False, tags=tags("hook_outer", "root", "external")),
+        *outer_bottom,
         LineSeg(j0, n_tl, tags("neck", "root")),
         # neck top: welds into the flange plate — an intentional corner pair
         LineSeg(n_tl, n_tr, tags("neck_top", "weld_joint")),

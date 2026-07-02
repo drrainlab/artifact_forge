@@ -52,6 +52,15 @@ def main(argv: list[str] | None = None) -> int:
     p_build.add_argument("-o", "--out", type=Path, default=Path("out"))
     p_build.add_argument("--strict", action="store_true", default=None)
 
+    p_edit = sub.add_parser(
+        "edit",
+        help="semantic edit: apply an intent/patch, rebuild, verify preserve",
+    )
+    p_edit.add_argument("product", type=Path)
+    p_edit.add_argument("--intent", type=str, default=None)
+    p_edit.add_argument("--patch", type=Path, default=None)
+    p_edit.add_argument("-o", "--out", type=Path, default=Path("out"))
+
     args = parser.parse_args(argv)
     try:
         if args.command == "validate":
@@ -61,6 +70,11 @@ def main(argv: list[str] | None = None) -> int:
             from .compiler.pipeline import run_build
 
             _print(run_build(args.product, args.out, args.strict))
+            return 0
+        if args.command == "edit":
+            from .repair.edit import run_edit
+
+            _print(run_edit(args.product, args.out, args.intent, args.patch))
             return 0
     except PipelineFailure as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
