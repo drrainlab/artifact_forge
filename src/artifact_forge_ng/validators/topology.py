@@ -433,6 +433,32 @@ def ribs_present(geometry: Geometry, form: PartForm) -> Finding:
     )
 
 
+@register_probe("topology.arm_reaches_tip")
+def arm_reaches_tip(geometry: Geometry, form: PartForm) -> Finding:
+    """Every lofted arm must be solid at its TIP — a loft that welded at
+    the root but never reached its declared end is a stub, not an arm."""
+    if not form.lofts:
+        return _finding("topology.arm_reaches_tip", True, "no lofted arms")
+    problems = []
+    for loft in form.lofts:
+        cx, cy = loft.base_center
+        tl, tw = loft.tip
+        z_tip = loft.z0 + loft.length
+        probe = box_probe(
+            cx - tl * 0.3, cy - tw * 0.3, z_tip - 3.0,
+            cx + tl * 0.3, cy + tw * 0.3, z_tip - 0.3,
+        )
+        frac = solid_fraction(geometry.workplane, probe)
+        if frac < 0.6:
+            problems.append(f"{loft.name} (tip fill {frac:.2f})")
+    return _finding(
+        "topology.arm_reaches_tip",
+        not problems,
+        "all arms solid to the tip" if not problems
+        else "stub arms: " + ", ".join(problems),
+    )
+
+
 @register_probe("topology.seat_lips_present")
 def seat_lips_present(geometry: Geometry, form: PartForm) -> Finding:
     """Every bearing seat's retaining lip ring must be real material —

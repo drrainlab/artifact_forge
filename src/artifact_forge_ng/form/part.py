@@ -168,6 +168,31 @@ class RibFeature:
 
 
 @dataclass(frozen=True)
+class LoftFeature:
+    """An ADDITIVE lofted beam: a rounded transition from a root rectangle
+    to a tip rectangle along +Z (the tapered-arm builder). Welded onto the
+    base like a rib; verified by ``topology.arm_reaches_tip`` — a loft that
+    fell off or never made it to its tip is a missing arm, not a style
+    defect."""
+
+    name: str
+    base_center: tuple[float, float]  # (x, y) of the root rectangle center
+    z0: float
+    length: float
+    root: tuple[float, float]  # (l, w) at z0
+    tip: tuple[float, float]  # (l, w) at z0 + length
+
+    def __post_init__(self) -> None:
+        if self.length <= 0:
+            raise ValueError(f"LoftFeature {self.name!r} needs positive length")
+        if self.tip[0] > self.root[0] + 1e-9 or self.tip[1] > self.root[1] + 1e-9:
+            raise ValueError(
+                f"LoftFeature {self.name!r} must taper (tip <= root) so the "
+                "printed arm is self-supporting"
+            )
+
+
+@dataclass(frozen=True)
 class BlendDirective:
     """A 3D-only blend: edges inside ``zone`` get ``radius``, with the
     safe-fillet ladder as fallback."""
@@ -199,6 +224,7 @@ class PartForm:
     bores: list[BoreFeature] = field(default_factory=list)
     cutboxes: list[CutBoxFeature] = field(default_factory=list)
     ribs: list[RibFeature] = field(default_factory=list)
+    lofts: list[LoftFeature] = field(default_factory=list)
     fields: list[FieldFeature] = field(default_factory=list)
     #: Oriented modifier canvases, keyed by the region name they serve.
     windows: dict[str, FaceWindow] = field(default_factory=dict)

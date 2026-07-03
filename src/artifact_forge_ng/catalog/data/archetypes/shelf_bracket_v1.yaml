@@ -1,0 +1,95 @@
+schema: archetype/v1
+id: shelf_bracket_v1
+version: 1
+object_class: shelf_bracket
+description: >
+  Wall shelf bracket (wave R4, strength): a rounded wall plate with two
+  countersunk screws, a TAPERED LOFTED ARM straight out of the wall, and
+  thin web gussets tying the arm root into the plate on both bending
+  sides. The taper (tip smaller than root) is enforced by the Form IR, so
+  the standing print is self-supporting; the arm is probe-verified solid
+  out to its tip.
+
+provides_features:
+  - mounting_plate_body
+  - hole_pattern
+  - tapered_arm
+  - stiffening_ribs
+
+parameters:
+  plate_l:
+    {type: length, default: 120mm, min: 70mm, max: 200mm, role: assembly,
+     description: plate length along the wall (vertical when mounted)}
+  plate_w:
+    {type: length, default: 60mm, min: 30mm, max: 120mm, role: assembly}
+  plate_t:
+    {type: length, default: 6mm, min: 4mm, max: 12mm, role: structural}
+  corner_r:
+    {type: length, default: 6mm, min: 2mm, max: 14mm, role: aesthetic}
+  arm_len:
+    {type: length, default: 150mm, min: 50mm, max: 210mm,
+     role: functional, exposed: true, description: shelf reach from the wall}
+  arm_root_l:
+    {type: length, default: 34mm, min: 16mm, max: expr(plate_w - 10), role: structural}
+  arm_root_w:
+    {type: length, default: 30mm, min: 14mm, max: expr(plate_l / 2), role: structural}
+  arm_tip_l:
+    {type: length, default: 22mm, min: 10mm, max: expr(arm_root_l), role: structural,
+     description: tip must not exceed root — the taper is the print safety}
+  arm_tip_w:
+    {type: length, default: 18mm, min: 8mm, max: expr(arm_root_w), role: structural}
+  gusset_h:
+    {type: length, default: 26mm, min: 10mm, max: 60mm, role: structural}
+  gusset_len:
+    {type: length, default: 22mm, min: 8mm, max: 50mm, role: structural}
+  gusset_t:
+    {type: length, default: 5mm, min: 3mm, max: 10mm, role: structural}
+  screw:
+    {type: choice, choices: [M4, M5], default: M5, role: assembly}
+  screw_spacing:
+    {type: length, default: expr(arm_root_w + 2 * gusset_len + 30), min: expr(arm_root_w + 2 * gusset_len + 26),
+     max: expr(plate_l - 18), role: assembly,
+     description: screws sit beyond the gussets where a driver reaches}
+  min_web:
+    {type: length, default: 4mm, min: 3mm, max: 10mm, role: manufacturing}
+
+constraints:
+  - arm_tip_l <= arm_root_l
+  - arm_tip_w <= arm_root_w
+  - screw_spacing > arm_root_w + 2 * gusset_len + 24
+
+form:
+  type: section_extrude
+  section: plate_loft_arm
+  plane: XY
+  width_axis: Z
+
+regions:
+  - {id: plate, role: mounting_surface, editable: true}
+  - {id: arm_root, role: high_stress_region, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.single_connected_solid
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.ribs_present
+  - topology.arm_reaches_tip
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - hole_pattern
+    - tapered_arm
+    - stiffening_ribs
+  must_not_have: []
+  invariants:
+    - arm_tip_l <= arm_root_l

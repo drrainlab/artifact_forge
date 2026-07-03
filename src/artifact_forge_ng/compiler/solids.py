@@ -74,6 +74,17 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
     for plate in form.plates:
         mass = weld(mass, _build_plate(plate), what=plate.name)
 
+    for loft in form.lofts:
+        cx, cy = loft.base_center
+        arm = (
+            cq.Workplane("XY", origin=(cx, cy, loft.z0))
+            .rect(loft.root[0], loft.root[1])
+            .workplane(offset=loft.length)
+            .rect(loft.tip[0], loft.tip[1])
+            .loft(combine=False)
+        )
+        mass = weld(mass, arm, what=loft.name)
+
     # Box cuts run BEFORE additive ribs: a shell's interior cavity must not
     # mow down the bosses that stand inside it (additive features survive
     # subtractive volumes declared by the base).

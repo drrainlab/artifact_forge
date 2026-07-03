@@ -21,6 +21,7 @@ from . import (
     phone_stand,
     pipe_clip,
     recipe,
+    shelf_bracket,
     underdesk_cable_clip,
     underdesk_cable_clip_sideprint,
     zip_tie_anchor,
@@ -40,6 +41,7 @@ FORM_BUILDERS: dict[str, FormBuilder] = {
     phone_stand.SECTION_NAME: phone_stand.build_form,
     recipe.SECTION_NAME: recipe.build_form,
     pipe_clip.SECTION_NAME: pipe_clip.build_form,
+    shelf_bracket.SECTION_NAME: shelf_bracket.build_form,
 }
 
 

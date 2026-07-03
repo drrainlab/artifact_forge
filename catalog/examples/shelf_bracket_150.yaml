@@ -1,0 +1,27 @@
+schema: product/v1
+id: shelf_bracket_150
+archetype: shelf_bracket_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - tapered_arm
+  - stiffening_ribs
+
+params:
+  plate_l: 120mm
+  plate_w: 60mm
+  plate_t: 6mm
+  arm_len: 150mm
+  arm_root_l: 34mm
+  arm_root_w: 30mm
+  arm_tip_l: 22mm
+  arm_tip_w: 18mm
+  screw: M5
+  screw_spacing: 100mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none
