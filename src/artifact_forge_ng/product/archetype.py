@@ -113,13 +113,31 @@ class RegionSpec(BaseModel):
     description: str = ""
 
 
+class RecipeOpUse(BaseModel):
+    """One builder invocation inside a recipe form. ``params`` values speak
+    the same value grammar as everything else ("70mm", "expr(plate_l/2)");
+    a bare string naming an archetype parameter substitutes its resolved
+    value (numbers and choices alike)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    op: str
+    id: str = ""
+    params: dict[str, Any] = {}
+
+
 class FormSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["section_extrude", "section_sweep", "plate", "profile_revolve"]
+    type: Literal[
+        "section_extrude", "section_sweep", "plate", "profile_revolve", "recipe"
+    ]
     section: str
     plane: Literal["YZ", "XZ", "XY"] = "YZ"
     width_axis: Literal["X", "Y", "Z"] = "X"
+    #: Recipe forms only: ordered builder invocations (first op is the base
+    #: solid, the rest attach features). Empty for classic Python builders.
+    ops: list[RecipeOpUse] = []
 
     @model_validator(mode="after")
     def _axis_off_plane(self) -> "FormSpec":
@@ -127,6 +145,10 @@ class FormSpec(BaseModel):
             raise ValueError(
                 f"width_axis {self.width_axis!r} must be normal to plane {self.plane!r}"
             )
+        if self.type == "recipe" and not self.ops:
+            raise ValueError("recipe form needs at least one op")
+        if self.type != "recipe" and self.ops:
+            raise ValueError("ops are only legal on recipe forms")
         return self
 
 

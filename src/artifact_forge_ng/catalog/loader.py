@@ -134,7 +134,32 @@ def _load_archetype(
                 raise CatalogError(
                     f"{where} region {region.id!r}: unknown modifier {mod_id!r}"
                 )
+    _bind_recipe_ops(spec, where)
     return spec
+
+
+def _bind_recipe_ops(spec: ArchetypeSpec, where: str) -> None:
+    """Recipe forms bind fail-fast twice over: every op name must exist in
+    the op registry, and every validator an op declares must appear in the
+    archetype's own ``validators:`` list — a builder cannot ship geometry
+    its checks won't measure."""
+    if spec.form.type != "recipe":
+        return
+    from ..form.recipe_ops import RECIPE_OPS
+
+    subscribed = set(spec.validators)
+    for use in spec.form.ops:
+        decl = RECIPE_OPS.get(use.op)
+        if decl is None:
+            raise CatalogError(
+                f"{where}: unknown recipe op {use.op!r}; known: {sorted(RECIPE_OPS)}"
+            )
+        missing = [v for v in decl.validators if v not in subscribed]
+        if missing:
+            raise CatalogError(
+                f"{where}: op {use.op!r} requires validators {missing} in the "
+                "archetype's validators list"
+            )
 
 
 def load_catalog(data_dir: Path | None = None) -> Catalog:

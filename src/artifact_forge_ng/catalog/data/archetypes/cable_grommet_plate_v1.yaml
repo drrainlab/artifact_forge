@@ -1,0 +1,92 @@
+schema: archetype/v1
+id: cable_grommet_plate_v1
+version: 1
+object_class: cable_grommet_plate
+description: >
+  Desk cable pass-through plate: a rounded mounting plate with a central
+  cable cutout and two countersunk screws beside it. The first archetype
+  composed ENTIRELY from recipe ops — zero dedicated Python; the geometry,
+  regions, frame keys and validator subscriptions all come from the op
+  registry (docs/BUILDERS.md, wave R1).
+
+provides_features:
+  - mounting_plate_body
+  - hole_pattern
+  - pass_through_cutout
+
+parameters:
+  plate_l:
+    {type: length, default: 90mm, min: 60mm, max: 140mm,
+     role: assembly, description: plate length along the screw line}
+  plate_w:
+    {type: length, default: 40mm, min: 24mm, max: 80mm, role: assembly}
+  thickness:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: manufacturing}
+  corner_r:
+    {type: length, default: 5mm, min: 1mm, max: 12mm, role: aesthetic}
+  cable_w:
+    {type: length, default: 30mm, min: 8mm, max: expr(plate_l - 44),
+     role: functional, exposed: true,
+     description: cable pass cutout width}
+  cable_h:
+    {type: length, default: 14mm, min: 6mm, max: expr(plate_w - 16),
+     role: functional, exposed: true,
+     description: cable pass cutout height}
+  screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+  screw_spacing:
+    {type: length, default: 70mm, min: expr(cable_w + 26), max: expr(plate_l - 12),
+     role: assembly,
+     description: screws sit beside the cutout; the floor keeps head
+       keepouts clear of the cable pass}
+  min_web:
+    {type: length, default: 4mm, min: 3mm, max: 10mm, role: manufacturing}
+
+constraints:
+  - screw_spacing > cable_w + 24
+  - cable_h < plate_w - 12
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params: {l: plate_l, w: plate_w, t: thickness, corner_r: corner_r}
+    - op: rounded_rect_cutout
+      id: cable_pass
+      params: {w: cable_w, h: cable_h}
+    - op: countersunk_hole_pattern
+      id: screws
+      params: {kind: line, screw: screw, count: 2, spacing: screw_spacing,
+               cs_face: top}
+
+regions:
+  - {id: plate, role: mounting_surface, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - form.cuts_respect_keepouts
+  - topology.single_connected_solid
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.cutout_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - hole_pattern
+    - pass_through_cutout
+  must_not_have: []
+  invariants:
+    - screw_spacing > cable_w + 24
