@@ -35,7 +35,18 @@ def cut_field(body: cq.Workplane, field: FieldFeature) -> tuple[cq.Workplane, bo
     z_start = -1.0 if oriented else field.plane_z + 1.0
     extrude_by = (depth + 1.0) if oriented else -(depth + 1.0)
     cutter: cq.Workplane | None = None
-    if field.centers:
+    if field.centers and field.pattern == "round":
+        # Circular cells (phyllotaxis etc.): the circle of diameter `cell`
+        # is exactly the hexagon's inscribed circle, so every hex-based
+        # ligament measure stays conservative for round cutters.
+        for cx, cy in field.centers:
+            piece = (
+                cq.Workplane("XY", origin=(cx, cy, z_start))
+                .circle(field.cell / 2.0)
+                .extrude(extrude_by)
+            )
+            cutter = piece if cutter is None else cutter.union(piece)
+    elif field.centers:
         # Hexagons FLAT-TO-FLAT along the row axis (vertices at 30+60k
         # degrees): cadquery's polygon() is pointy-right, which faces
         # vertices at row neighbours and thins the webs to ~half the

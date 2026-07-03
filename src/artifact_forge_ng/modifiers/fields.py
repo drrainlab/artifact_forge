@@ -11,6 +11,7 @@ from typing import Any
 from ..core.findings import Finding
 from ..form.fields import apply_field_with_keepouts
 from ..form.part import FieldFeature, PartForm
+from ..form.section import Pt
 from ..form.voronoi import voronoi_cells
 from ..product.archetype import ArchetypeSpec
 from ..product.instance import ModifierUse
@@ -162,4 +163,71 @@ def add_voronoi_field(
     )
     return [
         note(use.id, f"{len(cells)} voronoi cells (seed {seed}, {cut_mode}) on {use.target}")
+    ]
+
+
+@register_applicator("add_phyllotaxis_field")
+def add_phyllotaxis_field(
+    form: PartForm, use: ModifierUse, params: dict[str, Any], archetype: ArchetypeSpec
+) -> list[Finding]:
+    """Vogel sunflower spiral: hole k sits at r = c*sqrt(k), theta =
+    k * 137.508 deg around the window center. Deterministic (no seed even
+    needed — the spiral IS the pattern); every hole survives only if it
+    clears the keepouts, and the c-spacing guarantees the declared ligament
+    between NEIGHBOURS by construction (still measured, never trusted)."""
+    import math as _math
+
+    pw = plate_window(form, use.target)
+    if pw is None:
+        return [fail(use.id, f"target region {use.target!r} has no usable window")]
+    hole_d = params.get("hole_d", 3.0)
+    ligament = params.get("min_ligament", 1.6)
+    margin = params.get("edge_margin", 4.0)
+    count = int(round(params.get("count", 120)))
+    cut_mode = params.get("cut_mode", "through")
+    inner = pw.window.shrunk(margin)
+    if inner.width <= 0 or inner.height <= 0:
+        form.fields.append(FieldFeature(
+            plane_z=pw.z_top, centers=(), cell=hole_d, depth=pw.depth,
+            pattern="round", window=pw.window, keepouts=pw.keepouts,
+            min_ligament=ligament,
+        ))
+        return [note(use.id, "window smaller than margins — zero holes (honest)")]
+    cx = (inner.u0 + inner.u1) / 2.0
+    cy = (inner.v0 + inner.v1) / 2.0
+    r_max = min(inner.width, inner.height) / 2.0
+    # Vogel spacing: nearest-neighbour distance ~ c; pick c so that the
+    # web between hole rims is at least the ligament.
+    c = hole_d + ligament
+    golden = _math.radians(137.50776405)
+    kept: list[tuple[float, float]] = []
+    r_hole = hole_d / 2.0
+    k = 1
+    while len(kept) < count:
+        r = c * _math.sqrt(k)
+        if r > r_max - r_hole:
+            break
+        theta = k * golden
+        hx, hy = cx + r * _math.cos(theta), cy + r * _math.sin(theta)
+        p = Pt(hx, hy)
+        if inner.contains(p) and all(
+            keep.shape.distance(p) > r_hole + keep.clearance for keep in pw.keepouts
+        ):
+            kept.append((hx, hy))
+        k += 1
+    field = FieldFeature(
+        plane_z=pw.z_top,
+        centers=tuple(kept),
+        cell=hole_d,
+        depth=_depth_for(cut_mode, pw.depth, params.get("recess_depth", 1.2)),
+        pattern="round",
+        window=pw.window,
+        keepouts=pw.keepouts,
+        min_ligament=ligament,
+        origin=pw.origin,
+        tilt_deg=pw.tilt_deg,
+    )
+    form.fields.append(field)
+    return [
+        note(use.id, f"{len(kept)} phyllotaxis holes ({cut_mode}) on {use.target}")
     ]

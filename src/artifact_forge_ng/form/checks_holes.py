@@ -47,9 +47,15 @@ def _violations(form: PartForm) -> tuple[list[str], list[str]] | None:
     if outline is None:
         return None
     min_web = form.params.get("min_web", DEFAULT_MIN_WEB)
-    extra = tuple(
-        (b.center[0], b.center[1], b.d / 2.0) for b in form.bores if b.axis == "Z"
-    )
+    # COAXIAL Z-bores are one stepped bore (a bearing seat's pocket over
+    # its through hole), not a hole pair — keep only the widest per axis.
+    by_axis: dict[tuple[float, float], float] = {}
+    for b in form.bores:
+        if b.axis != "Z":
+            continue
+        key = (round(b.center[0], 3), round(b.center[1], 3))
+        by_axis[key] = max(by_axis.get(key, 0.0), b.d / 2.0)
+    extra = tuple((x, y, r) for (x, y), r in by_axis.items())
     problems = min_web_violations(form.holes, outline, min_web, extra)
     pair = [p for p in problems if "edge web" not in p]
     edge = [p for p in problems if "edge web" in p]

@@ -108,6 +108,12 @@ def _rounded_plate(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     state.regions.append(
         Region(name, RegionRole.MOUNTING_SURFACE, Box3(u0, v0, 0.0, u1, v1, t))
     )
+    # Every plate is also a lightening canvas: field modifiers target this
+    # region and the protected regions/prior cuts become keepouts.
+    state.regions.append(
+        Region(f"{name}_lightening", RegionRole.AESTHETIC_LIGHTENING,
+               Box3(u0 + 4.0, v0 + 4.0, 0.0, u1 - 4.0, v1 - 4.0, t))
+    )
     # The standard outline frame the hole checks measure against.
     state.frame.update(
         outline_u0=u0, outline_v0=v0, outline_u1=u1, outline_v1=v1,
@@ -303,22 +309,21 @@ def _bearing_seat(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     name = op_id or f"seat_{des}"
     # Both cuts declared with open overshoots: the pocket opens into the
     # through bore (no false 'blind skin' expectations), and both voids are
-    # probe-verified by bores_open; the lip ring gets its own probe.
+    # probe-verified by bores_open; the lip ring gets its own probe. The
+    # pocket span is INSET by the overshoot so the cutter's actual extent
+    # (span grown by overshoot on each end) lands exactly on t-bw..t —
+    # an overshooting cutter must never nibble the lip it seats on.
     state.bores.append(
         BoreFeature(name=f"{name}_pocket", axis="Z", center=(cx, cy, 0.0),
-                    d=seat_d, span=(t - bw, t), overshoot=(1.0, 1.0))
+                    d=seat_d, span=(t - bw + 1.0, t), overshoot=(1.0, 1.0))
     )
     state.bores.append(
         BoreFeature(name=f"{name}_through", axis="Z", center=(cx, cy, 0.0),
                     d=lip_inner_d, span=(-0.5, t - bw + 0.5), overshoot=(1.0, 1.0))
     )
-    state.regions.append(
-        Region(f"{name}_keep", RegionRole.FASTENER_KEEPOUT,
-               Box3(cx - seat_d / 2.0 - KEEPOUT_CLEARANCE,
-                    cy - seat_d / 2.0 - KEEPOUT_CLEARANCE, 0.0,
-                    cx + seat_d / 2.0 + KEEPOUT_CLEARANCE,
-                    cy + seat_d / 2.0 + KEEPOUT_CLEARANCE, t))
-    )
+    # No explicit keepout region: the seat's own bores would trip
+    # cuts_respect_keepouts against it. Field modifiers are still safe —
+    # derive_keepouts turns every Z-bore into a circular keepout.
     state.frame.update({
         f"{name}_cx": cx, f"{name}_cy": cy,
         f"{name}_lip_r": (seat_d / 2.0 + lip_inner_d / 2.0) / 2.0,

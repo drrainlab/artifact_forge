@@ -1,0 +1,98 @@
+schema: archetype/v1
+id: bearing_turntable_base_v1
+version: 1
+object_class: bearing_turntable
+description: >
+  Turntable / lazy-susan base plate around a standard ball bearing (wave
+  R5, pure recipe): a rounded plate with a press-fit bearing seat in the
+  center — pocket, through bore and a probe-verified retaining lip — and a
+  countersunk bolt circle for mounting. The plate is a lightening canvas,
+  so the phyllotaxis spiral applies as an ordinary modifier that respects
+  the seat and screw keepouts.
+
+provides_features:
+  - mounting_plate_body
+  - hole_pattern
+  - bearing_seats
+  - phyllotaxis_field
+
+parameters:
+  plate_l:
+    {type: length, default: 110mm, min: 60mm, max: 200mm,
+     role: functional, exposed: true}
+  plate_w:
+    {type: length, default: 110mm, min: 60mm, max: 200mm,
+     role: functional, exposed: true}
+  thickness:
+    {type: length, default: 9mm, min: 8mm, max: 16mm, role: structural,
+     description: must swallow the bearing width plus a floor}
+  corner_r:
+    {type: length, default: 10mm, min: 2mm, max: 30mm, role: aesthetic}
+  bearing:
+    {type: choice, choices: ["608", "625", "6001"], default: "608",
+     role: functional}
+  fit:
+    {type: choice, choices: [press, slip], default: press, role: manufacturing}
+  screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+  bc_d:
+    {type: length, default: 88mm, min: 50mm, max: "expr(min(plate_l, plate_w) - 18)",
+     role: assembly, description: mounting bolt circle diameter}
+  screw_count:
+    {type: count, default: 4, min: 3, max: 8, role: assembly}
+  min_web:
+    {type: length, default: 4mm, min: 3mm, max: 10mm, role: manufacturing}
+
+constraints:
+  - thickness > 8
+  - bc_d > 40
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params: {l: plate_l, w: plate_w, t: thickness, corner_r: corner_r}
+    - op: bearing_seat
+      id: seat
+      params: {bearing: bearing, fit: fit}
+    - op: countersunk_hole_pattern
+      id: screws
+      params: {kind: bolt_circle, screw: screw, count: screw_count,
+               bc_d: bc_d, cs_face: bottom}
+
+regions:
+  - {id: plate, role: mounting_surface, editable: false}
+  - {id: plate_lightening, role: aesthetic_lightening, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - form.cuts_respect_keepouts
+  - topology.single_connected_solid
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.bores_open
+  - topology.seat_lips_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_phyllotaxis_field
+  - add_hex_perforation
+  - add_voronoi_field
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - hole_pattern
+    - bearing_seats
+  must_not_have: []
+  invariants:
+    - thickness > 8

@@ -1,0 +1,34 @@
+schema: product/v1
+id: bearing_turntable_base
+archetype: bearing_turntable_base_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - bearing_seats
+  - phyllotaxis_field
+
+params:
+  plate_l: 110mm
+  plate_w: 110mm
+  thickness: 9mm
+  bearing: "608"
+  fit: press
+  screw: M4
+  bc_d: 88mm
+  screw_count: 4
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none
+
+modifiers:
+  - id: add_phyllotaxis_field
+    target: plate_lightening
+    params:
+      hole_d: 3mm
+      count: 160
+      min_ligament: 1.6mm
+      edge_margin: 5mm
