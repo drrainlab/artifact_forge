@@ -74,6 +74,15 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
     for plate in form.plates:
         mass = weld(mass, _build_plate(plate), what=plate.name)
 
+    # Box cuts run BEFORE additive ribs: a shell's interior cavity must not
+    # mow down the bosses that stand inside it (additive features survive
+    # subtractive volumes declared by the base).
+    for cutbox in form.cutboxes:
+        mass, cut = cut_box(mass, cutbox)
+        log.boxes_cut += int(cut)
+        if not cut:
+            log.notes.append(f"box cut {cutbox.name!r} could not be applied")
+
     for rib in form.ribs:
         b = rib.box
         bar = (
@@ -106,12 +115,6 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
         log.bores_cut += int(cut)
         if not cut:
             log.notes.append(f"bore {bore.name!r} could not be cut")
-
-    for cutbox in form.cutboxes:
-        mass, cut = cut_box(mass, cutbox)
-        log.boxes_cut += int(cut)
-        if not cut:
-            log.notes.append(f"box cut {cutbox.name!r} could not be applied")
 
     for hole in form.holes:
         mass, bored, sunk = cut_countersunk_hole(mass, hole)

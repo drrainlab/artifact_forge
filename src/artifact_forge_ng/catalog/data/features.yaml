@@ -211,3 +211,42 @@ features:
     verified_by:
       - form.cuts_respect_keepouts
       - topology.cutout_present
+
+  - id: box_shell
+    description: open-top enclosure shell keeping the declared wall and floor
+    verified_by:
+      - form.shell_walls_ok
+      - topology.cutout_present
+      - topology.single_connected_solid
+
+  - id: screw_bosses
+    description: screw bosses with blind pilot bores, welded to the floor
+    verified_by:
+      - topology.ribs_present
+      - topology.pockets_present
+
+  - id: snap_c_cavity
+    description: symmetric snap-clip cavity wrapping past half a circle, mouth narrower than the held diameter
+    verified_by:
+      - form.snap_arc_coverage
+      - form.snap_mouth_retains
+      - topology.cavity_open
+
+  - id: tapered_arm
+    description: lofted cantilever arm, solid from root to tip
+    verified_by:
+      - topology.arm_reaches_tip
+      - topology.single_connected_solid
+
+  - id: bearing_seats
+    description: bearing pocket + through bore with a verified retaining lip
+    verified_by:
+      - topology.bores_open
+      - topology.seat_lips_present
+
+  - id: phyllotaxis_field
+    description: deterministic sunflower-spiral perforation with guaranteed webs
+    verified_by:
+      - form.min_ligament_ok
+      - region.keepouts_preserved
+      - topology.hex_field_present

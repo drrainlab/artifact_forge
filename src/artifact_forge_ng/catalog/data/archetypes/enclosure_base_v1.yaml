@@ -1,0 +1,103 @@
+schema: archetype/v1
+id: enclosure_base_v1
+version: 1
+object_class: electronics_enclosure
+description: >
+  Open-top electronics enclosure base (wave R2, pure recipe): rounded box
+  shell, four corner screw bosses with blind pilot bores for heatset or
+  self-tapping screws, a device-jack port through one wall — and the floor
+  is a lightening region, so vent fields apply as ordinary modifiers with
+  the bosses and port automatically derived as keepouts.
+
+provides_features:
+  - box_shell
+  - screw_bosses
+  - pass_through_cutout
+  - grid_slots
+  - hex_perforation
+
+parameters:
+  box_l:
+    {type: length, default: 82mm, min: 40mm, max: 200mm,
+     role: functional, exposed: true, description: outer length}
+  box_w:
+    {type: length, default: 52mm, min: 30mm, max: 160mm,
+     role: functional, exposed: true, description: outer width}
+  box_h:
+    {type: length, default: 26mm, min: 12mm, max: 80mm,
+     role: functional, exposed: true, description: outer height}
+  wall:
+    {type: length, default: 2.4mm, min: 1.6mm, max: 5mm, role: manufacturing}
+  floor_t:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: manufacturing}
+  corner_r:
+    {type: length, default: 6mm, min: 2mm, max: 14mm, role: aesthetic}
+  boss_sx:
+    {type: length, default: expr(box_l - 2 * wall - 16), min: 20mm,
+     max: expr(box_l - 2 * wall - 12), role: assembly,
+     description: boss pattern span along X}
+  boss_sy:
+    {type: length, default: expr(box_w - 2 * wall - 16), min: 12mm,
+     max: expr(box_w - 2 * wall - 12), role: assembly}
+  boss_h:
+    {type: length, default: 6mm, min: 3mm, max: 16mm, role: assembly}
+  pilot_d:
+    {type: length, default: 4mm, min: 2mm, max: 6mm, role: assembly,
+     description: heatset/self-tap pilot bore diameter}
+  port_z:
+    {type: length, default: 12mm, min: 6mm, max: expr(box_h - 5), role: functional,
+     exposed: true, description: port opening center height}
+  port:
+    {type: choice, choices: [usb_c, micro_usb, usb_a, hdmi, audio_35, sd, barrel_55],
+     default: usb_c, role: functional}
+
+constraints:
+  - floor_t + 2 < box_h
+  - wall >= printer.min_wall
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_box_shell
+      id: shell
+      params: {l: box_l, w: box_w, h: box_h, wall: wall, floor_t: floor_t,
+               corner_r: corner_r}
+    - op: boss_pattern
+      id: bosses
+      params: {sx: boss_sx, sy: boss_sy, height: boss_h, pilot_d: pilot_d}
+    - op: port_cutout
+      id: port
+      params: {port: port, face: "+y", z: port_z}
+
+regions:
+  - {id: shell, role: mounting_surface, editable: false}
+  - {id: floor, role: aesthetic_lightening, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.shell_walls_ok
+  - form.cuts_respect_keepouts
+  - topology.single_connected_solid
+  - topology.cutout_present
+  - topology.ribs_present
+  - topology.pockets_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_grid_slot_field
+  - add_hex_perforation
+  - fillet_soften
+
+contract:
+  must_have:
+    - box_shell
+    - screw_bosses
+    - pass_through_cutout
+  must_not_have: []
+  invariants:
+    - floor_t + 2 < box_h

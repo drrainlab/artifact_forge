@@ -89,12 +89,29 @@ def plate_window(
         window=window,
         z_top=b.z1,
         depth=depth,
-        keepouts=tuple(derive_keepouts(form, window, keepout_clearance)),
+        keepouts=tuple(
+            derive_keepouts(
+                form, window, keepout_clearance, z_range=(b.z1 - depth, b.z1)
+            )
+        ),
     )
 
 
+def _z_disjoint(z_range: tuple[float, float] | None, z0: float, z1: float) -> bool:
+    """A cut or region entirely OUTSIDE the field's z-slab is no keepout —
+    the box-shell interior cavity (above the floor) must not veto vents cut
+    THROUGH the floor."""
+    if z_range is None:
+        return False
+    lo, hi = z_range
+    return z1 <= lo + 1e-6 or z0 >= hi - 1e-6
+
+
 def derive_keepouts(
-    form: PartForm, window: Rect2D, clearance: float = 0.0
+    form: PartForm,
+    window: Rect2D,
+    clearance: float = 0.0,
+    z_range: tuple[float, float] | None = None,
 ) -> list[Region2D]:
     """Every protected region overlapping the window (projected to XY),
     plus a circle per fastener hole — belt and suspenders."""
@@ -104,6 +121,11 @@ def derive_keepouts(
             continue
         b = region.box
         if not all(map(math.isfinite, (b.x0, b.y0, b.x1, b.y1))):
+            continue
+        if (
+            math.isfinite(b.z0) and math.isfinite(b.z1)
+            and _z_disjoint(z_range, b.z0, b.z1)
+        ):
             continue
         rect = Rect2D(b.x0, b.y0, b.x1, b.y1)
         if (

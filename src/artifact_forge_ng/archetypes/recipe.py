@@ -82,5 +82,7 @@ def build_form(
         style=style,
         holes=state.holes,
         cutboxes=state.cutboxes,
+        bores=state.bores,
+        ribs=state.ribs,
         regions=state.regions,
     )

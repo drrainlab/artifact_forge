@@ -1,0 +1,35 @@
+schema: product/v1
+id: esp32_box_base
+archetype: enclosure_base_v1@1
+strict: true
+
+requested_features:
+  - box_shell
+  - screw_bosses
+  - pass_through_cutout
+  - grid_slots
+
+params:
+  box_l: 82mm
+  box_w: 52mm
+  box_h: 26mm
+  wall: 2.4mm
+  floor_t: 3mm
+  boss_h: 6mm
+  pilot_d: 4mm     # M3 heatset
+  port: usb_c
+  port_z: 12mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none
+
+modifiers:
+  - id: add_grid_slot_field
+    target: floor
+    params:
+      slot_w: 3mm
+      web: 2.5mm
+      edge_margin: 5mm
+      cut_mode: through

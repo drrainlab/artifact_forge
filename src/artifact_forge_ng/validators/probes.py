@@ -69,6 +69,9 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.min_ligament_ok", Level.FORM, "webs between field cells meet the declared minimum ligament"),
         _decl("form.mount_face_flat", Level.FORM, "the in-profile mounting face is one flat top edge spanning the tongue"),
         _decl("form.constant_section", Level.FORM, "the part is a pure constant-section extrusion (small transverse holes allowed)"),
+        _decl("form.shell_walls_ok", Level.FORM, "box-shell interior keeps the declared wall and floor thickness"),
+        _decl("form.snap_arc_coverage", Level.FORM, "snap-clip cavity wraps the declared retention arc"),
+        _decl("form.snap_mouth_retains", Level.FORM, "snap-clip mouth is measurably narrower than the held diameter"),
         # -- topology level: probed on the compiled solid ---------------------
         _decl("topology.single_connected_solid", Level.TOPOLOGY, "exactly one connected valid solid"),
         _decl("topology.cavity_open", Level.TOPOLOGY, "the cable cavity is a real void along the cable axis"),
@@ -88,6 +91,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.bay_open", Level.TOPOLOGY, "the hook bay entry gap is void on the compiled solid"),
         _decl("topology.ribs_present", Level.TOPOLOGY, "every declared rib welded on as real material"),
         _decl("topology.pockets_present", Level.TOPOLOGY, "every blind pocket removed material without piercing through"),
+        _decl("topology.seat_lips_present", Level.TOPOLOGY, "every bearing seat keeps its retaining lip ring solid"),
+        _decl("topology.arm_reaches_tip", Level.TOPOLOGY, "the cantilever/loft arm is solid out to its tip"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),

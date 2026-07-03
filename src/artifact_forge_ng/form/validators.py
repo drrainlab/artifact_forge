@@ -409,6 +409,43 @@ def check_constant_section(form: PartForm) -> Finding:
     )
 
 
+def check_shell_walls_ok(form: PartForm) -> Finding:
+    """Box-shell honesty: the interior cavity cut must keep the declared
+    wall on all four sides and the declared floor under it — measured on
+    the IR boxes, so a later op or patch that widens the cavity into a
+    wall fails before any CAD."""
+    f = form.frame
+    if "shell_wall" not in f:
+        return _finding("form.shell_walls_ok", False, "no shell frame keys")
+    interior = next(
+        (c for c in form.cutboxes if c.name.endswith("_interior")), None
+    )
+    if interior is None:
+        return _finding("form.shell_walls_ok", False, "no interior cavity cut",
+                        critical=True)
+    b = interior.box
+    wall, floor_t = f["shell_wall"], f["floor_t"]
+    tol = 0.05
+    insets = (
+        b.x0 - f["outline_u0"], b.y0 - f["outline_v0"],
+        f["outline_u1"] - b.x1, f["outline_v1"] - b.y1,
+    )
+    problems = []
+    if min(insets) < wall - tol:
+        problems.append(f"wall thinned to {min(insets):.2f} (declared {wall:g})")
+    if b.z0 < floor_t - tol:
+        problems.append(f"floor thinned to {b.z0:.2f} (declared {floor_t:g})")
+    return _finding(
+        "form.shell_walls_ok",
+        not problems,
+        "interior keeps declared walls and floor" if not problems
+        else "; ".join(problems),
+        critical=True,
+        measured=min(min(insets), b.z0),
+        limit=min(wall, floor_t),
+    )
+
+
 # -- registry wiring ---------------------------------------------------------
 # Every form check registers under its KNOWN_CHECKS name with the uniform
 # implementation signature (PartForm, FormCheckContext) -> Finding. The
@@ -431,6 +468,7 @@ register_probe("form.screw_access_clear")(lambda form, ctx: check_screw_access_c
 register_probe("form.hex_field_in_safe_zone")(lambda form, ctx: check_hex_field_in_safe_zone(form))
 register_probe("form.mount_face_flat")(lambda form, ctx: check_mount_face_flat(form))
 register_probe("form.constant_section")(lambda form, ctx: check_constant_section(form))
+register_probe("form.shell_walls_ok")(lambda form, ctx: check_shell_walls_ok(form))
 
 # Import the phase-5 check modules so their registrations run — anything
 # importing validate_form gets the full form-check registry.

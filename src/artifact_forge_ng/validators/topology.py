@@ -396,6 +396,8 @@ def ribs_present(geometry: Geometry, form: PartForm) -> Finding:
             level=Level.TOPOLOGY,
             message="no ribs declared",
         )
+    import math
+
     missing = []
     for rib in form.ribs:
         b = rib.box
@@ -403,13 +405,53 @@ def ribs_present(geometry: Geometry, form: PartForm) -> Finding:
         core = box_probe(
             b.x0 + mx, b.y0 + my, b.z0 + 0.3, b.x1 - mx, b.y1 - my, b.z1 - 0.3
         )
+        # A rib may legitimately host declared Z-bores (a boss's pilot):
+        # discount their area from the expected fill instead of failing.
+        area = (b.x1 - b.x0 - 2 * mx) * (b.y1 - b.y0 - 2 * my)
+        bored = sum(
+            math.pi * (bore.d / 2.0) ** 2
+            for bore in form.bores
+            if bore.axis == "Z"
+            and b.x0 <= bore.center[0] <= b.x1
+            and b.y0 <= bore.center[1] <= b.y1
+            and bore.span[1] > b.z0 and bore.span[0] < b.z1
+        )
+        expected = max(0.2, 1.0 - bored / max(area, 1e-9))
         frac = solid_fraction(geometry.workplane, core)
-        if frac < 0.85:
-            missing.append(f"{rib.name} (fill {frac:.2f})")
+        if frac < expected * 0.85:
+            missing.append(f"{rib.name} (fill {frac:.2f} < {expected * 0.85:.2f})")
     return _finding(
         "topology.ribs_present",
         not missing,
         "all ribs welded" if not missing else "missing ribs: " + ", ".join(missing),
+    )
+
+
+@register_probe("topology.seat_lips_present")
+def seat_lips_present(geometry: Geometry, form: PartForm) -> Finding:
+    """Every bearing seat's retaining lip ring must be real material —
+    probed at four points around the ring the outer race will sit on."""
+    seats = [k[: -len("_lip_r")] for k in form.frame if k.endswith("_lip_r")]
+    if not seats:
+        return _finding("topology.seat_lips_present", True, "no bearing seats")
+    problems = []
+    for name in seats:
+        f = form.frame
+        cx, cy, r = f[f"{name}_cx"], f[f"{name}_cy"], f[f"{name}_lip_r"]
+        z0, z1 = f[f"{name}_lip_z0"] + 0.2, f[f"{name}_lip_z1"] - 0.2
+        if z1 - z0 < 0.3:
+            problems.append(f"{name}: lip too thin to probe")
+            continue
+        for dx, dy in ((r, 0), (-r, 0), (0, r), (0, -r)):
+            probe = box_probe(cx + dx - 0.5, cy + dy - 0.5, z0,
+                              cx + dx + 0.5, cy + dy + 0.5, z1)
+            if solid_fraction(geometry.workplane, probe) < 0.9:
+                problems.append(f"{name}: lip broken at ({dx:+.1f},{dy:+.1f})")
+                break
+    return _finding(
+        "topology.seat_lips_present",
+        not problems,
+        "all bearing lips solid" if not problems else "; ".join(problems),
     )
 
 
