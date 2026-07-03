@@ -151,6 +151,8 @@ def derive_keepouts(
     # silently eat the same material.
     for i, cut in enumerate(form.cutboxes):
         b = cut.box
+        if _z_disjoint(z_range, b.z0, b.z1):
+            continue
         keepouts.append(
             Region2D(
                 f"prior_cut_{cut.name}",
@@ -161,6 +163,8 @@ def derive_keepouts(
         )
     for i, bore in enumerate(form.bores):
         if bore.axis != "Z":
+            continue
+        if _z_disjoint(z_range, bore.span[0], bore.span[1]):
             continue
         keepouts.append(
             Region2D(

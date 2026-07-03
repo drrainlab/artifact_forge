@@ -346,8 +346,7 @@ def cutout_present(geometry: Geometry, form: PartForm) -> Finding:
 
 @register_probe("topology.hex_field_present")
 def hex_field_present(geometry: Geometry, form: PartForm) -> Finding:
-    fields = [f for f in form.fields if f.centers or f.polygons]
-    if not fields:
+    if not form.fields:
         return Finding(
             check="topology.hex_field_present",
             status=Status.PASS,
@@ -357,6 +356,13 @@ def hex_field_present(geometry: Geometry, form: PartForm) -> Finding:
     import math
 
     empty = []
+    # A declared field that produced ZERO cells is a failed field, not a
+    # vacuous pass — every cell got vetoed by keepouts and the requested
+    # feature simply does not exist on the part.
+    for field in form.fields:
+        if not field.centers and not field.polygons:
+            empty.append(f"{field.pattern} (zero cells survived the keepouts)")
+    fields = [f for f in form.fields if f.centers or f.polygons]
     for field in fields:
         if field.centers:
             r = field.cell / math.sqrt(3.0) * 0.4
