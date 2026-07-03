@@ -132,6 +132,14 @@ def run_pre_cad(product_path: Path, strict_flag: bool | None) -> PipelineState:
     catalog = load_catalog()
     instance = load_instance(product_path)
     strict = instance.strict if strict_flag is None else strict_flag
+    return pre_cad_from_instance(instance, catalog, strict)
+
+
+def pre_cad_from_instance(
+    instance: ProductInstance, catalog: Catalog, strict: bool
+) -> PipelineState:
+    """The pre-CAD core for an already-loaded instance — the assembly
+    pipeline runs each inline part through exactly this."""
     archetype = validate_instance(instance, catalog)
 
     resolved = resolve_params(archetype, instance)

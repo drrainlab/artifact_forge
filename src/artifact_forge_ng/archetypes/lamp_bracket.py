@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from ..core.fasteners import screw_spec
 from ..form.part import BlendDirective, BoreFeature, HoleFeature, PartForm, PlateFeature
+from ..form.patterns import bolt_circle_centers
 from ..form.profiles_bracket import BracketArmParams, build_bracket_arm_profile
 from ..form.regions import Box3, Region
 from ..form.style import resolve_style
@@ -65,7 +66,9 @@ def build_form(
         for x in xs
     ]
 
-    # -- wiring channel: L of two bores, one frame-declared probe path -----
+    # -- wiring channel: two bores (entry + run) and, when the tip carries
+    # a cup mount, a third vertical DROP through the arm's bottom face so
+    # the cable continues into the cup — the cross-part wiring path.
     channel_d = ctx["channel_d"]
     z_c = frame["arm_center_v"]
     entry_u = frame["root_u"] + max(channel_d, 6.0)
@@ -81,6 +84,39 @@ def build_form(
             d=channel_d, span=(entry_u, ctx["arm_len"]),
         ),
     ]
+
+    # -- tip cup mount: bolt-circle thread pilots on the arm's BOTTOM face
+    # plus the channel drop at the circle center. mount_bc = 0 disables the
+    # mount (bracket-only use keeps the horizontal tip exit).
+    mount_bc = ctx.get("mount_bc", 0.0)
+    mount_c_y = 0.0
+    if mount_bc > 1e-6:
+        mount_screw = resolved.choices.get("mount_screw", "M4")
+        m_spec = screw_spec(mount_screw)
+        m_count = int(round(ctx.get("mount_screw_count", 3)))
+        mount_c_y = ctx["arm_len"] - ctx["mount_inset"]
+        bot_v = frame["bot_v"]
+        pilot_depth = ctx["pilot_depth"]
+        for i, (px, py) in enumerate(bolt_circle_centers(m_count, mount_bc)):
+            bores.append(
+                BoreFeature(
+                    f"mount_pilot_{i}", axis="Z",
+                    center=(width / 2.0 + px, mount_c_y + py, 0.0),
+                    d=m_spec["tap"],
+                    span=(bot_v, bot_v + pilot_depth),
+                    overshoot=(1.0, 0.0),  # open below, blind above
+                )
+            )
+        # Open overshoots: the drop opens through the bottom face and its
+        # top merges into the run's void — it is a junction, not a pocket.
+        bores.append(
+            BoreFeature(
+                "channel_drop", axis="Z",
+                center=(width / 2.0, mount_c_y, 0.0),
+                d=channel_d, span=(bot_v, z_c),
+                overshoot=(1.0, 1.0),
+            )
+        )
 
     regions = [
         Region("plate", RegionRole.MOUNTING_SURFACE,
@@ -120,6 +156,22 @@ def build_form(
     for i, x in enumerate(xs):
         frame[f"screw_x_{i}"] = x
 
+    datums = {
+        "arm_tip": {
+            "at": [width / 2.0, ctx["arm_len"], frame["arm_center_v"]],
+            "rotate": [0.0, 0.0, 0.0],
+        }
+    }
+    if mount_bc > 1e-6:
+        frame["mount_c_y"] = mount_c_y
+        frame["mount_bc"] = mount_bc
+        frame["channel_drop_y"] = mount_c_y
+        # The cup mounts against the arm's BOTTOM face at the tip.
+        datums["mount_bc"] = {
+            "at": [width / 2.0, mount_c_y, frame["bot_v"]],
+            "rotate": [0.0, 0.0, 0.0],
+        }
+
     return PartForm(
         name=instance.id,
         params=dict(ctx),
@@ -132,10 +184,5 @@ def build_form(
         bores=bores,
         regions=regions,
         blends=blends,
-        datums={
-            "arm_tip": {
-                "at": [width / 2.0, ctx["arm_len"], frame["arm_center_v"]],
-                "rotate": [0.0, 0.0, 0.0],
-            }
-        },
+        datums=datums,
     )

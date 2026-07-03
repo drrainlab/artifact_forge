@@ -37,11 +37,15 @@ class Level(Enum):
     MANUFACTURING = "manufacturing"
     QUALITY = "quality"
     FORM = "form"
+    #: Cross-part checks in the assembled pose (joints, fit, continuity).
+    ASSEMBLY = "assembly"
 
 
 #: Levels whose FAILs are product-correctness failures: they override any
 #: numeric grade. Manufacturing failures cap the grade; quality only scores.
-CRITICAL_LEVELS = frozenset({Level.CONTRACT, Level.TOPOLOGY, Level.REGION})
+CRITICAL_LEVELS = frozenset(
+    {Level.CONTRACT, Level.TOPOLOGY, Level.REGION, Level.ASSEMBLY}
+)
 
 
 @dataclass(frozen=True)

@@ -39,7 +39,7 @@ parameters:
   screw:
     {type: choice, choices: [M3, M4], default: M3, role: assembly}
   screw_count:
-    {type: count, default: 2, min: 2, max: 3, role: assembly}
+    {type: count, default: 2, min: 2, max: 4, role: assembly}
   mount_bc:
     {type: length, default: 24mm, min: expr(exit_d + 14), max: 44mm,
      role: assembly, description: bolt-circle diameter of the base holes}

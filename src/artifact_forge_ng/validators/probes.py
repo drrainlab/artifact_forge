@@ -93,6 +93,12 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.pockets_present", Level.TOPOLOGY, "every blind pocket removed material without piercing through"),
         _decl("topology.seat_lips_present", Level.TOPOLOGY, "every bearing seat keeps its retaining lip ring solid"),
         _decl("topology.arm_reaches_tip", Level.TOPOLOGY, "the cantilever/loft arm is solid out to its tip"),
+        # -- assembly level: cross-part checks in the assembled pose ----------
+        _decl("assembly.screw_joint_ir", Level.ASSEMBLY, "bolt patterns coincide with compatible diameters in the pose"),
+        _decl("assembly.joint_pose", Level.ASSEMBLY, "every part is posed by a joint against existing datums"),
+        _decl("assembly.no_interference", Level.ASSEMBLY, "placed parts touch but never overlap"),
+        _decl("assembly.screw_axes_clear", Level.ASSEMBLY, "every joint screw axis is void through the assembled stack"),
+        _decl("assembly.channel_continuous_across", Level.ASSEMBLY, "the cable path is void through EVERY part in the pose"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),

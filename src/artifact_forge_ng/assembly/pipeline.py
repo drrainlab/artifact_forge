@@ -1,0 +1,365 @@
+"""The assembly pipeline — validate and build multi-part products.
+
+Mirrors the single-part discipline exactly: everything IR-checkable runs
+WITHOUT CAD (``forge validate`` on an assembly never imports cadquery);
+the build step compiles each part with the ordinary per-part pipeline
+(each STL exported in ITS OWN print orientation), then verifies the fit
+in the assembled pose with cross-part probes and writes assembled.step as
+a COMPOUND (no boolean fuse — placement for the eyes, intersection only
+inside probes).
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from ..catalog.loader import Catalog, CatalogError, load_catalog
+from ..core.findings import Finding, Level, Status
+from ..pipeline import PipelineFailure, PipelineState, pre_cad_from_instance
+from ..product.assembly import AssemblyInstance, JointUse
+from .joints import IDENTITY_POSE, JOINT_TYPES, JointError, Pose, compute_pose
+
+
+def load_assembly(path: Path) -> AssemblyInstance:
+    try:
+        doc = yaml.safe_load(Path(path).read_text())
+    except yaml.YAMLError as exc:
+        raise CatalogError(f"{path}: not valid YAML: {exc}") from exc
+    try:
+        return AssemblyInstance.model_validate(doc)
+    except Exception as exc:  # pydantic ValidationError
+        raise CatalogError(f"{path}: {exc}") from exc
+
+
+def validate_assembly(asm: AssemblyInstance, catalog: Catalog) -> None:
+    """Fail-fast name binding: joint types against the registry, features
+    against the vocabulary. Part instances are validated by the per-part
+    pre-CAD run (same code path as single products)."""
+    for joint in asm.joints:
+        if joint.type not in JOINT_TYPES:
+            raise CatalogError(
+                f"assembly {asm.id!r}: unknown joint type {joint.type!r}; "
+                f"known: {sorted(JOINT_TYPES)}"
+            )
+    for feature in asm.contract.must_have:
+        if feature not in catalog.features:
+            raise CatalogError(
+                f"assembly {asm.id!r}: unknown feature {feature!r} in contract"
+            )
+
+
+def _inject_shared(asm: AssemblyInstance, catalog: Catalog) -> dict[str, Any]:
+    """shared parameters land in every part whose archetype declares the
+    parameter — mating dimensions are stated ONCE. Returns instances by ref."""
+    instances = {}
+    for part in asm.parts:
+        instance = part.product
+        applicable = {
+            k: v
+            for k, v in asm.shared.items()
+            if k in catalog.archetype_for(instance).parameters
+        }
+        if applicable:
+            data = instance.model_dump(by_alias=True)
+            data["params"] = {**data.get("params", {}), **applicable}
+            instance = type(instance).model_validate(data)
+        instances[part.ref] = instance
+    return instances
+
+
+def _joint_findings(
+    asm: AssemblyInstance,
+    states: dict[str, PipelineState],
+) -> tuple[list[Finding], dict[str, Pose], list[dict[str, Any]]]:
+    """IR-level joint verification + the assembly poses (root = identity;
+    every joint poses its B part; recorded for the report)."""
+    findings: list[Finding] = []
+    poses: dict[str, Pose] = {asm.root: IDENTITY_POSE}
+    pose_report: list[dict[str, Any]] = [
+        {"part": asm.root, "transform": "identity"}
+    ]
+    for i, joint in enumerate(asm.joints):
+        decl = JOINT_TYPES[joint.type]
+        form_a = states[joint.a_ref].form
+        form_b = states[joint.b_ref].form
+        if form_a is None or form_b is None:
+            findings.append(Finding(
+                check="assembly.joint_pose", status=Status.FAIL,
+                level=Level.ASSEMBLY,
+                message=f"joint {i} ({joint.type}): a part failed to build its form",
+                critical=True,
+            ))
+            continue
+        try:
+            pose = compute_pose(joint, form_a, form_b)
+        except JointError as exc:
+            findings.append(Finding(
+                check="assembly.joint_pose", status=Status.FAIL,
+                level=Level.ASSEMBLY,
+                message=str(exc), critical=True,
+            ))
+            continue
+        if joint.b_ref != asm.root:
+            poses[joint.b_ref] = pose
+            pose_report.append({
+                "part": joint.b_ref,
+                "rotate": list(pose.rotate),
+                "translate": [round(v, 4) for v in pose.translate],
+                "derived_from": f"{joint.type}_{i}",
+            })
+        findings.extend(decl.ir_check(form_a, form_b, pose, joint))
+    for part in asm.parts:
+        if part.ref not in poses:
+            findings.append(Finding(
+                check="assembly.joint_pose", status=Status.FAIL,
+                level=Level.ASSEMBLY,
+                message=f"part {part.ref!r} is not posed by any joint",
+                critical=True,
+            ))
+    return findings, poses, pose_report
+
+
+def run_assembly_validate(path: Path, strict_flag: bool | None) -> dict[str, Any]:
+    catalog = load_catalog()
+    asm = load_assembly(path)
+    strict = asm.strict if strict_flag is None else strict_flag
+    validate_assembly(asm, catalog)
+    instances = _inject_shared(asm, catalog)
+    states = {
+        ref: pre_cad_from_instance(inst, catalog, strict)
+        for ref, inst in instances.items()
+    }
+    joint_findings, _, pose_report = _joint_findings(asm, states)
+
+    parts_summary = {ref: st.summary() for ref, st in states.items()}
+    critical_joint = [f for f in joint_findings if f.critical and f.status is Status.FAIL]
+    status = "fail" if critical_joint or any(
+        s["status"] == "fail" for s in parts_summary.values()
+    ) else "pass"
+    out = {
+        "assembly": asm.id,
+        "root": asm.root,
+        "parts": parts_summary,
+        "assembly_pose": pose_report,
+        "joints": [f.to_dict() for f in joint_findings],
+        "status": status,
+    }
+    if strict:
+        for ref, st in states.items():
+            st.enforce_strict()
+        if critical_joint:
+            raise AssemblyFailure(
+                out,
+                "strict: joint failures: "
+                + ", ".join(f.check for f in critical_joint),
+                code=4,
+            )
+    return out
+
+
+class AssemblyFailure(PipelineFailure):
+    def __init__(self, report: dict[str, Any], message: str, code: int = 4) -> None:
+        super().__init__(message, code=code)
+        self.report = report
+
+
+def run_assembly_build(
+    path: Path, out_dir: Path, strict_flag: bool | None
+) -> dict[str, Any]:
+    """Per-part builds + cross-part fit probes in the assembled pose."""
+    from ..compiler.pipeline import run_build_from_state  # cadquery import point
+    from ..cad.assembly import (
+        export_assembled_step,
+        place,
+        interference_volume,
+    )
+    from ..cad.probes import channel_probe, solid_fraction
+    catalog = load_catalog()
+    asm = load_assembly(path)
+    strict = asm.strict if strict_flag is None else strict_flag
+    validate_assembly(asm, catalog)
+    instances = _inject_shared(asm, catalog)
+    states = {
+        ref: pre_cad_from_instance(inst, catalog, strict)
+        for ref, inst in instances.items()
+    }
+    joint_findings, poses, pose_report = _joint_findings(asm, states)
+    # Joint IR gate BEFORE any CAD: a mismatched mount_bc must never reach
+    # the compiler.
+    hard = [f for f in joint_findings if f.critical and f.status is Status.FAIL]
+    if strict and hard:
+        raise PipelineFailure(
+            "strict: joint failures: " + ", ".join(sorted({f.check for f in hard})),
+            code=4,
+        )
+
+    target = out_dir / asm.id
+    parts_out: dict[str, Any] = {}
+    geometries = {}
+    for ref, state in states.items():
+        state.enforce_strict()
+        built, geometry = run_build_from_state(state, target / ref)
+        parts_out[ref] = {
+            "status": built["status"],
+            "grade": built.get("score", {}).get("grade"),
+            "exports": built["exports"],
+        }
+        geometries[ref] = geometry
+
+    def afind(check: str, ok: bool, message: str, *, measured: float | None = None,
+              limit: float | None = None) -> Finding:
+        return Finding(
+            check=check, status=Status.PASS if ok else Status.FAIL,
+            level=Level.ASSEMBLY, message=message, critical=not ok,
+            measured=measured, limit=limit,
+            unit="" if measured is None else "mm3" if "volume" in message else "",
+        )
+
+    placed = {ref: place(geometries[ref], poses[ref]) for ref in geometries if ref in poses}
+
+    # -- assembly.no_interference: parts may TOUCH, never overlap ---------
+    refs = list(placed)
+    worst_overlap = 0.0
+    for i in range(len(refs)):
+        for j in range(i + 1, len(refs)):
+            worst_overlap = max(
+                worst_overlap,
+                interference_volume(placed[refs[i]], placed[refs[j]]),
+            )
+    joint_findings.append(afind(
+        "assembly.no_interference",
+        worst_overlap <= 2.0,
+        f"worst pairwise overlap volume {worst_overlap:.2f} mm3 (weld-level "
+        "contact allowed, material overlap is not)",
+        measured=worst_overlap, limit=2.0,
+    ))
+
+    # -- assembly.screw_axes_clear: every screw must physically pass ------
+    for joint in asm.joints:
+        if joint.type != "screw_joint":
+            continue
+        form_b = states[joint.b_ref].form
+        pose_b = poses[joint.b_ref]
+        blocked = []
+        for h in form_b.holes:
+            hx, hy, z_top = h.at
+            p_top = pose_b.apply((hx, hy, z_top + 6.0))
+            p_bot = pose_b.apply((hx, hy, z_top - h.through - 1.0))
+            probe = channel_probe([p_top, p_bot], d=2.6)
+            frac = max(
+                solid_fraction(placed[r].workplane, probe) for r in placed
+            )
+            if frac > 0.05:
+                blocked.append(f"({hx:.1f},{hy:.1f}) fill {frac:.2f}")
+        joint_findings.append(afind(
+            "assembly.screw_axes_clear",
+            not blocked,
+            "all screw axes pass through the assembled stack"
+            if not blocked else "blocked screw axes: " + "; ".join(blocked),
+        ))
+
+    # -- assembly.channel_continuous_across: THE demo check ---------------
+    if asm.wiring is not None:
+        joint_findings.append(_wiring_check(asm, states, poses, placed, afind))
+
+    # -- assembled.step: compound, poses baked, no fuse -------------------
+    step_path = export_assembled_step(placed, target / "assembled.step")
+
+    # -- contract: joint features built iff their checks passed -----------
+    passed = {f.check for f in joint_findings if f.status is Status.PASS}
+    failed = {f.check for f in joint_findings if f.status is Status.FAIL}
+    built_features = []
+    for feature in asm.contract.must_have:
+        verified_by = catalog.features[feature].verified_by
+        if all(c in passed and c not in failed for c in verified_by):
+            built_features.append(feature)
+        else:
+            joint_findings.append(Finding(
+                check=f"contract.must_have:{feature}", status=Status.FAIL,
+                level=Level.CONTRACT,
+                message=f"{feature} NOT verified as built",
+                critical=True,
+            ))
+
+    grades = [p["grade"] for p in parts_out.values() if p.get("grade")]
+    hard_fails = [f for f in joint_findings if f.critical and f.status is Status.FAIL]
+    grade = "F" if hard_fails else (max(grades) if grades else "?")  # A<B<...: max = worst
+    status = "fail" if hard_fails or any(
+        p["status"] != "pass" for p in parts_out.values()
+    ) else "pass"
+
+    report = {
+        "assembly": asm.id,
+        "root": asm.root,
+        "parts": parts_out,
+        "assembly_pose": pose_report,
+        "joints": [f.to_dict() for f in joint_findings],
+        "built_features": built_features,
+        "exports": {"assembled_step": str(step_path)},
+        "status": status,
+        "grade": grade,
+    }
+    (target / "assembly_report.yaml").write_text(
+        yaml.safe_dump(report, sort_keys=False, allow_unicode=True)
+    )
+    if strict and status != "pass":
+        raise AssemblyFailure(
+            report,
+            "strict: assembly failures: "
+            + ", ".join(sorted({f.check for f in hard_fails})),
+            code=4,
+        )
+    return report
+
+
+def _wiring_check(asm, states, poses, placed, afind) -> Finding:
+    """The cable path through BOTH parts in the assembled pose: bracket
+    entry -> run -> tip drop -> (posed) cup base exit into the cavity."""
+    from ..cad.probes import channel_probe, solid_fraction
+    from ..core.values import parse_quantity
+
+    src = states[asm.wiring.from_part]
+    dst = states[asm.wiring.to_part]
+    f = src.form.frame
+    needed = ("channel_x", "channel_entry_u", "channel_z", "channel_drop_y")
+    if any(k not in f for k in needed):
+        return afind(
+            "assembly.channel_continuous_across", False,
+            f"{asm.wiring.from_part} declares no droppable channel path "
+            f"(needs frame keys {needed})",
+        )
+    d = parse_quantity(str(asm.wiring.d), "length", where="assembly.wiring.d")
+    x, entry_u, z_c, drop_y = (f[k] for k in needed)
+    top_z = f.get("flange_t", 5.0) + 2.0
+    # continue past the mount plane through the posed cup base to its cavity
+    dst_pose = poses[asm.wiring.to_part]
+    exit_end = dst_pose.apply((0.0, 0.0, dst.form.params.get("base_t", 3.0) + 2.0))
+    path = [
+        (x, entry_u, top_z),
+        (x, entry_u, z_c),
+        (x, drop_y, z_c),
+        (x, drop_y, exit_end[2]),
+    ]
+    # Probe LEG BY LEG and keep the worst: one full-path fraction would
+    # dilute a short plug (a too-small cup exit) below the threshold —
+    # a 3mm blockage in a 200mm path is 1.5% "clear" and 100% stuck cable.
+    worst = 0.0
+    for a, b in zip(path, path[1:]):
+        probe = channel_probe([a, b], d=0.8 * d)
+        if probe is None:
+            continue
+        worst = max(
+            worst,
+            max(solid_fraction(placed[r].workplane, probe) for r in placed),
+        )
+    return afind(
+        "assembly.channel_continuous_across",
+        worst < 0.05,
+        f"cable path through {asm.wiring.from_part}+{asm.wiring.to_part}: "
+        f"worst leg solid fraction {worst:.3f} — functional continuity "
+        "across parts",
+        measured=worst, limit=0.05,
+    )

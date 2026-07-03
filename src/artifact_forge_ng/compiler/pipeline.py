@@ -33,6 +33,14 @@ def orient_for_print(geometry: Geometry, form: PartForm) -> Geometry:
 
 def run_build(product_path: Path, out_dir: Path, strict_flag: bool | None) -> dict[str, Any]:
     state = run_pre_cad(product_path, strict_flag)
+    out, _ = run_build_from_state(state, out_dir / state.instance.id)
+    return out
+
+
+def run_build_from_state(state, target: Path) -> tuple[dict[str, Any], "object"]:
+    """The per-part build core — one compiled, validated, exported part.
+    The assembly pipeline runs each part through exactly this and keeps
+    the returned part-frame Geometry for the assembled-pose fit probes."""
     state.enforce_strict()  # never compile a form that failed its own IR
     if state.form is None:
         raise PipelineFailure("parameters did not resolve; nothing to build", code=4)
@@ -41,7 +49,6 @@ def run_build(product_path: Path, out_dir: Path, strict_flag: bool | None) -> di
 
     state.report.extend(_run_geometry_validators(state, geometry))
 
-    target = out_dir / state.instance.id
     oriented = orient_for_print(geometry, state.form)
     stl = oriented.export_stl(target / "part.stl")
     step = oriented.export_step(target / "part.step")
@@ -71,7 +78,7 @@ def run_build(product_path: Path, out_dir: Path, strict_flag: bool | None) -> di
     _finalize(state, geometry, out, target)
 
     state.enforce_strict()
-    return out
+    return out, geometry
 
 
 def _run_geometry_validators(state, geometry) -> list[Finding]:

@@ -1,0 +1,57 @@
+schema: assembly/v1
+id: desk_lamp_e27
+strict: true
+root: bracket
+
+# Mating dimensions declared ONCE — injected into every part whose
+# archetype has the parameter. mount_bc desync is unrepresentable.
+shared:
+  mount_bc: 24mm
+
+parts:
+  - ref: bracket
+    product:
+      schema: product/v1
+      id: lamp_arm
+      archetype: lamp_bracket_v1@1
+      params:
+        arm_len: 160mm
+        arm_w: 36mm
+        arm_h: 36mm
+        channel_d: 8mm
+        mount_screw: M4
+        mount_screw_count: 4
+        mount_inset: 26mm
+        screw: M4
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: cup
+    product:
+      schema: product/v1
+      id: lamp_cup
+      archetype: lamp_socket_cup_v1@1
+      params:
+        screw_count: 4
+        screw: M4
+        exit_d: 9mm
+      style: {surface: molded_utility_part}
+      manufacturing: {material: PETG, support_policy: none}
+
+joints:
+  - type: screw_joint
+    a: bracket.mount_bc
+    b: cup.mount_face
+    rotate: [180, 0, 0]   # cup opens downward under the arm tip
+    params: {screw: M4, count: 4, clearance: 0.3mm}
+
+# The killer check: the cable must pass through BOTH parts in the pose —
+# down the plate entry, along the arm, down the tip drop, through the cup
+# base into the socket cavity.
+wiring:
+  from_part: bracket
+  to_part: cup
+  d: 6mm
+
+contract:
+  must_have:
+    - bolted_interface
+    - cross_part_wiring

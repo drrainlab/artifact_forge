@@ -50,6 +50,25 @@ parameters:
   screw_spacing:
     {type: length, default: expr(arm_w + 20), min: expr(arm_w + 13),
      max: expr(plate_l - 10), role: assembly}
+  # -- tip cup mount (0 = no mount; set mount_bc to accept a socket cup) --
+  mount_bc:
+    {type: length, default: 0mm, min: 0mm, max: expr(arm_w - 10),
+     role: assembly,
+     description: "bolt-circle diameter of tip thread pilots; match the
+       cup's mount_bc (declare it once via assembly.shared)"}
+  mount_screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+  mount_screw_count:
+    {type: count, default: 4, min: 2, max: 6, role: assembly}
+  mount_inset:
+    {type: length, default: 26mm, min: expr(mount_bc / 2 + 6),
+     max: expr(arm_len / 2), role: assembly,
+     description: cup center setback from the arm tip}
+  pilot_depth:
+    {type: length, default: "expr(min(8, arm_h / 2 - channel_d / 2 - 2))", min: 5mm,
+     max: "expr(arm_h / 2 - channel_d / 2 - 2)", role: assembly,
+     description: "thread pilot depth — clamped so pilots never break
+       into the wiring channel above"}
 
 constraints:
   - channel_d <= min(arm_w, arm_h) - 4

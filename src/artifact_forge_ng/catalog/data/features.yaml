@@ -250,3 +250,16 @@ features:
       - form.min_ligament_ok
       - region.keepouts_preserved
       - topology.hex_field_present
+
+  # -- assembly interfaces (verified in the assembled pose) -------------------
+  - id: bolted_interface
+    description: screw joint between two parts — coincident bolt patterns, clear axes, no material overlap
+    verified_by:
+      - assembly.screw_joint_ir
+      - assembly.screw_axes_clear
+      - assembly.no_interference
+
+  - id: cross_part_wiring
+    description: the cable passes through every part of the assembly in the assembled pose
+    verified_by:
+      - assembly.channel_continuous_across

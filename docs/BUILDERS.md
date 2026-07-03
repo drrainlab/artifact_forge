@@ -97,6 +97,15 @@ Recipe-op без реализации в движке = честный engine-ga
 `biomorphic_surface_deform` = SurfaceStyle biomorphic_utility_part (слайдеры →
 controlled passes, preserve by construction). Не смешивать с recipe.
 
+### assembly joints (реестр assembly/joints.py — verified в позе)
+
+| joint | статус |
+|---|---|
+| `screw_joint` | ✅ R1: болт-круги совпадают в позе, clear↔tap, оси void, интерференс |
+| `lid_seat`, `press_fit_pin_pair` | ⬜ R2 Fit Interfaces |
+| `split_plane_with_alignment` | ⬜ R3 (авто-ответные половинки) |
+| snap/dovetail/compliant | ⬜ R4 |
+
 ### interface / joint / механика
 
 | builder | статус / волна |

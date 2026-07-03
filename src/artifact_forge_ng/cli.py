@@ -24,6 +24,14 @@ from .catalog.loader import CatalogError
 from .pipeline import PipelineFailure, run_pre_cad
 
 
+def _schema_kind(path: Path) -> str:
+    """Peek at the document's ``schema:`` marker — ``forge validate|build``
+    accept single products AND assemblies through the same commands."""
+    doc = yaml.safe_load(Path(path).read_text())
+    marker = (doc or {}).get("schema", "")
+    return str(marker).split("/")[0]
+
+
 def run_validate(product_path: Path, strict_flag: bool | None) -> dict[str, Any]:
     state = run_pre_cad(product_path, strict_flag)
     out = state.summary()
@@ -64,9 +72,19 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         if args.command == "validate":
+            if _schema_kind(args.product) == "assembly":
+                from .assembly.pipeline import run_assembly_validate
+
+                _print(run_assembly_validate(args.product, args.strict))
+                return 0
             _print(run_validate(args.product, args.strict))
             return 0
         if args.command == "build":
+            if _schema_kind(args.product) == "assembly":
+                from .assembly.pipeline import run_assembly_build
+
+                _print(run_assembly_build(args.product, args.out, args.strict))
+                return 0
             from .compiler.pipeline import run_build
 
             _print(run_build(args.product, args.out, args.strict))
