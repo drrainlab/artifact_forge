@@ -26,7 +26,8 @@ class ModifierAdd(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
-    target: str
+    #: Required for add; optional for update (matches any use of the id).
+    target: str = ""
     params: dict[str, Any] = {}
 
 
@@ -35,6 +36,9 @@ class ModifierOps(BaseModel):
 
     add: list[ModifierAdd] = []
     remove: list[str] = []
+    #: Update params of an ALREADY-PRESENT modifier use ("more voronoi" =
+    #: bump sites on the existing field) — merged over its current params.
+    update: list[ModifierAdd] = []
 
 
 class Patch(VersionedModel):
@@ -157,6 +161,16 @@ def apply_patch(
     modifiers = [dict(m) for m in data.get("modifiers", [])]
     if patch.modifiers.remove:
         modifiers = [m for m in modifiers if m["id"] not in set(patch.modifiers.remove)]
+    for upd in patch.modifiers.update:
+        hit = [m for m in modifiers
+               if m["id"] == upd.id and (not upd.target or m["target"] == upd.target)]
+        if not hit:
+            raise PatchError(
+                f"modifiers.update targets {upd.id!r}, which the instance "
+                "does not use — use modifiers.add"
+            )
+        for m in hit:
+            m["params"] = {**m.get("params", {}), **upd.params}
     for add in patch.modifiers.add:
         if any(m["id"] == add.id and m["target"] == add.target for m in modifiers):
             continue

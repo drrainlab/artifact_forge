@@ -150,11 +150,22 @@ def llm_intent(prompt: str, catalog: Catalog) -> dict[str, Any]:
     }
 
 
-def nl_edit(text: str, current_yaml: str) -> dict[str, Any]:
-    """Free-text edit -> either a known intent name or a raw Patch dict.
-    The result goes through /api/edit/preview like any hand-written patch."""
+def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog) -> dict[str, Any]:
+    """Free-text edit -> a known intent name or a raw Patch dict, GROUNDED
+    in the current archetype: the model sees exactly which parameter names,
+    modifier params and preserve entries are legal. Whatever it returns
+    still goes through /api/edit/preview like any hand-written patch —
+    and preserve entries outside the vocabulary are filtered server-side
+    (with a note), never passed through to fail late."""
     from ..repair.intents import INTENTS
 
+    param_names = sorted(archetype.parameters)
+    preserve_ok = sorted(set(param_names) | set(catalog.features))
+    mod_digest = []
+    for mod_id in archetype.allowed_modifiers:
+        mdef = catalog.modifiers.get(mod_id)
+        if mdef is not None:
+            mod_digest.append(f"{mod_id}(params: {', '.join(sorted(mdef.params))})")
     schema = {
         "type": "object",
         "properties": {
@@ -171,8 +182,36 @@ def nl_edit(text: str, current_yaml: str) -> dict[str, Any]:
                                       "structural", "style"]},
                     "reason": {"type": "string"},
                     "params": {"type": "object",
-                               "additionalProperties": {"type": "string"}},
-                    "preserve": {"type": "array", "items": {"type": "string"}},
+                               "additionalProperties": {"type": "string"},
+                               "description": f"ONLY these names: {', '.join(param_names)}"},
+                    "preserve": {"type": "array",
+                                 "items": {"type": "string", "enum": preserve_ok}},
+                    "modifiers": {
+                        "type": "object",
+                        "properties": {
+                            "update": {"type": "array", "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "target": {"type": "string"},
+                                    "params": {"type": "object",
+                                               "additionalProperties": {"type": "string"}},
+                                },
+                                "required": ["id", "params"],
+                            }},
+                            "add": {"type": "array", "items": {
+                                "type": "object",
+                                "properties": {
+                                    "id": {"type": "string"},
+                                    "target": {"type": "string"},
+                                    "params": {"type": "object",
+                                               "additionalProperties": {"type": "string"}},
+                                },
+                                "required": ["id", "target"],
+                            }},
+                            "remove": {"type": "array", "items": {"type": "string"}},
+                        },
+                    },
                 },
             },
         },
@@ -180,11 +219,28 @@ def nl_edit(text: str, current_yaml: str) -> dict[str, Any]:
     system = (
         "You translate a free-text edit request for an Artifact Forge "
         "product into EITHER a known intent name OR a typed patch "
-        "(patch/v1: absolute values or '+3mm' deltas on existing "
-        "parameters). Prefer a known intent when it matches. The current "
-        "product YAML follows; only reference its parameters.\n"
+        "(patch/v1). Rules:\n"
+        "- patch.params: ONLY archetype parameter names (absolute values "
+        "or '+3mm' deltas).\n"
+        "- pattern/field changes ('more voronoi', 'denser holes') go into "
+        "modifiers.update on the EXISTING modifier use (merge params like "
+        "sites/min_ligament/hole_d), never into patch.params.\n"
+        "- preserve: only from the allowed list (archetype params + feature "
+        "vocabulary) — modifier params are NOT valid preserve entries.\n"
+        f"Archetype {archetype.id}: params {', '.join(param_names)}.\n"
+        f"Allowed modifiers: {'; '.join(mod_digest) or '-'}.\n"
         f"Known intents: {', '.join(sorted(INTENTS))}"
     )
     raw = llm.complete(system, f"{current_yaml}\n\nREQUEST: {text}", schema,
                        cache_system=False)
-    return {"ok": True, "intent": raw.get("intent"), "patch": raw.get("patch")}
+    patch = raw.get("patch")
+    notes = []
+    if patch and patch.get("preserve"):
+        keep, dropped = [], []
+        for name in patch["preserve"]:
+            (keep if name in preserve_ok else dropped).append(name)
+        patch["preserve"] = keep
+        if dropped:
+            notes.append(f"dropped invalid preserve entries: {', '.join(dropped)}")
+    return {"ok": True, "intent": raw.get("intent"), "patch": patch,
+            "notes": "; ".join(notes)}

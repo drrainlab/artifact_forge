@@ -315,12 +315,24 @@ def api_edit_preview(body: EditBody) -> JSONResponse:
         allow_unicode=True,
     )
     validation = api_validate(YamlBody(yaml=edited_yaml, strict=False))
+    val = (yaml.safe_load(validation.body.decode())
+           if not isinstance(validation, dict) else validation)
+    # IR diff of the headline effect: a valid patch can still do the
+    # OPPOSITE of the intent (more voronoi sites -> fewer surviving cells
+    # in a narrow band) — the preview must say so BEFORE apply.
+    before_val = yaml.safe_load(
+        api_validate(YamlBody(yaml=body.yaml, strict=False)).body.decode()
+    )
+    def _cells(v):
+        return [f.get("cells", 0) for f in (v.get("form") or {}).get("fields", [])]
+    ir_diff = {"field_cells_before": _cells(before_val),
+               "field_cells_after": _cells(val)}
     return JSONResponse({
         "ok": True,
         "patch": patch.model_dump(mode="json"),
         "edited_yaml": edited_yaml,
-        "validation": yaml.safe_load(validation.body.decode())
-        if not isinstance(validation, dict) else validation,
+        "validation": val,
+        "ir_diff": ir_diff,
     })
 
 
@@ -451,6 +463,11 @@ def api_nl_edit(body: NlEditBody) -> JSONResponse:
             "LLM OFF and no known intent matched — use an intent button or a "
             "patch", "edit.nl")])
     try:
-        return JSONResponse(intent.nl_edit(body.text, body.yaml))
+        catalog = load_catalog()
+        instance = _load_product(body.yaml)
+        archetype = catalog.archetype_for(instance)
+        return JSONResponse(intent.nl_edit(body.text, body.yaml, archetype, catalog))
     except RuntimeError as exc:
         return _fail([error_finding(str(exc), "edit.llm")])
+    except Exception as exc:  # noqa: BLE001 — structured, never a traceback
+        return _fail([error_finding(str(exc), "edit.nl")])

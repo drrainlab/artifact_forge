@@ -462,8 +462,14 @@ function wireEdit() {
     const p = await api.editPreview(state.yaml, intent, patch);
     if (!p.ok) { out.innerHTML = findingsTable(p.findings); return; }
     const val = p.validation;
+    const cb = (p.ir_diff?.field_cells_before || []).reduce((a, b) => a + b, 0);
+    const ca = (p.ir_diff?.field_cells_after || []).reduce((a, b) => a + b, 0);
+    const cellsNote = (cb || ca) && cb !== ca
+      ? `<div class="mt ${ca < cb ? "" : "dim"}">field cells: ${cb} → ${ca}${ca < cb ? ' <span class="badge warn">fewer cells — likely the OPPOSITE of the intent</span>' : ""}</div>`
+      : "";
     out.innerHTML = `
       <div class="yaml-pane">${esc(jsyaml(p.patch))}</div>
+      ${cellsNote}
       <div class="mt">edited product validates: <span class="badge ${val.status}">${val.status}</span></div>
       ${findingsTable((val.findings || []).filter((f) => f.status !== "pass"))}
       <div class="row mt">

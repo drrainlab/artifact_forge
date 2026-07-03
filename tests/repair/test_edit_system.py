@@ -144,3 +144,28 @@ class TestPreserveContract:
         patch = Patch(schema="patch/v1", preserve=["warp_core_integrity"])
         with pytest.raises(PatchError, match="warp_core_integrity"):
             apply_patch(instance, patch, archetype, catalog)
+
+
+class TestModifierUpdate:
+    def test_update_merges_params(self, env):
+        catalog, instance, archetype = env
+        patch = Patch(
+            schema="patch/v1", type="style",
+            modifiers={"update": [{"id": "add_hex_perforation",
+                                   "params": {"cell_d": "6mm"}}]},
+        )
+        edited = apply_patch(instance, patch, archetype, catalog)
+        use = next(m for m in edited.modifiers if m.id == "add_hex_perforation")
+        assert use.params["cell_d"] == "6mm"
+        # untouched params survive the merge
+        assert use.params["wall_gap"] == "1.5mm"
+
+    def test_update_of_absent_modifier_refused(self, env):
+        catalog, instance, archetype = env
+        patch = Patch(
+            schema="patch/v1",
+            modifiers={"update": [{"id": "add_voronoi_field",
+                                   "params": {"sites": "30"}}]},
+        )
+        with pytest.raises(PatchError, match="does not use"):
+            apply_patch(instance, patch, archetype, catalog)
