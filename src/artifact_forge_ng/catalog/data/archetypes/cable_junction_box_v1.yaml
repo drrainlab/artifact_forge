@@ -1,0 +1,92 @@
+schema: archetype/v1
+id: cable_junction_box_v1
+version: 1
+object_class: cable_junction_box
+description: >
+  Small cable junction/splice box (pure recipe): open-top shell with two
+  drop-in wire exits through opposite walls and countersunk floor screws.
+  Cables drop into the rim notches during assembly — no threading.
+
+provides_features:
+  - box_shell
+  - pass_through_cutout
+  - countersunk_screw_holes
+
+parameters:
+  box_l:
+    {type: length, default: 60mm, min: 36mm, max: 140mm,
+     role: functional, exposed: true}
+  box_w:
+    {type: length, default: 40mm, min: 26mm, max: 100mm,
+     role: functional, exposed: true}
+  box_h:
+    {type: length, default: 22mm, min: 12mm, max: 60mm, role: functional, exposed: true}
+  wall:
+    {type: length, default: 2.4mm, min: 1.6mm, max: 5mm, role: manufacturing}
+  floor_t:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: manufacturing}
+  corner_r:
+    {type: length, default: 5mm, min: 2mm, max: 12mm, role: aesthetic}
+  cable_d:
+    {type: length, default: 6mm, min: 3mm, max: 12mm,
+     role: functional, exposed: true, description: cable the notches accept}
+  screw:
+    {type: choice, choices: [M3, M4], default: M3, role: assembly}
+  screw_spacing:
+    {type: length, default: expr(box_l - 26), min: 16mm,
+     max: expr(box_l - 20), role: assembly}
+
+constraints:
+  - cable_d + 4 < box_h
+  - wall >= printer.min_wall
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_box_shell
+      id: shell
+      params: {l: box_l, w: box_w, h: box_h, wall: wall, floor_t: floor_t,
+               corner_r: corner_r}
+    - op: wire_exit
+      id: wire_in
+      params: {cable_d: cable_d, face: "+x"}
+    - op: wire_exit
+      id: wire_out
+      params: {cable_d: cable_d, face: "-x"}
+    - op: countersunk_hole_pattern
+      id: screws
+      params: {kind: line, screw: screw, count: 2, spacing: screw_spacing,
+               cs_face: top, z_top: floor_t, through: floor_t}
+
+regions:
+  - {id: shell, role: mounting_surface, editable: false}
+  - {id: floor, role: aesthetic_lightening, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.shell_walls_ok
+  - form.cuts_respect_keepouts
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.single_connected_solid
+  - topology.cutout_present
+  - topology.screw_holes_open
+  - topology.countersinks_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - box_shell
+    - pass_through_cutout
+    - countersunk_screw_holes
+  must_not_have: []
+  invariants:
+    - cable_d + 4 < box_h

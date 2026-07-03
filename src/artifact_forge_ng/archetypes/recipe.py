@@ -84,5 +84,9 @@ def build_form(
         cutboxes=state.cutboxes,
         bores=state.bores,
         ribs=state.ribs,
+        plates=state.plates,
+        pins=state.pins,
+        fields=state.fields,
         regions=state.regions,
+        datums=state.datums,
     )

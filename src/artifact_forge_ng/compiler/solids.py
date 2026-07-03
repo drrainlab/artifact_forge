@@ -74,6 +74,15 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
     for plate in form.plates:
         mass = weld(mass, _build_plate(plate), what=plate.name)
 
+    for pin in form.pins:
+        px, py = pin.at
+        post = (
+            cq.Workplane("XY", origin=(px, py, pin.z0))
+            .circle(pin.d / 2.0)
+            .extrude(pin.length)
+        )
+        mass = weld(mass, post, what=pin.name)
+
     for loft in form.lofts:
         cx, cy = loft.base_center
         arm = (

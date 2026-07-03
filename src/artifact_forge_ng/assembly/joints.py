@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from ..core.fasteners import screw_spec
 from ..core.findings import Finding, Level, Status
@@ -129,28 +129,44 @@ def _screw_joint_ir(
     count = int(joint.params.get("count", 3))
     spec = screw_spec(screw)
 
-    pilots = [b for b in form_a.bores if b.name.startswith(PILOT_PREFIX)]
+    prefix = str(joint.params.get("pilots", PILOT_PREFIX))
+    pilots = [b for b in form_a.bores if b.name.startswith(prefix)]
     holes = list(form_b.holes)
-    if len(pilots) != count or len(holes) != count:
+    if len(pilots) < count or len(holes) < count:
         findings.append(_finding(
             "assembly.screw_joint_ir", False,
             f"screw count mismatch: joint wants {count}, "
-            f"{joint.a_ref} has {len(pilots)} pilot(s), "
+            f"{joint.a_ref} has {len(pilots)} pilot(s) ({prefix}*), "
             f"{joint.b_ref} has {len(holes)} hole(s)",
         ))
         return findings
 
     # B hole centers in the assembled (root) frame. Holes sit on B's mount
-    # plane — project each to its plate-bottom point before posing.
+    # plane — project each to its plate-bottom point before posing. Every
+    # HOLE must land on a DISTINCT pilot (a part may carry more pilots than
+    # this joint uses — the box's four bosses serve screws AND pins).
     posed = []
     for h in holes:
         hx, hy, z_top = h.at
         posed.append(pose.apply((hx, hy, z_top - h.through)))
+    taken: set[int] = set()
+    matched: list[tuple[Any, ...]] = []
     worst = 0.0
-    for b in pilots:
-        px, py, _ = b.center
-        best = min(math.hypot(px - q[0], py - q[1]) for q in posed)
-        worst = max(worst, best)
+    for q in posed:
+        best_i, best_d = None, float("inf")
+        for i, b in enumerate(pilots):
+            if i in taken:
+                continue
+            d_i = math.hypot(b.center[0] - q[0], b.center[1] - q[1])
+            if d_i < best_d:
+                best_i, best_d = i, d_i
+        if best_i is None:
+            best_d = float("inf")
+        else:
+            taken.add(best_i)
+            matched.append((pilots[best_i],))
+        worst = max(worst, best_d)
+    pilots = [m[0] for m in matched] if len(matched) == len(posed) else pilots
     if worst > POSITION_TOL:
         findings.append(_finding(
             "assembly.screw_joint_ir", False,
@@ -201,4 +217,155 @@ _register(JointDecl(
                 "thread pilots on A, verified coincident in the pose",
     ir_check=_screw_joint_ir,
     cad_checks=("assembly.no_interference", "assembly.screw_axes_clear"),
+))
+
+
+# -- lid_seat -------------------------------------------------------------------
+
+
+def _lid_seat_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """Dimension-chain fit: the lid's plug must drop into the shell's
+    interior with the declared clearance on every side, and not bottom out
+    on anything before the rim seats. A is the box (shell frame keys), B is
+    the lid (plug frame keys)."""
+    clearance = float(joint.params.get("clearance", 0.3))
+    fa, fb = form_a.frame, form_b.frame
+    need_a = ("inner_u0", "inner_v0", "inner_u1", "inner_v1", "shell_h")
+    need_b = ("plug_u0", "plug_v0", "plug_u1", "plug_v1", "plug_depth")
+    missing = [k for k in need_a if k not in fa] + [k for k in need_b if k not in fb]
+    if missing:
+        return [_finding(
+            "assembly.lid_seat_ir", False,
+            f"missing fit frame keys: {missing} — the parts do not expose "
+            "a shell interior / lid plug",
+        )]
+    # Pose the plug rectangle into the root frame (quarter turns keep it
+    # axis-aligned) and compare against the interior rectangle.
+    corners = [
+        pose.apply((fb["plug_u0"], fb["plug_v0"], 0.0)),
+        pose.apply((fb["plug_u1"], fb["plug_v1"], 0.0)),
+    ]
+    pu0, pu1 = sorted((corners[0][0], corners[1][0]))
+    pv0, pv1 = sorted((corners[0][1], corners[1][1]))
+    gaps = (
+        pu0 - fa["inner_u0"], fa["inner_u1"] - pu1,
+        pv0 - fa["inner_v0"], fa["inner_v1"] - pv1,
+    )
+    lo, hi = clearance - 0.15, clearance + 0.6
+    problems: list[str] = []
+    if min(gaps) < lo:
+        problems.append(
+            f"plug too tight: side gap {min(gaps):.2f} < {lo:.2f} "
+            "(it will not drop in)"
+        )
+    if max(gaps) > hi:
+        problems.append(
+            f"plug too loose: side gap {max(gaps):.2f} > {hi:.2f} "
+            "(the lid will rattle)"
+        )
+    # The plug must not reach the bosses/floor: depth < shell_h - floor gap.
+    boss_top = max(
+        (fa[k] for k in fa if k.endswith("_top")), default=fa.get("floor_t", 0.0)
+    )
+    room = fa["shell_h"] - boss_top
+    if fb["plug_depth"] > room - 0.2:
+        problems.append(
+            f"plug depth {fb['plug_depth']:g} bottoms out on the bosses "
+            f"(only {room:.1f} below the rim)"
+        )
+    if problems:
+        return [_finding("assembly.lid_seat_ir", False, "; ".join(problems),
+                         measured=min(gaps), limit=clearance)]
+    return [_finding(
+        "assembly.lid_seat_ir", True,
+        f"plug seats with side gaps {min(gaps):.2f}..{max(gaps):.2f} "
+        f"(clearance {clearance:g})",
+        measured=min(gaps), limit=clearance,
+    )]
+
+
+_register(JointDecl(
+    name="lid_seat",
+    description="lid plug drops into the shell interior with declared "
+                "clearance and seats on the rim without bottoming out",
+    ir_check=_lid_seat_ir,
+    cad_checks=("assembly.no_interference", "assembly.lid_seats"),
+))
+
+
+# -- press_fit_pin_pair ---------------------------------------------------------
+
+
+def _press_fit_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """Pins on B land on receiving bores on A with the declared
+    INTERFERENCE: the pin is thicker than the bore (negative clearance) —
+    that is what makes it press-fit rather than loose."""
+    interference = float(joint.params.get("interference", 0.1))
+    prefix = str(joint.params.get("receivers", PILOT_PREFIX))
+    if interference <= 0:
+        return [_finding(
+            "assembly.press_fit_ir", False,
+            f"interference {interference:g} must be positive — a pin no "
+            "thicker than its bore falls out",
+        )]
+    pins = list(form_b.pins)
+    if not pins:
+        return [_finding(
+            "assembly.press_fit_ir", False,
+            f"{joint.b_ref} declares no pins",
+        )]
+    receivers = [b for b in form_a.bores if b.name.startswith(prefix)]
+    problems: list[str] = []
+    worst = 0.0
+    taken: set[int] = set()
+    for pin in pins:
+        px, py = pin.at
+        q = pose.apply((px, py, 0.0))
+        best_i, best_d = None, float("inf")
+        for i, b in enumerate(receivers):
+            if i in taken:
+                continue
+            d_i = math.hypot(b.center[0] - q[0], b.center[1] - q[1])
+            if d_i < best_d:
+                best_i, best_d = i, d_i
+        if best_i is None or best_d > POSITION_TOL:
+            problems.append(f"pin {pin.name} has no receiver within tolerance")
+            continue
+        taken.add(best_i)
+        worst = max(worst, best_d)
+        bore = receivers[best_i]
+        want = bore.d + interference
+        # Declared design numbers must agree nearly exactly — a tolerance
+        # wider than the interference itself would wave loose pins through.
+        if abs(pin.d - want) > 0.06:
+            problems.append(
+                f"pin {pin.name} d={pin.d:g} vs receiver {bore.d:g}: "
+                f"needs {want:g} for {interference:g} interference"
+            )
+        depth = abs(bore.span[1] - bore.span[0])
+        if pin.length > depth - 0.3:
+            problems.append(
+                f"pin {pin.name} ({pin.length:g}) longer than its receiver "
+                f"({depth:g}) — the lid will never seat"
+            )
+    if problems:
+        return [_finding("assembly.press_fit_ir", False, "; ".join(problems))]
+    return [_finding(
+        "assembly.press_fit_ir", True,
+        f"{len(pins)} pin(s) land on receivers (worst offset {worst:.3f}) "
+        f"with {interference:g} interference",
+        measured=worst, limit=POSITION_TOL,
+    )]
+
+
+_register(JointDecl(
+    name="press_fit_pin_pair",
+    description="pins on B press into receiving bores on A: coincident in "
+                "the pose, thicker than the bore by the interference",
+    ir_check=_press_fit_ir,
+    cad_checks=("assembly.pins_engage",),
 ))

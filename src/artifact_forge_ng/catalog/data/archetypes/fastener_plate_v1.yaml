@@ -1,0 +1,104 @@
+schema: archetype/v1
+id: fastener_plate_v1
+version: 1
+object_class: fastener_showcase
+description: >
+  Fastener interface showcase plate (pure recipe): socket-cap counterbores,
+  a hex nut trap over a clearance bore, heatset insert pockets and four
+  PCB standoffs — every fastener op from the registry on one printable
+  plate, each verified by its own probes.
+
+provides_features:
+  - mounting_plate_body
+  - hole_pattern
+  - nut_traps
+  - heatset_pockets
+  - standoffs
+
+parameters:
+  plate_l:
+    {type: length, default: 120mm, min: 80mm, max: 200mm, role: assembly}
+  plate_w:
+    {type: length, default: 70mm, min: 50mm, max: 140mm, role: assembly}
+  thickness:
+    {type: length, default: 8mm, min: 6mm, max: 14mm, role: structural}
+  corner_r:
+    {type: length, default: 6mm, min: 2mm, max: 14mm, role: aesthetic}
+  cb_screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+  cb_spacing:
+    {type: length, default: 96mm, min: 40mm, max: expr(plate_l - 20), role: assembly}
+  nut_screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+  insert_screw:
+    {type: choice, choices: [M3, M4], default: M3, role: assembly}
+  insert_spacing:
+    {type: length, default: 40mm, min: 16mm, max: expr(plate_l - 30), role: assembly}
+  standoff_sx:
+    {type: length, default: 60mm, min: 20mm, max: expr(plate_l - 30), role: assembly}
+  standoff_sy:
+    {type: length, default: 24mm, min: 12mm, max: expr(plate_w - 40), role: assembly}
+  min_web:
+    {type: length, default: 4mm, min: 3mm, max: 10mm, role: manufacturing}
+
+constraints:
+  - thickness >= 6
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params: {l: plate_l, w: plate_w, t: thickness, corner_r: corner_r}
+    - op: counterbore_hole_pattern
+      id: cbores
+      params: {kind: line, screw: cb_screw, count: 2, spacing: cb_spacing,
+               cs_face: top}
+    - op: nut_trap
+      id: nut
+      params: {screw: nut_screw, cx: 0mm, cy: 0mm}
+    - op: heatset_insert_pocket
+      id: inserts
+      params: {screw: insert_screw, spacing: insert_spacing,
+               cy: "expr(plate_w / 2 - 14)"}
+    - op: standoff_pattern
+      id: standoffs
+      params: {sx: standoff_sx, sy: standoff_sy,
+               cy: "expr(19 - plate_w / 2)", height: 6mm,
+               pilot_d: 2.7mm, pilot_depth: 5mm}
+
+regions:
+  - {id: plate, role: mounting_surface, editable: false}
+  - {id: plate_lightening, role: aesthetic_lightening, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.single_connected_solid
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.hex_field_present
+  - topology.bores_open
+  - topology.pockets_present
+  - topology.ribs_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - hole_pattern
+    - nut_traps
+    - heatset_pockets
+    - standoffs
+  must_not_have: []
+  invariants:
+    - thickness >= 6

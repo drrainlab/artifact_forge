@@ -15,6 +15,7 @@ from ..product.resolve import ResolvedParams
 from . import (
     adapter_plate,
     cable_comb,
+    cable_raceway,
     j_hook,
     lamp_bracket,
     lamp_socket_cup,
@@ -34,6 +35,7 @@ FORM_BUILDERS: dict[str, FormBuilder] = {
     underdesk_cable_clip_sideprint.SECTION_NAME: underdesk_cable_clip_sideprint.build_form,
     adapter_plate.SECTION_NAME: adapter_plate.build_form,
     cable_comb.SECTION_NAME: cable_comb.build_form,
+    cable_raceway.SECTION_NAME: cable_raceway.build_form,
     zip_tie_anchor.SECTION_NAME: zip_tie_anchor.build_form,
     j_hook.SECTION_NAME: j_hook.build_form,
     lamp_socket_cup.SECTION_NAME: lamp_socket_cup.build_form,

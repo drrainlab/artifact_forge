@@ -263,3 +263,49 @@ features:
     description: the cable passes through every part of the assembly in the assembled pose
     verified_by:
       - assembly.channel_continuous_across
+
+  - id: lid_plug
+    description: inset plug plate under a lid, welded as one solid
+    verified_by:
+      - topology.single_connected_solid
+
+  - id: alignment_pins
+    description: press-fit/alignment pins welded to the part
+    verified_by:
+      - topology.pins_present
+
+  - id: seated_lid
+    description: the lid plug drops into the shell with the declared clearance and seats on the rim
+    verified_by:
+      - assembly.lid_seat_ir
+      - assembly.lid_seats
+      - assembly.no_interference
+
+  - id: press_fit_alignment
+    description: pins press into receiving bores with the declared interference, engaged in the pose
+    verified_by:
+      - assembly.press_fit_ir
+      - assembly.pins_engage
+
+  - id: open_channel
+    description: open-topped U-channel with the declared wall kept between slot and outside
+    verified_by:
+      - form.profile_closed
+      - form.wall_thickness
+
+  - id: nut_traps
+    description: hex nut pockets over clearance bores, cut flat-to-flat true
+    verified_by:
+      - topology.hex_field_present
+      - topology.bores_open
+
+  - id: heatset_pockets
+    description: blind pockets sized from the heatset insert table
+    verified_by:
+      - topology.pockets_present
+
+  - id: standoffs
+    description: PCB standoffs with blind pilots rising from the plate
+    verified_by:
+      - topology.ribs_present
+      - topology.pockets_present

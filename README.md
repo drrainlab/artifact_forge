@@ -130,9 +130,12 @@ fit-пробы в собранной позе после per-part билдов: 
 проходит через ВСЕ детали (по-сегментный worst-case, пробку не разбавить
 длинным путём). Каждая деталь печатается в своей ориентации; `assembled.step`
 — compound в позе (без fuse), `assembly_report.yaml` — позы/joints/grade.
-Демо: `catalog/examples/desk_lamp_e27.yaml` (кронштейн + чашка E27, 4×M4,
-сквозная проводка). Дорожная карта: R2 lids/pins/press-fit → R3 split_plane
-→ R4 snap/dovetail → R5 assembly-intents.
+Демо: `desk_lamp_e27.yaml` (кронштейн + чашка E27, 4×M4, сквозная
+проводка) и `esp32_box_with_lid.yaml` — коробка с крышкой: `lid_seat`
+(размерная цепочка плаг↔интерьер−2·clearance до CAD + посадка в позе),
+`screw_joint` в бобышки и `press_fit_pin_pair` (пин ТОЛЩЕ гнезда на
+interference; реальный overlap измеряется и обязан попасть в декларацию).
+Дорожная карта: R3 split_plane → R4 snap/dovetail → R5 assembly-intents.
 
 ## Geometry Builders & Recipe (docs/BUILDERS.md)
 

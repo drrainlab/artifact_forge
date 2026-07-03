@@ -1,0 +1,21 @@
+schema: product/v1
+id: junction_box_60
+archetype: cable_junction_box_v1@1
+strict: true
+
+requested_features:
+  - box_shell
+  - pass_through_cutout
+  - countersunk_screw_holes
+
+params:
+  box_l: 60mm
+  box_w: 40mm
+  box_h: 22mm
+  cable_d: 6mm
+  screw: M3
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

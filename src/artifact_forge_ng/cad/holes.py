@@ -30,6 +30,25 @@ def cut_countersunk_hole(
     if not bored or not hole.countersink:
         return body, bored, False
     head_r = spec["head"] / 2.0
+    if hole.head_style == "cylinder":
+        # Counterbore: a flat-bottomed cylindrical recess for a socket-cap
+        # head — depth swallows the head, never more than half the stock.
+        cb_depth = min(spec["head"] * 0.8, hole.through * 0.5)
+        if hole.countersink_face == "bottom":
+            z_start = z_top - hole.through - 1.0
+            cutter = (
+                cq.Workplane("XY", origin=(x, y, z_start))
+                .circle(head_r + 0.3)
+                .extrude(cb_depth + 1.0)
+            )
+        else:
+            cutter = (
+                cq.Workplane("XY", origin=(x, y, z_top + 1.0))
+                .circle(head_r + 0.3)
+                .extrude(-(cb_depth + 1.0))
+            )
+        body, sunk = cut_keep_solid(body, cutter)
+        return body, bored, sunk
     cs_depth = min(2.0, hole.through * 0.4)
     if hole.countersink_face == "bottom":
         # Screw head seats on the underside; the desk-side face stays flat.

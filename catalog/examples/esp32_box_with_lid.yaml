@@ -1,0 +1,66 @@
+schema: assembly/v1
+id: esp32_box_with_lid
+strict: true
+root: box
+
+# One declaration, both parts: outer size, wall, boss grid — the lid's
+# plug, screws and pins all chain from these.
+shared:
+  wall: 2.4mm
+  boss_sx: 61.2mm
+  boss_sy: 31.2mm
+
+parts:
+  - ref: box
+    product:
+      schema: product/v1
+      id: esp32_base
+      archetype: enclosure_base_v1@1
+      params:
+        box_l: 82mm
+        box_w: 52mm
+        box_h: 26mm
+        floor_t: 3mm
+        boss_h: 19mm    # bosses reach up to the plug: rim 26 - plug 3.5 - floor 3
+        pilot_d: 4mm
+        port: usb_c
+        port_z: 12mm
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: lid
+    product:
+      schema: product/v1
+      id: esp32_lid
+      archetype: enclosure_lid_v1@1
+      params:
+        lid_l: 82mm
+        lid_w: 52mm
+        lid_t: 3mm
+        seat_clearance: 0.3mm
+        plug_depth: 3.5mm
+        screw: M3
+        pin_d: 4.1mm
+        pin_len: 4mm
+      manufacturing: {material: PETG, support_policy: none}
+
+joints:
+  - type: lid_seat
+    a: box.rim
+    b: lid.seat
+    rotate: [180, 0, 0]      # lid flips over onto the rim
+    params: {clearance: 0.3}
+  - type: screw_joint
+    a: box.rim
+    b: lid.seat
+    rotate: [180, 0, 0]
+    params: {screw: M3, count: 2, pilots: bosses_pilot}
+  - type: press_fit_pin_pair
+    a: box.rim
+    b: lid.seat
+    rotate: [180, 0, 0]
+    params: {interference: 0.1, receivers: bosses_pilot}
+
+contract:
+  must_have:
+    - seated_lid
+    - bolted_interface
+    - press_fit_alignment

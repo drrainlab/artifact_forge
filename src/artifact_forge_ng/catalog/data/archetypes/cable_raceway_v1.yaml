@@ -1,0 +1,74 @@
+schema: archetype/v1
+id: cable_raceway_v1
+version: 1
+object_class: cable_raceway
+description: >
+  Open U-channel cable raceway: the back screws flat to a wall or desk,
+  cables drop into the slot from above. A constant-section extrusion
+  printed as modeled (back on the bed) — zero overhangs; countersunk screw
+  heads sit below the slot floor so cables never snag.
+
+provides_features:
+  - open_channel
+  - rounded_contact_edges
+  - molded_side_profile
+  - countersunk_screw_holes
+  - support_free_by_construction
+
+parameters:
+  length:
+    {type: length, default: 200mm, min: 60mm, max: 240mm,
+     role: functional, exposed: true}
+  inner_w:
+    {type: length, default: 24mm, min: 8mm, max: 60mm,
+     role: functional, exposed: true, description: slot width}
+  inner_h:
+    {type: length, default: 16mm, min: 6mm, max: 40mm,
+     role: functional, exposed: true, description: slot depth}
+  wall:
+    {type: length, default: 2.5mm, min: 1.6mm, max: 5mm, role: manufacturing}
+  screw:
+    {type: choice, choices: [M3, M4], default: M4, role: assembly}
+  screw_count:
+    {type: count, default: 3, min: 2, max: 6, role: assembly}
+  screw_spacing:
+    {type: length, default: expr((length - 24) / (screw_count - 1)),
+     min: 20mm, max: expr(length - 20), role: assembly}
+
+constraints:
+  - wall >= printer.min_wall
+  - screw_spacing * (screw_count - 1) < length - 16
+
+form:
+  type: section_extrude
+  section: open_c_channel
+  plane: YZ
+  width_axis: X
+
+regions:
+  - {id: back, role: mounting_surface, editable: true}
+  - {id: channel, role: soft_contact_surface, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.wall_thickness
+  - form.contact_edges_rounded
+  - form.constant_section
+  - topology.single_connected_solid
+  - topology.screw_holes_open
+  - topology.countersinks_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - open_channel
+    - countersunk_screw_holes
+    - support_free_by_construction
+  must_not_have: []
+  invariants:
+    - inner_w > 4

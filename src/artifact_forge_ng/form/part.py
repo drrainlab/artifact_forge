@@ -46,6 +46,9 @@ class HoleFeature:
     through: float  # cut depth
     countersink: bool = True
     countersink_face: str = "bottom"  # "bottom" | "top"
+    #: "cone" = countersink (flat-head), "cylinder" = counterbore
+    #: (socket-cap head recess).
+    head_style: str = "cone"
 
 
 @dataclass(frozen=True)
@@ -168,6 +171,24 @@ class RibFeature:
 
 
 @dataclass(frozen=True)
+class PinFeature:
+    """An ADDITIVE alignment/press-fit pin: a cylinder welded onto a face,
+    rising along +Z from ``z0``. The mating part receives it in a bore
+    whose diameter is pin_d minus the declared interference — verified by
+    the press_fit_pin_pair joint in the assembled pose."""
+
+    name: str
+    at: tuple[float, float]  # (x, y) of the pin axis
+    d: float
+    z0: float  # weld start (should overlap the host by the weld rule)
+    length: float
+
+    def __post_init__(self) -> None:
+        if self.d <= 0 or self.length <= 0:
+            raise ValueError(f"PinFeature {self.name!r} needs positive d/length")
+
+
+@dataclass(frozen=True)
 class LoftFeature:
     """An ADDITIVE lofted beam: a rounded transition from a root rectangle
     to a tip rectangle along +Z (the tapered-arm builder). Welded onto the
@@ -225,6 +246,7 @@ class PartForm:
     cutboxes: list[CutBoxFeature] = field(default_factory=list)
     ribs: list[RibFeature] = field(default_factory=list)
     lofts: list[LoftFeature] = field(default_factory=list)
+    pins: list[PinFeature] = field(default_factory=list)
     fields: list[FieldFeature] = field(default_factory=list)
     #: Oriented modifier canvases, keyed by the region name they serve.
     windows: dict[str, FaceWindow] = field(default_factory=dict)

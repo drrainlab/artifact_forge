@@ -433,6 +433,28 @@ def ribs_present(geometry: Geometry, form: PartForm) -> Finding:
     )
 
 
+@register_probe("topology.pins_present")
+def pins_present(geometry: Geometry, form: PartForm) -> Finding:
+    """Every declared pin must be real material along its length."""
+    if not form.pins:
+        return _finding("topology.pins_present", True, "no pins declared")
+    missing = []
+    for pin in form.pins:
+        px, py = pin.at
+        probe = channel_probe(
+            [(px, py, pin.z0 + 0.4), (px, py, pin.z0 + pin.length - 0.3)],
+            d=pin.d * 0.7,
+        )
+        frac = solid_fraction(geometry.workplane, probe)
+        if frac < 0.9:
+            missing.append(f"{pin.name} (fill {frac:.2f})")
+    return _finding(
+        "topology.pins_present",
+        not missing,
+        "all pins welded" if not missing else "missing pins: " + ", ".join(missing),
+    )
+
+
 @register_probe("topology.arm_reaches_tip")
 def arm_reaches_tip(geometry: Geometry, form: PartForm) -> Finding:
     """Every lofted arm must be solid at its TIP — a loft that welded at

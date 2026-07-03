@@ -1,0 +1,24 @@
+schema: product/v1
+id: fastener_plate_demo
+archetype: fastener_plate_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - nut_traps
+  - heatset_pockets
+  - standoffs
+
+params:
+  plate_l: 120mm
+  plate_w: 70mm
+  thickness: 8mm
+  cb_screw: M4
+  nut_screw: M4
+  insert_screw: M3
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

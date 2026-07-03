@@ -40,7 +40,7 @@ parameters:
     {type: length, default: expr(box_w - 2 * wall - 16), min: 12mm,
      max: expr(box_w - 2 * wall - 12), role: assembly}
   boss_h:
-    {type: length, default: 6mm, min: 3mm, max: 16mm, role: assembly}
+    {type: length, default: 6mm, min: 3mm, max: expr(box_h - floor_t - 4), role: assembly}
   pilot_d:
     {type: length, default: 4mm, min: 2mm, max: 6mm, role: assembly,
      description: heatset/self-tap pilot bore diameter}

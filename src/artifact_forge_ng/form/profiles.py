@@ -248,6 +248,51 @@ def build_molded_side_hook_profile(
     return profile, f
 
 
+def build_open_c_channel_profile(
+    inner_w: float, inner_h: float, wall: float, style: SurfaceStyle
+) -> tuple[SectionProfile, dict[str, float]]:
+    """Open U-channel (cable raceway, guide rail): back on the bed
+    (v = 0), two walls rising, slot open at the top. A pure constant
+    section — printed as modeled it has zero overhangs; wall thickness is
+    measured by the same cavity-vs-outer machinery as the hooks (the slot
+    is tagged cavity_inner, the outside hook_outer)."""
+    if inner_w <= 2.0 or inner_h <= 2.0:
+        raise ValueError("channel interior too small")
+    ow, oh = inner_w + 2.0 * wall, inner_h + wall
+    u0, u1 = -ow / 2.0, ow / 2.0
+    s0, s1 = -inner_w / 2.0, inner_w / 2.0
+    inner_tags = _tags("cavity_inner", "cable_contact")
+    outer_tags = _tags("hook_outer", "external")
+
+    segments: list[Seg] = [
+        # back (the print bed face — stays flat, corners intentional)
+        LineSeg(Pt(u1, 0.0), Pt(u0, 0.0), _tags("back", "mount_face", "intentional_corner")),
+        LineSeg(Pt(u0, 0.0), Pt(u0, oh), outer_tags),      # left outer wall
+        LineSeg(Pt(u0, oh), Pt(s0, oh), _tags("wall_top", "external")),
+        LineSeg(Pt(s0, oh), Pt(s0, wall), inner_tags),     # left slot face
+        LineSeg(Pt(s0, wall), Pt(s1, wall), inner_tags),   # slot floor
+        LineSeg(Pt(s1, wall), Pt(s1, oh), inner_tags),     # right slot face
+        LineSeg(Pt(s1, oh), Pt(u1, oh), _tags("wall_top", "external")),
+        LineSeg(Pt(u1, oh), Pt(u1, 0.0), outer_tags),      # right outer wall
+    ]
+
+    loop = round_profile_corners(ProfileLoop(segments), style)
+    frame = {
+        "inner_w": inner_w,
+        "inner_h": inner_h,
+        "wall": wall,
+        "outer_w": ow,
+        "outer_h": oh,
+        "slot_u0": s0,
+        "slot_u1": s1,
+        "slot_floor_v": wall,
+    }
+    profile = SectionProfile(
+        name="open_c_channel", outer=loop, plane="YZ", width_axis="X"
+    )
+    return profile, frame
+
+
 @dataclass(frozen=True)
 class SnapClipParams:
     """Symmetric snap C-clip for pipes/rods/broom handles — the retention

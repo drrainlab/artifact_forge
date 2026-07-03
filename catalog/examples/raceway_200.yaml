@@ -1,0 +1,22 @@
+schema: product/v1
+id: raceway_200
+archetype: cable_raceway_v1@1
+strict: true
+
+requested_features:
+  - open_channel
+  - countersunk_screw_holes
+  - support_free_by_construction
+
+params:
+  length: 200mm
+  inner_w: 24mm
+  inner_h: 16mm
+  wall: 2.5mm
+  screw: M4
+  screw_count: 3
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

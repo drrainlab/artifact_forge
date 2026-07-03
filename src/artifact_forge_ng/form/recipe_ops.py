@@ -19,8 +19,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+import math
+
 from ..core.fasteners import screw_spec
-from .part import BoreFeature, CutBoxFeature, HoleFeature, RibFeature
+from .part import BoreFeature, CutBoxFeature, HoleFeature, PinFeature, PlateFeature, RibFeature
 from .patterns import bolt_circle_centers, holes_from_centers, line_centers
 from .profiles_plate import rounded_rect_loop
 from .regions import Box3, Region
@@ -63,8 +65,12 @@ class RecipeState:
     cutboxes: list[CutBoxFeature] = field(default_factory=list)
     bores: list[BoreFeature] = field(default_factory=list)
     ribs: list[RibFeature] = field(default_factory=list)
+    plates: list[PlateFeature] = field(default_factory=list)
+    pins: list[PinFeature] = field(default_factory=list)
+    fields: list[Any] = field(default_factory=list)
     regions: list[Region] = field(default_factory=list)
     frame: dict[str, float] = field(default_factory=dict)
+    datums: dict[str, dict[str, Any]] = field(default_factory=dict)
 
     def require_base(self, op: str) -> None:
         if self.section is None:
@@ -168,6 +174,8 @@ def _rounded_box_shell(state: RecipeState, p: dict[str, Any], op_id: str) -> Non
         inner_u1=u1 - wall, inner_v1=v1 - wall,
         shell_wall=wall, floor_t=floor_t, shell_h=h,
     )
+    # The rim center — what a lid's `seat` datum mates against.
+    state.datums["rim"] = {"at": [0.0, 0.0, h], "rotate": [0.0, 0.0, 0.0]}
 
 
 _register(RecipeOpDecl(
@@ -350,7 +358,8 @@ _register(RecipeOpDecl(
 
 
 def _hole_pattern(
-    state: RecipeState, p: dict[str, Any], op_id: str, *, countersunk: bool
+    state: RecipeState, p: dict[str, Any], op_id: str, *, countersunk: bool,
+    counterbore: bool = False,
 ) -> None:
     state.require_base("hole_pattern")
     kind = p["kind"]
@@ -364,8 +373,19 @@ def _hole_pattern(
         raise RecipeError(f"hole pattern kind {kind!r} not in (line, bolt_circle)")
     screw = p["screw"]
     t = state.width
-    holes = holes_from_centers(centers, t, t, screw, p["cs_face"])
-    if not countersunk:
+    # A stacked part (lid plate + welded plug) needs holes cut from the
+    # STACK top through everything — z_top/through of 0 mean "the base".
+    z_top = p["z_top"] if p["z_top"] > 1e-9 else t
+    through = p["through"] if p["through"] > 1e-9 else z_top
+    holes = holes_from_centers(centers, z_top, through, screw, p["cs_face"])
+    if counterbore:
+        holes = [
+            HoleFeature(at=h.at, screw=h.screw, through=h.through,
+                        countersink_face=h.countersink_face,
+                        head_style="cylinder")
+            for h in holes
+        ]
+    elif not countersunk:
         holes = [
             HoleFeature(at=h.at, screw=h.screw, through=h.through, countersink=False)
             for h in holes
@@ -374,13 +394,15 @@ def _hole_pattern(
     head_r = screw_spec(screw)["head"] / 2.0
     name = op_id or "holes"
     for i, (hx, hy) in enumerate(centers):
+        # Keepout spans the HOLE's z-extent, not the whole part — floor
+        # screws in a box must not veto the interior cavity above them.
         state.regions.append(
             Region(
                 f"{name}_{i}", RegionRole.FASTENER_KEEPOUT,
                 Box3(hx - head_r - KEEPOUT_CLEARANCE, hy - head_r - KEEPOUT_CLEARANCE,
-                     0.0,
+                     z_top - through,
                      hx + head_r + KEEPOUT_CLEARANCE, hy + head_r + KEEPOUT_CLEARANCE,
-                     t),
+                     z_top),
             )
         )
         state.frame[f"{name}_{i}_x"] = hx
@@ -397,6 +419,8 @@ _HOLE_PARAMS: dict[str, tuple[str, Any]] = {
     "cx": ("length", 0.0),
     "cy": ("length", 0.0),
     "cs_face": ("choice", "top"),
+    "z_top": ("length", 0.0),
+    "through": ("length", 0.0),
 }
 
 _register(RecipeOpDecl(
@@ -451,4 +475,284 @@ _register(RecipeOpDecl(
     validators=("form.cuts_respect_keepouts", "topology.cutout_present"),
     apply=_rounded_rect_cutout,
     description="through rectangular cutout (v1: square corners)",
+))
+
+
+# -- fit-interface & fastener ops (registry completion wave) -------------------
+
+
+def _inset_plug(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """The lid's plug: a smaller plate welded ON TOP of the base plate.
+    The lid is MODELED plug-up (plate on the bed, plug and pins rising —
+    the natural print orientation); the lid_seat joint flips it 180 into
+    the box. Frame publishes the plug chain the joint verifies."""
+    state.require_base("inset_plug")
+    f = state.frame
+    if "outline_u0" not in f:
+        raise RecipeError("inset_plug needs a rounded_plate base")
+    l, w, depth = p["l"], p["w"], p["depth"]
+    if l >= (f["outline_u1"] - f["outline_u0"]) or w >= (f["outline_v1"] - f["outline_v0"]):
+        raise RecipeError("plug larger than its own lid plate")
+    t = state.width
+    state.plates.append(
+        PlateFeature(
+            name=op_id or "plug",
+            x0=-l / 2.0, y0=-w / 2.0, x1=l / 2.0, y1=w / 2.0,
+            z_bottom=t - 0.6,  # weld overlap into the lid plate
+            thickness=depth + 0.6,
+            corner_r=p["corner_r"],
+        )
+    )
+    state.frame.update(
+        plug_u0=-l / 2.0, plug_v0=-w / 2.0, plug_u1=l / 2.0, plug_v1=w / 2.0,
+        plug_depth=depth, plug_corner_r=p["corner_r"],
+        plug_top_z=t + depth, plug_mid_z=t + depth / 2.0,
+    )
+    # The mating plane: the plate top, where the plug starts.
+    state.datums["seat"] = {"at": [0.0, 0.0, t], "rotate": [0.0, 0.0, 0.0]}
+
+
+_register(RecipeOpDecl(
+    name="inset_plug",
+    kind="feature",
+    params={
+        "l": ("length", None), "w": ("length", None),
+        "depth": ("length", 4.0), "corner_r": ("length", 3.0),
+    },
+    validators=("topology.single_connected_solid",),
+    apply=_inset_plug,
+    description="lid plug plate welded under the base — mates a box shell",
+))
+
+
+def _pin_pair(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Two press-fit/alignment pins rising +Z from ``z0`` (a lid's plug
+    top in the model frame; the assembly pose flips them into the box's
+    receiving bores), spaced along X."""
+    state.require_base("pin_pair")
+    sx = p["spacing"] / 2.0
+    cx, cy = p["cx"], p["cy"]
+    z0 = p["z0"] if p["z0"] > 1e-9 else state.width
+    name = op_id or "pins"
+    for i, px in enumerate((cx - sx, cx + sx)):
+        state.pins.append(
+            PinFeature(
+                name=f"{name}_{i}", at=(px, cy), d=p["pin_d"],
+                z0=z0 - 0.6, length=p["length"] + 0.6,  # weld overlap
+            )
+        )
+        state.frame[f"{name}_{i}_x"] = px
+        state.frame[f"{name}_{i}_y"] = cy
+    state.frame[f"{name}_d"] = p["pin_d"]
+    state.frame[f"{name}_len"] = p["length"]
+
+
+_register(RecipeOpDecl(
+    name="pin_pair",
+    kind="feature",
+    params={
+        "pin_d": ("length", 4.1), "length": ("length", 5.0),
+        "spacing": ("length", None), "cx": ("length", 0.0),
+        "cy": ("length", 0.0), "z0": ("length", 0.0),
+    },
+    validators=("topology.pins_present",),
+    apply=_pin_pair,
+    description="press-fit/alignment pin pair rising +Z (z0=0 means the part top)",
+))
+
+
+def _counterbore_hole_pattern(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    state.require_base("counterbore_hole_pattern")
+    _hole_pattern(state, p, op_id, countersunk=False, counterbore=True)
+
+
+_register(RecipeOpDecl(
+    name="counterbore_hole_pattern",
+    kind="feature",
+    params=_HOLE_PARAMS,
+    validators=(
+        "form.min_web_between_holes",
+        "form.holes_within_outline",
+        "topology.screw_holes_open",
+        "topology.countersinks_present",
+    ),
+    apply=_counterbore_hole_pattern,
+    description="cylindrical-head recesses (socket-cap screws) over clearance holes",
+))
+
+
+def _heatset_insert_pocket(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Blind pockets sized for heatset inserts, entered from the top face."""
+    state.require_base("heatset_insert_pocket")
+    spec = screw_spec(p["screw"])
+    t = state.width
+    depth = p["depth"]
+    if depth >= t - 0.8:
+        raise RecipeError("heatset pocket would pierce the plate")
+    sx = p["spacing"] / 2.0
+    name = op_id or "inserts"
+    for i, px in enumerate((p["cx"] - sx, p["cx"] + sx)):
+        state.bores.append(
+            BoreFeature(
+                name=f"{name}_{i}", axis="Z", center=(px, p["cy"], 0.0),
+                d=spec["heatset"], span=(t - depth, t), overshoot=(0.0, 1.0),
+            )
+        )
+        state.frame[f"{name}_{i}_x"] = px
+        state.frame[f"{name}_{i}_y"] = p["cy"]
+
+
+_register(RecipeOpDecl(
+    name="heatset_insert_pocket",
+    kind="feature",
+    params={
+        "screw": ("choice", "M3"), "depth": ("length", 5.0),
+        "spacing": ("length", None), "cx": ("length", 0.0),
+        "cy": ("length", 0.0),
+    },
+    validators=("topology.pockets_present",),
+    apply=_heatset_insert_pocket,
+    description="blind pockets sized from the heatset table, pair along X",
+))
+
+
+def _standoff_pattern(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """PCB standoffs rising from a PLATE top (the plate cousin of
+    boss_pattern, which needs a shell floor)."""
+    state.require_base("standoff_pattern")
+    t = state.width
+    sx, sy = p["sx"] / 2.0, p["sy"] / 2.0
+    cx, cy = p["cx"], p["cy"]
+    boss, height = p["boss"], p["height"]
+    pilot_d, pilot_depth = p["pilot_d"], p["pilot_depth"]
+    if pilot_depth >= height + t - 0.8:
+        raise RecipeError("standoff pilot would pierce the plate")
+    name = op_id or "standoffs"
+    top = t + height
+    for i, (bx, by) in enumerate(
+        [(cx - sx, cy - sy), (cx + sx, cy - sy), (cx + sx, cy + sy), (cx - sx, cy + sy)]
+    ):
+        state.ribs.append(
+            RibFeature(
+                name=f"{name}_{i}",
+                box=Box3(bx - boss / 2.0, by - boss / 2.0, t - 0.6,
+                         bx + boss / 2.0, by + boss / 2.0, top),
+            )
+        )
+        state.bores.append(
+            BoreFeature(
+                name=f"{name}_pilot_{i}", axis="Z", center=(bx, by, 0.0),
+                d=pilot_d, span=(top - pilot_depth, top), overshoot=(0.0, 1.0),
+            )
+        )
+        state.regions.append(
+            Region(f"{name}_keep_{i}", RegionRole.FASTENER_KEEPOUT,
+                   Box3(bx - boss / 2.0 - KEEPOUT_CLEARANCE,
+                        by - boss / 2.0 - KEEPOUT_CLEARANCE, 0.0,
+                        bx + boss / 2.0 + KEEPOUT_CLEARANCE,
+                        by + boss / 2.0 + KEEPOUT_CLEARANCE, t))
+        )
+        state.frame[f"{name}_{i}_x"] = bx
+        state.frame[f"{name}_{i}_y"] = by
+
+
+_register(RecipeOpDecl(
+    name="standoff_pattern",
+    kind="feature",
+    params={
+        "sx": ("length", None), "sy": ("length", None),
+        "cx": ("length", 0.0), "cy": ("length", 0.0),
+        "boss": ("length", 7.0), "height": ("length", 6.0),
+        "pilot_d": ("length", 2.7), "pilot_depth": ("length", 5.0),
+    },
+    validators=("topology.ribs_present", "topology.pockets_present"),
+    apply=_standoff_pattern,
+    description="4 PCB standoffs with blind pilots, rising from a plate top",
+))
+
+
+def _nut_trap(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Top-access hex nut pocket over a through screw bore. The hexagon is
+    cut FLAT-TO-FLAT correct (the 30-degree lesson) with FDM clearance on
+    the across-flats size."""
+    from .part import FieldFeature
+
+    state.require_base("nut_trap")
+    spec = screw_spec(p["screw"])
+    af = spec["nut_af"] + 2.0 * p["clearance"]
+    nut_h = spec["nut_h"] + p["clearance"]
+    t = state.width
+    if nut_h >= t - 1.0:
+        raise RecipeError("nut trap deeper than the plate")
+    cx, cy = p["cx"], p["cy"]
+    r_hex = af / math.sqrt(3.0)
+    hexagon = tuple(
+        (cx + r_hex * math.cos(math.radians(30 + 60 * k)),
+         cy + r_hex * math.sin(math.radians(30 + 60 * k)))
+        for k in range(6)
+    )
+    state.fields.append(
+        FieldFeature(
+            plane_z=t, centers=(), cell=af, depth=nut_h,
+            pattern="slots", polygons=(hexagon,), min_ligament=0.0,
+        )
+    )
+    state.bores.append(
+        BoreFeature(
+            name=f"{op_id or 'nut'}_bore", axis="Z", center=(cx, cy, 0.0),
+            d=spec["clear"], span=(-0.5, t - nut_h + 0.5), overshoot=(1.0, 1.0),
+        )
+    )
+    state.frame[f"{op_id or 'nut'}_af"] = af
+
+
+_register(RecipeOpDecl(
+    name="nut_trap",
+    kind="feature",
+    params={
+        "screw": ("choice", "M4"), "clearance": ("length", 0.25),
+        "cx": ("length", 0.0), "cy": ("length", 0.0),
+    },
+    validators=("topology.hex_field_present", "topology.bores_open"),
+    apply=_nut_trap,
+    description="top-access hex nut pocket over a clearance bore",
+))
+
+
+def _wire_exit(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """An open U-notch in a shell's rim for a cable — reaches down from
+    the top edge so the wire drops in during assembly."""
+    state.require_base("wire_exit")
+    f = state.frame
+    if "shell_wall" not in f:
+        raise RecipeError("wire_exit needs a rounded_box_shell base")
+    w = p["cable_d"] + 2.0 * p["clearance"]
+    depth = p["cable_d"] + p["drop"]
+    h, wall = f["shell_h"], f["shell_wall"]
+    off = p["offset"]
+    face = p["face"]
+    if face in ("+y", "-y"):
+        edge = f["outline_v1"] if face == "+y" else f["outline_v0"]
+        y0, y1 = (edge - wall - 1.0, edge + 1.0) if face == "+y" else (edge - 1.0, edge + wall + 1.0)
+        box = Box3(off - w / 2.0, y0, h - depth, off + w / 2.0, y1, h + 1.0)
+    elif face in ("+x", "-x"):
+        edge = f["outline_u1"] if face == "+x" else f["outline_u0"]
+        x0, x1 = (edge - wall - 1.0, edge + 1.0) if face == "+x" else (edge - 1.0, edge + wall + 1.0)
+        box = Box3(x0, off - w / 2.0, h - depth, x1, off + w / 2.0, h + 1.0)
+    else:
+        raise RecipeError(f"wire_exit face {face!r} not in (+x, -x, +y, -y)")
+    state.cutboxes.append(CutBoxFeature(name=op_id or "wire_exit", box=box))
+
+
+_register(RecipeOpDecl(
+    name="wire_exit",
+    kind="feature",
+    params={
+        "cable_d": ("length", 5.0), "clearance": ("length", 0.5),
+        "drop": ("length", 3.0), "face": ("choice", "+x"),
+        "offset": ("length", 0.0),
+    },
+    validators=("form.cuts_respect_keepouts", "topology.cutout_present"),
+    apply=_wire_exit,
+    description="open U-notch through a shell rim for a drop-in cable",
 ))

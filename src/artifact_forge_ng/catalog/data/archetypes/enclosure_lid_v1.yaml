@@ -1,0 +1,110 @@
+schema: archetype/v1
+id: enclosure_lid_v1
+version: 1
+object_class: electronics_enclosure
+description: >
+  Lid for enclosure_base_v1 (pure recipe, zero Python): a rounded top
+  plate, an inset plug that drops into the shell interior (the lid_seat
+  joint verifies the clearance chain), countersunk screws into two of the
+  base's bosses, and a press-fit alignment pin pair into the other two.
+  Match the mating dimensions via assembly.shared.
+
+provides_features:
+  - mounting_plate_body
+  - hole_pattern
+  - lid_plug
+  - alignment_pins
+
+parameters:
+  lid_l:
+    {type: length, default: 82mm, min: 40mm, max: 200mm,
+     role: functional, exposed: true, description: matches the box outer length}
+  lid_w:
+    {type: length, default: 52mm, min: 30mm, max: 160mm,
+     role: functional, exposed: true}
+  lid_t:
+    {type: length, default: 3mm, min: 2.4mm, max: 6mm, role: manufacturing}
+  corner_r:
+    {type: length, default: 6mm, min: 2mm, max: 14mm, role: aesthetic}
+  wall:
+    {type: length, default: 2.4mm, min: 1.6mm, max: 5mm, role: assembly,
+     description: the BOX's wall — the plug is sized from it}
+  seat_clearance:
+    {type: length, default: 0.3mm, min: 0.15mm, max: 0.6mm, role: manufacturing}
+  plug_depth:
+    {type: length, default: 4mm, min: 2mm, max: 10mm, role: assembly}
+  boss_sx:
+    {type: length, default: expr(lid_l - 2 * wall - 16), min: 20mm,
+     max: expr(lid_l - 2 * wall - 12), role: assembly,
+     description: must equal the base's boss span (share it)}
+  boss_sy:
+    {type: length, default: expr(lid_w - 2 * wall - 16), min: 12mm,
+     max: expr(lid_w - 2 * wall - 12), role: assembly}
+  screw:
+    {type: choice, choices: [M3, M4], default: M3, role: assembly}
+  pin_d:
+    {type: length, default: 4.1mm, min: 2.5mm, max: 6mm, role: assembly,
+     description: "pilot_d + interference: presses into two boss pilots"}
+  pin_len:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: assembly}
+  min_web:
+    {type: length, default: 4mm, min: 3mm, max: 10mm, role: manufacturing}
+
+constraints:
+  - plug_depth < 12
+  - lid_t >= 2.4
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: lid
+      params: {l: lid_l, w: lid_w, t: lid_t, corner_r: corner_r}
+    - op: inset_plug
+      id: plug
+      params: {l: "expr(lid_l - 2 * wall - 2 * seat_clearance)",
+               w: "expr(lid_w - 2 * wall - 2 * seat_clearance)",
+               depth: plug_depth, corner_r: 2mm}
+    - op: countersunk_hole_pattern
+      id: screws
+      params: {kind: line, screw: screw, count: 2, spacing: boss_sx,
+               cy: "expr(boss_sy / 2)", cs_face: bottom,
+               z_top: "expr(lid_t + plug_depth)",
+               through: "expr(lid_t + plug_depth)"}
+    - op: pin_pair
+      id: pins
+      params: {pin_d: pin_d, length: pin_len, spacing: boss_sx,
+               cy: "expr(0 - boss_sy / 2)", z0: "expr(lid_t + plug_depth)"}
+
+regions:
+  - {id: lid, role: mounting_surface, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.single_connected_solid
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.pins_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_hex_perforation
+  - add_voronoi_field
+  - add_phyllotaxis_field
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - lid_plug
+    - alignment_pins
+  must_not_have: []
+  invariants:
+    - lid_t >= 2.4

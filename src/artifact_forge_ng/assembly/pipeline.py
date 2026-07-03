@@ -220,7 +220,18 @@ def run_assembly_build(
 
     placed = {ref: place(geometries[ref], poses[ref]) for ref in geometries if ref in poses}
 
-    # -- assembly.no_interference: parts may TOUCH, never overlap ---------
+    # -- assembly.no_interference: parts may TOUCH, never overlap — except
+    # the overlap a press fit DECLARES (the pin is thicker than its bore
+    # by the interference; that annulus is the joint working as designed).
+    import math as _math
+
+    allowed = 2.0
+    for joint in asm.joints:
+        if joint.type != "press_fit_pin_pair":
+            continue
+        interference = float(joint.params.get("interference", 0.1))
+        for pin in states[joint.b_ref].form.pins:
+            allowed += _math.pi * pin.d * (interference / 2.0) * pin.length * 1.5
     refs = list(placed)
     worst_overlap = 0.0
     for i in range(len(refs)):
@@ -231,10 +242,11 @@ def run_assembly_build(
             )
     joint_findings.append(afind(
         "assembly.no_interference",
-        worst_overlap <= 2.0,
-        f"worst pairwise overlap volume {worst_overlap:.2f} mm3 (weld-level "
-        "contact allowed, material overlap is not)",
-        measured=worst_overlap, limit=2.0,
+        worst_overlap <= allowed,
+        f"worst pairwise overlap volume {worst_overlap:.2f} mm3 (allowed "
+        f"{allowed:.2f}: weld-level contact plus declared press-fit "
+        "interference)",
+        measured=worst_overlap, limit=allowed,
     ))
 
     # -- assembly.screw_axes_clear: every screw must physically pass ------
@@ -259,6 +271,62 @@ def run_assembly_build(
             not blocked,
             "all screw axes pass through the assembled stack"
             if not blocked else "blocked screw axes: " + "; ".join(blocked),
+        ))
+
+    # -- assembly.lid_seats: the plug really sits inside the rim ----------
+    for joint in asm.joints:
+        if joint.type != "lid_seat":
+            continue
+        fa = states[joint.a_ref].form.frame
+        fb = states[joint.b_ref].form.frame
+        pose_b = poses[joint.b_ref]
+        # sample the plug's mid-depth center: must be BELOW the rim plane
+        # and inside the interior void of the box (not resting on top)
+        probe_pt = pose_b.apply((0.0, 0.0, fb["plug_mid_z"]))
+        inside = (
+            fa["inner_u0"] < probe_pt[0] < fa["inner_u1"]
+            and fa["inner_v0"] < probe_pt[1] < fa["inner_v1"]
+            and probe_pt[2] < fa["shell_h"]
+        )
+        # and the box material must NOT be there (it is the interior void)
+        box_probe_ = channel_probe(
+            [probe_pt, (probe_pt[0], probe_pt[1], probe_pt[2] - 1.0)], d=3.0
+        )
+        frac = solid_fraction(placed[joint.a_ref].workplane, box_probe_)
+        joint_findings.append(afind(
+            "assembly.lid_seats",
+            inside and frac < 0.05,
+            f"plug center sits {'inside' if inside else 'OUTSIDE'} the rim "
+            f"(box material fraction at plug {frac:.2f})",
+        ))
+
+    # -- assembly.pins_engage: pins physically occupy their receivers -----
+    for joint in asm.joints:
+        if joint.type != "press_fit_pin_pair":
+            continue
+        form_b = states[joint.b_ref].form
+        pose_b = poses[joint.b_ref]
+        missing = []
+        for pin in form_b.pins:
+            px, py = pin.at
+            top = pose_b.apply((px, py, pin.z0 + pin.length - 0.5))
+            bot = pose_b.apply((px, py, pin.z0 + 0.5))
+            probe = channel_probe([top, bot], d=pin.d * 0.6)
+            # the PIN part's own material must fill this line in the pose
+            frac = solid_fraction(placed[joint.b_ref].workplane, probe)
+            if frac < 0.9:
+                missing.append(f"{pin.name} (fill {frac:.2f})")
+                continue
+            # and the receiving part must be void there (the bore) — the
+            # interference itself is IR-verified; here we prove engagement
+            recv = solid_fraction(placed[joint.a_ref].workplane, probe)
+            if recv > 0.4:
+                missing.append(f"{pin.name} collides with receiver body ({recv:.2f})")
+        joint_findings.append(afind(
+            "assembly.pins_engage",
+            not missing,
+            "all pins engage their receivers in the pose"
+            if not missing else "pins not engaged: " + "; ".join(missing),
         ))
 
     # -- assembly.channel_continuous_across: THE demo check ---------------

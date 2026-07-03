@@ -93,12 +93,17 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.pockets_present", Level.TOPOLOGY, "every blind pocket removed material without piercing through"),
         _decl("topology.seat_lips_present", Level.TOPOLOGY, "every bearing seat keeps its retaining lip ring solid"),
         _decl("topology.arm_reaches_tip", Level.TOPOLOGY, "the cantilever/loft arm is solid out to its tip"),
+        _decl("topology.pins_present", Level.TOPOLOGY, "every alignment/press-fit pin is real material along its length"),
         # -- assembly level: cross-part checks in the assembled pose ----------
         _decl("assembly.screw_joint_ir", Level.ASSEMBLY, "bolt patterns coincide with compatible diameters in the pose"),
         _decl("assembly.joint_pose", Level.ASSEMBLY, "every part is posed by a joint against existing datums"),
         _decl("assembly.no_interference", Level.ASSEMBLY, "placed parts touch but never overlap"),
         _decl("assembly.screw_axes_clear", Level.ASSEMBLY, "every joint screw axis is void through the assembled stack"),
         _decl("assembly.channel_continuous_across", Level.ASSEMBLY, "the cable path is void through EVERY part in the pose"),
+        _decl("assembly.lid_seat_ir", Level.ASSEMBLY, "lid plug dimensions chain to the shell interior minus clearance"),
+        _decl("assembly.press_fit_ir", Level.ASSEMBLY, "pins land on receiving bores with the declared interference"),
+        _decl("assembly.pins_engage", Level.ASSEMBLY, "every pin physically occupies its receiving bore in the pose"),
+        _decl("assembly.lid_seats", Level.ASSEMBLY, "the lid plug sits inside the shell rim in the pose"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),
