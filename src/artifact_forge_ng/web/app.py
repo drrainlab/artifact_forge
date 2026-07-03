@@ -29,6 +29,25 @@ EXAMPLES_DIR = REPO_ROOT / "catalog" / "examples"
 STATIC_DIR = Path(__file__).parent / "static"
 OUT_DIR = REPO_ROOT / "out"
 
+
+def _load_dotenv() -> None:
+    """Pick up .env from the repo root (ANTHROPIC_API_KEY etc.) without a
+    dotenv dependency. Real environment variables always win."""
+    env_file = REPO_ROOT / ".env"
+    if not env_file.exists():
+        return
+    for line in env_file.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key, value = key.strip(), value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_dotenv()
+
 app = FastAPI(title="Artifact Forge NG — Product Cockpit")
 jobs = ThreadJobRunner()
 
