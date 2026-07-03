@@ -1,0 +1,96 @@
+schema: archetype/v1
+id: enclosure_lid_snap_v1
+version: 1
+object_class: electronics_enclosure
+description: >
+  SNAP-ON lid (pure recipe): top plate, inset plug, and a pair of
+  cantilever hooks rising from the plug edges — modeled plug-up (natural
+  print orientation), flipped into the box by the assembly. No fasteners;
+  the snap_joint verifies the hooks reach their windows with a real
+  undercut and survivable insertion strain.
+
+provides_features:
+  - mounting_plate_body
+  - lid_plug
+  - snap_hooks
+
+parameters:
+  lid_l:
+    {type: length, default: 82mm, min: 40mm, max: 200mm,
+     role: functional, exposed: true}
+  lid_w:
+    {type: length, default: 52mm, min: 30mm, max: 160mm,
+     role: functional, exposed: true}
+  lid_t:
+    {type: length, default: 3mm, min: 2.4mm, max: 6mm, role: manufacturing}
+  corner_r:
+    {type: length, default: 6mm, min: 2mm, max: 14mm, role: aesthetic}
+  wall:
+    {type: length, default: 2.4mm, min: 1.6mm, max: 5mm, role: assembly}
+  seat_clearance:
+    {type: length, default: 0.3mm, min: 0.15mm, max: 0.6mm, role: manufacturing}
+  plug_depth:
+    {type: length, default: 3.5mm, min: 2mm, max: 8mm, role: assembly}
+  beam_t:
+    {type: length, default: 1.8mm, min: 1.2mm, max: 3mm, role: structural,
+     description: hook beam thickness — thinner flexes easier}
+  hook_w:
+    {type: length, default: 8mm, min: 5mm, max: 16mm, role: assembly}
+  hook_len:
+    {type: length, default: 9mm, min: 6mm, max: 18mm, role: structural,
+     description: flexure length — longer means lower insertion strain}
+  lip_d:
+    {type: length, default: 1.6mm, min: 1mm, max: 2.5mm, role: assembly,
+     description: lip protrusion = clearance ride + window undercut}
+  lip_h:
+    {type: length, default: 3mm, min: 2mm, max: 5mm, role: assembly}
+
+constraints:
+  - lid_t >= 2.4
+  - hook_len > lip_h + 2
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: lid
+      params: {l: lid_l, w: lid_w, t: lid_t, corner_r: corner_r}
+    - op: inset_plug
+      id: plug
+      params: {l: "expr(lid_l - 2 * wall - 2 * seat_clearance)",
+               w: "expr(lid_w - 2 * wall - 2 * seat_clearance)",
+               depth: plug_depth, corner_r: 2mm}
+    - op: snap_hook_pair
+      id: snap
+      params: {beam_t: beam_t, hook_w: hook_w, hook_len: hook_len,
+               lip_d: lip_d, lip_h: lip_h}
+
+regions:
+  - {id: lid, role: mounting_surface, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.holes_within_outline
+  - topology.single_connected_solid
+  - topology.ribs_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_hex_perforation
+  - add_voronoi_field
+  - add_phyllotaxis_field
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - lid_plug
+    - snap_hooks
+  must_not_have: []
+  invariants:
+    - hook_len > lip_h + 2

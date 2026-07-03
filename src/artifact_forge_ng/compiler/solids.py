@@ -75,11 +75,12 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
         mass = weld(mass, _build_plate(plate), what=plate.name)
 
     for pin in form.pins:
-        px, py = pin.at
+        sx, sy, sz = pin.start_point()
+        plane = {"Z": "XY", "X": "YZ", "Y": "XZ"}[pin.axis]
         post = (
-            cq.Workplane("XY", origin=(px, py, pin.z0))
+            cq.Workplane(plane, origin=(sx, sy, sz))
             .circle(pin.d / 2.0)
-            .extrude(pin.length)
+            .extrude(pin.length if pin.axis != "Y" else -pin.length)
         )
         mass = weld(mass, post, what=pin.name)
 

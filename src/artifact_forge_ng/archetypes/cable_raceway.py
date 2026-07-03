@@ -10,7 +10,7 @@ z = 0..wall, slot floor at z = wall.
 from __future__ import annotations
 
 from ..core.fasteners import screw_spec
-from ..form.part import HoleFeature, PartForm
+from ..form.part import BoreFeature, HoleFeature, PartForm, PinFeature
 from ..form.profiles import build_open_c_channel_profile
 from ..form.regions import Box3, Region
 from ..form.style import resolve_style
@@ -51,6 +51,33 @@ def build_form(
         for x in xs
     ]
 
+    # -- butt-split ends: a run longer than the bed prints as mating
+    # halves — pins on one part's end face, receiving sockets on the
+    # other's, joined by the butt_pin_joint in an assembly.
+    end_joint = resolved.choices.get("end_joint", "none")
+    pins: list[PinFeature] = []
+    bores: list[BoreFeature] = []
+    wall = ctx["wall"]
+    interference = 0.1
+    pin_d, pin_len = ctx["butt_pin_d"], ctx["butt_pin_len"]
+    # Two anchor points in the section: one in each side wall, mid-height.
+    ow = ctx["inner_w"] + 2.0 * wall
+    anchor_y = (ow - wall) / 2.0
+    anchor_z = (ctx["inner_h"] + wall) * 0.5
+    if end_joint == "pins":
+        pins = [
+            PinFeature(name=f"butt_pin_{i}", at=(y, anchor_z), d=pin_d,
+                       z0=length - 0.6, length=pin_len + 0.6, axis="X")
+            for i, y in enumerate((-anchor_y, anchor_y))
+        ]
+    elif end_joint == "sockets":
+        bores = [
+            BoreFeature(name=f"butt_socket_{i}", axis="X",
+                        center=(0.0, y, anchor_z), d=pin_d - interference,
+                        span=(0.0, pin_len + 0.4), overshoot=(1.0, 0.0))
+            for i, y in enumerate((-anchor_y, anchor_y))
+        ]
+
     regions = [
         Region("back", RegionRole.MOUNTING_SURFACE,
                Box3(0.0, -frame["outer_w"] / 2.0, 0.0,
@@ -76,6 +103,9 @@ def build_form(
     for i, x in enumerate(xs):
         frame[f"screw_x_{i}"] = x
 
+    frame["butt_anchor_y"] = anchor_y
+    frame["butt_anchor_z"] = anchor_z
+
     return PartForm(
         name=instance.id,
         params=dict(ctx),
@@ -84,8 +114,13 @@ def build_form(
         width=length,
         style=style,
         holes=holes,
+        pins=pins,
+        bores=bores,
         regions=regions,
         datums={
             "back_face": {"at": [length / 2.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0]},
+            # butt faces: x=length (where pins grow) and x=0 (sockets)
+            "end_face": {"at": [length, 0.0, anchor_z], "rotate": [0.0, 0.0, 0.0]},
+            "start_face": {"at": [0.0, 0.0, anchor_z], "rotate": [0.0, 0.0, 0.0]},
         },
     )

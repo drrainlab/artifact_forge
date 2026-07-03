@@ -287,6 +287,24 @@ features:
       - assembly.press_fit_ir
       - assembly.pins_engage
 
+  - id: snap_hooks
+    description: cantilever snap hooks welded on the part (the flexure pair of a snap lid)
+    verified_by:
+      - topology.ribs_present
+
+  - id: butt_aligned_split
+    description: one long section printed as identical-profile halves aligned by end-face press pins
+    verified_by:
+      - assembly.butt_pin_ir
+      - assembly.no_interference
+
+  - id: snap_on_interface
+    description: cantilever snap hooks engage receiver windows with printable flexure strain
+    verified_by:
+      - assembly.snap_joint_ir
+      - assembly.hooks_engage
+      - assembly.no_interference
+
   - id: open_channel
     description: open-topped U-channel with the declared wall kept between slot and outside
     verified_by:

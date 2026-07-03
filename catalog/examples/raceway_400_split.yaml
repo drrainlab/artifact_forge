@@ -1,0 +1,38 @@
+schema: assembly/v1
+id: raceway_400_split
+strict: true
+root: left
+
+# One 400mm cable run, longer than the bed — printed as two identical-
+# section halves aligned by end-face press pins (the butt-split pattern).
+shared:
+  inner_w: 24mm
+  inner_h: 16mm
+  wall: 2.5mm
+
+parts:
+  - ref: left
+    product:
+      schema: product/v1
+      id: raceway_left
+      archetype: cable_raceway_v1@1
+      params: {length: 200mm, end_joint: sockets, screw: M4}
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: right
+    product:
+      schema: product/v1
+      id: raceway_right
+      archetype: cable_raceway_v1@1
+      params: {length: 200mm, end_joint: pins, screw: M4}
+      manufacturing: {material: PETG, support_policy: none}
+
+joints:
+  - type: butt_pin_joint
+    a: left.start_face      # sockets live at x=0 of the left half
+    b: right.end_face       # pins grow from x=length of the right half
+    rotate: [0, 0, 0]
+    params: {interference: 0.1}
+
+contract:
+  must_have:
+    - butt_aligned_split

@@ -173,19 +173,44 @@ class RibFeature:
 @dataclass(frozen=True)
 class PinFeature:
     """An ADDITIVE alignment/press-fit pin: a cylinder welded onto a face,
-    rising along +Z from ``z0``. The mating part receives it in a bore
-    whose diameter is pin_d minus the declared interference — verified by
-    the press_fit_pin_pair joint in the assembled pose."""
+    rising along ``axis`` from ``start``. The mating part receives it in a
+    bore whose diameter is pin_d minus the declared interference —
+    verified by the press-fit joints in the assembled pose.
+
+    Legacy spelling (axis Z): ``at=(x, y)`` + ``z0``. Axis X/Y pins (a
+    split part's butt-joint pins on an end face) give the full ``start``
+    point instead."""
 
     name: str
-    at: tuple[float, float]  # (x, y) of the pin axis
+    at: tuple[float, float]  # (x, y) of the pin axis for axis="Z"
     d: float
-    z0: float  # weld start (should overlap the host by the weld rule)
+    z0: float  # weld start along the axis (should overlap the host)
     length: float
+    axis: str = "Z"
 
     def __post_init__(self) -> None:
         if self.d <= 0 or self.length <= 0:
             raise ValueError(f"PinFeature {self.name!r} needs positive d/length")
+        if self.axis not in ("X", "Y", "Z"):
+            raise ValueError(f"PinFeature {self.name!r} axis must be X/Y/Z")
+
+    def start_point(self) -> tuple[float, float, float]:
+        """Axis-start in world coords: `at` holds the two off-axis coords
+        in world order, z0 the axis coordinate."""
+        a, b = self.at
+        if self.axis == "Z":
+            return (a, b, self.z0)
+        if self.axis == "X":
+            return (self.z0, a, b)
+        return (a, self.z0, b)
+
+    def end_point(self) -> tuple[float, float, float]:
+        x, y, z = self.start_point()
+        if self.axis == "Z":
+            return (x, y, z + self.length)
+        if self.axis == "X":
+            return (x + self.length, y, z)
+        return (x, y + self.length, z)
 
 
 @dataclass(frozen=True)

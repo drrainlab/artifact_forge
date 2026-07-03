@@ -369,3 +369,180 @@ _register(JointDecl(
     ir_check=_press_fit_ir,
     cad_checks=("assembly.pins_engage",),
 ))
+
+
+# -- butt_pin_joint -------------------------------------------------------------
+
+
+def _butt_pin_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """Butt-split alignment: a run longer than the bed prints as two
+    mating halves — pins on B's end face press into sockets on A's start
+    face. The joint proves the halves are the SAME section (outline match)
+    and the pins land on their sockets with the declared interference."""
+    interference = float(joint.params.get("interference", 0.1))
+    pins = [p for p in form_b.pins if p.name.startswith("butt_pin")]
+    sockets = [b for b in form_a.bores if b.name.startswith("butt_socket")]
+    if not pins or len(pins) != len(sockets):
+        return [_finding(
+            "assembly.butt_pin_ir", False,
+            f"butt joint needs matching pin/socket counts: {joint.b_ref} has "
+            f"{len(pins)} pin(s), {joint.a_ref} has {len(sockets)} socket(s) "
+            "(set end_joint: pins / sockets on the two halves)",
+        )]
+    # Same section: both halves must share the profile outline bbox.
+    la, ha = form_a.section.outer.bbox()
+    lb, hb = form_b.section.outer.bbox()
+    mismatch = max(
+        abs(la.u - lb.u), abs(la.v - lb.v), abs(ha.u - hb.u), abs(ha.v - hb.v)
+    )
+    if mismatch > 0.05:
+        return [_finding(
+            "assembly.butt_pin_ir", False,
+            f"halves have different sections (outline mismatch {mismatch:.2f}) "
+            "— a butt joint only aligns identical profiles",
+            measured=mismatch, limit=0.05,
+        )]
+    problems: list[str] = []
+    worst = 0.0
+    for pin in pins:
+        tip = pose.apply(pin.end_point())
+        best = min(
+            math.hypot(
+                # off-axis distance in the socket's cross plane (axis X):
+                tip[1] - s.center[1], tip[2] - s.center[2]
+            )
+            for s in sockets
+        )
+        worst = max(worst, best)
+        near = min(sockets, key=lambda s: math.hypot(
+            tip[1] - s.center[1], tip[2] - s.center[2]))
+        want = near.d + interference
+        if abs(pin.d - want) > 0.06:
+            problems.append(
+                f"{pin.name} d={pin.d:g} vs socket {near.d:g}: needs "
+                f"{want:g} for {interference:g} interference"
+            )
+        depth = abs(near.span[1] - near.span[0])
+        if pin.length > depth + 0.5:
+            problems.append(
+                f"{pin.name} ({pin.length:g}) longer than its socket ({depth:g})"
+            )
+    if worst > POSITION_TOL:
+        problems.append(
+            f"pins do not land on sockets (worst offset {worst:.2f})"
+        )
+    if problems:
+        return [_finding("assembly.butt_pin_ir", False, "; ".join(problems))]
+    return [_finding(
+        "assembly.butt_pin_ir", True,
+        f"{len(pins)} butt pin(s) align identical sections "
+        f"(worst offset {worst:.3f}, interference {interference:g})",
+        measured=worst, limit=POSITION_TOL,
+    )]
+
+
+_register(JointDecl(
+    name="butt_pin_joint",
+    description="butt-split halves of one long section aligned by end-face "
+                "press pins — identical outlines verified, pins on sockets",
+    ir_check=_butt_pin_ir,
+    cad_checks=("assembly.no_interference",),
+))
+
+
+# -- snap_joint -----------------------------------------------------------------
+
+#: Max flexure strain during snap insertion for common FDM plastics
+#: (PETG/ABS ~5%; PLA is stiffer — the check WARNs above 3.5%).
+SNAP_STRAIN_LIMIT = 0.05
+SNAP_STRAIN_WARN = 0.035
+
+
+def _snap_joint_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """Cantilever snap: B's hook lips must land INSIDE A's receiver
+    windows in the pose with a real undercut, and the beam must survive
+    the insertion flex — strain = 1.5 * deflection * t / L^2, the classic
+    cantilever snap formula, checked against printable-plastic limits."""
+    prefix = str(joint.params.get("hooks", "snap"))
+    lips = [r for r in form_b.ribs if r.name.startswith(f"{prefix}_lip")]
+    windows = [c for c in form_a.cutboxes if "snap_window" in c.name]
+    if not lips or len(lips) > len(windows):
+        return [_finding(
+            "assembly.snap_joint_ir", False,
+            f"{joint.b_ref} has {len(lips)} lip(s), {joint.a_ref} has "
+            f"{len(windows)} window(s)",
+        )]
+    f = form_b.frame
+    beam_t = f.get(f"{prefix}_beam_t")
+    hook_len = f.get(f"{prefix}_hook_len")
+    lip_d = f.get(f"{prefix}_lip_d")
+    if beam_t is None or hook_len is None or lip_d is None:
+        return [_finding(
+            "assembly.snap_joint_ir", False,
+            f"{joint.b_ref} frame lacks {prefix}_beam_t/hook_len/lip_d",
+        )]
+    # Insertion flex: the beam deflects by the full lip depth.
+    strain = 1.5 * lip_d * beam_t / (hook_len * hook_len)
+    if strain > SNAP_STRAIN_LIMIT:
+        return [_finding(
+            "assembly.snap_joint_ir", False,
+            f"snap insertion strain {strain:.3f} > {SNAP_STRAIN_LIMIT} — "
+            "the hook snaps off instead of snapping in (lengthen the beam, "
+            "thin it, or shorten the lip)",
+            measured=strain, limit=SNAP_STRAIN_LIMIT,
+        )]
+    problems: list[str] = []
+    engaged = 0
+    for lip in lips:
+        b = lip.box
+        c1 = pose.apply((b.x0, b.y0, b.z0))
+        c2 = pose.apply((b.x1, b.y1, b.z1))
+        lx0, lx1 = sorted((c1[0], c2[0]))
+        ly0, ly1 = sorted((c1[1], c2[1]))
+        lz0, lz1 = sorted((c1[2], c2[2]))
+        hit = None
+        for win in windows:
+            w = win.box
+            if (w.x0 - 0.01 <= lx0 and lx1 <= w.x1 + 0.01
+                    and w.y0 + 0.05 <= ly0 and ly1 <= w.y1 - 0.05
+                    and w.z0 + 0.05 <= lz0 and lz1 <= w.z1 - 0.05):
+                hit = win
+                break
+        if hit is None:
+            problems.append(f"{lip.name} does not land inside any window")
+            continue
+        # Real undercut: the lip must reach PAST the wall's inner face.
+        wall = form_a.frame.get("shell_wall", 2.4)
+        inner = (form_a.frame.get("inner_u1", 0.0)
+                 if (lx0 + lx1) / 2.0 > 0 else form_a.frame.get("inner_u0", 0.0))
+        undercut = (lx1 - inner) if (lx0 + lx1) / 2.0 > 0 else (inner - lx0)
+        if undercut < 0.8:
+            problems.append(
+                f"{lip.name} undercut {undercut:.2f} < 0.8 — the lid pops off"
+            )
+            continue
+        engaged += 1
+    if problems:
+        return [_finding("assembly.snap_joint_ir", False, "; ".join(problems))]
+    note = ""
+    if strain > SNAP_STRAIN_WARN:
+        note = f" (strain {strain:.3f} is PETG/ABS territory — brittle PLA may crack)"
+    return [_finding(
+        "assembly.snap_joint_ir", True,
+        f"{engaged} hook(s) engage their windows, insertion strain "
+        f"{strain:.3f} <= {SNAP_STRAIN_LIMIT}{note}",
+        measured=strain, limit=SNAP_STRAIN_LIMIT,
+    )]
+
+
+_register(JointDecl(
+    name="snap_joint",
+    description="cantilever snap hooks into receiver windows: undercut and "
+                "insertion strain verified, engagement probed in the pose",
+    ir_check=_snap_joint_ir,
+    cad_checks=("assembly.no_interference", "assembly.hooks_engage"),
+))

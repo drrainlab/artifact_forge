@@ -756,3 +756,90 @@ _register(RecipeOpDecl(
     apply=_wire_exit,
     description="open U-notch through a shell rim for a drop-in cable",
 ))
+
+
+def _snap_hook_pair(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Two cantilever snap hooks rising from the plug top at the +-X plug
+    edges, lips pointing OUTWARD — the assembly flips the lid and the lips
+    click into receiver windows in the box walls. v1 lips are square
+    (no insertion ramp): flex the hooks by hand while seating the lid.
+    The flexure strain is verified by the snap_joint, not hoped for."""
+    state.require_base("snap_hook_pair")
+    f = state.frame
+    if "plug_u1" not in f:
+        raise RecipeError("snap_hook_pair needs an inset_plug first")
+    beam_t, hook_w = p["beam_t"], p["hook_w"]
+    hook_len, lip_d, lip_h = p["hook_len"], p["lip_d"], p["lip_h"]
+    z0 = f["plug_top_z"]
+    name = op_id or "snap"
+    for i, side in enumerate((-1.0, 1.0)):
+        edge = f["plug_u1"] if side > 0 else f["plug_u0"]
+        post_x0 = edge - beam_t if side > 0 else edge
+        post_x1 = edge if side > 0 else edge + beam_t
+        state.ribs.append(RibFeature(
+            name=f"{name}_post_{i}",
+            box=Box3(post_x0, -hook_w / 2.0, z0 - 0.6,
+                     post_x1, hook_w / 2.0, z0 + hook_len),
+        ))
+        lip_x0 = edge if side > 0 else edge - lip_d
+        lip_x1 = edge + lip_d if side > 0 else edge
+        state.ribs.append(RibFeature(
+            name=f"{name}_lip_{i}",
+            box=Box3(lip_x0, -hook_w / 2.0, z0 + hook_len - lip_h,
+                     lip_x1, hook_w / 2.0, z0 + hook_len),
+        ))
+    state.frame.update({
+        f"{name}_beam_t": beam_t, f"{name}_hook_len": hook_len,
+        f"{name}_lip_d": lip_d, f"{name}_lip_h": lip_h,
+        f"{name}_hook_w": hook_w,
+    })
+
+
+_register(RecipeOpDecl(
+    name="snap_hook_pair",
+    kind="feature",
+    params={
+        "beam_t": ("length", 1.8), "hook_w": ("length", 8.0),
+        "hook_len": ("length", 9.0), "lip_d": ("length", 1.6),
+        "lip_h": ("length", 3.0),
+    },
+    validators=("topology.ribs_present",),
+    apply=_snap_hook_pair,
+    description="cantilever snap hooks on the plug edges, lips outward",
+))
+
+
+def _snap_window_pair(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Receiver windows through the +-X shell walls for a snap lid."""
+    state.require_base("snap_window_pair")
+    f = state.frame
+    if "shell_wall" not in f:
+        raise RecipeError("snap_window_pair needs a rounded_box_shell base")
+    w_win, h_win, off = p["w"], p["h"], p["top_offset"]
+    h_shell = f["shell_h"]
+    name = op_id or "snap_window"
+    for i, (x0, x1) in enumerate((
+        (f["outline_u0"] - 1.0, f["outline_u0"] + f["shell_wall"] + 1.0),
+        (f["outline_u1"] - f["shell_wall"] - 1.0, f["outline_u1"] + 1.0),
+    )):
+        state.cutboxes.append(CutBoxFeature(
+            name=f"{name}_{i}",
+            box=Box3(x0, -w_win / 2.0, h_shell - off - h_win,
+                     x1, w_win / 2.0, h_shell - off),
+        ))
+    state.frame[f"{name}_w"] = w_win
+    state.frame[f"{name}_h"] = h_win
+    state.frame[f"{name}_top_offset"] = off
+
+
+_register(RecipeOpDecl(
+    name="snap_window_pair",
+    kind="feature",
+    params={
+        "w": ("length", 8.8), "h": ("length", 3.8),
+        "top_offset": ("length", 6.0),
+    },
+    validators=("form.cuts_respect_keepouts", "topology.cutout_present"),
+    apply=_snap_window_pair,
+    description="through-wall receiver windows on both X walls",
+))

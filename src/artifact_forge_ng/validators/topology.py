@@ -440,11 +440,13 @@ def pins_present(geometry: Geometry, form: PartForm) -> Finding:
         return _finding("topology.pins_present", True, "no pins declared")
     missing = []
     for pin in form.pins:
-        px, py = pin.at
-        probe = channel_probe(
-            [(px, py, pin.z0 + 0.4), (px, py, pin.z0 + pin.length - 0.3)],
-            d=pin.d * 0.7,
-        )
+        sx, sy, sz = pin.start_point()
+        ex, ey, ez = pin.end_point()
+        # inset the probe 0.4 from each end along the axis
+        t0, t1 = 0.4 / pin.length, 1.0 - 0.3 / pin.length
+        a = (sx + (ex - sx) * t0, sy + (ey - sy) * t0, sz + (ez - sz) * t0)
+        b = (sx + (ex - sx) * t1, sy + (ey - sy) * t1, sz + (ez - sz) * t1)
+        probe = channel_probe([a, b], d=pin.d * 0.7)
         frac = solid_fraction(geometry.workplane, probe)
         if frac < 0.9:
             missing.append(f"{pin.name} (fill {frac:.2f})")

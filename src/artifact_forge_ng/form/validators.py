@@ -386,10 +386,16 @@ def check_constant_section(form: PartForm) -> Finding:
     breakers: list[str] = []
     if form.kind != "section_extrude":
         breakers.append(f"kind={form.kind}")
+    # Features ALONG the extrusion axis (a split half's butt pins and
+    # sockets) keep every layer self-similar — they are vertical posts and
+    # holes in the side-print orientation, still zero overhang.
+    axis = form.section.width_axis
+    off_axis_bores = [b for b in form.bores if b.axis != axis]
+    off_axis_pins = [p for p in form.pins if p.axis != axis]
     for label, items in (
         ("plates", form.plates), ("ribs", form.ribs),
-        ("cutboxes", form.cutboxes), ("bores", form.bores),
-        ("fields", form.fields),
+        ("cutboxes", form.cutboxes), ("bores", off_axis_bores),
+        ("pins", off_axis_pins), ("fields", form.fields),
     ):
         if items:
             breakers.append(f"{label} x{len(items)}")

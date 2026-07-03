@@ -104,6 +104,9 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.press_fit_ir", Level.ASSEMBLY, "pins land on receiving bores with the declared interference"),
         _decl("assembly.pins_engage", Level.ASSEMBLY, "every pin physically occupies its receiving bore in the pose"),
         _decl("assembly.lid_seats", Level.ASSEMBLY, "the lid plug sits inside the shell rim in the pose"),
+        _decl("assembly.butt_pin_ir", Level.ASSEMBLY, "butt-split halves share one section and align on end pins"),
+        _decl("assembly.snap_joint_ir", Level.ASSEMBLY, "snap hooks reach their windows with printable flexure strain"),
+        _decl("assembly.hooks_engage", Level.ASSEMBLY, "every snap hook lip occupies its window in the pose"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),

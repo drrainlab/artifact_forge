@@ -227,7 +227,7 @@ def run_assembly_build(
 
     allowed = 2.0
     for joint in asm.joints:
-        if joint.type != "press_fit_pin_pair":
+        if joint.type not in ("press_fit_pin_pair", "butt_pin_joint"):
             continue
         interference = float(joint.params.get("interference", 0.1))
         for pin in states[joint.b_ref].form.pins:
@@ -327,6 +327,36 @@ def run_assembly_build(
             not missing,
             "all pins engage their receivers in the pose"
             if not missing else "pins not engaged: " + "; ".join(missing),
+        ))
+
+    # -- assembly.hooks_engage: snap lips physically sit in the windows ---
+    for joint in asm.joints:
+        if joint.type != "snap_joint":
+            continue
+        form_b = states[joint.b_ref].form
+        pose_b = poses[joint.b_ref]
+        prefix = str(joint.params.get("hooks", "snap"))
+        missing = []
+        for lip in [r for r in form_b.ribs if r.name.startswith(f"{prefix}_lip")]:
+            b = lip.box
+            center = pose_b.apply(
+                ((b.x0 + b.x1) / 2.0, (b.y0 + b.y1) / 2.0, (b.z0 + b.z1) / 2.0)
+            )
+            probe = channel_probe(
+                [(center[0], center[1] - 1.0, center[2]),
+                 (center[0], center[1] + 1.0, center[2])], d=1.2
+            )
+            own = solid_fraction(placed[joint.b_ref].workplane, probe)
+            host = solid_fraction(placed[joint.a_ref].workplane, probe)
+            if own < 0.8:
+                missing.append(f"{lip.name} lip missing in pose ({own:.2f})")
+            elif host > 0.3:
+                missing.append(f"{lip.name} collides with the wall ({host:.2f})")
+        joint_findings.append(afind(
+            "assembly.hooks_engage",
+            not missing,
+            "all snap lips sit in their windows"
+            if not missing else "; ".join(missing),
         ))
 
     # -- assembly.channel_continuous_across: THE demo check ---------------

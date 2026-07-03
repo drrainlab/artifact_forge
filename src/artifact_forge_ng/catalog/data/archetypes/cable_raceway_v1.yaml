@@ -34,6 +34,15 @@ parameters:
   screw_spacing:
     {type: length, default: expr((length - 24) / (screw_count - 1)),
      min: 20mm, max: expr(length - 20), role: assembly}
+  end_joint:
+    {type: choice, choices: [none, pins, sockets], default: none,
+     role: assembly,
+     description: "butt-split ends: pins on one half, sockets on the other
+       — runs longer than the bed print as mating halves"}
+  butt_pin_d:
+    {type: length, default: 4.1mm, min: 3mm, max: 6mm, role: assembly}
+  butt_pin_len:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: assembly}
 
 constraints:
   - wall >= printer.min_wall
@@ -53,6 +62,8 @@ surface_style: molded_utility_part
 
 validators:
   - form.wall_thickness
+  - topology.pins_present
+  - topology.pockets_present
   - form.contact_edges_rounded
   - form.constant_section
   - topology.single_connected_solid

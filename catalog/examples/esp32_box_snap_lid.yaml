@@ -1,0 +1,57 @@
+schema: assembly/v1
+id: esp32_box_snap_lid
+strict: true
+root: box
+
+# The snap chain is declared ONCE: hook flexure, lip and plug dimensions
+# drive BOTH the lid's hooks and the box's receiver windows.
+shared:
+  wall: 2.4mm
+  plug_depth: 3.5mm
+  hook_len: 10mm
+  hook_w: 8mm
+  lip_h: 3mm
+
+parts:
+  - ref: box
+    product:
+      schema: product/v1
+      id: snap_base
+      archetype: enclosure_base_snap_v1@1
+      params:
+        box_l: 82mm
+        box_w: 52mm
+        box_h: 26mm
+        port: usb_c
+        port_z: 12mm
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: lid
+    product:
+      schema: product/v1
+      id: snap_lid
+      archetype: enclosure_lid_snap_v1@1
+      params:
+        lid_l: 82mm
+        lid_w: 52mm
+        lid_t: 3mm
+        seat_clearance: 0.3mm
+        beam_t: 1.8mm
+        lip_d: 1.6mm
+      manufacturing: {material: PETG, support_policy: none}
+
+joints:
+  - type: lid_seat
+    a: box.rim
+    b: lid.seat
+    rotate: [180, 0, 0]
+    params: {clearance: 0.3}
+  - type: snap_joint
+    a: box.rim
+    b: lid.seat
+    rotate: [180, 0, 0]
+    params: {hooks: snap}
+
+contract:
+  must_have:
+    - seated_lid
+    - snap_on_interface
