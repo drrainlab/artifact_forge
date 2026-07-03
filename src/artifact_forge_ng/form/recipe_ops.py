@@ -843,3 +843,56 @@ _register(RecipeOpDecl(
     apply=_snap_window_pair,
     description="through-wall receiver windows on both X walls",
 ))
+
+
+def _truss_web_cutouts(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Warren-truss lightening for a flat beam plate: alternating
+    triangular cutouts between two solid chords. Struts and chords hold
+    their declared thickness BY CONSTRUCTION and the ligament check
+    measures the actual polygons — a printed 2D truss, not clip art."""
+    from .part import FieldFeature
+
+    state.require_base("truss_web_cutouts")
+    f = state.frame
+    if "outline_u0" not in f:
+        raise RecipeError("truss_web_cutouts needs a rounded_plate base")
+    chord, strut = p["chord"], p["strut_t"]
+    panels = int(round(p["panels"]))
+    margin = p["end_margin"]
+    y0, y1 = f["outline_v0"] + chord, f["outline_v1"] - chord
+    x0, x1 = f["outline_u0"] + margin, f["outline_u1"] - margin
+    if y1 - y0 < 6.0 or panels < 2:
+        raise RecipeError("truss web too small for triangles")
+    pitch = (x1 - x0) / panels
+    s2 = strut / 2.0
+    tris: list[tuple[tuple[float, float], ...]] = []
+    for i in range(panels):
+        a, b = x0 + i * pitch, x0 + (i + 1) * pitch
+        if i % 2 == 0:  # apex up
+            tris.append((
+                (a + s2 * 2.2, y0 + s2), (b - s2 * 2.2, y0 + s2),
+                ((a + b) / 2.0, y1 - s2),
+            ))
+        else:  # apex down
+            tris.append((
+                (a + s2 * 2.2, y1 - s2), (b - s2 * 2.2, y1 - s2),
+                ((a + b) / 2.0, y0 + s2),
+            ))
+    state.fields.append(FieldFeature(
+        plane_z=state.width, centers=(), cell=strut, depth=state.width,
+        pattern="slots", polygons=tuple(tris), min_ligament=strut,
+    ))
+    state.frame[f"{op_id or 'truss'}_panels"] = float(panels)
+
+
+_register(RecipeOpDecl(
+    name="truss_web_cutouts",
+    kind="feature",
+    params={
+        "chord": ("length", 8.0), "strut_t": ("length", 5.0),
+        "panels": ("count", 5), "end_margin": ("length", 10.0),
+    },
+    validators=("form.min_ligament_ok", "topology.hex_field_present"),
+    apply=_truss_web_cutouts,
+    description="warren-truss triangular lightening between solid chords",
+))

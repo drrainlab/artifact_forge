@@ -1,0 +1,90 @@
+schema: archetype/v1
+id: truss_beam_v1
+version: 1
+object_class: truss_beam
+description: >
+  Flat warren-truss beam (pure recipe): a plate with alternating
+  triangular lightening between two solid chords, plus countersunk end
+  screws. Struts hold their declared thickness by construction and the
+  measured ligament check confirms it — a printable spanning beam that
+  saves most of its plastic.
+
+provides_features:
+  - mounting_plate_body
+  - hole_pattern
+  - truss_web
+
+parameters:
+  span:
+    {type: length, default: 180mm, min: 100mm, max: 240mm,
+     role: functional, exposed: true}
+  height:
+    {type: length, default: 40mm, min: 24mm, max: 80mm,
+     role: functional, exposed: true}
+  thickness:
+    {type: length, default: 8mm, min: 5mm, max: 14mm, role: structural}
+  corner_r:
+    {type: length, default: 4mm, min: 2mm, max: 10mm, role: aesthetic}
+  chord:
+    {type: length, default: 8mm, min: 5mm, max: 16mm, role: structural,
+     description: solid band top and bottom}
+  strut_t:
+    {type: length, default: 5mm, min: 3mm, max: 10mm, role: structural}
+  panels:
+    {type: count, default: 5, min: 3, max: 11, role: structural}
+  screw:
+    {type: choice, choices: [M4, M5], default: M4, role: assembly}
+  screw_spacing:
+    {type: length, default: expr(span - 24), min: 60mm,
+     max: expr(span - 20), role: assembly}
+  min_web:
+    {type: length, default: 4mm, min: 3mm, max: 10mm, role: manufacturing}
+
+constraints:
+  - height > 2 * chord + 8
+  - strut_t >= 3
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params: {l: span, w: height, t: thickness, corner_r: corner_r}
+    - op: countersunk_hole_pattern
+      id: screws
+      params: {kind: line, screw: screw, count: 2, spacing: screw_spacing,
+               cs_face: top}
+    - op: truss_web_cutouts
+      id: truss
+      params: {chord: chord, strut_t: strut_t, panels: panels,
+               end_margin: 16mm}
+
+regions:
+  - {id: plate, role: mounting_surface, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - form.min_ligament_ok
+  - topology.single_connected_solid
+  - topology.hex_field_present
+  - topology.screw_holes_open
+  - topology.countersinks_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - truss_web
+  must_not_have: []
+  invariants:
+    - height > 2 * chord + 8

@@ -1,0 +1,19 @@
+schema: product/v1
+id: drawer_handle_110
+archetype: grab_handle_v1@1
+strict: true
+
+requested_features:
+  - swept_grip_bar
+  - countersunk_screw_holes
+
+params:
+  span: 110mm
+  rise: 30mm
+  bar_d: 14mm
+  screw: M4
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

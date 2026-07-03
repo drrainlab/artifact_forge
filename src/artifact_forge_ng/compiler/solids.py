@@ -63,11 +63,35 @@ def _build_plate(plate: PlateFeature) -> cq.Workplane:
     return body
 
 
+def _sweep_arc_bar(form: PartForm) -> cq.Workplane:
+    """Sweep a circular section along a planar arc in the XZ plane — the
+    grab-handle/bow primitive. Frame contract: ``sweep_span`` (chord along
+    X), ``sweep_rise`` (arc apex height above the ends), ``bar_d``. The
+    path runs from (0,0,0) through the apex (span/2, 0, rise) to (span,0,0);
+    the probes sample the same three-point arc, so declared and swept
+    geometry cannot drift."""
+    f = form.frame
+    span, rise, bar_d = f["sweep_span"], f["sweep_rise"], f["bar_d"]
+    path = (
+        cq.Workplane("XZ")
+        .moveTo(0.0, 0.0)
+        .threePointArc((span / 2.0, rise), (span, 0.0))
+    )
+    return (
+        cq.Workplane("YZ")
+        .center(0.0, 0.0)
+        .circle(bar_d / 2.0)
+        .sweep(path)
+    )
+
+
 def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
     log = CompileLog()
 
     if form.kind == "profile_revolve":
         mass = revolve_section_profile(form.section)
+    elif form.kind == "section_sweep":
+        mass = _sweep_arc_bar(form)
     else:
         mass = extrude_section_profile(form.section, form.width)
 

@@ -1,0 +1,22 @@
+schema: product/v1
+id: showcase_vein_plate
+archetype: cable_grommet_plate_v1@1
+strict: true
+
+requested_features: [mounting_plate_body, hole_pattern, pass_through_cutout]
+
+params:
+  plate_l: 100mm
+  plate_w: 46mm
+  thickness: 5mm
+  cable_w: 30mm
+  cable_h: 14mm
+  screw_spacing: 76mm
+  screw: M4
+
+manufacturing: {process: fdm, material: PETG, support_policy: none}
+
+modifiers:
+  - id: add_vein_ribs
+    target: plate_lightening
+    params: {count: 6, rib_h: 1.4mm, rib_t: 2.4mm, seed: 11}

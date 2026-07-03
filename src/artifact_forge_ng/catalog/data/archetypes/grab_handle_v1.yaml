@@ -1,0 +1,68 @@
+schema: archetype/v1
+id: grab_handle_v1
+version: 1
+object_class: grab_handle
+description: >
+  Drawer/door/case grab handle — the first section_sweep archetype: a
+  round bar swept along a planar arc, welded into two flat countersunk
+  screw pads. The bar is probe-verified solid along the WHOLE declared
+  arc; printed pads-down, the bow is self-supporting.
+
+provides_features:
+  - swept_grip_bar
+  - countersunk_screw_holes
+  - rounded_contact_edges
+
+parameters:
+  span:
+    {type: length, default: 110mm, min: 60mm, max: 200mm,
+     role: functional, exposed: true, description: grip length pad to pad}
+  rise:
+    {type: length, default: 30mm, min: 16mm, max: expr(span / 2 - 4),
+     role: functional, exposed: true, description: bow height (finger room)}
+  bar_d:
+    {type: length, default: 14mm, min: 8mm, max: 24mm,
+     role: functional, exposed: true}
+  pad_l:
+    {type: length, default: 24mm, min: 16mm, max: 50mm, role: assembly}
+  pad_w:
+    {type: length, default: 26mm, min: 16mm, max: 50mm, role: assembly}
+  pad_t:
+    {type: length, default: 5mm, min: 4mm, max: 10mm, role: structural}
+  screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+
+constraints:
+  - rise > bar_d
+  - rise < span / 2
+
+form:
+  type: section_sweep
+  section: arc_bar_sweep
+  plane: YZ
+  width_axis: X
+
+regions:
+  - {id: grip, role: soft_contact_surface, editable: false}
+  - {id: pads, role: mounting_surface, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - topology.single_connected_solid
+  - topology.bar_follows_arc
+  - topology.screw_holes_open
+  - topology.countersinks_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - swept_grip_bar
+    - countersunk_screw_holes
+  must_not_have: []
+  invariants:
+    - rise > bar_d

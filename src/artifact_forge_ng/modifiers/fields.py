@@ -231,3 +231,61 @@ def add_phyllotaxis_field(
     return [
         note(use.id, f"{len(kept)} phyllotaxis holes ({cut_mode}) on {use.target}")
     ]
+
+
+@register_applicator("add_vein_ribs")
+def add_vein_ribs(
+    form: PartForm, use: ModifierUse, params: dict[str, Any], archetype: ArchetypeSpec
+) -> list[Finding]:
+    """Standalone vein ribs — thin raised ridges flowing across the target
+    face with a seeded rhythm (the biomorphic veins, available without the
+    full style). Additive: they sit ON the face, keepouts only veto veins
+    that would bury a screw head."""
+    from ..form.part import RibFeature
+    from ..form.regions import Box3
+
+    pw = plate_window(form, use.target)
+    if pw is None:
+        return [fail(use.id, f"target region {use.target!r} has no usable window")]
+    if pw.origin is not None:
+        return [fail(use.id, "vein ribs v1 support horizontal faces only")]
+    import random
+
+    rng = random.Random(int(round(params.get("seed", 7))))
+    count = int(round(params.get("count", 5)))
+    rib_h = params.get("rib_h", 1.4)
+    rib_t = params.get("rib_t", 2.2)
+    margin = params.get("edge_margin", 5.0)
+    inner = pw.window.shrunk(margin)
+    if inner.width <= 0 or inner.height <= 0:
+        return [note(use.id, "window smaller than margins — zero veins (honest)")]
+    along_u = inner.width >= inner.height
+    lane = (inner.height if along_u else inner.width) / (count + 1)
+    placed = 0
+    for i in range(count):
+        base = (inner.v0 if along_u else inner.u0) + lane * (i + 1)
+        jitter = rng.uniform(-0.35, 0.35) * lane
+        pos = base + jitter
+        # seeded rhythm on the length too
+        head = rng.uniform(0.0, 0.15)
+        tail = rng.uniform(0.0, 0.15)
+        if along_u:
+            box = Box3(inner.u0 + head * inner.width, pos - rib_t / 2.0,
+                       pw.z_top - 0.6,
+                       inner.u1 - tail * inner.width, pos + rib_t / 2.0,
+                       pw.z_top + rib_h)
+        else:
+            box = Box3(pos - rib_t / 2.0, inner.v0 + head * inner.height,
+                       pw.z_top - 0.6,
+                       pos + rib_t / 2.0, inner.v1 - tail * inner.height,
+                       pw.z_top + rib_h)
+        # veto veins that would bury a screw head
+        from ..form.section import Pt as _Pt
+        mid = _Pt((box.x0 + box.x1) / 2.0, (box.y0 + box.y1) / 2.0)
+        if any(k.shape.distance(mid) <= k.clearance + rib_t for k in pw.keepouts):
+            continue
+        form.ribs.append(RibFeature(name=f"vein_{use.target}_{i}", box=box))
+        placed += 1
+    if placed == 0:
+        return [fail(use.id, "every vein was vetoed by keepouts")]
+    return [note(use.id, f"{placed} vein rib(s) (seed {int(params.get('seed', 7))}) on {use.target}")]

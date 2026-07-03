@@ -1,0 +1,19 @@
+schema: product/v1
+id: truss_beam_180
+archetype: truss_beam_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - truss_web
+
+params:
+  span: 180mm
+  height: 40mm
+  thickness: 8mm
+  chord: 8mm
+  strut_t: 5mm
+  panels: 5
+  screw: M4
+
+manufacturing: {process: fdm, material: PETG, support_policy: none}

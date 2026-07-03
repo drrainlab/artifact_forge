@@ -65,6 +65,7 @@ form:
 
 regions:
   - {id: plate, role: mounting_surface, editable: true}
+  - {id: plate_lightening, role: aesthetic_lightening, editable: true}
 
 surface_style: molded_utility_part
 
@@ -80,6 +81,9 @@ validators:
 forbidden_forms: []
 
 allowed_modifiers:
+  - add_vein_ribs
+  - add_hex_perforation
+  - add_phyllotaxis_field
   - fillet_soften
 
 contract:

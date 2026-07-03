@@ -1,0 +1,19 @@
+schema: modifier/v1
+id: add_vein_ribs
+category: pattern_field
+description: >
+  Raised vein ridges flowing across a face with a seeded rhythm — the
+  biomorphic veins as a standalone additive field (no full style needed).
+applies_to: [aesthetic_lightening, mounting_surface]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   retaining_flexure, seal_surface]
+params:
+  count: {type: count, default: 5, min: 2, max: 12}
+  rib_h: {type: length, default: 1.4mm, min: 0.6mm, max: 3mm}
+  rib_t: {type: length, default: 2.2mm, min: 1.2mm, max: 5mm}
+  edge_margin: {type: length, default: 5mm, min: 2mm, max: 16mm}
+  seed: {type: count, default: 7, min: 0, max: 9999}
+provides_features: [stiffening_ribs]
+validators:
+  - topology.ribs_present

@@ -287,6 +287,18 @@ features:
       - assembly.press_fit_ir
       - assembly.pins_engage
 
+  - id: truss_web
+    description: warren-truss triangular lightening between solid chords, ligaments measured
+    verified_by:
+      - form.min_ligament_ok
+      - topology.hex_field_present
+
+  - id: swept_grip_bar
+    description: round bar swept along a planar arc, solid end to end
+    verified_by:
+      - topology.bar_follows_arc
+      - topology.single_connected_solid
+
   - id: snap_hooks
     description: cantilever snap hooks welded on the part (the flexure pair of a snap lid)
     verified_by:

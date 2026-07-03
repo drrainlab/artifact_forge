@@ -433,6 +433,45 @@ def ribs_present(geometry: Geometry, form: PartForm) -> Finding:
     )
 
 
+@register_probe("topology.bar_follows_arc")
+def bar_follows_arc(geometry: Geometry, form: PartForm) -> Finding:
+    """The swept bar must be solid along the WHOLE declared arc — sampled
+    on the same three-point arc the compiler swept, so a sweep that
+    silently failed (or drifted) cannot pass."""
+    import math
+
+    f = form.frame
+    needed = ("sweep_span", "sweep_rise", "bar_d")
+    if any(k not in f for k in needed):
+        return _finding("topology.bar_follows_arc", False, "no sweep frame keys")
+    span, rise, bar_d = (f[k] for k in needed)
+    half = span / 2.0
+    cz = (rise * rise - half * half) / (2.0 * rise)
+    radius = rise - cz
+    a0 = math.atan2(0.0 - cz, 0.0 - half)
+    a1 = math.atan2(0.0 - cz, span - half)
+    # walk the upper arc from end to end through the apex (pi/2)
+    apex = math.pi / 2.0
+    pts = []
+    n = 10
+    for i in range(n + 1):
+        t = i / n
+        # two symmetric halves via the apex to avoid wrap ambiguity
+        ang = a0 + (apex - a0) * min(1.0, t * 2.0) if t <= 0.5 else (
+            apex + (a1 - apex) * (t - 0.5) * 2.0
+        )
+        pts.append((half + radius * math.cos(ang), 0.0, cz + radius * math.sin(ang)))
+    probe = channel_probe(pts, d=bar_d * 0.5)
+    frac = solid_fraction(geometry.workplane, probe)
+    return _finding(
+        "topology.bar_follows_arc",
+        frac > 0.95,
+        f"bar fill along the declared arc {frac:.3f}",
+        measured=frac,
+        limit=0.95,
+    )
+
+
 @register_probe("topology.pins_present")
 def pins_present(geometry: Geometry, form: PartForm) -> Finding:
     """Every declared pin must be real material along its length."""

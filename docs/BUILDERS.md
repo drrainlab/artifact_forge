@@ -54,13 +54,13 @@ Recipe-op без реализации в движке = честный engine-ga
 | `device_slot_profile` | ✅ | phone_stand (slot = f(tilt), COM-гейт) |
 | `open_c_channel_profile` | ✅ | cable_raceway_v1 (raceway_200): U-канал, constant section, wall меряется |
 | `snap_c_clip_profile` | ✅ | snap_c_tongue (pipe_clip_v1_sideprint): арк-ретенция + балка в профиле, sideprint |
-| `cylindrical_cradle` | ⬜ R3 | микрофоны, фонарики (частично покрыт revolve) |
-| `device_cradle` | ⬜ R3 | обобщение phone_stand люльки |
+| `cylindrical_cradle` | 🔶 | = зеркальный snap_c (arc<180, рот вверх); билдер-флип при первом клиенте |
+| `device_cradle` | 🔶 | покрыт device_slot_profile (phone_stand параметрический) |
 | `rounded_box_shell` | ✅ | recipe-op: outer body + interior cut, form.shell_walls_ok |
-| `sweep_profile_along_path` | ⬜ R4 | ручки, дуги; швы — отдельная работа |
-| `loft_between_sections` | ⬜ R4 | molded-переходы |
+| `sweep_profile_along_path` | ✅ | kind section_sweep: дуга по 3 точкам + topology.bar_follows_arc (grab_handle_v1) |
+| `loft_between_sections` | 🔶 | rect→rect есть (LoftFeature/tapered_beam); rect→circle при первом клиенте |
 | `tapered_beam` | ✅ | LoftFeature (конус по построению) + topology.arm_reaches_tip (shelf_bracket_v1) |
-| `truss_beam` | ⬜ R5 | фермы |
+| `truss_beam` | ✅ | truss_web_cutouts op: warren-треугольники, лигамент = strut by construction (truss_beam_180) |
 
 ### feature — крепёж, карманы, вырезы
 
@@ -89,7 +89,7 @@ Recipe-op без реализации в движке = честный engine-ga
 | `strap_slot_pair` | ✅ add_zip_tie_slots |
 | `rib_field` | ✅ add_ribs (аддитивные, topology.ribs_present) |
 | `phyllotaxis_field` | ✅ add_phyllotaxis_field (Vogel-спираль, лигамент by construction + измерен) |
-| `vein_rib_field` | 🔶 style-слой: вены biomorphic уже есть; как отдельный field — R5 |
+| `vein_rib_field` | ✅ | add_vein_ribs (standalone, seeded rhythm, additive) + вены biomorphic в style |
 | `space_colonization_branching` | ⬜ R5 |
 
 ### style — не builders, отдельный слой (закреплено)
@@ -104,18 +104,19 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 | `screw_joint` | ✅ R1: болт-круги совпадают в позе, clear↔tap, оси void, интерференс |
 | `lid_seat` | ✅ R2: цепочка plug↔interior−2·clearance до CAD + assembly.lid_seats в позе |
 | `press_fit_pin_pair` | ✅ R2: PinFeature + interference-контракт (пин ТОЛЩЕ гнезда, overlap измерен и ограничен) |
-| `split_plane_with_alignment` | ⬜ R3 (авто-ответные половинки) |
-| snap/dovetail/compliant | ⬜ R4 |
+| `split_plane_with_alignment` | ✅ суть: butt_pin_joint (секции идентичны + торцевые пины; PinFeature.axis) — raceway_400_split. Авто-генератор из ОДНОГО инстанса = edit-intent следующей итерации |
+| `snap_joint` | ✅ compliant: undercut + insertion strain 1.5·δ·t/L² ≤ 5% (esp32_box_snap_lid) |
+| dovetail | ⬜ скользящая посадка — своя механика |
 
 ### interface / joint / механика
 
 | builder | статус / волна |
 |---|---|
 | `gusset_pair` | ✅ shelf_bracket_v1 (web-косынки как рёбра) |
-| `snap_hook` / `snap_receiver` | ⬜ (глубокая механика: гибкая балка, свои валидаторы) |
+| `snap_hook` / `snap_receiver` | ✅ | ops snap_hook_pair / snap_window_pair + snap_joint (strain-физика поймала первый дизайн: 9мм балка ломалась) |
 | `press_fit_pin_pair` | ✅ (см. assembly joints) |
 | `dovetail_joint` / `tongue_groove_joint` | ⬜ R4 |
-| `split_plane_with_alignment` | ⬜ R4 (+ multi-part пайплайн) |
+| `split_plane_with_alignment` | ✅ (см. assembly joints: butt_pin_joint) |
 | `pin_hinge` | ⬜ R4 |
 | `rail_slider` | ⬜ R5 |
 | `living_hinge` | ⬜ R5 (материал/усталость — свои валидаторы) |
@@ -146,6 +147,19 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 - **R5 — Wow & механика** ✅ ядро: bearing_seat + phyllotaxis_field
   (bearing_turntable_base). Остаток: резьбы, ratchet, branching,
   friction hinge.
+
+## Честный остаток (глубокая механика — по итерации на штуку)
+
+`dovetail`/`tongue_groove` и `rail_slider` — скользящие посадки (трение,
+допуски по направлению хода); `pin_hinge` и `friction_hinge` — подвижные
+сборки (зазор оси, момент); `living_hinge` — усталость материала;
+`thread_external/internal` — helix-sweep в OCC + профиль резьбы;
+`shaft_coupler`, `ratchet_teeth` — передачи момента;
+`space_colonization_branching` — нужен ориентированный аддитив (диагональные
+ветви, Box3-рёбер недостаточно). У каждого — собственная физика и
+валидаторы; фича без них была бы галлюцинацией, поэтому они не
+«добиваются», а планируются как отдельные итерации на готовом фундаменте
+(recipe + joints + позные пробы).
 
 ## Ориентация печати — сквозная забота
 
