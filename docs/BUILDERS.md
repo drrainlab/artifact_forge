@@ -52,14 +52,14 @@ Recipe-op без реализации в движке = честный engine-ga
 | `cable_comb_profile` | ✅ | cable_comb |
 | `omega_anchor_profile` | ✅ | zip_tie_anchor |
 | `device_slot_profile` | ✅ | phone_stand (slot = f(tilt), COM-гейт) |
-| `open_c_channel_profile` | ⬜ R3 | кабель-каналы, направляющие |
-| `snap_c_clip_profile` | ⬜ R3 | generic pipe/cable snap; НЕ для under-desk side-hook |
+| `open_c_channel_profile` | ⬜ | кабель-каналы, направляющие |
+| `snap_c_clip_profile` | ✅ | snap_c_tongue (pipe_clip_v1_sideprint): арк-ретенция + балка в профиле, sideprint |
 | `cylindrical_cradle` | ⬜ R3 | микрофоны, фонарики (частично покрыт revolve) |
 | `device_cradle` | ⬜ R3 | обобщение phone_stand люльки |
-| `rounded_box_shell` | ⬜ R2 | корпуса; требует form/shells.py |
+| `rounded_box_shell` | ✅ | recipe-op: outer body + interior cut, form.shell_walls_ok |
 | `sweep_profile_along_path` | ⬜ R4 | ручки, дуги; швы — отдельная работа |
 | `loft_between_sections` | ⬜ R4 | molded-переходы |
-| `tapered_beam` | ⬜ R4 | кронштейны с переменным сечением |
+| `tapered_beam` | ✅ | LoftFeature (конус по построению) + topology.arm_reaches_tip (shelf_bracket_v1) |
 | `truss_beam` | ⬜ R5 | фермы |
 
 ### feature — крепёж, карманы, вырезы
@@ -68,13 +68,13 @@ Recipe-op без реализации в движке = честный engine-ga
 |---|---|---|
 | `hole_pattern` (line/grid/bolt-circle) | ✅ | form/patterns.py + min_web/outline-чеки |
 | `countersunk_hole_pattern` | ✅ | HoleFeature.countersink_face (урок печати: зенковка снизу) |
-| `counterbore_hole_pattern` | ⬜ R1 | тривиальное расширение cad/holes.py |
-| `rounded_rect_cutout` | 🔶 R1 | CutBoxFeature есть; нужен recipe-op с радиусом |
-| `port_cutout` (usb_c/audio/…) | ⬜ R2 | словарь портов + clearance |
+| `counterbore_hole_pattern` | ⬜ | тривиальное расширение cad/holes.py |
+| `rounded_rect_cutout` | ✅ | recipe-op (углы прямые v1) |
+| `port_cutout` (usb_c/audio/…) | ✅ | recipe-op, типизированная таблица PORT_SIZES |
 | `wire_exit` | 🔶 R2 | BoreFeature покрывает круглый; rounded_slot + strain relief — R2 |
 | `nut_trap` | ⬜ R2 | шестигранник уже умеем резать (hex-урок про 30°!) |
 | `heatset_insert_pocket` | ⬜ R2 | словарь вставок |
-| `boss_pattern` | ⬜ R2 | RibFeature-механика + бор |
+| `boss_pattern` | ✅ | recipe-op: 4 бобышки + глухие pilot-боры, keepout в слое пола |
 | `standoff_pattern` | ⬜ R2 | как boss, выше |
 | `lid_seat` | ⬜ R2 | overlap/recess + clearance; нужны fit-пробы |
 
@@ -88,7 +88,7 @@ Recipe-op без реализации в движке = честный engine-ga
 | `magnet_pocket_pattern` | ✅ add_magnet_pockets (глухие, кожа проверяется) |
 | `strap_slot_pair` | ✅ add_zip_tie_slots |
 | `rib_field` | ✅ add_ribs (аддитивные, topology.ribs_present) |
-| `phyllotaxis_field` | ⬜ R5 (порт математики из v1 как controlled field) |
+| `phyllotaxis_field` | ✅ add_phyllotaxis_field (Vogel-спираль, лигамент by construction + измерен) |
 | `vein_rib_field` | 🔶 style-слой: вены biomorphic уже есть; как отдельный field — R5 |
 | `space_colonization_branching` | ⬜ R5 |
 
@@ -101,7 +101,7 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 
 | builder | статус / волна |
 |---|---|
-| `gusset_pair` | ⬜ R4 |
+| `gusset_pair` | ✅ shelf_bracket_v1 (web-косынки как рёбра) |
 | `snap_hook` / `snap_receiver` | ⬜ R4 (пара, clearance-контракт общий) |
 | `press_fit_pin_pair` | ⬜ R4 |
 | `dovetail_joint` / `tongue_groove_joint` | ⬜ R4 |
@@ -110,7 +110,8 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 | `rail_slider` | ⬜ R5 |
 | `living_hinge` | ⬜ R5 (материал/усталость — свои валидаторы) |
 | `thread_external` / `thread_internal_clearance` | ⬜ R5 |
-| `bearing_seat`, `shaft_coupler`, `ratchet_teeth`, `friction_hinge` | ⬜ R5 |
+| `bearing_seat` | ✅ recipe-op (таблица 608/625/6001, губа проверяется probe) |
+| `shaft_coupler`, `ratchet_teeth`, `friction_hinge` | ⬜ |
 
 ---
 
@@ -123,15 +124,18 @@ controlled passes, preserve by construction). Не смешивать с recipe.
   `rounded_rect_cutout`); демо-архетип ЦЕЛИКОМ из YAML без Python.
   Критерий: новый полезный архетип (панель/грометка) собирается рецептом и
   проходит полный honesty-пайплайн.
-- **R2 — Enclosure core**: rounded_box_shell, lid_seat (+fit-пробы),
-  boss/standoff, nut_trap, heatset_insert_pocket, port_cutout, wire_exit.
-  Даёт корпуса электроники.
-- **R3 — Maker profiles**: open_c_channel, snap_c_clip, cylindrical/device
-  cradle как параметрические профили с семейными silhouette-проверками.
-- **R4 — Strength & assembly**: gusset, tapered_beam, sweep/loft, joints,
-  split_plane (тянет multi-part и fit-пробы).
-- **R5 — Wow & механика**: phyllotaxis/branching, резьбы, подшипники,
-  ratchet, friction hinge.
+- **R2 — Enclosure core** ✅ ядро (2026-07-03): rounded_box_shell +
+  boss_pattern + port_cutout; пример esp32_box_base (+вентиляция полей).
+  Остаток: lid_seat (нужны multi-part fit-пробы), standoff, nut_trap,
+  heatset-словарь, wire_exit со strain relief.
+- **R3 — Maker profiles** ✅ ядро: snap_c_tongue (broom_clip_25mm,
+  support-free). Остаток: open_c_channel, cradles.
+- **R4 — Strength & assembly** ✅ ядро: LoftFeature/tapered_beam +
+  gusset-webs (shelf_bracket_150). Остаток: sweep, joints/split_plane —
+  ждут multi-part пайплайна.
+- **R5 — Wow & механика** ✅ ядро: bearing_seat + phyllotaxis_field
+  (bearing_turntable_base). Остаток: резьбы, ratchet, branching,
+  friction hinge.
 
 ## Ориентация печати — сквозная забота
 
