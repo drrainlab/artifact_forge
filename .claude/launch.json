@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cockpit",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "uvicorn", "artifact_forge_ng.web.app:app", "--port", "8765"],
+      "port": 8765
+    }
+  ]
+}

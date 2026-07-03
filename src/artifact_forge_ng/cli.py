@@ -69,6 +69,8 @@ def main(argv: list[str] | None = None) -> int:
     p_edit.add_argument("--patch", type=Path, default=None)
     p_edit.add_argument("-o", "--out", type=Path, default=Path("out"))
 
+    sub.add_parser("ui", help="launch the Product Cockpit (local web)")
+
     args = parser.parse_args(argv)
     try:
         if args.command == "validate":
@@ -93,6 +95,11 @@ def main(argv: list[str] | None = None) -> int:
             from .repair.edit import run_edit
 
             _print(run_edit(args.product, args.out, args.intent, args.patch))
+            return 0
+        if args.command == "ui":
+            from .web.app import main as ui_main
+
+            ui_main()
             return 0
     except PipelineFailure as exc:
         print(f"FAIL: {exc}", file=sys.stderr)

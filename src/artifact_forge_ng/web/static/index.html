@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Artifact Forge — Product Cockpit</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/css/forge.css">
+<script type="importmap">
+{ "imports": {
+    "three": "/static/vendor/three.module.js",
+    "three/addons/controls/OrbitControls.js": "/static/vendor/OrbitControls.js",
+    "three/addons/loaders/STLLoader.js": "/static/vendor/STLLoader.js"
+} }
+</script>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand">ARTIFACT<span>FORGE</span> <em>cockpit</em></div>
+    <nav id="nav">
+      <button data-screen="home" class="active">Home</button>
+      <button data-screen="catalog">Catalog</button>
+      <button data-screen="wizard">Create</button>
+      <button data-screen="workspace">Workspace</button>
+    </nav>
+    <div id="topstatus" class="topstatus"></div>
+  </header>
+  <main id="screen"></main>
+</div>
+<script type="module" src="/static/js/main.js"></script>
+</body>
+</html>

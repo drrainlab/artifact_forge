@@ -1,0 +1,410 @@
+"""The cockpit API. One rule above all: the UI shows what the pipeline
+produced. /api/validate is the heart — fast, CAD-free, structured errors
+(FindingViewModel), never a traceback.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+from typing import Any
+
+import yaml
+from fastapi import FastAPI
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from ..archetypes import builder_for
+from ..assembly.joints import JOINT_TYPES
+from ..catalog.loader import CatalogError, load_catalog
+from ..form.recipe_ops import RECIPE_OPS
+from ..pipeline import PipelineFailure, pre_cad_from_instance
+from ..product.instance import ProductInstance
+from .jobs import ThreadJobRunner
+from .serialize import contract_vm, error_finding, validate_vm
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+EXAMPLES_DIR = REPO_ROOT / "catalog" / "examples"
+STATIC_DIR = Path(__file__).parent / "static"
+OUT_DIR = REPO_ROOT / "out"
+
+app = FastAPI(title="Artifact Forge NG — Product Cockpit")
+jobs = ThreadJobRunner()
+
+
+def _cad_available() -> bool:
+    try:
+        import cadquery  # noqa: F401
+
+        return True
+    except Exception:
+        return False
+
+
+def _llm_available() -> bool:
+    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+
+@app.get("/api/status")
+def api_status() -> dict[str, Any]:
+    catalog = load_catalog()
+    buildable, recipe_only, metadata_only = [], [], []
+    for spec in catalog.archetypes.values():
+        if spec.form.type == "recipe":
+            recipe_only.append(spec.id)
+        elif builder_for(spec) is not None:
+            buildable.append(spec.id)
+        else:
+            metadata_only.append(spec.id)
+    return {
+        "archetypes": {
+            "buildable": sorted(buildable),
+            "recipe": sorted(recipe_only),
+            "metadata_only": sorted(metadata_only),
+        },
+        "modifiers": sorted(catalog.modifiers),
+        "joints": sorted(JOINT_TYPES),
+        "recipe_ops": sorted(RECIPE_OPS),
+        "features": len(catalog.features),
+        "cad": _cad_available(),
+        "llm": _llm_available(),
+        "strict_default": True,
+    }
+
+
+@app.get("/api/catalog")
+def api_catalog() -> dict[str, Any]:
+    catalog = load_catalog()
+    cards = []
+    for spec in catalog.archetypes.values():
+        status = "recipe" if spec.form.type == "recipe" else (
+            "buildable" if builder_for(spec) is not None else "metadata_only"
+        )
+        cards.append({
+            "id": spec.id,
+            "version": spec.version,
+            "object_class": spec.object_class,
+            "description": spec.description.strip(),
+            "status": status,
+            "provides_features": list(spec.provides_features),
+            "validators": list(spec.validators),
+            "allowed_modifiers": list(spec.allowed_modifiers),
+            "contract": contract_vm(spec),
+            "parameters": [
+                {"name": n, "type": p.type, "role": p.role,
+                 "exposed": bool(p.exposed), "description": p.description,
+                 "choices": list(p.choices) if p.type == "choice" else None,
+                 "default": getattr(p.default, "literal", p.default)}
+                for n, p in spec.parameters.items()
+            ],
+        })
+    modifiers = [
+        {"id": m.id, "category": m.category, "description": m.description.strip(),
+         "applies_to": [getattr(r, "value", str(r)) for r in m.applies_to],
+         "validators": list(m.validators)}
+        for m in catalog.modifiers.values()
+    ]
+    return {
+        "archetypes": sorted(cards, key=lambda c: c["id"]),
+        "modifiers": modifiers,
+        "joints": [
+            {"name": d.name, "description": d.description,
+             "cad_checks": list(d.cad_checks)}
+            for d in JOINT_TYPES.values()
+        ],
+        "examples": _examples_index(),
+    }
+
+
+def _examples_index() -> list[dict[str, Any]]:
+    out = []
+    for path in sorted(EXAMPLES_DIR.glob("*.yaml")):
+        try:
+            doc = yaml.safe_load(path.read_text()) or {}
+        except yaml.YAMLError:
+            continue
+        kind = str(doc.get("schema", "")).split("/")[0]
+        out.append({
+            "file": path.name,
+            "id": doc.get("id", path.stem),
+            "kind": kind,
+            "archetype": doc.get("archetype"),
+            "parts": [p.get("ref") for p in doc.get("parts", [])] or None,
+        })
+    return out
+
+
+class YamlBody(BaseModel):
+    yaml: str
+    strict: bool | None = None
+
+
+def _load_product(text: str) -> ProductInstance:
+    doc = yaml.safe_load(text)
+    return ProductInstance.model_validate(doc)
+
+
+@app.post("/api/validate")
+def api_validate(body: YamlBody) -> JSONResponse:
+    """The heart of the cockpit: YAML text in, the full truth out —
+    CAD-free, so it is fast enough to run on every slider tick."""
+    catalog = load_catalog()
+    try:
+        doc = yaml.safe_load(body.yaml)
+    except yaml.YAMLError as exc:
+        return _fail([error_finding(f"not valid YAML: {exc}", "schema.yaml")])
+    kind = str((doc or {}).get("schema", "")).split("/")[0]
+    if kind == "assembly":
+        return _validate_assembly(body)
+    try:
+        instance = ProductInstance.model_validate(doc)
+    except Exception as exc:
+        return _fail([error_finding(str(exc), "schema.product")])
+    try:
+        strict = instance.strict if body.strict is None else body.strict
+        state = pre_cad_from_instance(instance, catalog, strict)
+    except CatalogError as exc:
+        return _fail([error_finding(str(exc), "schema.catalog")])
+    except PipelineFailure as exc:
+        return _fail([error_finding(str(exc), "schema.pipeline")])
+    return JSONResponse(validate_vm(state))
+
+
+def _validate_assembly(body: YamlBody) -> JSONResponse:
+    from ..assembly.pipeline import (
+        AssemblyFailure,
+        load_assembly,
+        run_assembly_validate,
+    )
+    import tempfile
+
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".yaml", delete=False
+        ) as tmp:
+            tmp.write(body.yaml)
+            tmp_path = Path(tmp.name)
+        try:
+            out = run_assembly_validate(tmp_path, body.strict)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+    except AssemblyFailure as exc:
+        report = dict(exc.report)
+        report["ok"] = False
+        return JSONResponse(report)
+    except (CatalogError, PipelineFailure) as exc:
+        return _fail([error_finding(str(exc), "schema.assembly")])
+    out["ok"] = out.get("status") == "pass"
+    return JSONResponse(out)
+
+
+def _fail(findings: list[dict[str, Any]]) -> JSONResponse:
+    return JSONResponse({
+        "ok": False,
+        "status": "fail",
+        "findings": findings,
+        "form": None,
+        "params": [],
+        "capability": None,
+    })
+
+
+@app.get("/api/examples/{name}")
+def api_example(name: str) -> JSONResponse:
+    path = (EXAMPLES_DIR / name).resolve()
+    if not str(path).startswith(str(EXAMPLES_DIR.resolve())) or not path.exists():
+        return _fail([error_finding(f"unknown example {name!r}", "schema.example")])
+    return JSONResponse({"ok": True, "file": name, "yaml": path.read_text()})
+
+
+# -- jobs: build / edit -------------------------------------------------------
+
+
+@app.post("/api/build")
+def api_build(body: YamlBody) -> dict[str, Any]:
+    doc = yaml.safe_load(body.yaml)
+    kind = str((doc or {}).get("schema", "")).split("/")[0]
+
+    def run(job) -> Any:
+        import tempfile
+
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tmp:
+            tmp.write(body.yaml)
+            tmp_path = Path(tmp.name)
+        try:
+            job.log.append(f"building {doc.get('id', '?')} ({kind})")
+            if kind == "assembly":
+                from ..assembly.pipeline import run_assembly_build
+
+                return run_assembly_build(tmp_path, OUT_DIR, body.strict)
+            from ..compiler.pipeline import run_build
+
+            return run_build(tmp_path, OUT_DIR, body.strict)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+    return {"job": jobs.submit("build", run)}
+
+
+class EditBody(BaseModel):
+    yaml: str
+    intent: str | None = None
+    patch: dict[str, Any] | None = None
+
+
+@app.post("/api/edit/preview")
+def api_edit_preview(body: EditBody) -> JSONResponse:
+    """Pure patch preview: apply the patch, validate the result — NO CAD.
+    The user sees the edited YAML and its IR truth before committing."""
+    from ..repair.intents import INTENTS, IntentNotApplicable
+    from ..repair.patch import Patch, PatchError, apply_patch
+
+    catalog = load_catalog()
+    try:
+        instance = _load_product(body.yaml)
+        archetype = catalog.archetype_for(instance)
+    except Exception as exc:
+        return _fail([error_finding(str(exc), "schema.product")])
+    try:
+        if body.intent:
+            spec = INTENTS.get(body.intent)
+            if spec is None:
+                return _fail([error_finding(
+                    f"unknown intent {body.intent!r}; known: {sorted(INTENTS)}",
+                    "edit.intent")])
+            patch = spec.build_patch(instance, archetype)
+        elif body.patch is not None:
+            patch = Patch.model_validate({"schema": "patch/v1", **body.patch})
+        else:
+            return _fail([error_finding("edit needs intent or patch", "edit.input")])
+        edited = apply_patch(instance, patch, archetype, catalog)
+    except (IntentNotApplicable, PatchError) as exc:
+        return _fail([error_finding(str(exc), "edit.patch")])
+    edited_yaml = yaml.safe_dump(
+        edited.model_dump(by_alias=True, mode="json"), sort_keys=False,
+        allow_unicode=True,
+    )
+    validation = api_validate(YamlBody(yaml=edited_yaml, strict=False))
+    return JSONResponse({
+        "ok": True,
+        "patch": patch.model_dump(mode="json"),
+        "edited_yaml": edited_yaml,
+        "validation": yaml.safe_load(validation.body.decode())
+        if not isinstance(validation, dict) else validation,
+    })
+
+
+@app.post("/api/edit/apply")
+def api_edit_apply(body: EditBody) -> dict[str, Any]:
+    def run(job) -> Any:
+        import tempfile
+
+        from ..repair.edit import run_edit
+
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as tmp:
+            tmp.write(body.yaml)
+            tmp_path = Path(tmp.name)
+        try:
+            job.log.append(f"edit: {body.intent or 'patch'}")
+            patch_path = None
+            if body.patch is not None:
+                import json
+
+                pf = tmp_path.with_suffix(".patch.yaml")
+                pf.write_text(yaml.safe_dump(
+                    {"schema": "patch/v1", **json.loads(json.dumps(body.patch))}
+                ))
+                patch_path = pf
+            return run_edit(tmp_path, OUT_DIR, body.intent, patch_path)
+        finally:
+            tmp_path.unlink(missing_ok=True)
+
+    return {"job": jobs.submit("edit", run)}
+
+
+@app.get("/api/jobs/{job_id}")
+def api_job(job_id: str) -> JSONResponse:
+    job = jobs.get(job_id)
+    if job is None:
+        return _fail([error_finding(f"unknown job {job_id!r}", "job.unknown")])
+    return JSONResponse(job.to_dict())
+
+
+# -- static -------------------------------------------------------------------
+
+OUT_DIR.mkdir(exist_ok=True)
+app.mount("/artifacts", StaticFiles(directory=OUT_DIR), name="artifacts")
+
+
+@app.get("/")
+def index() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+def main() -> None:
+    import uvicorn
+    import webbrowser
+
+    port = int(os.environ.get("FORGE_UI_PORT", "8765"))
+    webbrowser.open(f"http://127.0.0.1:{port}")
+    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+
+
+# -- intent / natural edit (the LLM seam; deterministic fallback) ---------------
+
+
+class IntentBody(BaseModel):
+    prompt: str
+
+
+@app.post("/api/intent")
+def api_intent(body: IntentBody) -> JSONResponse:
+    from . import intent, llm
+
+    catalog = load_catalog()
+    if not body.prompt.strip():
+        return _fail([error_finding("empty prompt", "intent.input")])
+    if llm.available():
+        try:
+            return JSONResponse(intent.llm_intent(body.prompt, catalog))
+        except RuntimeError as exc:
+            out = intent.deterministic_intent(body.prompt, catalog)
+            out["notes"] = f"{exc}; deterministic fallback"
+            return JSONResponse(out)
+    return JSONResponse(intent.deterministic_intent(body.prompt, catalog))
+
+
+class NlEditBody(BaseModel):
+    yaml: str
+    text: str
+
+
+@app.post("/api/nl_edit")
+def api_nl_edit(body: NlEditBody) -> JSONResponse:
+    from . import intent, llm
+
+    if not llm.available():
+        # honest degraded mode: map to a known intent by keyword
+        text = body.text.lower()
+        for key, name in (
+            ("поддерж", "make_support_free"), ("support", "make_support_free"),
+            ("прочн", "make_stronger"), ("strong", "make_stronger"),
+            ("устойчив", "make_stronger"),
+            ("биом", "make_biomorphic"), ("органич", "make_biomorphic"),
+            ("bio", "make_biomorphic"),
+            ("перфор", "remove_perforation"), ("perfor", "remove_perforation"),
+        ):
+            if key in text:
+                return JSONResponse({"ok": True, "intent": name, "patch": None,
+                                     "source": "deterministic"})
+        return _fail([error_finding(
+            "LLM OFF and no known intent matched — use an intent button or a "
+            "patch", "edit.nl")])
+    try:
+        return JSONResponse(intent.nl_edit(body.text, body.yaml))
+    except RuntimeError as exc:
+        return _fail([error_finding(str(exc), "edit.llm")])

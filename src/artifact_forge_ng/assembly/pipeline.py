@@ -102,7 +102,7 @@ def _joint_findings(
                 message=str(exc), critical=True,
             ))
             continue
-        if joint.b_ref != asm.root:
+        if joint.b_ref != asm.root and joint.b_ref not in poses:
             poses[joint.b_ref] = pose
             pose_report.append({
                 "part": joint.b_ref,
