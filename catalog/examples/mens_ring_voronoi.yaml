@@ -1,0 +1,29 @@
+schema: product/v1
+id: mens_ring_voronoi
+archetype: finger_ring_v1@1
+strict: true
+
+requested_features:
+  - ring_band
+  - voronoi_field
+
+params:
+  inner_d: 20.4mm      # EU 64
+  size_clearance: 0.25mm
+  band_h: 9mm
+  wall: 2.2mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none
+
+modifiers:
+  - id: add_voronoi_field
+    target: band_outer_surface
+    params:
+      sites: 22
+      min_ligament: 1.2mm
+      seed: 42
+      edge_margin: 0.5mm
+      corner_smooth: 2

@@ -46,6 +46,7 @@ Recipe-op без реализации в движке = честный engine-ga
 |---|---|---|
 | `section_extrude` | ✅ | ядро (PartForm.kind) |
 | `profile_revolve` | ✅ | ядро; lamp_socket_cup — чашки, втулки, шайбы, ручки |
+| `revolve_band` | ✅ | recipe-op: кольцо/втулка/шайба/браслет + цилиндрическая канва полей (finger_ring_v1, catalog/local) |
 | `rounded_plate` | ✅ | profiles_plate.rounded_rect_loop + PlateFeature (adapter_plate) |
 | `molded_side_hook_profile` | ✅ | flagship; + teardrop roof; + `tongue_side_hook` (sideprint) |
 | `j_hook_profile` | ✅ | wall_hook / headphone_hook |
@@ -79,6 +80,11 @@ Recipe-op без реализации в движке = честный engine-ga
 | `lid_seat` | ✅ | inset_plug op + lid_seat joint: размерная цепочка + pose-проба (esp32_box_with_lid) |
 
 ### field — модификаторы (уже region-bound, композиция через keepouts)
+
+Маппинги окон: planar, tilted (наклонные грани), **cylindrical_z_mapping_v1**
+(боковая стенка revolve-тел: ось Z, полный 360°, один явный seam_keepout;
+ячейки строятся в касательной плоскости и режутся радиально; support-free —
+это измеряемый `manufacturing.max_opening_span`, не обещание).
 
 | builder | статус |
 |---|---|

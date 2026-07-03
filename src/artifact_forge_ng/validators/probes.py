@@ -115,6 +115,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("manufacturing.min_wall", Level.MANUFACTURING, "measured minimum wall >= printer minimum"),
         _decl("manufacturing.bed_fit", Level.MANUFACTURING, "bounding box fits the print bed"),
         _decl("manufacturing.overhang", Level.MANUFACTURING, "overhang fraction acceptable for the support policy"),
+        _decl("manufacturing.max_opening_span", Level.MANUFACTURING, "widest through-wall opening bridges without support"),
         # -- quality level ------------------------------------------------------
         _decl("quality.moldedness", Level.QUALITY, "molded-utility family score"),
         _decl("quality.boxiness", Level.QUALITY, "boxy-primitive penalty score"),

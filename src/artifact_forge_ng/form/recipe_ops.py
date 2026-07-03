@@ -61,6 +61,8 @@ class RecipeState:
 
     section: SectionProfile | None = None
     width: float = 0.0
+    kind: str = "section_extrude"
+    print_orientation: str = "as_modeled"
     holes: list[HoleFeature] = field(default_factory=list)
     cutboxes: list[CutBoxFeature] = field(default_factory=list)
     bores: list[BoreFeature] = field(default_factory=list)
@@ -71,6 +73,7 @@ class RecipeState:
     regions: list[Region] = field(default_factory=list)
     frame: dict[str, float] = field(default_factory=dict)
     datums: dict[str, dict[str, Any]] = field(default_factory=dict)
+    windows: dict[str, Any] = field(default_factory=dict)
 
     def require_base(self, op: str) -> None:
         if self.section is None:
@@ -895,4 +898,107 @@ _register(RecipeOpDecl(
     validators=("form.min_ligament_ok", "topology.hex_field_present"),
     apply=_truss_web_cutouts,
     description="warren-truss triangular lightening between solid chords",
+))
+
+
+# -- revolve_band + cylindrical_z_mapping_v1 ------------------------------------
+
+#: MVP guard: a cell wider than this fraction of the wall-midline radius
+#: distorts too much when flattened onto its tangent plane.
+CYL_MAX_CELL_FRACTION = 0.6
+
+
+def _revolve_band(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """A revolved band — ring, bushing, washer, bracelet, sleeve. The
+    half-section (XZ plane, +u side of the axis) is a rounded rectangle;
+    the compiler revolves it 360 degrees. size_clearance is added to the
+    bore because a band is a CONTACT part (a finger, a shaft): declared
+    inner_d is the nominal fit, the frame records the effective bore.
+
+    The outer wall is a field canvas: a cylindrical_z_mapping_v1 window
+    (axis Z only, one seam, full 360 band) with the seam and both edges as
+    explicit keepout regions — the pattern math stays honest and visible."""
+    from .part import FaceWindow
+    from .regions import Rect2D as _Rect2D
+
+    if state.section is not None:
+        raise RecipeError("revolve_band must be the (single) base op")
+    inner_d, height, wall = p["inner_d"], p["height"], p["wall"]
+    clearance = p["size_clearance"]
+    if wall < 1.5:
+        raise RecipeError(
+            f"wall {wall:g} < 1.5 — too thin for a through-cut band"
+        )
+    inner_d_eff = inner_d + clearance
+    inner_r = inner_d_eff / 2.0
+    outer_r = inner_r + wall
+    corner_r = min(p["corner_r"], wall * 0.45, height * 0.3)
+    state.section = SectionProfile(
+        name="recipe_revolve",
+        outer=rounded_rect_loop(inner_r, 0.0, outer_r, height, corner_r),
+        plane="XZ",
+        width_axis="Y",
+    )
+    state.kind = "profile_revolve"
+    state.width = 2.0 * outer_r  # reporting; the compiler revolves
+    r_mid = (inner_r + outer_r) / 2.0
+    seam = p["seam_keepout"]
+    margin = p["edge_margin"]
+    circumference = 2.0 * math.pi * r_mid
+    if circumference - 2.0 * seam < 10.0 or height - 2.0 * margin < 2.0:
+        raise RecipeError("band too small for a patterned window")
+    name = op_id or "band"
+    state.regions.extend([
+        Region("band_outer_surface", RegionRole.AESTHETIC_LIGHTENING,
+               Box3(-outer_r, -outer_r, 0.0, outer_r, outer_r, height)),
+        Region("bore_contact", RegionRole.SOFT_CONTACT_SURFACE,
+               Box3(-inner_r, -inner_r, 0.0, inner_r, inner_r, height)),
+        # Edge and seam keepouts are REAL regions — the honesty/region
+        # lenses show them, and the field math is checked against them.
+        Region("top_edge_keepout", RegionRole.HIGH_STRESS_REGION,
+               Box3(-outer_r, -outer_r, height - margin, outer_r, outer_r, height)),
+        Region("bottom_edge_keepout", RegionRole.HIGH_STRESS_REGION,
+               Box3(-outer_r, -outer_r, 0.0, outer_r, outer_r, margin)),
+        Region("seam_keepout", RegionRole.HIGH_STRESS_REGION,
+               Box3(r_mid - wall, -seam, 0.0, outer_r + 1.0, seam, height)),
+    ])
+    # The cylindrical window in LOCAL (arc, height) coords; the seam sits
+    # at theta=0, so the window starts past it and ends before it wraps.
+    state.datums["axis"] = {"at": [0.0, 0.0, height / 2.0], "rotate": [0.0, 0.0, 0.0]}
+    window = _Rect2D(seam, margin, circumference - seam, height - margin)
+    state.frame.update(
+        inner_d=inner_d, inner_d_effective=inner_d_eff,
+        inner_r=inner_r, outer_r=outer_r, wall=wall,
+        band_h=height, band_z0=0.0, band_z1=height,
+        cyl_r_mid=r_mid,
+        # the revolve probes read these names (cup convention):
+        exit_r=inner_r, height=height, axis_clear_r=inner_r,
+    )
+    state.windows["band_outer_surface"] = FaceWindow(
+        origin=(0.0, 0.0, 0.0), tilt_deg=0.0,
+        window=window, depth=wall,
+        keepouts=(),
+        mapping="cylindrical", cyl_center=(0.0, 0.0),
+        cyl_r=r_mid, cyl_r_outer=outer_r, cyl_z0=0.0,
+        note="cylindrical_z_mapping_v1: axis Z, one seam at theta=0",
+    )
+
+
+_register(RecipeOpDecl(
+    name="revolve_band",
+    kind="base",
+    params={
+        "inner_d": ("length", None), "height": ("length", None),
+        "wall": ("length", 2.2), "corner_r": ("length", 0.8),
+        "size_clearance": ("length", 0.25),
+        "seam_keepout": ("length", 2.0), "edge_margin": ("length", 0.9),
+    },
+    validators=(
+        "form.revolve_profile_clear_of_axis",
+        "topology.revolve_cavity_open",
+        "topology.single_connected_solid",
+    ),
+    apply=_revolve_band,
+    description="revolved band (ring/bushing/washer/bracelet) with a "
+                "cylindrical field canvas on the outer wall",
 ))

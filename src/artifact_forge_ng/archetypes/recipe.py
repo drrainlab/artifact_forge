@@ -80,6 +80,8 @@ def build_form(
         section=state.section,
         width=state.width,
         style=style,
+        kind=state.kind,
+        print_orientation=state.print_orientation,
         holes=state.holes,
         cutboxes=state.cutboxes,
         bores=state.bores,
@@ -88,5 +90,6 @@ def build_form(
         pins=state.pins,
         fields=state.fields,
         regions=state.regions,
+        windows=state.windows,
         datums=state.datums,
     )

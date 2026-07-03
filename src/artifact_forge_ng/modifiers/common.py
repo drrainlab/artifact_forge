@@ -52,6 +52,12 @@ class PlateWindow:
     keepouts: tuple[Region2D, ...]
     origin: tuple[float, float, float] | None = None
     tilt_deg: float = 0.0
+    #: cylindrical_z_mapping_v1 passthrough (see form.part.FieldFeature).
+    mapping: str = "planar"
+    cyl_center: tuple[float, float] = (0.0, 0.0)
+    cyl_r: float = 0.0
+    cyl_r_outer: float = 0.0
+    cyl_z0: float = 0.0
 
 
 def plate_window(
@@ -71,6 +77,11 @@ def plate_window(
             keepouts=face.keepouts,
             origin=face.origin,
             tilt_deg=face.tilt_deg,
+            mapping=face.mapping,
+            cyl_center=face.cyl_center,
+            cyl_r=face.cyl_r,
+            cyl_r_outer=face.cyl_r_outer,
+            cyl_z0=face.cyl_z0,
         )
     region = form.region(region_name)
     if region is None:

@@ -40,6 +40,8 @@ class Catalog:
     features: dict[str, FeatureDef] = field(default_factory=dict)
     modifiers: dict[str, ModifierDef] = field(default_factory=dict)
     archetypes: dict[str, ArchetypeSpec] = field(default_factory=dict)
+    #: archetype id -> "builtin" | "local" (Studio-promoted user catalog).
+    origins: dict[str, str] = field(default_factory=dict)
 
     def archetype_for(self, instance: ProductInstance) -> ArchetypeSpec:
         spec = self.archetypes.get(instance.archetype_id)
@@ -162,6 +164,11 @@ def _bind_recipe_ops(spec: ArchetypeSpec, where: str) -> None:
             )
 
 
+#: Repo-level user catalog: full-status archetypes outside the package
+#: (the Archetype Studio's promote target). Merged by load_catalog.
+LOCAL_DIR = Path(__file__).resolve().parents[3] / "catalog" / "local"
+
+
 def load_catalog(data_dir: Path | None = None) -> Catalog:
     root = data_dir or DATA_DIR
     vocabulary = _load_features(root / "features.yaml")
@@ -172,12 +179,22 @@ def load_catalog(data_dir: Path | None = None) -> Catalog:
             raise CatalogError(f"duplicate modifier id {mod.id!r}")
         modifiers[mod.id] = mod
     archetypes: dict[str, ArchetypeSpec] = {}
-    for path in sorted((root / "archetypes").glob("*.yaml")):
+    origins: dict[str, str] = {}
+    archetype_files = [
+        (path, "builtin") for path in sorted((root / "archetypes").glob("*.yaml"))
+    ]
+    if data_dir is None and LOCAL_DIR.exists():
+        archetype_files += [
+            (path, "local") for path in sorted(LOCAL_DIR.glob("*.yaml"))
+        ]
+    for path, origin in archetype_files:
         spec = _load_archetype(path, vocabulary, modifiers)
         if spec.id in archetypes:
             raise CatalogError(f"duplicate archetype id {spec.id!r}")
         archetypes[spec.id] = spec
-    return Catalog(features=vocabulary, modifiers=modifiers, archetypes=archetypes)
+        origins[spec.id] = origin
+    return Catalog(features=vocabulary, modifiers=modifiers,
+                   archetypes=archetypes, origins=origins)
 
 
 def load_instance(path: Path) -> ProductInstance:

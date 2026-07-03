@@ -299,6 +299,13 @@ features:
       - topology.bar_follows_arc
       - topology.single_connected_solid
 
+  - id: ring_band
+    description: a revolved band with a real bore — the finger/shaft passes through, verified end to end
+    verified_by:
+      - form.revolve_profile_clear_of_axis
+      - topology.revolve_cavity_open
+      - topology.single_connected_solid
+
   - id: snap_hooks
     description: cantilever snap hooks welded on the part (the flexure pair of a snap lid)
     verified_by:

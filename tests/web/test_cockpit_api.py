@@ -90,7 +90,8 @@ def test_edit_preview_shows_the_migration():
     assert "underdesk_cable_clip_v3_sideprint" in p["edited_yaml"]
 
 
-def test_deterministic_intent_finds_the_clip():
+def test_deterministic_intent_finds_the_clip(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     out = client.post("/api/intent", json={
         "prompt": "клипса под столом для пучка кабеля 20мм, 2 самореза M4"
     }).json()
@@ -101,7 +102,8 @@ def test_deterministic_intent_finds_the_clip():
     assert out["params"].get("screw") == "M4"
 
 
-def test_nl_edit_fallback_maps_known_intents():
+def test_nl_edit_fallback_maps_known_intents(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     out = client.post("/api/nl_edit", json={
         "yaml": GOLDEN, "text": "сделай без поддержек"
     }).json()

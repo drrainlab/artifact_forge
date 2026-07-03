@@ -75,12 +75,31 @@ class FieldFeature:
     #: by a translation to ``origin``. None = legacy horizontal field.
     origin: tuple[float, float, float] | None = None
     tilt_deg: float = 0.0
+    #: cylindrical_z_mapping_v1 — cells live on a Z-axis cylinder wall
+    #: (a ring band, a cup skirt): local a = ARC LENGTH at cyl_r (the wall
+    #: midline), b = height above cyl_z0, n = radial depth INWARD from the
+    #: OUTER surface. Deliberate MVP limits: axis Z only, one seam, full
+    #: 360 band, no periodic wrapping.
+    mapping: str = "planar"  # "planar" | "cylindrical"
+    cyl_center: tuple[float, float] = (0.0, 0.0)
+    cyl_r: float = 0.0
+    cyl_r_outer: float = 0.0
+    cyl_z0: float = 0.0
 
     def local_to_world(self, a: float, b: float, n: float = 0.0) -> tuple[float, float, float]:
         """Map local (a, b, n) — in-plane coords + offset ALONG the cut
         direction (into the material) — to world XYZ."""
         import math
 
+        if self.mapping == "cylindrical":
+            theta = a / self.cyl_r
+            r = self.cyl_r_outer - n
+            cx, cy = self.cyl_center
+            return (
+                cx + r * math.cos(theta),
+                cy + r * math.sin(theta),
+                self.cyl_z0 + b,
+            )
         if self.origin is None:
             return (a, b, self.plane_z - n)
         t = math.radians(self.tilt_deg)
@@ -153,6 +172,13 @@ class FaceWindow:
     #: (e.g. the biomorphic bow curved it) — applicators fail honestly.
     usable: bool = True
     note: str = ""
+    #: cylindrical_z_mapping_v1 (see FieldFeature): a Z-axis cylinder wall
+    #: window; local a = arc length at cyl_r, b = height above cyl_z0.
+    mapping: str = "planar"
+    cyl_center: tuple[float, float] = (0.0, 0.0)
+    cyl_r: float = 0.0
+    cyl_r_outer: float = 0.0
+    cyl_z0: float = 0.0
 
 
 @dataclass(frozen=True)

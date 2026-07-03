@@ -1,0 +1,77 @@
+schema: archetype/v1
+id: finger_ring_v1
+version: 1
+object_class: finger_ring
+description: >
+  Finger ring — a revolved band with a patterned outer wall
+  (cylindrical_z_mapping_v1: voronoi/hex cells cut radially through the
+  band, one honest seam column at theta=0). Sizing: EU ring size is the
+  inner circumference in mm, so inner_d = EU_size / pi; size_clearance
+  adds the FDM print allowance (0.2-0.4mm typical). Support-free is a
+  TARGET verified by manufacturing.max_opening_span, never a promise.
+
+provides_features:
+  - ring_band
+  - voronoi_field
+  - hex_perforation
+
+parameters:
+  inner_d:
+    {type: length, default: 20.4mm, min: 14mm, max: 24mm,
+     role: functional, exposed: true,
+     description: "nominal bore = EU size / pi (EU 64 -> 20.4mm)"}
+  size_clearance:
+    {type: length, default: 0.25mm, min: 0mm, max: 0.6mm,
+     role: manufacturing,
+     description: FDM print allowance added to the bore}
+  band_h:
+    {type: length, default: 8mm, min: 5mm, max: 12mm,
+     role: functional, exposed: true}
+  wall:
+    {type: length, default: 2.2mm, min: 1.6mm, max: 3mm, role: structural}
+  corner_r:
+    {type: length, default: 0.8mm, min: 0.2mm, max: 1.4mm, role: aesthetic,
+     description: comfort rounding of the band edges}
+
+constraints:
+  - wall >= printer.min_wall
+  - band_h > wall
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: revolve_band
+      id: band
+      params: {inner_d: inner_d, height: band_h, wall: wall,
+               corner_r: corner_r, size_clearance: size_clearance}
+
+regions:
+  - {id: band_outer_surface, role: aesthetic_lightening, editable: true}
+  - {id: bore_contact, role: soft_contact_surface, editable: false}
+  - {id: seam_keepout, role: high_stress_region, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.revolve_profile_clear_of_axis
+  - form.min_ligament_ok
+  - topology.revolve_cavity_open
+  - topology.single_connected_solid
+  - topology.hex_field_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_voronoi_field
+  - add_hex_perforation
+  - fillet_soften
+
+contract:
+  must_have:
+    - ring_band
+  must_not_have: []
+  invariants:
+    - band_h > wall

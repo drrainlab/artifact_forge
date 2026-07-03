@@ -15,7 +15,7 @@ params:
          description: "stable seed — same YAML, same object"}
   sites: {type: count, default: 18, min: 4, max: 48}
   min_ligament: {type: length, default: 1.6mm, min: 1mm, max: 5mm}
-  edge_margin: {type: length, default: 3mm, min: 2mm, max: 16mm}
+  edge_margin: {type: length, default: 3mm, min: 0.5mm, max: 16mm}
   relax_iterations: {type: count, default: 2, min: 0, max: 6}
   corner_smooth: {type: count, default: 2, min: 0, max: 4,
                   description: Chaikin passes — organic rounded cells}

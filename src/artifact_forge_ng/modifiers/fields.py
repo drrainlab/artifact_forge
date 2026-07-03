@@ -43,10 +43,14 @@ def add_hex_perforation(
         plane_z=pw.z_top,
         depth=_depth_for(cut_mode, pw.depth, params.get("recess_depth", 1.2)),
     )
-    if pw.origin is not None:
-        from dataclasses import replace
+    from dataclasses import replace
 
+    if pw.origin is not None:
         field = replace(field, origin=pw.origin, tilt_deg=pw.tilt_deg)
+    if pw.mapping == "cylindrical":
+        field = replace(field, mapping="cylindrical", cyl_center=pw.cyl_center,
+                        cyl_r=pw.cyl_r, cyl_r_outer=pw.cyl_r_outer,
+                        cyl_z0=pw.cyl_z0)
     form.fields.append(field)
     return [
         note(use.id, f"{len(field.centers)} hex cells ({cut_mode}) on {use.target}")
@@ -136,6 +140,9 @@ def add_voronoi_field(
     seed = int(round(params.get("seed", 42)))
     ligament = params.get("min_ligament", 1.6)
     cut_mode = params.get("cut_mode", "through")
+    if pw.mapping == "cylindrical" and ligament < 1.0:
+        return [fail(use.id, f"cylindrical field ligament {ligament:g} < 1.0 — "
+                             "through-wall webs this thin do not print")]
     cells = voronoi_cells(
         pw.window,
         list(pw.keepouts),
@@ -146,6 +153,17 @@ def add_voronoi_field(
         relax_iterations=int(round(params.get("relax_iterations", 2))),
         corner_smooth=int(round(params.get("corner_smooth", 2))),
     )
+    if pw.mapping == "cylindrical" and cells:
+        # cylindrical_z_mapping_v1 bound: a cell flattened onto its tangent
+        # plane distorts by ~(s/2r)^2; keep cells small next to the radius.
+        max_a = max(
+            max(p[0] for p in c) - min(p[0] for p in c) for c in cells
+        )
+        if max_a > 0.6 * pw.cyl_r:
+            return [fail(use.id,
+                f"cell arc-width {max_a:.1f} > 0.6*r ({0.6 * pw.cyl_r:.1f}) — "
+                "too distorted for the tangent-plane approximation; use more "
+                "sites or a taller band")]
     form.fields.append(
         FieldFeature(
             plane_z=pw.z_top,
@@ -159,6 +177,11 @@ def add_voronoi_field(
             min_ligament=ligament,
             origin=pw.origin,
             tilt_deg=pw.tilt_deg,
+            mapping=pw.mapping,
+            cyl_center=pw.cyl_center,
+            cyl_r=pw.cyl_r,
+            cyl_r_outer=pw.cyl_r_outer,
+            cyl_z0=pw.cyl_z0,
         )
     )
     return [

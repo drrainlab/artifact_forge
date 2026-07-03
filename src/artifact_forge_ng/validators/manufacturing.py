@@ -153,3 +153,34 @@ def overhang(geometry: Geometry, form: PartForm) -> Finding:
         measured=span if span > 0 else None,
         suggestion=suggestion,
     )
+
+
+@register_probe("manufacturing.max_opening_span")
+def max_opening_span(geometry: Geometry, form: PartForm) -> Finding:
+    """Support-free is a TARGET, never a promise: for through-wall fields
+    on a vertical wall (a ring band printed flat) every opening roof is a
+    bridge — measure the widest span and say whether it bridges."""
+    spans = []
+    for f in form.fields:
+        if f.mapping != "cylindrical":
+            continue
+        for poly in f.polygons:
+            spans.append(max(p[0] for p in poly) - min(p[0] for p in poly))
+        if f.centers:
+            spans.append(f.cell)
+    if not spans:
+        return _finding(
+            "manufacturing.max_opening_span", Status.PASS,
+            "no through-wall openings to bridge",
+        )
+    worst = max(spans)
+    ok = worst <= 12.0
+    return _finding(
+        "manufacturing.max_opening_span",
+        Status.PASS if ok else Status.WARN,
+        f"widest opening spans {worst:.1f} mm "
+        + ("— bridges fine, supports unlikely" if ok
+           else "— roof bridging is doubtful, supports likely"),
+        measured=worst,
+        limit=12.0,
+    )
