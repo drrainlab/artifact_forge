@@ -52,6 +52,16 @@ app = FastAPI(title="Artifact Forge NG — Product Cockpit")
 jobs = ThreadJobRunner()
 
 
+@app.middleware("http")
+async def _no_cache_static(request, call_next):
+    """ES modules cache aggressively; a local dev cockpit must always
+    serve the current code — a stale section renderer is a lie on screen."""
+    response = await call_next(request)
+    if request.url.path.startswith("/static"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 def _cad_available() -> bool:
     try:
         import cadquery  # noqa: F401
@@ -356,9 +366,26 @@ OUT_DIR.mkdir(exist_ok=True)
 app.mount("/artifacts", StaticFiles(directory=OUT_DIR), name="artifacts")
 
 
+def _static_version() -> int:
+    """Cache-buster: the newest mtime across the app's own modules — a
+    stale renderer must never survive a reload."""
+    paths = [STATIC_DIR / "index.html", *(STATIC_DIR / "js").glob("*.js"),
+             *(STATIC_DIR / "css").glob("*.css")]
+    return int(max(p.stat().st_mtime for p in paths if p.exists()))
+
+
 @app.get("/")
-def index() -> FileResponse:
-    return FileResponse(STATIC_DIR / "index.html")
+def index():
+    from fastapi.responses import HTMLResponse
+
+    html = (STATIC_DIR / "index.html").read_text().replace(
+        "__V__", str(_static_version())
+    )
+    html = html.replace(
+        'href="/static/css/forge.css"',
+        f'href="/static/css/forge.css?v={_static_version()}"',
+    )
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

@@ -58,34 +58,40 @@ export function renderSection(container, form) {
       `<title>${s.tags.join(", ") || "segment"}</title></path>`
     );
   }
-  // frame annotations: the headline numbers, straight from the frame dict.
-  // font size lives in viewBox units — scale it to the drawing, not the px.
-  const fs = Math.max(h, w) * 0.028;
+  // Frame annotations live in HTML BESIDE the drawing, never inside the
+  // viewBox — a tiny profile (a ring's 2x8mm half-section) must not fight
+  // its own labels for space.
   const f = form.frame || {};
-  const notes = [];
   const noteKeys = [
     ["mouth_gap", "mouth_gap"], ["r_cavity", "r_cavity"],
     ["wall", "wall"], ["snap_arc_deg", "arc_deg"],
     ["inner_w", "inner_w"], ["tongue_t", "tongue_t"],
     ["sweep_span", "span"], ["sweep_rise", "rise"],
+    ["inner_d_effective", "bore ⌀ eff"], ["band_h", "band_h"],
+    ["cyl_r_mid", "r_mid"],
   ];
-  let ny = fs * 1.4;
-  for (const [k, label] of noteKeys) {
-    if (f[k] !== undefined) {
-      notes.push(`<text x="${fs * 0.5}" y="${ny}" font-size="${fs}" fill="#8a93a3" font-family="monospace">${label}: ${Number(f[k]).toFixed(2)}</text>`);
-      ny += fs * 1.35;
-    }
-  }
+  const notes = noteKeys
+    .filter(([k]) => f[k] !== undefined)
+    .map(([k, label]) =>
+      `<div><span>${label}</span><b>${Number(f[k]).toFixed(2)}</b></div>`)
+    .join("");
+  const cellPx = Math.max(w, h) / 20;
   container.innerHTML = `
-    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
-      <defs><pattern id="bgrid" width="${w / 24}" height="${w / 24}" patternUnits="userSpaceOnUse">
-        <path d="M ${w / 24} 0 L 0 0 0 ${w / 24}" fill="none" stroke="#1b2027" stroke-width="${w / 900}"/>
-      </pattern></defs>
-      <rect width="${w}" height="${h}" fill="url(#bgrid)"/>
-      <g transform="translate(${pad - minU}, ${h - pad + minV}) scale(1,-1)">
-        ${parts.join("\n")}
-      </g>
-      ${notes.join("\n")}
-      <text x="${fs * 0.5}" y="${h - fs * 0.5}" font-size="${fs * 0.8}" fill="#565e6c" font-family="monospace">section: ${form.section.name} · plane ${form.section.plane} · exact IR, no mesh</text>
-    </svg>`;
+    <div class="section-wrap">
+      <div class="section-box">
+        <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+          <defs><pattern id="bgrid" width="${cellPx}" height="${cellPx}" patternUnits="userSpaceOnUse">
+            <path d="M ${cellPx} 0 L 0 0 0 ${cellPx}" fill="none" stroke="#1b2027" stroke-width="${cellPx / 40}"/>
+          </pattern></defs>
+          <rect width="${w}" height="${h}" fill="url(#bgrid)"/>
+          <g transform="translate(${pad - minU}, ${h - pad + minV}) scale(1,-1)">
+            ${parts.join("\n")}
+          </g>
+        </svg>
+      </div>
+      <div class="section-meta">
+        ${notes || '<div class="faint">no headline frame values</div>'}
+        <div class="section-caption">section: ${form.section.name}<br>plane ${form.section.plane} · exact IR, no mesh</div>
+      </div>
+    </div>`;
 }

@@ -1,8 +1,8 @@
 // Product Cockpit — screens. Truth first: every panel renders view models
 // from the pipeline; the UI never invents state.
-import { api } from "./api.js";
-import { renderSection } from "./section.js";
-import { ThreeView } from "./three_view.js";
+import { api } from "app/api.js";
+import { renderSection } from "app/section.js";
+import { ThreeView } from "app/three_view.js";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const screenEl = $("#screen");
@@ -351,6 +351,12 @@ function renderWorkspace() {
   setLens(state.lens, v, isAssembly);
 }
 
+function artifactUrl(path) {
+  // exports paths may be absolute — everything under out/ is served as /artifacts/
+  const tail = String(path).split(/\/out\//).pop().replace(/^out\//, "");
+  return "/artifacts/" + tail;
+}
+
 async function load3D(view, v, isAssembly) {
   view.clear();
   const report = state.buildReport;
@@ -362,10 +368,10 @@ async function load3D(view, v, isAssembly) {
         const stl = part.exports?.stl;
         if (!stl) continue;
         const pose = poses[ref]?.rotate ? poses[ref] : null;
-        await view.loadSTL("/artifacts/" + stl.replace(/^out\//, ""), pose);
+        await view.loadSTL(artifactUrl(stl), pose);
       }
     } else if (report?.exports?.stl) {
-      await view.loadSTL("/artifacts/" + report.exports.stl.replace(/^out\//, ""));
+      await view.loadSTL(artifactUrl(report.exports.stl));
     } else if (!isAssembly && v.product) {
       // try prebuilt artifact from out/
       await view.loadSTL(`/artifacts/${v.product}/part.stl`);
@@ -480,7 +486,7 @@ function wireEdit() {
         </table>
         <div class="row mt"><button class="ghost" id="openedited">open edited product in workspace</button></div>`;
       $("#openedited").addEventListener("click", async () => {
-        const txt = await (await fetch("/artifacts/" + rep.edited_yaml.replace(/^out\//, ""))).text();
+        const txt = await (await fetch(artifactUrl(rep.edited_yaml))).text();
         await openInWorkspace(txt);
       });
     });
