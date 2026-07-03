@@ -248,6 +248,130 @@ def build_molded_side_hook_profile(
     return profile, f
 
 
+@dataclass(frozen=True)
+class SnapClipParams:
+    """Symmetric snap C-clip for pipes/rods/broom handles — the retention
+    is the ARC (coverage past 180 degrees), not asymmetric lips. NOT a
+    substitute for the under-desk side-hook: different physics, different
+    family checks."""
+
+    pipe_d: float
+    clearance: float
+    wall: float
+    #: Cavity coverage in degrees; the mouth chord follows from it.
+    arc_deg: float
+    neck_drop: float
+
+    @property
+    def r_cavity(self) -> float:
+        return self.pipe_d / 2.0 + self.clearance
+
+    @property
+    def r_outer(self) -> float:
+        return self.r_cavity + self.wall
+
+
+def snap_c_frame(p: SnapClipParams) -> dict[str, float]:
+    if not 190.0 <= p.arc_deg <= 268.0:
+        raise ValueError(f"arc_deg {p.arc_deg:g} outside the snap range 190..268")
+    r_i, r_o = p.r_cavity, p.r_outer
+    vc = -(p.neck_drop + r_o)
+    half_gap = math.radians((360.0 - p.arc_deg) / 2.0)
+    mouth_gap = 2.0 * r_i * math.sin(half_gap)
+    neck_w = max(3.0 * p.wall, r_i * 0.9)
+    n = min(neck_w / 2.0, r_o * 0.6)
+    return {
+        "r_cavity": r_i,
+        "r_outer": r_o,
+        "cavity_center_u": 0.0,
+        "cavity_center_v": vc,
+        "snap_arc_deg": p.arc_deg,
+        "mouth_gap": mouth_gap,
+        "hook_top_v": vc + r_o,
+        "hook_bot_v": vc - r_o,
+        "neck_u0": -n,
+        "neck_u1": n,
+    }
+
+
+def build_snap_c_tongue_profile(
+    p: SnapClipParams, beam_half: float, tongue_t: float, style: SurfaceStyle
+) -> tuple[SectionProfile, dict[str, float]]:
+    """Snap C-clip with the mounting beam IN the profile (both wings carry
+    a screw), mouth opening straight down (-v) away from the mount face.
+    A constant-section extrusion — prints profile-on-bed, zero overhangs."""
+    f = snap_c_frame(p)
+    r_i, r_o = f["r_cavity"], f["r_outer"]
+    vc = f["cavity_center_v"]
+    center = Pt(0.0, vc)
+    n0, n1 = f["neck_u0"], f["neck_u1"]
+    if beam_half <= r_o + 2.0:
+        raise ValueError("beam must extend past the hook on both sides")
+
+    def at_angle(radius: float, deg: float) -> Pt:
+        return Pt(
+            radius * math.cos(math.radians(deg)),
+            vc + radius * math.sin(math.radians(deg)),
+        )
+
+    half_gap_deg = (360.0 - p.arc_deg) / 2.0
+    ang_r = 270.0 + half_gap_deg  # right mouth edge
+    ang_l = 270.0 - half_gap_deg  # left mouth edge
+    b_i, b_o = at_angle(r_i, ang_r), at_angle(r_o, ang_r)
+    a_i, a_o = at_angle(r_i, ang_l), at_angle(r_o, ang_l)
+    j0 = Pt(n0, vc + math.sqrt(r_o * r_o - n0 * n0))
+    j1 = Pt(n1, vc + math.sqrt(r_o * r_o - n1 * n1))
+    tr, br = Pt(beam_half, tongue_t), Pt(beam_half, 0.0)
+    tl, bl = Pt(-beam_half, tongue_t), Pt(-beam_half, 0.0)
+    inner_tags = _tags("cavity_inner", "cable_contact")
+    outer_tags = _tags("hook_outer", "root", "external")
+
+    segments: list[Seg] = [
+        # the mount face: one flat edge across both wings
+        LineSeg(tl, tr, _tags("mount_face", "intentional_corner")),
+        LineSeg(tr, br, _tags("tongue_back", "external")),
+        LineSeg(br, Pt(n1, 0.0), _tags("tongue_bottom", "root", "external")),
+        LineSeg(Pt(n1, 0.0), j1, _tags("neck", "root")),
+        # outer wall down the right side to the mouth
+        ArcSeg(j1, b_o, center, ccw=False, tags=outer_tags),
+        # right mouth face (rounded at both ends by the molded pass)
+        LineSeg(b_o, b_i, _tags("mouth_face", "contact")),
+        # the retention arc — the long way over the top
+        ArcSeg(b_i, a_i, center, ccw=True, tags=inner_tags),
+        LineSeg(a_i, a_o, _tags("mouth_face", "contact")),
+        ArcSeg(a_o, j0, center, ccw=False, tags=outer_tags),
+        LineSeg(j0, Pt(n0, 0.0), _tags("neck", "root")),
+        LineSeg(Pt(n0, 0.0), bl, _tags("tongue_bottom", "root", "external")),
+        LineSeg(bl, tl, _tags("tongue_back", "external")),
+    ]
+
+    loop = round_profile_corners(ProfileLoop(segments), style)
+    f = dict(f)
+    f.update(
+        tongue_u0=-beam_half,
+        beam_u1=beam_half,
+        tongue_t=tongue_t,
+        hook_y0=-r_o,
+        hook_y1=r_o,
+    )
+    profile = SectionProfile(
+        name="snap_c_tongue",
+        outer=loop,
+        plane="YZ",
+        width_axis="X",
+        features={
+            "cavity": SideOpenObroundCavity(
+                center=center,
+                bundle_d=p.pipe_d,
+                clearance=p.clearance,
+                mouth_gap=f["mouth_gap"],
+                mouth_dir=(0.0, -1.0),
+            )
+        },
+    )
+    return profile, f
+
+
 def build_tongue_side_hook_profile(
     p: SideHookParams, tongue_u0: float, tongue_t: float, style: SurfaceStyle
 ) -> tuple[SectionProfile, dict[str, float]]:

@@ -480,6 +480,7 @@ from . import (  # noqa: E402,F401
     checks_jhook,
     checks_revolve,
     checks_slots,
+    checks_snap,
     checks_stability,
     checks_tunnel,
 )

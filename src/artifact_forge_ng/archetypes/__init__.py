@@ -19,6 +19,7 @@ from . import (
     lamp_bracket,
     lamp_socket_cup,
     phone_stand,
+    pipe_clip,
     recipe,
     underdesk_cable_clip,
     underdesk_cable_clip_sideprint,
@@ -38,6 +39,7 @@ FORM_BUILDERS: dict[str, FormBuilder] = {
     lamp_bracket.SECTION_NAME: lamp_bracket.build_form,
     phone_stand.SECTION_NAME: phone_stand.build_form,
     recipe.SECTION_NAME: recipe.build_form,
+    pipe_clip.SECTION_NAME: pipe_clip.build_form,
 }
 
 

@@ -64,14 +64,13 @@ def measure_mouth_direction(profile: SectionProfile) -> tuple[float, float] | No
     return (d.u / n, d.v / n)
 
 
-def cavity_back_closed(loop: ProfileLoop, center: Pt | None = None) -> bool:
-    """The cavity boundary must wrap well past a half-circle around its
-    center — an open back or a shallow scoop is not a hook. Measured as the
-    ANGULAR COVERAGE of every cavity_inner segment (arcs AND chords — a
-    teardrop's 45-degree chamfers close the bottom just as well)."""
+def cavity_coverage_deg(loop: ProfileLoop, center: Pt | None = None) -> float:
+    """ANGULAR COVERAGE of every cavity_inner segment around the cavity
+    center, in degrees — arcs AND chords count (a teardrop's 45-degree
+    chamfers close a hook bottom just as well as an arc does)."""
     segments = loop.tagged("cavity_inner")
     if not segments:
-        return False
+        return 0.0
     if center is None:
         # centroid of the cavity boundary samples — good enough fallback
         pts = [s.point_at(t / 4) for s in segments for t in range(5)]
@@ -84,7 +83,13 @@ def cavity_back_closed(loop: ProfileLoop, center: Pt | None = None) -> bool:
             a = seg.point_at(i / steps) - center
             b = seg.point_at((i + 1) / steps) - center
             coverage += abs(math.atan2(a.cross(b), a.dot(b)))
-    return coverage >= math.radians(200)
+    return math.degrees(coverage)
+
+
+def cavity_back_closed(loop: ProfileLoop, center: Pt | None = None) -> bool:
+    """The cavity boundary must wrap well past a half-circle around its
+    center — an open back or a shallow scoop is not a hook."""
+    return cavity_coverage_deg(loop, center) >= 200.0
 
 
 def measure(profile: SectionProfile, frame: dict[str, float]) -> SilhouetteReport:

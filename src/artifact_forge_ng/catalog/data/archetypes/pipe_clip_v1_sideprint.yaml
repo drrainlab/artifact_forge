@@ -1,0 +1,89 @@
+schema: archetype/v1
+id: pipe_clip_v1_sideprint
+version: 1
+object_class: pipe_snap_clip
+description: >
+  Symmetric snap C-clip for pipes, rods and broom handles (wave R3): the
+  retention is the cavity arc wrapping past half a circle, the mouth opens
+  away from the mounting surface, and the mounting beam lives INSIDE the
+  extruded profile with a screw wing each side — a constant-section
+  extrusion printed profile-on-bed, zero overhangs by construction. This is
+  the generic snap clip; the under-desk asymmetric side-hook stays its own
+  family with different physics.
+
+provides_features:
+  - snap_c_cavity
+  - rear_mounting_tongue
+  - rounded_contact_edges
+  - molded_side_profile
+  - countersunk_screw_holes
+  - support_free_by_construction
+
+parameters:
+  pipe_d:
+    {type: length, default: 25mm, min: 8mm, max: 45mm,
+     role: functional, exposed: true,
+     description: held pipe/handle diameter}
+  clearance:
+    {type: length, default: 0.4mm, min: 0.1mm, max: 1mm, role: manufacturing,
+     description: "radial clearance — snap clips grip, keep it small"}
+  wall:
+    {type: length, default: 3.2mm, min: 2mm, max: 6mm, role: structural,
+     description: arm wall; thicker = stiffer snap}
+  arc_deg:
+    {type: number, default: 240, min: 200, max: 262,
+     role: functional, exposed: true,
+     description: "cavity coverage; more arc = stronger retention, harder entry"}
+  neck_drop:
+    {type: length, default: 6mm, min: 3mm, max: 16mm, role: aesthetic}
+  width:
+    {type: length, default: 20mm, min: 10mm, max: 60mm, role: assembly,
+     description: extrusion width along the pipe axis}
+  tongue_t:
+    {type: length, default: 5mm, min: 4mm, max: 10mm, role: manufacturing}
+  screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+
+constraints:
+  - wall >= printer.min_wall
+
+form:
+  type: section_extrude
+  section: snap_c_tongue
+  plane: YZ
+  width_axis: X
+
+regions:
+  - {id: tongue, role: mounting_surface, editable: true}
+  - {id: screw_zones, role: fastener_keepout, editable: false}
+  - {id: pipe_contact, role: soft_contact_surface, editable: false}
+  - {id: snap_arms, role: high_stress_region, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.snap_arc_coverage
+  - form.snap_mouth_retains
+  - form.wall_thickness
+  - form.contact_edges_rounded
+  - form.screw_access_clear
+  - form.mount_face_flat
+  - form.constant_section
+  - topology.single_connected_solid
+  - topology.cavity_open
+  - topology.screw_holes_open
+  - topology.countersinks_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - snap_c_cavity
+    - rear_mounting_tongue
+    - support_free_by_construction
+  must_not_have: []
+  invariants:
+    - arc_deg > 200

@@ -1,0 +1,22 @@
+schema: product/v1
+id: broom_clip_25mm
+archetype: pipe_clip_v1_sideprint@1
+strict: true
+
+requested_features:
+  - snap_c_cavity
+  - rear_mounting_tongue
+  - support_free_by_construction
+  - countersunk_screw_holes
+
+params:
+  pipe_d: 25mm
+  arc_deg: 240
+  wall: 3.2mm
+  width: 20mm
+  screw: M4
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none
