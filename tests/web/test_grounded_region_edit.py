@@ -229,6 +229,110 @@ def test_nl_edit_survives_llm_shape_drift(monkeypatch):
     assert "neither a known intent nor a patch" in out["findings"][0]["message"]
 
 
+def test_nl_edit_decodes_yaml_string_patch(monkeypatch):
+    """Real cockpit failure (wall_tool_ring_clamp session): the model emitted
+    the patch as a YAML string — not valid JSON, so json.loads missed it and
+    the whole request failed. YAML is a JSON superset; decode it."""
+    _fake_llm(monkeypatch, {"intent": None, "patch": (
+        "type: style\n"
+        "modifiers:\n"
+        "  add:\n"
+        "    - {id: add_voronoi_field, target: band_outer_surface, params: {}}\n"
+    )})
+    out = client.post("/api/nl_edit", json={
+        "yaml": RING_YAML, "text": "add voronoi pattern"}).json()
+    assert out["ok"], out
+    assert out["patch"]["modifiers"]["add"][0]["id"] == "add_voronoi_field"
+    assert "decoded JSON-string" in out["notes"]
+
+
+def test_nl_edit_retries_once_after_unusable_answer(monkeypatch):
+    """First answer garbage, second good: the maker's request must survive
+    one malformed LLM reply — with the correction visible to the model."""
+    answers = [
+        {"intent": None, "patch": 42},  # nothing actionable
+        {"intent": None, "patch": {
+            "type": "style",
+            "modifiers": {"add": [
+                {"id": "add_voronoi_field", "target": "band_outer_surface",
+                 "params": {}},
+            ]},
+        }},
+    ]
+    seen_users = []
+
+    def fake_complete(system, user, schema, cache_system=True):
+        seen_users.append(user)
+        return answers.pop(0)
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr(llm, "complete", fake_complete)
+    out = client.post("/api/nl_edit", json={
+        "yaml": RING_YAML, "text": "add voronoi pattern"}).json()
+    assert out["ok"], out
+    assert out["patch"]["modifiers"]["add"][0]["id"] == "add_voronoi_field"
+    assert "retried once" in out["notes"]
+    assert len(seen_users) == 2
+    assert "REJECTED" in seen_users[1]  # the model sees WHY it is re-asked
+
+
+def test_edit_preview_rejects_percent_delta_as_finding():
+    """Real cockpit failure: an LLM patch carried flange_h: '-50%' — the
+    value grammar raised ValueError_ and the endpoint 500'd, leaving the UI
+    stuck on 'computing patch…'. It must be an honest finding."""
+    p = client.post("/api/edit/preview", json={"yaml": RING_YAML, "patch": {
+        "type": "functional", "params": {"band_h": "-50%"},
+    }})
+    assert p.status_code == 200
+    body = p.json()
+    assert body["ok"] is False
+    assert body["findings"][0]["check"] == "edit.patch"
+    assert "%" in body["findings"][0]["message"]
+
+
+def test_nl_edit_grounds_param_values(monkeypatch):
+    """A percent value in patch.params is dropped WITH the reason, while the
+    rest of the patch (the modifier add) survives and stays actionable."""
+    _fake_llm(monkeypatch, {"intent": None, "patch": {
+        "type": "functional",
+        "params": {"band_h": "-50%", "wall": "2.4mm"},
+        "modifiers": {"add": [
+            {"id": "add_voronoi_field", "target": "band_outer_surface",
+             "params": {}},
+        ]},
+    }})
+    out = client.post("/api/nl_edit", json={
+        "yaml": RING_YAML, "text": "add voronoi and make it half as tall"}).json()
+    assert out["ok"], out
+    assert "band_h" not in out["patch"]["params"]
+    assert out["patch"]["params"]["wall"] == "2.4mm"
+    assert "params.band_h" in out["notes"] and "dropped" in out["notes"]
+    assert out["patch"]["modifiers"]["add"][0]["id"] == "add_voronoi_field"
+
+
+def test_nl_edit_grounds_invented_modifier_ids(monkeypatch):
+    """Real cockpit failure: the model invented 'hex_perforation_1' (an
+    instance-ish name) — the preview then failed with 'unknown modifier'.
+    Ids are grounded onto catalog ids, and the schema enum only OFFERS
+    legal ids in the first place."""
+    seen = _fake_llm(monkeypatch, {"intent": None, "patch": {
+        "type": "style",
+        "modifiers": {"add": [
+            {"id": "hex_perforation_1", "target": "band_outer_surface",
+             "params": {}},
+        ]},
+    }})
+    out = client.post("/api/nl_edit", json={
+        "yaml": RING_YAML, "text": "add hexcomb for plastic economy"}).json()
+    assert out["ok"], out
+    add = out["patch"]["modifiers"]["add"][0]
+    assert add["id"] == "add_hex_perforation"
+    assert "catalog id" in out["notes"]
+    add_schema = (seen["schema"]["properties"]["patch"]["properties"]
+                  ["modifiers"]["properties"]["add"]["items"])
+    assert "add_hex_perforation" in add_schema["properties"]["id"]["enum"]
+
+
 def test_edit_preview_catches_dead_field_before_build():
     """Default voronoi params (edge_margin 3mm) kill every cell on a narrow
     band — the preview must FAIL at validate (form.field_cells_present),

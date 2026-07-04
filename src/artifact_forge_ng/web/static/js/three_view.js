@@ -9,6 +9,8 @@ const ROLE_COLORS = {
   soft_contact_surface: 0x4dc3d6, high_stress_region: 0xf0a832,
   retaining_flexure: 0x46c07a, aesthetic_lightening: 0x8a93a3,
   seal_surface: 0xa06be0,
+  exoskeleton_panel: 0x6bd06b, rib_anchor: 0xc9963c,
+  interface_keepout: 0xd05555,
 };
 
 export class ThreeView {
@@ -121,19 +123,27 @@ export class ThreeView {
   }
 
   // Selected region turns amber and opaque; with a selection active the
-  // rest fade to ghosts so keepout boxes cannot drown the target out.
+  // rest fade to ghosts AND the part itself goes translucent, so the
+  // region reads as "this zone of the part", not an abstract floating box.
   highlightRegion(name) {
     for (const box of this.regionGroup.children) {
       const r = box.userData.region;
       const on = !!name && r?.name === name;
       const base = ROLE_COLORS[r?.role] ?? 0x8a93a3;
-      box.material.color.set(on ? 0xd9b544 : base);
-      box.material.opacity = on ? 0.38 : name ? 0.05 : 0.16;
+      box.material.color.set(on ? 0xffc94d : base);
+      box.material.opacity = on ? 0.45 : name ? 0.03 : 0.16;
+      box.scale.setScalar(on ? 1.02 : 1.0);
       const edges = box.children[0];
       if (edges) {
-        edges.material.color.set(on ? 0xd9b544 : base);
-        edges.material.opacity = on ? 1.0 : name ? 0.25 : 0.6;
+        edges.material.color.set(on ? 0xffd76a : base);
+        edges.material.opacity = on ? 1.0 : name ? 0.12 : 0.6;
       }
+    }
+    for (const mesh of this.meshes.children) {
+      mesh.material.transparent = true;
+      mesh.material.opacity = name ? 0.5 : 1.0;
+      mesh.material.depthWrite = !name;
+      mesh.material.needsUpdate = true;
     }
   }
 

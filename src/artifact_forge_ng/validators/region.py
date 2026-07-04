@@ -27,16 +27,24 @@ def _finding(check: str, ok: bool, message: str, measured: float | None = None) 
 def keepouts_preserved(geometry: Geometry, form: PartForm) -> Finding:
     """The annulus around each screw bore (outside the bore + countersink,
     inside the keepout radius) must stay solid — no hex cell, no stray cut."""
+    from ..core.fasteners import screw_spec
+
     head_r = form.frame.get("screw_head_r", 3.5)
     violated = []
     for hole in form.holes:
         x, y, z_top = hole.at
-        # Slab between the countersink recess and the far face — must stay
-        # solid apart from the bore itself.
+        # Slab between the head recess and the far face — must stay solid
+        # apart from the bore itself. A cylindrical counterbore recesses
+        # deeper than a countersink cone, so the slab starts below the
+        # ACTUAL recess (mirrors cad/holes.py cut depths).
+        recess = 2.2
+        if hole.countersink and hole.head_style == "cylinder":
+            spec = screw_spec(hole.screw)
+            recess = min(spec["head"] * 0.8, hole.through * 0.5) + 0.3
         if hole.countersink_face == "bottom":
-            z_lo, z_hi = z_top - hole.through + 2.2, z_top - 0.1
+            z_lo, z_hi = z_top - hole.through + recess, z_top - 0.1
         else:
-            z_lo, z_hi = z_top - hole.through + 0.1, z_top - 2.2
+            z_lo, z_hi = z_top - hole.through + 0.1, z_top - recess
         zone = box_probe(
             x - head_r - 1.5, y - head_r - 1.5, z_lo,
             x + head_r + 1.5, y + head_r + 1.5, z_hi,

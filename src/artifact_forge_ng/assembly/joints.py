@@ -546,3 +546,87 @@ _register(JointDecl(
     ir_check=_snap_joint_ir,
     cad_checks=("assembly.no_interference", "assembly.hooks_engage"),
 ))
+
+
+# -- compression_gap_joint --------------------------------------------------------
+
+#: A compression gap thinner than this cannot guarantee squeeze across FDM
+#: tolerances — the halves would bottom out face-to-face.
+MIN_COMPRESSION_GAP = 1.5
+
+
+def _compression_gap_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """Split-clamp compression joint (Bio-1): in the assembled pose the two
+    mating planes stay exactly ``gap`` apart, the saddle centers coincide
+    (the halves form ONE branch circle), and both saddles carry the same
+    radius — the branch_d desync detector. Measured on the two Form IR
+    frames + the pose, before any CAD."""
+    from ..core.values import parse_quantity
+
+    check = "assembly.clamp_gap_ir"
+    raw_gap = joint.params.get("gap")
+    if raw_gap is None:
+        return [_finding(check, False,
+                         "compression_gap_joint needs params.gap (length)")]
+    try:
+        gap = parse_quantity(str(raw_gap), "length", where="compression_gap_joint.gap")
+    except ValueError as exc:
+        return [_finding(check, False, str(exc))]
+    fa, fb = form_a.frame, form_b.frame
+    needed = ("mate_z", "saddle_cz", "saddle_r", "cavity_center_u")
+    missing = [k for k in needed if k not in fa or k not in fb]
+    if missing:
+        return [_finding(
+            check, False,
+            f"clamp frame keys missing on a half: {missing} — the parts are "
+            "not split-clamp halves",
+        )]
+    if gap < MIN_COMPRESSION_GAP:
+        return [_finding(
+            check, False,
+            f"compression gap {gap:g} < {MIN_COMPRESSION_GAP} — the halves "
+            "bottom out face-to-face and never squeeze the branch",
+            measured=gap, limit=MIN_COMPRESSION_GAP,
+        )]
+    problems: list[str] = []
+    # posed mating-plane separation == gap
+    posed_mate_b = pose.apply((0.0, 0.0, fb["mate_z"]))[2]
+    separation = posed_mate_b - fa["mate_z"]
+    if abs(separation - gap) > 0.15:
+        problems.append(
+            f"posed mate planes are {separation:.2f} apart, declared gap "
+            f"{gap:g} (check compression_gap on both halves — use "
+            "assembly.shared)")
+    # posed saddle centers coincide: one nominal branch circle
+    a_c = (form_a.width / 2.0, fa["cavity_center_u"], fa["saddle_cz"])
+    b_c = pose.apply((form_b.width / 2.0, fb["cavity_center_u"], fb["saddle_cz"]))
+    center_off = math.dist(a_c, b_c)
+    if center_off > 0.15:
+        problems.append(
+            f"posed saddle centers {center_off:.2f} apart — the halves do "
+            "not form one branch circle")
+    # branch_d desync detector
+    if abs(fa["saddle_r"] - fb["saddle_r"]) > 0.05:
+        problems.append(
+            f"saddle radii differ: {fa['saddle_r']:g} vs {fb['saddle_r']:g} "
+            "— nominal_branch_d desync between the halves")
+    if problems:
+        return [_finding(check, False, "; ".join(problems),
+                         measured=separation, limit=gap)]
+    return [_finding(
+        check, True,
+        f"mating planes {separation:.2f} apart (gap {gap:g}), saddle centers "
+        f"coincide within {center_off:.3f}, radii match",
+        measured=separation, limit=gap,
+    )]
+
+
+_register(JointDecl(
+    name="compression_gap_joint",
+    description="split-clamp compression interface: posed mating planes keep "
+                "the declared gap, saddles form one circle with equal radii",
+    ir_check=_compression_gap_ir,
+    cad_checks=("assembly.no_interference",),
+))

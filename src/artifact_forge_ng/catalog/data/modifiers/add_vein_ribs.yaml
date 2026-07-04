@@ -4,7 +4,7 @@ category: pattern_field
 description: >
   Raised vein ridges flowing across a face with a seeded rhythm — the
   biomorphic veins as a standalone additive field (no full style needed).
-applies_to: [aesthetic_lightening, mounting_surface]
+applies_to: [aesthetic_lightening, mounting_surface, exoskeleton_panel]
 forbidden_targets:
   [fastener_keepout, high_stress_region, soft_contact_surface,
    retaining_flexure, seal_surface]

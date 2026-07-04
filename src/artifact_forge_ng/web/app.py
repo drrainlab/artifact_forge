@@ -121,6 +121,7 @@ def api_catalog() -> dict[str, Any]:
             "object_class": spec.object_class,
             "description": spec.description.strip(),
             "status": status,
+            "maturity": spec.maturity,
             "provides_features": list(spec.provides_features),
             "validators": list(spec.validators),
             "allowed_modifiers": list(spec.allowed_modifiers),
@@ -324,7 +325,7 @@ def api_edit_preview(body: EditBody) -> JSONResponse:
     """Pure patch preview: apply the patch, validate the result — NO CAD.
     The user sees the edited YAML and its IR truth before committing."""
     from ..repair.intents import INTENTS, IntentNotApplicable
-    from ..repair.patch import Patch, PatchError, apply_patch
+    from ..repair.patch import Patch, apply_patch
 
     catalog = load_catalog()
     try:
@@ -345,7 +346,10 @@ def api_edit_preview(body: EditBody) -> JSONResponse:
         else:
             return _fail([error_finding("edit needs intent or patch", "edit.input")])
         edited = apply_patch(instance, patch, archetype, catalog)
-    except (IntentNotApplicable, PatchError) as exc:
+    # ValueError covers PatchError AND the value grammar's ValueError_ — a
+    # patch carrying '-50%' must come back as a finding, never as a 500
+    # that leaves the cockpit stuck on "computing patch…"
+    except (IntentNotApplicable, ValueError) as exc:
         finding = error_finding(str(exc), "edit.patch")
         did_you_mean = _target_suggestions(body.patch or {}, archetype)
         if did_you_mean:

@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from .exoskeleton.ir import ExoskeletonIR
 from .regions import Box3, Rect2D, Region, Region2D
 from .section import SectionProfile
 from .style import SurfaceStyle
@@ -304,6 +305,10 @@ class PartForm:
     regions: list[Region] = field(default_factory=list)
     blends: list[BlendDirective] = field(default_factory=list)
     datums: dict[str, dict[str, Any]] = field(default_factory=dict)
+    #: Bio-2 exoskeleton intent (rib graph + organic windows + masks) —
+    #: attached by apply_biomorphic_exoskeleton, measured by the
+    #: form.rib_* checks, materialized in CAD by Bio-3.
+    exoskeleton: ExoskeletonIR | None = None
 
     def region(self, name: str) -> Region | None:
         for r in self.regions:

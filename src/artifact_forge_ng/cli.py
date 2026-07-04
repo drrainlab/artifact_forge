@@ -32,9 +32,25 @@ def _schema_kind(path: Path) -> str:
     return str(marker).split("/")[0]
 
 
-def run_validate(product_path: Path, strict_flag: bool | None) -> dict[str, Any]:
+def run_validate(
+    product_path: Path,
+    strict_flag: bool | None,
+    *,
+    debug_ir: bool = False,
+    out_dir: Path = Path("out"),
+) -> dict[str, Any]:
     state = run_pre_cad(product_path, strict_flag)
     out = state.summary()
+    if (
+        debug_ir
+        and state.form is not None
+        and state.form.exoskeleton is not None
+    ):
+        # Opt-in only: a plain validate writes NOTHING to disk.
+        from .form.exoskeleton.debug import dump_exoskeleton_debug
+
+        written = dump_exoskeleton_debug(state.form, out_dir / state.instance.id)
+        out["debug_ir"] = [str(p) for p in written]
     try:
         state.enforce_strict()
     except PipelineFailure:
@@ -54,6 +70,11 @@ def main(argv: list[str] | None = None) -> int:
     p_validate = sub.add_parser("validate", help="validate a product YAML without CAD")
     p_validate.add_argument("product", type=Path)
     p_validate.add_argument("--strict", action="store_true", default=None)
+    p_validate.add_argument(
+        "--debug-ir", action="store_true",
+        help="dump exoskeleton IR debug JSONs to <out>/<product-id>/",
+    )
+    p_validate.add_argument("-o", "--out", type=Path, default=Path("out"))
 
     p_build = sub.add_parser("build", help="build a product to STL/STEP")
     p_build.add_argument("product", type=Path)
@@ -79,7 +100,10 @@ def main(argv: list[str] | None = None) -> int:
 
                 _print(run_assembly_validate(args.product, args.strict))
                 return 0
-            _print(run_validate(args.product, args.strict))
+            _print(run_validate(
+                args.product, args.strict,
+                debug_ir=args.debug_ir, out_dir=args.out,
+            ))
             return 0
         if args.command == "build":
             if _schema_kind(args.product) == "assembly":

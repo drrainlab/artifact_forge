@@ -105,6 +105,8 @@ allowed_modifiers:
   - add_magnet_pockets
   - add_zip_tie_slots
   - add_ribs
+  - apply_biomorphic_exoskeleton
+  - add_bone_windows
 
 contract:
   must_have:

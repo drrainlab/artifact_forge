@@ -199,6 +199,19 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog,
     upd_target: dict[str, Any] = {"type": "string"}
     if used_targets:
         upd_target["enum"] = used_targets
+    # modifier ids are CATALOG ids, never invented instance names — the
+    # enum constrains the model, the server grounds whatever comes back
+    legal_add_ids = sorted(compat)
+    used_ids = sorted({
+        str(m.get("id")) for m in doc.get("modifiers", [])
+        if isinstance(m, dict) and m.get("id")
+    })
+    add_id: dict[str, Any] = {"type": "string"}
+    if legal_add_ids:
+        add_id["enum"] = legal_add_ids
+    upd_id: dict[str, Any] = {"type": "string"}
+    if used_ids:
+        upd_id["enum"] = used_ids
     schema = {
         "type": "object",
         "properties": {
@@ -209,6 +222,8 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog,
             },
             "patch": {
                 "type": ["object", "null"],
+                "description": "the typed patch as a NESTED JSON OBJECT — "
+                               "never a JSON- or YAML-encoded string",
                 "properties": {
                     "type": {"type": "string",
                              "enum": ["functional", "manufacturing",
@@ -225,7 +240,7 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog,
                             "update": {"type": "array", "items": {
                                 "type": "object",
                                 "properties": {
-                                    "id": {"type": "string"},
+                                    "id": upd_id,
                                     "target": upd_target,
                                     "params": {"type": "object",
                                                "additionalProperties": {"type": "string"}},
@@ -235,7 +250,7 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog,
                             "add": {"type": "array", "items": {
                                 "type": "object",
                                 "properties": {
-                                    "id": {"type": "string"},
+                                    "id": add_id,
                                     "target": add_target,
                                     "params": {"type": "object",
                                                "additionalProperties": {"type": "string"}},
@@ -264,7 +279,8 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog,
         "product into EITHER a known intent name OR a typed patch "
         "(patch/v1). Rules:\n"
         "- patch.params: ONLY archetype parameter names (absolute values "
-        "or '+3mm' deltas).\n"
+        "or '+3mm'/'-3mm' deltas). NEVER percentages — to halve or scale a "
+        "dimension, compute the absolute number yourself.\n"
         "- pattern/field changes ('more voronoi', 'denser holes') go into "
         "modifiers.update on the EXISTING modifier use (merge params like "
         "sites/min_ligament/hole_d), never into patch.params.\n"
@@ -291,51 +307,125 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog,
            "MUST target exactly it.\n" if selected is not None else "")
         + f"Known intents: {', '.join(sorted(INTENTS))}"
     )
-    raw = llm.complete(system, f"{current_yaml}\n\nREQUEST: {text}", schema,
-                       cache_system=False)
-    patch = _coerce_obj(raw.get("patch"), "patch", notes)
-    mods = None
-    if patch is not None:
-        mods = _coerce_obj(patch.get("modifiers"), "modifiers", notes)
-        patch["modifiers"] = mods or {}
-    if mods:
-        for key in ("add", "update", "remove"):
-            if key in mods and not isinstance(mods[key], list):
-                notes.append(f"modifiers.{key}: not a list — dropped")
-                mods[key] = []
-    if mods and mods.get("add"):
-        raw_add = mods["add"] if isinstance(mods["add"], list) else []
-        add_entries = [e for e in raw_add if isinstance(e, dict)]
-        if len(add_entries) != len(raw_add):
-            notes.append("dropped malformed modifiers.add entries")
-        existing = {
-            (str(m.get("id")), str(m.get("target")))
-            for m in doc.get("modifiers", []) if isinstance(m, dict)
-        }
-        kept = []
-        for entry in add_entries:
-            _ground_add_target(entry, archetype, compat, selected, notes)
-            key = (str(entry.get("id")), str(entry.get("target")))
-            if key in existing:
-                # apply_patch silently skips duplicate adds — say it and
-                # turn the request into an update on the existing use
-                mods.setdefault("update", []).append(entry)
-                notes.append(
-                    f"{entry.get('id')} is already on {entry.get('target')!r}"
-                    " — converted add to update (tune its params: 'more/"
-                    "denser/larger…')")
-            else:
-                kept.append(entry)
-        mods["add"] = kept
-    if patch and isinstance(patch.get("preserve"), list):
-        keep, dropped = [], []
-        for name in patch["preserve"]:
-            (keep if name in preserve_ok else dropped).append(name)
-        patch["preserve"] = keep
-        if dropped:
-            notes.append(f"dropped invalid preserve entries: {', '.join(dropped)}")
-    intent_name = raw.get("intent")
-    intent_name = intent_name if isinstance(intent_name, str) else None
+    def _attempt(user_msg: str):
+        raw = llm.complete(system, user_msg, schema, cache_system=False)
+        patch = _coerce_obj(raw.get("patch"), "patch", notes)
+        mods = None
+        if patch is not None:
+            mods = _coerce_obj(patch.get("modifiers"), "modifiers", notes)
+            patch["modifiers"] = mods or {}
+        if mods:
+            for key in ("add", "update", "remove"):
+                if key in mods and not isinstance(mods[key], list):
+                    notes.append(f"modifiers.{key}: not a list — dropped")
+                    mods[key] = []
+        if mods:
+            # ground modifier IDS first (targets are grounded per-id below):
+            # the model invents instance-ish names like 'hex_perforation_1' —
+            # resolve them onto catalog ids or drop with the reason
+            for key, legal_ids in (("add", legal_add_ids),
+                                   ("update", sorted(set(used_ids) | set(legal_add_ids)))):
+                kept_entries = []
+                for entry in mods.get(key) or []:
+                    if not isinstance(entry, dict):
+                        kept_entries.append(entry)
+                        continue
+                    given = str(entry.get("id") or "")
+                    hit = _resolve_modifier_id(given, legal_ids)
+                    if hit is None:
+                        notes.append(
+                            f"modifiers.{key}: unknown modifier {given!r} — "
+                            f"dropped (allowed: {', '.join(legal_ids) or '-'})")
+                        continue
+                    if hit != given:
+                        notes.append(f"modifier id {given!r} -> catalog id {hit!r}")
+                        entry["id"] = hit
+                    kept_entries.append(entry)
+                if key in mods and mods[key] is not None:
+                    mods[key] = kept_entries
+        if mods and mods.get("add"):
+            raw_add = mods["add"] if isinstance(mods["add"], list) else []
+            add_entries = [e for e in raw_add if isinstance(e, dict)]
+            if len(add_entries) != len(raw_add):
+                notes.append("dropped malformed modifiers.add entries")
+            existing = {
+                (str(m.get("id")), str(m.get("target")))
+                for m in doc.get("modifiers", []) if isinstance(m, dict)
+            }
+            kept = []
+            for entry in add_entries:
+                _ground_add_target(entry, archetype, compat, selected, notes)
+                key = (str(entry.get("id")), str(entry.get("target")))
+                if key in existing:
+                    # apply_patch silently skips duplicate adds — say it and
+                    # turn the request into an update on the existing use
+                    mods.setdefault("update", []).append(entry)
+                    notes.append(
+                        f"{entry.get('id')} is already on {entry.get('target')!r}"
+                        " — converted add to update (tune its params: 'more/"
+                        "denser/larger…')")
+                else:
+                    kept.append(entry)
+            mods["add"] = kept
+        if patch and isinstance(patch.get("preserve"), list):
+            keep, dropped = [], []
+            for name in patch["preserve"]:
+                (keep if name in preserve_ok else dropped).append(name)
+            patch["preserve"] = keep
+            if dropped:
+                notes.append(f"dropped invalid preserve entries: {', '.join(dropped)}")
+        if patch and isinstance(patch.get("params"), dict):
+            # ground the VALUES too: a '-50%' here would 500 the preview —
+            # drop what the value grammar cannot parse, with the reason
+            from ..core.values import parse_delta
+
+            good: dict[str, Any] = {}
+            for name, value in patch["params"].items():
+                spec = archetype.parameters.get(name)
+                if spec is None:
+                    notes.append(f"params.{name}: not an archetype parameter — dropped")
+                    continue
+                if spec.type == "choice":
+                    if value in spec.choices:
+                        good[name] = value
+                    else:
+                        notes.append(f"params.{name}: {value!r} not in "
+                                     f"{spec.choices} — dropped")
+                    continue
+                try:
+                    parse_delta(value, spec.type, where=f"params.{name}")
+                except ValueError as exc:
+                    notes.append(
+                        f"params.{name}: {exc} — dropped (use an absolute "
+                        "value like '90mm' or a delta like '-30mm')")
+                    continue
+                good[name] = value
+            patch["params"] = good
+        if patch is not None and not any((
+            patch.get("params"),
+            any((patch.get("modifiers") or {}).get(k) for k in ("add", "update", "remove")),
+            patch.get("manufacturing"), patch.get("style"), patch.get("archetype"),
+        )):
+            notes.append("patch had nothing actionable left after grounding")
+            patch = None
+        intent_name = raw.get("intent")
+        intent_name = intent_name if isinstance(intent_name, str) else None
+        return raw, intent_name, patch
+
+    request_msg = f"{current_yaml}\n\nREQUEST: {text}"
+    raw, intent_name, patch = _attempt(request_msg)
+    if intent_name is None and patch is None:
+        # one corrective retry: the model answered, but nothing actionable
+        # survived coercion — name the drops and demand the object shape
+        # instead of failing the maker's request on the first malformed try
+        rejection = "; ".join(notes) or "empty answer"
+        notes.append("first answer had nothing actionable — retried once")
+        raw, intent_name, patch = _attempt(
+            f"{request_msg}\n\nYOUR PREVIOUS ANSWER WAS REJECTED: {rejection}. "
+            "Answer again through the tool: set patch to a NESTED JSON OBJECT "
+            "(never a string). Parameter changes go in patch.params, new "
+            "modifiers in patch.modifiers.add (id + target + params)."
+        )
     if intent_name is None and patch is None:
         # nothing actionable came back — an honest failure WITH the drop
         # notes beats ok:true that downstream turns into 'edit.input'
@@ -360,16 +450,39 @@ def _coerce_obj(value: Any, where: str, notes: list[str]) -> dict[str, Any] | No
     if value is None or isinstance(value, dict):
         return value
     if isinstance(value, str):
+        decoded = None
         try:
             decoded = json.loads(value)
         except ValueError:
-            decoded = None
+            # models also emit YAML-ish strings (single quotes, bare keys);
+            # YAML is a JSON superset, so try it before giving up
+            try:
+                decoded = yaml.safe_load(value)
+            except yaml.YAMLError:
+                decoded = None
         if isinstance(decoded, dict):
             notes.append(f"{where}: decoded JSON-string object from the LLM")
             return decoded
     notes.append(f"{where}: LLM returned {type(value).__name__} instead of "
                  "an object — dropped")
     return None
+
+
+def _resolve_modifier_id(given: str, legal: list[str]) -> str | None:
+    """Ground an LLM-emitted modifier id onto a catalog id: exact match,
+    then the instance-suffix/prefix families ('hex_perforation_1' →
+    'add_hex_perforation'), then a fuzzy last resort. None = no safe match."""
+    g = given.strip().lower()
+    if g in legal:
+        return g
+    core = re.sub(r"_\d+$", "", g)  # strip an invented instance suffix
+    for lid in legal:
+        if core == lid or f"add_{core}" == lid or (len(core) >= 6 and core in lid):
+            return lid
+    import difflib
+
+    hits = difflib.get_close_matches(core, legal, n=1, cutoff=0.6)
+    return hits[0] if hits else None
 
 
 def _ground_add_target(entry: dict[str, Any], archetype,

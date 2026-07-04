@@ -16,7 +16,8 @@ from ..form.section import Pt
 from ..product.archetype import RegionRole
 
 PROTECTED_ROLES = frozenset(
-    {RegionRole.FASTENER_KEEPOUT, RegionRole.HIGH_STRESS_REGION}
+    {RegionRole.FASTENER_KEEPOUT, RegionRole.HIGH_STRESS_REGION,
+     RegionRole.INTERFACE_KEEPOUT}
 )
 
 

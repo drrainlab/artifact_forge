@@ -41,6 +41,15 @@ class RegionRole(StrEnum):
     RETAINING_FLEXURE = "retaining_flexure"
     AESTHETIC_LIGHTENING = "aesthetic_lightening"
     SEAL_SURFACE = "seal_surface"
+    # -- biomorphic pack (docs/BIOMORPHIC.md) ------------------------------
+    #: Large shell face that may receive additive ribs AND subtractive
+    #: windows — the exoskeleton's primary canvas.
+    EXOSKELETON_PANEL = "exoskeleton_panel"
+    #: Where rib roots are allowed/expected to land (flange rims, bosses).
+    RIB_ANCHOR = "rib_anchor"
+    #: Functional interface volume no modifier may cut into (boss columns,
+    #: channel reservations, rail zones …) — flavor lives in the region id.
+    INTERFACE_KEEPOUT = "interface_keepout"
 
 
 class ParamSpec(BaseModel):
@@ -101,6 +110,29 @@ class ParamSpec(BaseModel):
                 f"min {self.min.literal} > max {self.max.literal}"
             )
         return self
+
+
+#: Informational archetype lifecycle (docs/BIOMORPHIC.md). The COMPUTED
+#: status (recipe/buildable/metadata_only) stays the source of truth about
+#: buildability; maturity records where the archetype sits in its life.
+#: Bio-0 adds maturity to ArchetypeSpec only; Bio-4A may extend it to
+#: presets/families/extensions.
+MATURITY_LEVELS = (
+    "draft", "metadata_only", "recipe_valid", "form_valid",
+    "sandbox_buildable", "production_buildable",
+)
+
+
+class LoadPathSpec(BaseModel):
+    """A declared force route (docs/BIOMORPHIC.md): from a source region to
+    an anchor region. The exoskeleton substrate seeds rib growth along it;
+    ``form.load_paths_connected`` then verifies the built graph honors it."""
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    from_: str = Field(alias="from")
+    to: str
+    priority: Literal["primary", "secondary"] = "primary"
 
 
 class RegionSpec(BaseModel):
@@ -170,6 +202,13 @@ class ArchetypeSpec(VersionedModel):
     constraints: list[str] = []
     form: FormSpec
     regions: list[RegionSpec] = []
+    #: Declared force routes between regions — see LoadPathSpec.
+    load_paths: list[LoadPathSpec] = []
+    #: Informational lifecycle stage; buildability truth stays computed.
+    maturity: Literal[
+        "draft", "metadata_only", "recipe_valid", "form_valid",
+        "sandbox_buildable", "production_buildable",
+    ] | None = None
     surface_style: str = "molded_utility_part"
     validators: list[str] = []
     forbidden_forms: list[str] = []

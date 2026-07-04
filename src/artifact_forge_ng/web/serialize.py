@@ -122,6 +122,16 @@ def form_vm(form: PartForm) -> dict[str, Any]:
         ],
         "datums": form.datums,
         "frame": {k: round(v, 6) for k, v in form.frame.items()},
+        # Compact Bio-2 exoskeleton digest (counts, not dumps — the full IR
+        # lives in the --debug-ir JSON artifacts).
+        "exoskeleton": None if form.exoskeleton is None else {
+            "region": form.exoskeleton.region,
+            "nodes": len(form.exoskeleton.graph.nodes),
+            "edges": len(form.exoskeleton.graph.edges),
+            "windows": len(form.exoskeleton.windows),
+            "min_rib_d": form.exoskeleton.min_rib_d,
+            "seed": form.exoskeleton.seed,
+        },
     }
 
 

@@ -270,6 +270,14 @@ def add_vein_ribs(
     pw = plate_window(form, use.target)
     if pw is None:
         return [fail(use.id, f"target region {use.target!r} has no usable window")]
+    # Side-profile bodies (the clamp halves): the AABB fallback "top plane"
+    # slices through the body interior — veins planted there would cross
+    # the open saddle and the rail root while validate stays green.
+    from .exoskeleton import side_profile_window_gap
+
+    gap = side_profile_window_gap(form, use, "bio surfaces")
+    if gap is not None:
+        return [gap]
     if pw.origin is not None:
         return [fail(use.id, "vein ribs v1 support horizontal faces only")]
     import random

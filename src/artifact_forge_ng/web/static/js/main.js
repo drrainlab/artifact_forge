@@ -77,7 +77,7 @@ async function renderCatalog() {
     <h3 class="dim" style="margin-bottom:12px">ARCHETYPES</h3>
     <div class="cards">${c.archetypes.map((a) => `
       <div class="card">
-        <h3>${esc(a.id)} <span class="badge ${a.status}">${a.status}</span></h3>
+        <h3>${esc(a.id)} <span class="badge ${a.status}">${a.status}</span>${a.maturity ? ` <span class="badge off" title="lifecycle stage (informational)">${esc(a.maturity)}</span>` : ""}</h3>
         <div class="desc">${esc(a.description)}</div>
         <div class="meta">features ${a.provides_features.length} ·
           validators ${a.validators.length} · modifiers ${a.allowed_modifiers.length}
@@ -341,10 +341,10 @@ function renderWorkspace() {
         <button id="dl-stl" style="display:none" title="download the STL artifact shown in the viewport">⭳ STL</button>
       </div>
       <div id="viewport3d"></div>
+      <div id="insp-card" style="display:none"></div>
       <div id="viewport-section" style="display:none"></div>
       <div id="viewport-panel" style="display:none"></div>
     </div>
-    <div class="ws-insp insp" id="insp"><h3>INSPECTOR</h3><div class="dim">click a tree node, region, parameter or finding</div></div>
     <div class="ws-console" id="console"></div>
   </div>`;
   buildTree(v, isAssembly);
@@ -436,6 +436,8 @@ function setLens(lens, v, isAssembly) {
   $("#lenses").querySelectorAll("button[data-lens]").forEach((b) =>
     b.classList.toggle("active", b.dataset.lens === lens));
   const v3 = $("#viewport3d"), vs = $("#viewport-section"), vp = $("#viewport-panel");
+  const rc = $("#insp-card");
+  if (rc) rc.style.display = "none"; // stale card never outlives a lens switch
   // EDIT is a split lens: the edit panel on the left, the REAL region
   // viewport (same ThreeView, same STL, same picking) on the right.
   const split = lens === "edit";
@@ -529,8 +531,15 @@ async function wireEdit(v) {
   };
   if (targetable.length) {
     $("#targetrow").style.display = "flex";
+    // protected regions are LISTED (disabled) — an entry the user can see
+    // beats a mysteriously short dropdown
+    const shielded = regions.filter((r) => !targetable.includes(r));
     sel.innerHTML = `<option value="">— auto —</option>` + targetable.map((r) =>
-      `<option value="${esc(r.id)}">${esc(r.label || r.id)} (${esc(r.id)})</option>`).join("");
+      `<option value="${esc(r.id)}">${esc(r.label || r.id)} (${esc(r.id)})</option>`).join("")
+      + (shielded.length
+        ? `<optgroup label="protected — not editable">` + shielded.map((r) =>
+            `<option disabled>${esc(r.label || r.id)}</option>`).join("") + `</optgroup>`
+        : "");
     const keep = targetable.some((r) => r.id === state.selectedRegion)
       ? state.selectedRegion
       : targetable.length === 1 ? targetable[0].id : null;
@@ -548,7 +557,14 @@ async function wireEdit(v) {
 
   const preview = async (intent, patch, note = "") => {
     out.innerHTML = `<span class="dim">computing patch…</span>`;
-    const p = await api.editPreview(state.yaml, intent, patch);
+    let p;
+    try {
+      p = await api.editPreview(state.yaml, intent, patch);
+    } catch (e) {
+      // a transport/server error must never leave "computing patch…" up
+      out.innerHTML = findingsTable([{ status: "fail", check: "edit.preview", message: String(e) }]);
+      return;
+    }
     if (!p.ok) {
       out.innerHTML = findingsTable(p.findings);
       // did-you-mean: the pipeline proposes the fix, the user confirms
@@ -678,38 +694,95 @@ function buildTree(v, isAssembly) {
     el.addEventListener("click", () => inspect(JSON.parse(el.dataset.insp), v)));
 }
 
+// One inspection surface: everything renders as a card OVER the viewport —
+// the eye stays on the geometry, no separate inspector column.
+function cardHead(title, dot = null) {
+  return `<div class="rc-head">${dot ? `<span class="rc-dot" style="background:${dot}"></span>` : ""}
+    <b>${esc(title)}</b><button class="ghost rc-close" title="hide">✕</button></div>`;
+}
+
+function showCard(html, onClose = null) {
+  const card = $("#insp-card");
+  if (!card) return null;
+  card.style.display = "block";
+  card.innerHTML = html;
+  card.querySelector(".rc-close")?.addEventListener("click", () => {
+    card.style.display = "none";
+    if (onClose) onClose();
+  });
+  return card;
+}
+
 function inspect(sel, v) {
-  const insp = $("#insp");
   if (sel.kind === "param") {
     const p = sel.param;
     const used = Object.keys(v.form?.frame || {}).filter((k) => k.includes(p.name)).slice(0, 8);
-    insp.innerHTML = `<h3>${esc(p.name)}</h3><table>
+    showCard(cardHead(p.name) + `<table>
       <tr><td>value</td><td>${esc(p.value)}</td></tr>
       <tr><td>role</td><td>${esc(p.role)}</td></tr>
       <tr><td>range</td><td>${p.min ?? "—"} … ${p.max ?? "—"}</td></tr>
       <tr><td>rule</td><td>${esc(p.description || "—")}</td></tr>
-      <tr><td>frame keys</td><td>${used.map(esc).join("<br>") || "—"}</td></tr></table>`;
+      <tr><td>frame</td><td>${used.map(esc).join("<br>") || "—"}</td></tr></table>`);
   } else if (sel.kind === "region") {
     const r = sel.region;
     if (editSetTarget) {
       editSetTarget(r.name); // validates protected roles, syncs the select
     } else {
       state.selectedRegion = r.name;
-      state.three?.highlightRegion(r.name);
     }
-    insp.innerHTML = `<h3>region: ${esc(r.name)}</h3><table>
-      <tr><td>role</td><td>${esc(r.role)}</td></tr>
-      <tr><td>box</td><td>${esc(JSON.stringify(r.box))}</td></tr></table>
-      <div class="mt dim">selected as EDIT target — modifiers target regions; keepouts derive from protected roles</div>`;
+    // the pick must be VISIBLE whatever the lens: reveal the region boxes
+    // and light the picked one up (others ghost out)
+    state.three?.showRegions(v.form?.regions, true);
+    state.three?.highlightRegion(r.name);
+    // no STL yet (validate-only) → the camera never fitted; frame the boxes
+    if (state.three && !state.three.meshes.children.length) state.three.fit();
+    showRegionCard(r, v);
   } else if (sel.kind === "field") {
-    insp.innerHTML = `<h3>field: ${esc(sel.field.pattern)}</h3><table>
+    showCard(cardHead(`field: ${sel.field.pattern}`) + `<table>
       <tr><td>cells</td><td>${sel.field.cells}</td></tr>
-      <tr><td>min ligament</td><td>${sel.field.min_ligament} mm (measured, not hoped)</td></tr>
-      <tr><td>depth</td><td>${sel.field.depth} mm</td></tr></table>`;
+      <tr><td>web</td><td>${sel.field.min_ligament} mm (measured, not hoped)</td></tr>
+      <tr><td>depth</td><td>${sel.field.depth} mm</td></tr></table>`);
   } else {
-    insp.innerHTML = `<h3>${esc(sel.name || sel.kind)}</h3>
-      <div class="dim">${esc(sel.kind)}</div>`;
+    showCard(cardHead(sel.name || sel.kind) + `<div class="dim">${esc(sel.kind)}</div>`);
   }
+}
+
+// Region details live ON the viewport (one screen: geometry + meaning),
+// not in a separate panel the eye has to travel to.
+async function showRegionCard(r, v) {
+  const b = r.box || {};
+  const num = (x) => (Number.isFinite(x) ? +(+x).toFixed(1) : "∞");
+  const dims = [b.x1 - b.x0, b.y1 - b.y0, b.z1 - b.z0].map(num).join(" × ");
+  if (!state.catalog) { try { state.catalog = await api.catalog(); } catch (e) { /* card still renders */ } }
+  const archId = String(v.archetype || "").split("@")[0];
+  const spec = (state.catalog?.archetypes || []).find((a) => a.id === archId)
+    ?.regions?.find((x) => x.id === r.name);
+  const mods = spec?.compatible_modifiers || [];
+  const editable = spec ? spec.editable && mods.length : false;
+  showCard(
+    cardHead(spec?.label || r.name, regionColor(r.role)) + `
+    <table>
+      <tr><td>id</td><td>${esc(r.name)}</td></tr>
+      <tr><td>role</td><td>${esc(r.role)}</td></tr>
+      <tr><td>box</td><td>${dims} mm</td></tr>
+      <tr><td>edit</td><td>${editable
+        ? `editable · modifiers: ${mods.map(esc).join(", ")}`
+        : `<span class="rc-protected">protected</span> — keepouts derive from this role`}</td></tr>
+    </table>
+    ${spec?.description ? `<div class="dim mt">${esc(spec.description)}</div>` : ""}`,
+    () => {
+      state.three?.highlightRegion(null);
+      state.three?.showRegions(v.form?.regions, state.lens === "edit");
+    });
+}
+
+function regionColor(role) {
+  return {
+    mounting_surface: "#d9b544", fastener_keepout: "#e05575",
+    soft_contact_surface: "#4dc3d6", high_stress_region: "#f0a832",
+    retaining_flexure: "#46c07a", aesthetic_lightening: "#8a93a3",
+    seal_surface: "#a06be0",
+  }[role] || "#8a93a3";
 }
 
 function buildConsole(v, isAssembly) {

@@ -585,22 +585,46 @@ _register(RecipeOpDecl(
 
 
 def _heatset_insert_pocket(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """Blind pockets sized for heatset inserts, entered from the top face."""
+    """Blind pockets sized for heatset inserts, entered from the top face.
+
+    ``z_top`` = 0 is the legacy behavior (pockets descend from the part's
+    ``state.width`` top — the plate archetypes). A positive ``z_top`` names
+    the entry plane explicitly (a clamp wing top, a rail top) AND drops a
+    FASTENER_KEEPOUT column under each pocket down to z=0 (the boss_pattern
+    floor-slab trick) so later cuts through the bolt column honestly fail
+    ``form.cuts_respect_keepouts``."""
     state.require_base("heatset_insert_pocket")
     spec = screw_spec(p["screw"])
     t = state.width
     depth = p["depth"]
-    if depth >= t - 0.8:
-        raise RecipeError("heatset pocket would pierce the plate")
+    z_top = p.get("z_top", 0.0)  # .get: direct callers predate the param
+    if z_top <= 1e-9:
+        # legacy path — behavior kept EXACTLY (fastener_plate_v1 and friends)
+        if depth >= t - 0.8:
+            raise RecipeError("heatset pocket would pierce the plate")
+        z_top = t
+        keepout_column = False
+    else:
+        if depth >= z_top - 0.8:
+            raise RecipeError("heatset pocket would pierce below its entry plane")
+        keepout_column = True
     sx = p["spacing"] / 2.0
     name = op_id or "inserts"
+    r_keep = spec["heatset"] / 2.0 + KEEPOUT_CLEARANCE
     for i, px in enumerate((p["cx"] - sx, p["cx"] + sx)):
         state.bores.append(
             BoreFeature(
                 name=f"{name}_{i}", axis="Z", center=(px, p["cy"], 0.0),
-                d=spec["heatset"], span=(t - depth, t), overshoot=(0.0, 1.0),
+                d=spec["heatset"], span=(z_top - depth, z_top), overshoot=(0.0, 1.0),
             )
         )
+        if keepout_column and z_top - depth - 0.5 > 0.0:
+            state.regions.append(
+                Region(f"{name}_keep_{i}", RegionRole.FASTENER_KEEPOUT,
+                       Box3(px - r_keep, p["cy"] - r_keep, 0.0,
+                            px + r_keep, p["cy"] + r_keep,
+                            z_top - depth - 0.5))
+            )
         state.frame[f"{name}_{i}_x"] = px
         state.frame[f"{name}_{i}_y"] = p["cy"]
 
@@ -611,11 +635,12 @@ _register(RecipeOpDecl(
     params={
         "screw": ("choice", "M3"), "depth": ("length", 5.0),
         "spacing": ("length", None), "cx": ("length", 0.0),
-        "cy": ("length", 0.0),
+        "cy": ("length", 0.0), "z_top": ("length", 0.0),
     },
     validators=("topology.pockets_present",),
     apply=_heatset_insert_pocket,
-    description="blind pockets sized from the heatset table, pair along X",
+    description="blind pockets sized from the heatset table, pair along X "
+                "(z_top>0: explicit entry plane + bolt-column keepout)",
 ))
 
 
@@ -901,6 +926,142 @@ _register(RecipeOpDecl(
 ))
 
 
+# -- wall_ring_mount ------------------------------------------------------------
+
+
+def _wall_ring_mount(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Wall tool ring mount base: a wall flange fused with a C-ring saddle
+    around a vertical tool axis, buttressed by gusset ribs. Model frame:
+    Z = wall normal (wall at z=0), X = vertical along the wall = tool axis
+    = extrusion axis, Y = horizontal. The base section (top view: flange
+    strip + fused ring) extrudes x in [0, collar_h]; the taller flange
+    continues above as a PlateFeature — anchors land there via a separate
+    hole op. Prints upright ("side_profile"): everything rises from the
+    section on the bed."""
+    from .profiles_wallmount import WallRingParams, build_wall_ring_section
+    from .style import MOLDED_UTILITY_PART
+
+    if state.section is not None:
+        raise RecipeError("wall_ring_mount must be the (single) base op")
+    collar_h, flange_h = p["collar_h"], p["flange_h"]
+    if collar_h + 24.0 > flange_h:
+        raise RecipeError(
+            f"flange_h {flange_h:g} leaves no anchor panel above the "
+            f"collar (needs >= collar_h + 24)"
+        )
+    wp = WallRingParams(
+        tool_d=p["tool_d"], clearance=p["clearance"], ring_wall=p["ring_wall"],
+        capture_deg=p["capture_deg"], standoff=p["standoff"],
+        flange_w=p["flange_w"], flange_t=p["flange_t"],
+        flange_corner_r=p["flange_corner_r"],
+    )
+    try:
+        profile, f = build_wall_ring_section(wp, MOLDED_UTILITY_PART)
+    except ValueError as exc:
+        raise RecipeError(f"wall_ring_mount: {exc}") from exc
+    state.section = profile
+    state.width = collar_h
+    state.print_orientation = "side_profile"
+
+    fw, t = p["flange_w"], p["flange_t"]
+    s, r_i, r_o = f["saddle_cz"], f["saddle_r"], f["r_outer"]
+    name = op_id or "body"
+    state.plates.append(
+        PlateFeature(
+            name=f"{name}_flange",
+            x0=0.0, y0=-fw / 2.0, x1=flange_h, y1=fw / 2.0,
+            z_bottom=0.0, thickness=t, corner_r=p["flange_corner_r"],
+        )
+    )
+
+    # Gusset ribs: two side buttresses welding the flange front to the ring
+    # flank, provably clear of the saddle cavity (|y| > saddle_r). A center
+    # rib under the ring belly is geometrically impossible in this family —
+    # it needs the ring floated off the flange, which contradicts the
+    # direct-fusion guard — so the count is fixed, not a parameter.
+    rib_t = p["rib_t"]
+    rib_y0 = r_i + 1.5
+    if rib_y0 + rib_t > fw / 2.0 - 1.0:
+        raise RecipeError(
+            f"gusset ribs at |y| {rib_y0 + rib_t:.1f} stick past the flange "
+            f"(flange_w/2 - 1 = {fw / 2.0 - 1.0:.1f})"
+        )
+    for i, side in enumerate((-1.0, 1.0)):
+        lo, hi = side * (rib_y0 + rib_t), side * rib_y0
+        state.ribs.append(
+            RibFeature(
+                name=f"{name}_rib_{i}",
+                box=Box3(0.0, min(lo, hi), t - 0.6, collar_h, max(lo, hi), s),
+            )
+        )
+    # Semantic regions — names match the archetype YAML region ids.
+    state.regions.extend([
+        Region("wall_flange", RegionRole.MOUNTING_SURFACE,
+               Box3(0.0, -fw / 2.0, 0.0, flange_h, fw / 2.0, t)),
+        Region("saddle_contact", RegionRole.SOFT_CONTACT_SURFACE,
+               Box3(0.0, -r_i, s - r_i, collar_h, r_i, s + r_i)),
+        Region("retaining_lip", RegionRole.RETAINING_FLEXURE,
+               Box3(0.0, -(r_o + 1.0), s, collar_h, r_o + 1.0, s + r_o + 1.0)),
+        Region("load_rib_zone", RegionRole.HIGH_STRESS_REGION,
+               Box3(0.0, -(r_o + 1.0), t - 1.0, collar_h, r_o + 1.0, s)),
+        Region("flange_lightening", RegionRole.AESTHETIC_LIGHTENING,
+               Box3(collar_h + 6.0, -(fw / 2.0 - 4.0), 0.0,
+                    flange_h - 4.0, fw / 2.0 - 4.0, t)),
+        # Reserved for v2 cylindrical/biomorphic mapping (ring axis is X;
+        # field mapping is Z-axis-only today) — non-editable in the YAML.
+        Region("outer_shell", RegionRole.AESTHETIC_LIGHTENING,
+               Box3(0.0, -r_o, t, collar_h, r_o, s + r_o)),
+    ])
+
+    load_n = p["tool_mass_kg"] * 9.81
+    state.frame.update(f)
+    state.frame.update(
+        collar_h=collar_h,
+        flange_h=flange_h,
+        # the plate outline the hole-web checks measure against:
+        outline_u0=0.0, outline_v0=-fw / 2.0,
+        outline_u1=flange_h, outline_v1=fw / 2.0,
+        outline_corner_r=p["flange_corner_r"], plate_t=t,
+        load_n_est=load_n,
+        moment_nmm_est=load_n * p["safety_factor"] * p["standoff"],
+    )
+    state.datums["tool_axis"] = {
+        "at": [collar_h / 2.0, 0.0, s], "rotate": [0.0, 0.0, 0.0],
+    }
+    state.datums["mount_face"] = {
+        "at": [flange_h / 2.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0],
+    }
+
+
+_register(RecipeOpDecl(
+    name="wall_ring_mount",
+    kind="base",
+    params={
+        "tool_d": ("length", None), "clearance": ("length", 1.0),
+        "ring_wall": ("length", 7.0), "collar_h": ("length", 30.0),
+        "capture_deg": ("number", 220.0), "standoff": ("length", None),
+        "flange_w": ("length", None), "flange_h": ("length", None),
+        "flange_t": ("length", None), "flange_corner_r": ("length", 6.0),
+        "rib_t": ("length", 3.0),
+        "tool_mass_kg": ("number", 2.5), "safety_factor": ("number", 2.5),
+    },
+    validators=(
+        "form.tool_saddle_radius_ok",
+        "form.tool_clearance_ok",
+        "form.retention_angle_ok",
+        "form.mouth_gap_ok",
+        "form.ribs_connect_saddle_to_flange",
+        "form.anchor_wall_strength_unverified",
+        "topology.tool_void_open",
+        "topology.single_connected_solid",
+        "topology.ribs_present",
+    ),
+    apply=_wall_ring_mount,
+    description="wall flange + fused C-ring tool saddle + gusset ribs "
+                "(tool axis = X, prints upright)",
+))
+
+
 # -- revolve_band + cylindrical_z_mapping_v1 ------------------------------------
 
 #: MVP guard: a cell wider than this fraction of the wall-midline radius
@@ -1001,4 +1162,219 @@ _register(RecipeOpDecl(
     apply=_revolve_band,
     description="revolved band (ring/bushing/washer/bracelet) with a "
                 "cylindrical field canvas on the outer wall",
+))
+
+
+# -- split branch clamp (Bio-1, docs/BIOMORPHIC.md) ------------------------------
+
+
+def _clamp_common(state: RecipeState, p: dict[str, Any]) -> Any:
+    from .profiles_clamp import ClampHalfParams
+
+    if state.section is not None:
+        raise RecipeError("a clamp half must be the (single) base op")
+    return ClampHalfParams(
+        branch_d=p["branch_d"], gap=p["gap"], flange_t=p["flange_t"],
+        bolt_y=p["bolt_y"], edge_m=p["edge_m"], wall=p["wall"],
+        corner_r=p["corner_r"], land_angle=p["land_angle"],
+        land_w=p["land_w"], pad_recess=p["pad_recess"],
+        base_t=p.get("base_t", 8.0), top_t=p.get("top_t", 20.0),
+        rail_w=p.get("rail_w", 20.0), rail_h=p.get("rail_h", 6.0),
+        rail_angle=p.get("rail_angle", 10.0),
+    )
+
+
+def _clamp_finish(
+    state: RecipeState, p: dict[str, Any], profile: Any, f: dict[str, float]
+) -> None:
+    """Shared tail of both halves: section, outline frame (in the Z-hole
+    plane: x = extrusion axis, y = profile u), print orientation."""
+    state.section = profile
+    state.width = p["clamp_w"]
+    state.kind = "section_extrude"
+    state.print_orientation = "side_profile"
+    state.frame.update(f)
+    state.frame.update(
+        outline_u0=0.0, outline_v0=-f["wing_u_out"],
+        outline_u1=p["clamp_w"], outline_v1=f["wing_u_out"],
+        outline_corner_r=0.0,
+    )
+
+
+def _clamp_half_lower(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Lower half of the split branch clamp: base slab, open saddle notch
+    in the mating (top) edge, wing flanges carrying the bolt columns.
+
+    The ``clamp_mate`` datum bakes the compression gap in: it sits at
+    ``mate_z + gap`` — joints land datum-on-datum and cannot express an
+    offset, so the LOWER half's datum carries the gap and the upper half
+    (modeled mating-face-down, datum at v=0) poses with rotate [0,0,0]."""
+    from .profiles_clamp import build_clamp_lower_profile
+
+    cp = _clamp_common(state, p)
+    try:
+        profile, f = build_clamp_lower_profile(cp)
+    except ValueError as exc:
+        raise RecipeError(f"clamp_half_lower: {exc}") from exc
+    _clamp_finish(state, p, profile, f)
+    w, mh = p["clamp_w"], f["saddle_mouth_half"]
+    state.regions.extend([
+        Region("saddle_contact", RegionRole.SOFT_CONTACT_SURFACE,
+               Box3(0.0, -mh, f["saddle_apex_v"] - p["pad_recess"],
+                    w, mh, f["mate_z"])),
+        Region("outer_shell", RegionRole.EXOSKELETON_PANEL,
+               Box3(0.0, -f["body_half"], 0.0, w, f["body_half"], f["wing_v0"])),
+    ])
+    state.datums["clamp_mate"] = {
+        "at": [w / 2.0, 0.0, f["mate_z"] + p["gap"]], "rotate": [0.0, 0.0, 0.0],
+    }
+    state.datums["branch_axis"] = {
+        "at": [w / 2.0, 0.0, f["saddle_cz"]], "rotate": [0.0, 0.0, 0.0],
+    }
+
+
+_register(RecipeOpDecl(
+    name="clamp_half_lower",
+    kind="base",
+    params={
+        "branch_d": ("length", None), "clamp_w": ("length", None),
+        "gap": ("length", 3.0), "base_t": ("length", 8.0),
+        "flange_t": ("length", 10.0), "bolt_y": ("length", None),
+        "edge_m": ("length", 10.0), "wall": ("length", 4.0),
+        "corner_r": ("length", 2.5), "land_angle": ("angle", 50.0),
+        "land_w": ("length", 14.0), "pad_recess": ("length", 1.2),
+    },
+    validators=(
+        "form.saddle_geometry_ok",
+        "form.pad_lands_present",
+        "topology.cavity_open",
+        "topology.single_connected_solid",
+    ),
+    apply=_clamp_half_lower,
+    description="lower split-clamp half: open branch saddle + bolt wings "
+                "(X = branch axis, prints on its section)",
+))
+
+
+def _clamp_half_upper(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Upper half, modeled MATING-FACE-DOWN (mating plane at v=0, saddle
+    notch in the bottom edge, dovetail rail on top) — the assembly poses it
+    with rotate [0,0,0], no flip needed. Its ``clamp_mate`` datum sits ON
+    the mating plane; the gap is baked into the LOWER half's datum."""
+    from .profiles_clamp import build_clamp_upper_profile
+
+    cp = _clamp_common(state, p)
+    try:
+        profile, f = build_clamp_upper_profile(cp)
+    except ValueError as exc:
+        raise RecipeError(f"clamp_half_upper: {exc}") from exc
+    _clamp_finish(state, p, profile, f)
+    w, mh = p["clamp_w"], f["saddle_mouth_half"]
+    state.regions.extend([
+        Region("saddle_contact", RegionRole.SOFT_CONTACT_SURFACE,
+               Box3(0.0, -mh, 0.0, w, mh, f["saddle_apex_v"] + p["pad_recess"])),
+        Region("outer_shell", RegionRole.EXOSKELETON_PANEL,
+               Box3(0.0, -f["body_half"], f["flange_t"],
+                    w, f["body_half"], f["body_top_v"])),
+        Region("rail_interface", RegionRole.MOUNTING_SURFACE,
+               Box3(0.0, -f["rail_top_w"] / 2.0 - 1.0, f["rail_v0"],
+                    w, f["rail_top_w"] / 2.0 + 1.0, f["rail_v1"] + 0.5)),
+    ])
+    state.datums["clamp_mate"] = {
+        "at": [w / 2.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0],
+    }
+    state.datums["branch_axis"] = {
+        "at": [w / 2.0, 0.0, f["saddle_cz"]], "rotate": [0.0, 0.0, 0.0],
+    }
+
+
+_register(RecipeOpDecl(
+    name="clamp_half_upper",
+    kind="base",
+    params={
+        "branch_d": ("length", None), "clamp_w": ("length", None),
+        "gap": ("length", 3.0), "flange_t": ("length", 10.0),
+        "bolt_y": ("length", None), "edge_m": ("length", 10.0),
+        "wall": ("length", 4.0), "corner_r": ("length", 2.5),
+        "land_angle": ("angle", 50.0), "land_w": ("length", 14.0),
+        "pad_recess": ("length", 1.2), "top_t": ("length", 20.0),
+        "rail_w": ("length", 20.0), "rail_h": ("length", 6.0),
+        "rail_angle": ("angle", 10.0),
+    },
+    validators=(
+        "form.saddle_geometry_ok",
+        "form.pad_lands_present",
+        "topology.cavity_open",
+        "topology.single_connected_solid",
+        "form.dovetail_rail_profile",
+        "topology.rail_present",
+    ),
+    apply=_clamp_half_upper,
+    description="upper split-clamp half, mating-face-down: saddle + wings + "
+                "male dovetail rail on top",
+))
+
+
+def _axial_channel(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """A through cable channel along the extrusion (branch) axis, open at
+    both ends — verified void end to end by topology.bores_open and placed
+    clear of the saddle/rail by form.clamp_channel_clear."""
+    state.require_base("axial_channel")
+    name = op_id or "channel"
+    state.bores.append(
+        BoreFeature(
+            name=name, axis="X", center=(0.0, p["y"], p["z"]),
+            d=p["d"], span=(0.0, state.width), overshoot=(1.0, 1.0),
+        )
+    )
+    state.frame.update(channel_z=p["z"], channel_y=p["y"], channel_d=p["d"])
+
+
+_register(RecipeOpDecl(
+    name="axial_channel",
+    kind="feature",
+    params={
+        "d": ("length", 10.0), "y": ("length", 0.0), "z": ("length", None),
+    },
+    validators=("form.clamp_channel_clear", "topology.bores_open"),
+    apply=_axial_channel,
+    description="through cable channel along the extrusion axis, open both ends",
+))
+
+
+def _cord_slot_pair(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Two through slots near the saddle center (shock cord / zip tie for
+    mounting) — they exit INTO the saddle void through the mating plane.
+    cx = 0 means the width center; the keepout check keeps them honest
+    around the bolt columns."""
+    state.require_base("cord_slot_pair")
+    mate_z = state.frame.get("mate_z")
+    if mate_z is None:
+        raise RecipeError("cord_slot_pair needs a clamp_half base (mate_z)")
+    cx = p["cx"] if abs(p["cx"]) > 1e-9 else state.width / 2.0
+    half_l, half_w = p["slot_l"] / 2.0, p["slot_w"] / 2.0
+    name = op_id or "cord_slots"
+    for i, sy in enumerate((-p["spacing"] / 2.0, p["spacing"] / 2.0)):
+        state.cutboxes.append(
+            CutBoxFeature(
+                name=f"{name}_{i}",
+                box=Box3(cx - half_l, sy - half_w, -1.0,
+                         cx + half_l, sy + half_w, mate_z + 1.0),
+            )
+        )
+        state.frame[f"{name}_{i}_v"] = sy
+    state.frame[f"{name}_l"] = p["slot_l"]
+    state.frame[f"{name}_w"] = p["slot_w"]
+
+
+_register(RecipeOpDecl(
+    name="cord_slot_pair",
+    kind="feature",
+    params={
+        "slot_l": ("length", 8.0), "slot_w": ("length", 4.0),
+        "spacing": ("length", None), "cx": ("length", 0.0),
+    },
+    validators=("form.cuts_respect_keepouts", "topology.cutout_present"),
+    apply=_cord_slot_pair,
+    description="through cord/tie slot pair exiting into the saddle void",
 ))

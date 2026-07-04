@@ -123,3 +123,10 @@ def finalize_build(state, geometry, out: dict[str, Any], target: Path) -> None:
             allow_unicode=True,
         )
     )
+
+    # Bio-2 exoskeleton debug artifacts ride along with every build that
+    # carries the IR (lazy import — most builds have no exoskeleton).
+    if state.form is not None and getattr(state.form, "exoskeleton", None) is not None:
+        from ..form.exoskeleton.debug import dump_exoskeleton_debug
+
+        dump_exoskeleton_debug(state.form, target)

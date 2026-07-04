@@ -346,3 +346,113 @@ features:
     verified_by:
       - topology.ribs_present
       - topology.pockets_present
+
+  # -- wall tool mounts pack ---------------------------------------------------
+
+  - id: tool_saddle_ring
+    description: C-ring saddle whose bore matches the declared tool diameter plus clearance
+    verified_by:
+      - form.tool_saddle_radius_ok
+      - form.tool_clearance_ok
+      - form.retention_angle_ok
+      - topology.tool_void_open
+
+  - id: snap_retention_mouth
+    description: mouth throat narrower than the tool (retains) yet wide enough to insert it
+    verified_by:
+      - form.mouth_gap_ok
+      - form.retention_angle_ok
+
+  - id: wall_mount_flange
+    description: wall flange with both anchors on the centerline, reachable by a driver
+    verified_by:
+      - form.mount_hole_positions_ok
+      - form.holes_within_outline
+      - form.screw_access_clear
+
+  - id: counterbored_anchor_holes
+    description: open anchor bores with recessed heads on the front face
+    verified_by:
+      - topology.screw_holes_open
+      - topology.countersinks_present
+
+  - id: saddle_buttress_ribs
+    description: ring fused into the flange with gusset ribs bridging the load path
+    verified_by:
+      - form.ribs_connect_saddle_to_flange
+      - topology.ribs_present
+
+  # -- biomorphic pack (docs/BIOMORPHIC.md). The topology.* entries below
+  # are implemented in Bio-3: until then these features stay honestly
+  # supported-but-not-built — mark_built requires ALL verified_by to pass.
+  - id: biomorphic_exoskeleton
+    description: >
+      load-aware organic rib network grown over a functional core's
+      exoskeleton panel — a validator-backed structural skin, not decoration
+    verified_by:
+      - form.rib_graph_connected
+      - form.rib_roots_touch_substrate
+      - form.min_rib_diameter_ok
+      - topology.exoskeleton_ribs_materialized
+
+  - id: organic_windows
+    description: >
+      organic lightening windows between exoskeleton ribs, keepout-safe
+      with a guaranteed minimum ligament
+    verified_by:
+      - form.windows_inside_safe_regions
+      - form.min_ligament_ok
+      - topology.organic_windows_open
+
+  - id: load_path_ribs
+    description: >
+      ribs routed along a declared load path (shared structural feature:
+      workshop cores spell it as gussets, the bio pack as organic struts)
+    verified_by:
+      - form.rib_graph_connected
+      - form.no_rib_islands
+      - topology.exoskeleton_ribs_materialized
+
+  - id: split_branch_clamp
+    description: >
+      two-half clamp for a branch/pipe — open saddles meeting at a bolted
+      mating plane, never a closed hole around the branch
+    verified_by:
+      - form.saddle_geometry_ok
+      - assembly.screw_joint_ir
+      - assembly.no_interference
+
+  - id: branch_saddle
+    description: open semicircular saddle notch sized to the nominal branch
+    verified_by:
+      - form.saddle_geometry_ok
+      - topology.cavity_open
+
+  - id: three_point_tpu_contact
+    description: >
+      three flat recessed pad lands across the assembled saddle pair —
+      three-point contact by construction, holding glued TPU strips
+    verified_by:
+      - form.pad_lands_present
+
+  - id: axial_cable_channel
+    description: through cable channel along the clamp axis, open both ends
+    verified_by:
+      - form.clamp_channel_clear
+      - topology.bores_open
+
+  - id: dovetail_rail
+    description: male dovetail rail in the extruded section, top wider than root
+    verified_by:
+      - form.dovetail_rail_profile
+      - topology.rail_present
+
+  - id: compression_clamp_interface
+    description: >
+      bolted split clamp that never closes fully — the declared compression
+      gap survives into the assembled pose
+    verified_by:
+      - assembly.screw_joint_ir
+      - assembly.clamp_gap_ir
+      - assembly.screw_axes_clear
+      - assembly.no_interference

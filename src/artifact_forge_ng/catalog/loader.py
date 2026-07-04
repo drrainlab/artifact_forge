@@ -138,6 +138,14 @@ def _load_archetype(
                 raise CatalogError(
                     f"{where} region {region.id!r}: unknown modifier {mod_id!r}"
                 )
+    region_ids = {r.id for r in spec.regions}
+    for lp in spec.load_paths:
+        for name in (lp.from_, lp.to):
+            if name not in region_ids:
+                raise CatalogError(
+                    f"{where} load_path {lp.from_!r} -> {lp.to!r}: "
+                    f"{name!r} is not a declared region"
+                )
     _bind_recipe_ops(spec, where)
     return spec
 

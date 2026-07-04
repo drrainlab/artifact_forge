@@ -150,6 +150,33 @@ def _poly_clear_of_keepout(poly: Poly, keepout: Region2D) -> bool:
     )
 
 
+def voronoi_cells_for_sites(
+    sites: list[tuple[float, float]],
+    window: Rect2D,
+    keepouts: list[Region2D],
+    *,
+    min_ligament: float,
+    min_cell_area: float = 12.0,
+    corner_smooth: int = 2,
+) -> list[Poly]:
+    """The cell pipeline for FIXED sites (no Lloyd relaxation): half-plane
+    Voronoi cell per site inside ``window``, shrunk for the ligament,
+    area/keepout filtered, Chaikin-smoothed. :func:`voronoi_cells` relaxes
+    its random sites first and then runs exactly this; the exoskeleton
+    windows (form/exoskeleton/windows.py) feed rib-graph nodes straight in."""
+    out: list[Poly] = []
+    for site in sites:
+        cell = _cell(site, sites, window)
+        if len(cell) < 3:
+            continue
+        shrunk = _shrink_convex(cell, min_ligament / 2.0)
+        if len(shrunk) < 3 or _area(shrunk) < min_cell_area:
+            continue
+        if all(_poly_clear_of_keepout(shrunk, k) for k in keepouts):
+            out.append(chaikin(shrunk, corner_smooth))
+    return out
+
+
 def voronoi_cells(
     window: Rect2D,
     keepouts: list[Region2D],
@@ -177,17 +204,14 @@ def voronoi_cells(
         points = [
             _centroid(c) if len(c) >= 3 else s for s, c in zip(points, cells)
         ]
-    out: list[Poly] = []
-    for site in points:
-        cell = _cell(site, points, inner)
-        if len(cell) < 3:
-            continue
-        shrunk = _shrink_convex(cell, min_ligament / 2.0)
-        if len(shrunk) < 3 or _area(shrunk) < min_cell_area:
-            continue
-        if all(_poly_clear_of_keepout(shrunk, k) for k in keepouts):
-            out.append(chaikin(shrunk, corner_smooth))
-    return out
+    return voronoi_cells_for_sites(
+        points,
+        inner,
+        keepouts,
+        min_ligament=min_ligament,
+        min_cell_area=min_cell_area,
+        corner_smooth=corner_smooth,
+    )
 
 
 def min_polygon_gap(polys: list[Poly], cap: float = 1e9) -> float:

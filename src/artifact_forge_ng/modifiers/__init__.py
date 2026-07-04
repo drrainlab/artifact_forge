@@ -101,4 +101,4 @@ def apply_modifiers(
 
 
 # Import applicator modules so their registrations run.
-from . import fields, interface, structural  # noqa: E402,F401
+from . import exoskeleton, fields, interface, structural  # noqa: E402,F401

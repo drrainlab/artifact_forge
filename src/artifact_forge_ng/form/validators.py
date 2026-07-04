@@ -480,7 +480,9 @@ register_probe("form.shell_walls_ok")(lambda form, ctx: check_shell_walls_ok(for
 # importing validate_form gets the full form-check registry.
 from . import (  # noqa: E402,F401
     checks_channel,
+    checks_clamp,
     checks_cuts,
+    checks_exoskeleton,
     checks_fields,
     checks_holes,
     checks_jhook,
@@ -489,6 +491,7 @@ from . import (  # noqa: E402,F401
     checks_snap,
     checks_stability,
     checks_tunnel,
+    checks_wallmount,
 )
 
 #: Structural sanity every archetype gets whether it asks or not — mirrors

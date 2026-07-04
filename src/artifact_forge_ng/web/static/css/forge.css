@@ -105,9 +105,9 @@ textarea:focus, input:focus { outline: none; border-color: var(--amber); }
 
 /* workspace */
 .ws { display: grid; height: calc(100vh - 41px);
-  grid-template-columns: 250px 1fr 300px;
+  grid-template-columns: 250px 1fr;
   grid-template-rows: 1fr 220px;
-  grid-template-areas: "tree view insp" "console console console"; }
+  grid-template-areas: "tree view" "console console"; }
 .ws-tree { grid-area: tree; background: var(--bg2); border-right: 1px solid var(--line);
   overflow: auto; padding: 10px; }
 .ws-view { grid-area: view; position: relative; background: var(--bg); overflow: hidden; }
@@ -180,3 +180,18 @@ tr.f-fail td:first-child { color: var(--magenta); }
     border-top: 1px solid var(--line); }
 }
 button[disabled] { opacity: .45; cursor: not-allowed; }
+
+/* -- inspect card: geometry + meaning on ONE screen, overlaying the 3D -- */
+#insp-card { position: absolute; top: 44px; right: 10px; z-index: 6;
+  width: 280px; max-width: 40%; background: rgba(16,19,24,.92);
+  border: 1px solid var(--line); border-radius: 5px; padding: 10px 12px;
+  font-family: var(--mono); font-size: 11px; backdrop-filter: blur(3px); }
+#insp-card .rc-head { display: flex; align-items: center; gap: 8px;
+  margin-bottom: 6px; color: var(--text); }
+#insp-card .rc-head b { flex: 1; font-size: 12px; }
+#insp-card .rc-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+#insp-card .rc-close { padding: 0 6px; font-size: 11px; }
+#insp-card table { border-collapse: collapse; width: 100%; }
+#insp-card td { padding: 2px 8px 2px 0; color: var(--dim); vertical-align: top; }
+#insp-card td:first-child { color: var(--faint); width: 42px; }
+#insp-card .rc-protected { color: var(--yellow); }

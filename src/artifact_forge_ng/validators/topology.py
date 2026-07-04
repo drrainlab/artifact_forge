@@ -173,6 +173,38 @@ def countersinks_present(geometry: Geometry, form: PartForm) -> Finding:
     )
 
 
+@register_probe("topology.tool_void_open")
+def tool_void_open(geometry: Geometry, form: PartForm) -> Finding:
+    """The wall tool mount's saddle: the tool-body cylinder along the tool
+    axis (X) AND the mouth window (between the prong tips, out past the
+    ring) must both be real voids — a blocked saddle or a grown-shut mouth
+    is a paperweight, not a holder."""
+    f = form.frame
+    if "tool_probe_d" not in f:
+        return _finding("topology.tool_void_open", False,
+                        "frame declares no tool probe sizes")
+    y, z = f.get("saddle_cu", 0.0), f["saddle_cz"]
+    axis = channel_probe(
+        [(-2.0, y, z), (form.width + 2.0, y, z)], d=f["tool_probe_d"]
+    )
+    frac_axis = solid_fraction(geometry.workplane, axis)
+    half = f["mouth_probe_d"] / 2.0
+    mouth = box_probe(
+        1.0, y - half, f["mouth_tip_v"] + 0.5,
+        max(form.width - 1.0, 2.0), y + half, z + f["r_outer"] + 2.0,
+    )
+    frac_mouth = solid_fraction(geometry.workplane, mouth)
+    ok = frac_axis < 0.05 and frac_mouth < 0.05
+    return _finding(
+        "topology.tool_void_open",
+        ok,
+        f"tool axis solid fraction {frac_axis:.3f}, "
+        f"mouth window solid fraction {frac_mouth:.3f}",
+        measured=max(frac_axis, frac_mouth),
+        limit=0.05,
+    )
+
+
 @register_probe("topology.revolve_cavity_open")
 def revolve_cavity_open(geometry: Geometry, form: PartForm) -> Finding:
     """The revolved cavity + cable exit must be void along the axis, end to
@@ -584,4 +616,34 @@ def pockets_present(geometry: Geometry, form: PartForm) -> Finding:
         "topology.pockets_present",
         not problems,
         "all pockets cut, skins intact" if not problems else "; ".join(problems),
+    )
+
+
+@register_probe("topology.rail_present")
+def rail_present(geometry: Geometry, form: PartForm) -> Finding:
+    """The dovetail rail core must be solid material along the body — a
+    rail the compiler dropped (or a cut that severed it) is a missing
+    mounting interface, not a style defect. Probes the rail's inner core
+    only (frame keys rail_root_w / rail_v0 / rail_v1; part frame: x =
+    extrusion axis, y = profile u, z = profile v)."""
+    f = form.frame
+    if "rail_v0" not in f or "rail_root_w" not in f:
+        return Finding(
+            check="topology.rail_present",
+            status=Status.PASS,
+            level=Level.TOPOLOGY,
+            message="no rail declared",
+        )
+    half_u = 0.3 * f["rail_root_w"]
+    zone = box_probe(
+        form.width * 0.25, -half_u, f["rail_v0"] + 0.2,
+        form.width * 0.75, half_u, f["rail_v1"] - 0.2,
+    )
+    frac = solid_fraction(geometry.workplane, zone)
+    return _finding(
+        "topology.rail_present",
+        frac > 0.9,
+        f"rail core solid fraction {frac:.3f}",
+        measured=frac,
+        limit=0.9,
     )

@@ -73,6 +73,28 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.shell_walls_ok", Level.FORM, "box-shell interior keeps the declared wall and floor thickness"),
         _decl("form.snap_arc_coverage", Level.FORM, "snap-clip cavity wraps the declared retention arc"),
         _decl("form.snap_mouth_retains", Level.FORM, "snap-clip mouth is measurably narrower than the held diameter"),
+        # -- wall tool mount form checks (impls in form/checks_wallmount.py) --
+        _decl("form.tool_saddle_radius_ok", Level.FORM, "saddle arc radius/center match the declared tool diameter and standoff"),
+        _decl("form.tool_clearance_ok", Level.FORM, "effective saddle bore leaves the declared radial clearance around the tool"),
+        _decl("form.retention_angle_ok", Level.FORM, "saddle arc wraps the declared capture angle, past half a circle"),
+        _decl("form.mouth_gap_ok", Level.FORM, "mouth throat is narrower than the tool (retains) yet wide enough to insert"),
+        _decl("form.mount_hole_positions_ok", Level.FORM, "two anchor holes on the flange centerline, clear of the collar and the edges"),
+        _decl("form.ribs_connect_saddle_to_flange", Level.FORM, "ring fuses into the flange and every gusset rib bridges flange to ring flank"),
+        _decl("form.anchor_wall_strength_unverified", Level.FORM, "honesty warning: wall material and anchor rating are external assumptions"),
+        # -- biomorphic exoskeleton form checks (impls in form/checks_exoskeleton.py)
+        _decl("form.rib_graph_connected", Level.FORM, "exoskeleton rib graph is a single component containing every root"),
+        _decl("form.no_rib_islands", Level.FORM, "no rib node or component is disconnected from every anchor root"),
+        _decl("form.rib_roots_touch_substrate", Level.FORM, "every rib root lands on an anchor region/edge within tolerance"),
+        _decl("form.min_rib_diameter_ok", Level.FORM, "measured minimum rib diameter meets the declared floor"),
+        _decl("form.windows_inside_safe_regions", Level.FORM, "every organic window polygon stays inside its window and clear of keepouts"),
+        _decl("form.load_paths_connected", Level.FORM, "every declared load path routes through the rib graph from source to anchor"),
+        _decl("form.no_load_path_through_keepout", Level.FORM, "declared load path polylines stay clear of keepout masks"),
+        _decl("form.primary_load_path_has_ribs", Level.FORM, "the primary load path carries thickened ribs (Bio-3)"),
+        # -- branch clamp form checks (impls in form/checks_clamp.py) ---------
+        _decl("form.saddle_geometry_ok", Level.FORM, "saddle arc radius/center match the branch and the mouth opens at the mating plane"),
+        _decl("form.pad_lands_present", Level.FORM, "the saddle carries its flat recessed TPU pad lands"),
+        _decl("form.clamp_channel_clear", Level.FORM, "the axial cable channel spans the body with open ends and clear walls"),
+        _decl("form.dovetail_rail_profile", Level.FORM, "the rail section is a real dovetail — top measurably wider than root"),
         # -- topology level: probed on the compiled solid ---------------------
         _decl("topology.single_connected_solid", Level.TOPOLOGY, "exactly one connected valid solid"),
         _decl("topology.cavity_open", Level.TOPOLOGY, "the cable cavity is a real void along the cable axis"),
@@ -82,6 +104,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.screw_holes_open", Level.TOPOLOGY, "screw holes pass through the flange"),
         _decl("topology.countersinks_present", Level.TOPOLOGY, "conical countersinks removed material at hole rims"),
         _decl("topology.hex_field_present", Level.TOPOLOGY, "hex perforation removed material in the safe zone"),
+        _decl("topology.tool_void_open", Level.TOPOLOGY, "the tool cylinder and its mouth window are real voids on the solid"),
         # -- phase-5 topology probes ------------------------------------------
         _decl("topology.bores_open", Level.TOPOLOGY, "every declared bore is void along its span"),
         _decl("topology.channel_continuous", Level.TOPOLOGY, "the wiring channel is void along its full L-path"),
@@ -96,6 +119,10 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.arm_reaches_tip", Level.TOPOLOGY, "the cantilever/loft arm is solid out to its tip"),
         _decl("topology.pins_present", Level.TOPOLOGY, "every alignment/press-fit pin is real material along its length"),
         _decl("topology.bar_follows_arc", Level.TOPOLOGY, "the swept bar is solid along its whole declared arc"),
+        # -- biomorphic / clamp topology probes --------------------------------
+        _decl("topology.rail_present", Level.TOPOLOGY, "the dovetail rail core is solid material along the body"),
+        _decl("topology.exoskeleton_ribs_materialized", Level.TOPOLOGY, "every rib graph edge is solid material on the compiled part (Bio-3)"),
+        _decl("topology.organic_windows_open", Level.TOPOLOGY, "every organic window removed material through the panel (Bio-3)"),
         # -- assembly level: cross-part checks in the assembled pose ----------
         _decl("assembly.screw_joint_ir", Level.ASSEMBLY, "bolt patterns coincide with compatible diameters in the pose"),
         _decl("assembly.joint_pose", Level.ASSEMBLY, "every part is posed by a joint against existing datums"),
@@ -109,6 +136,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.butt_pin_ir", Level.ASSEMBLY, "butt-split halves share one section and align on end pins"),
         _decl("assembly.snap_joint_ir", Level.ASSEMBLY, "snap hooks reach their windows with printable flexure strain"),
         _decl("assembly.hooks_engage", Level.ASSEMBLY, "every snap hook lip occupies its window in the pose"),
+        _decl("assembly.clamp_gap_ir", Level.ASSEMBLY, "posed clamp halves keep the declared compression gap with coincident saddle centers"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),
@@ -139,6 +167,12 @@ FORBIDDEN_FORM_DETECTORS: dict[str, str] = {
     "profile_crosses_axis": "form.revolve_profile_clear_of_axis",
     "tipping_stand": "form.stability_footprint",
     "closed_bay": "form.bay_open_top",
+    # biomorphic pack (docs/BIOMORPHIC.md): the clamp's must_not_have set
+    "blocked_cable_channel": "topology.bores_open",
+    "closed_branch_hole_without_split": "form.saddle_geometry_ok",
+    "weak_saddle_contact": "form.pad_lands_present",
+    "perforated_bolt_boss": "region.keepouts_preserved",
+    "floating_ribs": "topology.ribs_present",
 }
 
 
