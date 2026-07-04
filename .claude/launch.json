@@ -6,6 +6,12 @@
       "runtimeExecutable": "uv",
       "runtimeArgs": ["run", "uvicorn", "artifact_forge_ng.web.app:app", "--port", "8765"],
       "port": 8765
+    },
+    {
+      "name": "cockpit-preview",
+      "runtimeExecutable": "uv",
+      "runtimeArgs": ["run", "uvicorn", "artifact_forge_ng.web.app:app", "--port", "8766"],
+      "port": 8766
     }
   ]
 }

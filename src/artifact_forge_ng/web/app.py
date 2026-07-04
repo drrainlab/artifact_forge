@@ -17,7 +17,12 @@ from pydantic import BaseModel
 
 from ..archetypes import builder_for
 from ..assembly.joints import JOINT_TYPES
-from ..catalog.loader import CatalogError, load_catalog
+from ..catalog.loader import (
+    CatalogError,
+    compatible_regions,
+    load_catalog,
+    suggest_region,
+)
 from ..form.recipe_ops import RECIPE_OPS
 from ..pipeline import PipelineFailure, pre_cad_from_instance
 from ..product.instance import ProductInstance
@@ -119,6 +124,17 @@ def api_catalog() -> dict[str, Any]:
             "provides_features": list(spec.provides_features),
             "validators": list(spec.validators),
             "allowed_modifiers": list(spec.allowed_modifiers),
+            "regions": [
+                {"id": r.id, "role": r.role.value, "editable": r.editable,
+                 "label": r.label, "aliases": list(r.aliases),
+                 "compatible_modifiers": [
+                     mod_id for mod_id in spec.allowed_modifiers
+                     if mod_id in catalog.modifiers
+                     and any(cr.id == r.id for cr in compatible_regions(
+                         spec, catalog.modifiers[mod_id]))
+                 ]}
+                for r in spec.regions
+            ],
             "contract": contract_vm(spec),
             "parameters": [
                 {"name": n, "type": p.type, "role": p.role,
@@ -282,6 +298,27 @@ class EditBody(BaseModel):
     patch: dict[str, Any] | None = None
 
 
+def _target_suggestions(patch: dict[str, Any], archetype) -> list[dict[str, Any]]:
+    """did-you-mean for modifier targets: for every add/update entry whose
+    target is not a region of this archetype, offer the closest real one
+    (alias/label resolution first, fuzzy match second). The pipeline never
+    silently fixes a patch — it proposes, the user confirms."""
+    out: list[dict[str, Any]] = []
+    mods = (patch or {}).get("modifiers") or {}
+    for key in ("add", "update"):
+        for entry in mods.get(key) or []:
+            if not isinstance(entry, dict):
+                continue
+            target = str(entry.get("target") or "")
+            if not target or archetype.region(target) is not None:
+                continue
+            hit = suggest_region(archetype, target)
+            if hit is not None:
+                out.append({"modifier": entry.get("id"), "given": target,
+                            "suggestion": hit.id, "label": hit.label})
+    return out
+
+
 @app.post("/api/edit/preview")
 def api_edit_preview(body: EditBody) -> JSONResponse:
     """Pure patch preview: apply the patch, validate the result — NO CAD.
@@ -309,7 +346,23 @@ def api_edit_preview(body: EditBody) -> JSONResponse:
             return _fail([error_finding("edit needs intent or patch", "edit.input")])
         edited = apply_patch(instance, patch, archetype, catalog)
     except (IntentNotApplicable, PatchError) as exc:
-        return _fail([error_finding(str(exc), "edit.patch")])
+        finding = error_finding(str(exc), "edit.patch")
+        did_you_mean = _target_suggestions(body.patch or {}, archetype)
+        if did_you_mean:
+            finding["suggestion"] = "; ".join(
+                f"did you mean region {d['suggestion']!r}"
+                + (f" ({d['label']})" if d["label"] else "")
+                for d in did_you_mean)
+        return JSONResponse({
+            "ok": False, "status": "fail", "findings": [finding],
+            "form": None, "params": [], "capability": None,
+            "did_you_mean": did_you_mean,
+        })
+    # A valid patch can still change NOTHING (e.g. adding a modifier the
+    # instance already carries) — the preview must say so, not let the
+    # user "apply" a rebuild of the same object and wonder why.
+    noop = (edited.model_dump(by_alias=True, mode="json")
+            == instance.model_dump(by_alias=True, mode="json"))
     edited_yaml = yaml.safe_dump(
         edited.model_dump(by_alias=True, mode="json"), sort_keys=False,
         allow_unicode=True,
@@ -333,6 +386,7 @@ def api_edit_preview(body: EditBody) -> JSONResponse:
         "edited_yaml": edited_yaml,
         "validation": val,
         "ir_diff": ir_diff,
+        "noop": noop,
     })
 
 
@@ -439,12 +493,19 @@ def api_intent(body: IntentBody) -> JSONResponse:
 class NlEditBody(BaseModel):
     yaml: str
     text: str
+    #: Region the user selected in the UI (viewport click / picker) — pins
+    #: the target enum the LLM sees.
+    selected_region: str | None = None
 
 
 @app.post("/api/nl_edit")
 def api_nl_edit(body: NlEditBody) -> JSONResponse:
     from . import intent, llm
 
+    if not body.text.strip():
+        return _fail([error_finding(
+            "empty edit request — describe the change or pick an intent "
+            "button", "edit.input")])
     if not llm.available():
         # honest degraded mode: map to a known intent by keyword
         text = body.text.lower()
@@ -466,7 +527,9 @@ def api_nl_edit(body: NlEditBody) -> JSONResponse:
         catalog = load_catalog()
         instance = _load_product(body.yaml)
         archetype = catalog.archetype_for(instance)
-        return JSONResponse(intent.nl_edit(body.text, body.yaml, archetype, catalog))
+        return JSONResponse(intent.nl_edit(
+            body.text, body.yaml, archetype, catalog,
+            selected_region=body.selected_region))
     except RuntimeError as exc:
         return _fail([error_finding(str(exc), "edit.llm")])
     except Exception as exc:  # noqa: BLE001 — structured, never a traceback

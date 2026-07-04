@@ -6,6 +6,8 @@ is a :class:`CatalogError`, never a silent skip.
 
 from __future__ import annotations
 
+import difflib
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -14,7 +16,7 @@ import yaml
 from pydantic import ValidationError
 
 from ..core.values import parse_value
-from ..product.archetype import ArchetypeSpec
+from ..product.archetype import ArchetypeSpec, RegionSpec
 from ..product.capability import FeatureDef
 from ..product.instance import ModifierUse, ProductInstance
 from ..product.modifier import ModifierDef
@@ -202,6 +204,59 @@ def load_instance(path: Path) -> ProductInstance:
         return ProductInstance.model_validate(_load_yaml(path))
     except ValidationError as exc:
         raise CatalogError(f"{path.name}: {exc}") from exc
+
+
+def compatible_regions(archetype: ArchetypeSpec, mod: ModifierDef) -> list["RegionSpec"]:
+    """Editable regions where this modifier may legally land — the exact
+    rules :func:`_check_modifier_use` enforces, computed BEFORE a patch
+    exists, so UIs and LLM grounding can offer only legal targets."""
+    return [
+        r for r in archetype.regions
+        if r.editable
+        and r.role in mod.applies_to
+        and r.role not in mod.forbidden_targets
+        and mod.id not in r.forbidden_modifiers
+    ]
+
+
+def _normalize_region_name(name: str) -> str:
+    return re.sub(r"[\s\-]+", "_", str(name).strip().lower())
+
+
+def resolve_region_name(archetype: ArchetypeSpec, name: str) -> "RegionSpec | None":
+    """Map a human/LLM region name onto the canonical RegionSpec: exact id
+    first, then label and aliases (case/space/underscore-insensitive).
+    Returns None when nothing matches — the caller decides between a
+    did-you-mean suggestion and an honest failure."""
+    wanted = _normalize_region_name(name)
+    if not wanted:
+        return None
+    for r in archetype.regions:
+        if _normalize_region_name(r.id) == wanted:
+            return r
+    for r in archetype.regions:
+        if any(_normalize_region_name(n) == wanted
+               for n in (r.label, *r.aliases) if n):
+            return r
+    return None
+
+
+def suggest_region(archetype: ArchetypeSpec, name: str) -> "RegionSpec | None":
+    """Closest existing region for an unknown name (did-you-mean). Exact
+    alias resolution wins; otherwise fuzzy-match over ids, labels and
+    aliases."""
+    hit = resolve_region_name(archetype, name)
+    if hit is not None:
+        return hit
+    lookup: dict[str, RegionSpec] = {}
+    for r in archetype.regions:
+        for n in (r.id, r.label, *r.aliases):
+            if n:
+                lookup.setdefault(_normalize_region_name(n), r)
+    close = difflib.get_close_matches(
+        _normalize_region_name(name), list(lookup), n=1, cutoff=0.5
+    )
+    return lookup[close[0]] if close else None
 
 
 def _check_modifier_use(

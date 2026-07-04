@@ -38,11 +38,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
     }),
-  nlEdit: (yaml, text) =>
+  nlEdit: (yaml, text, selectedRegion = null) =>
     j("/api/nl_edit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ yaml, text }),
+      body: JSON.stringify({ yaml, text, selected_region: selectedRegion }),
     }),
   job: (id) => j(`/api/jobs/${id}`),
   async waitJob(id, onLog) {

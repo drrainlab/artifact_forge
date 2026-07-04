@@ -18,6 +18,7 @@ params:
   recess_depth: {type: length, default: 1.2mm, min: 0.6mm, max: 3mm}
 provides_features: [hex_perforation]
 validators:
+  - form.field_cells_present
   - form.hex_field_in_safe_zone
   - form.min_ligament_ok
   - region.keepouts_preserved

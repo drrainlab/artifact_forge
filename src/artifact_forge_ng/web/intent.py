@@ -11,8 +11,11 @@ object classes, descriptions and feature names. Honest and boring.
 
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
+
+import yaml
 
 from ..archetypes import builder_for
 from ..catalog.loader import Catalog
@@ -150,22 +153,52 @@ def llm_intent(prompt: str, catalog: Catalog) -> dict[str, Any]:
     }
 
 
-def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog) -> dict[str, Any]:
+def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog,
+            selected_region: str | None = None) -> dict[str, Any]:
     """Free-text edit -> a known intent name or a raw Patch dict, GROUNDED
     in the current archetype: the model sees exactly which parameter names,
-    modifier params and preserve entries are legal. Whatever it returns
-    still goes through /api/edit/preview like any hand-written patch —
-    and preserve entries outside the vocabulary are filtered server-side
-    (with a note), never passed through to fail late."""
+    modifier params, preserve entries AND region targets are legal. Targets
+    are enum-constrained to the regions each modifier may land on
+    (compatible_regions); a region selected in the UI pins that enum.
+    Whatever comes back still goes through /api/edit/preview like any
+    hand-written patch — aliases are canonicalized and missing targets
+    auto-filled server-side (with a note), never passed through to fail
+    late."""
+    from ..catalog.loader import compatible_regions, resolve_region_name
     from ..repair.intents import INTENTS
 
     param_names = sorted(archetype.parameters)
     preserve_ok = sorted(set(param_names) | set(catalog.features))
+    notes: list[str] = []
+    compat: dict[str, list[str]] = {}
     mod_digest = []
     for mod_id in archetype.allowed_modifiers:
         mdef = catalog.modifiers.get(mod_id)
         if mdef is not None:
-            mod_digest.append(f"{mod_id}(params: {', '.join(sorted(mdef.params))})")
+            compat[mod_id] = [r.id for r in compatible_regions(archetype, mdef)]
+            mod_digest.append(
+                f"{mod_id}(params: {', '.join(sorted(mdef.params))}; "
+                f"targets: {', '.join(compat[mod_id]) or '-'})")
+    selected = (resolve_region_name(archetype, selected_region)
+                if selected_region else None)
+    if selected_region and selected is None:
+        notes.append(f"selected region {selected_region!r} does not exist "
+                     f"on {archetype.id!r} — ignored")
+    target_enum = ([selected.id] if selected is not None
+                   else sorted({r for ids in compat.values() for r in ids}))
+    # update targets an EXISTING use — its legal values come from the
+    # instance document, not from the archetype.
+    doc = yaml.safe_load(current_yaml) or {}
+    used_targets = sorted({
+        str(m.get("target")) for m in doc.get("modifiers", [])
+        if isinstance(m, dict) and m.get("target")
+    })
+    add_target: dict[str, Any] = {"type": "string"}
+    if target_enum:
+        add_target["enum"] = target_enum
+    upd_target: dict[str, Any] = {"type": "string"}
+    if used_targets:
+        upd_target["enum"] = used_targets
     schema = {
         "type": "object",
         "properties": {
@@ -193,7 +226,7 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog) -> dict[s
                                 "type": "object",
                                 "properties": {
                                     "id": {"type": "string"},
-                                    "target": {"type": "string"},
+                                    "target": upd_target,
                                     "params": {"type": "object",
                                                "additionalProperties": {"type": "string"}},
                                 },
@@ -203,7 +236,7 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog) -> dict[s
                                 "type": "object",
                                 "properties": {
                                     "id": {"type": "string"},
-                                    "target": {"type": "string"},
+                                    "target": add_target,
                                     "params": {"type": "object",
                                                "additionalProperties": {"type": "string"}},
                                 },
@@ -216,6 +249,16 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog) -> dict[s
             },
         },
     }
+    region_lines = []
+    for r in archetype.regions:
+        mods = [m for m, ids in compat.items() if r.id in ids]
+        if mods:
+            label = f' ("{r.label}")' if r.label else ""
+            region_lines.append(
+                f"- {r.id}{label}: role {r.role.value}; "
+                f"modifiers: {', '.join(mods)}")
+    protected = [r.id for r in archetype.regions
+                 if not any(r.id in ids for ids in compat.values())]
     system = (
         "You translate a free-text edit request for an Artifact Forge "
         "product into EITHER a known intent name OR a typed patch "
@@ -227,20 +270,134 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog) -> dict[s
         "sites/min_ligament/hole_d), never into patch.params.\n"
         "- preserve: only from the allowed list (archetype params + feature "
         "vocabulary) — modifier params are NOT valid preserve entries.\n"
+        "- modifiers.add.target: a CANONICAL region id from the target "
+        "regions below — a target is a Form IR region, never free text or "
+        "a feature name.\n"
+        "- fit field params to the window: on narrow bands/strips (height "
+        "≤ 10mm) set edge_margin 0.5-0.8mm (NOT more — every cell shrinks "
+        "by ligament/2 per side and 1mm margins kill them all) and "
+        "min_ligament ~1.2mm; on ring/cylinder bands keep sites 16-20 — "
+        "fewer sites make cells wider than 0.6*radius and the cylindrical "
+        "mapping honestly refuses, more sites make cells too narrow to "
+        "survive the shrink.\n"
         f"Archetype {archetype.id}: params {', '.join(param_names)}.\n"
         f"Allowed modifiers: {'; '.join(mod_digest) or '-'}.\n"
-        f"Known intents: {', '.join(sorted(INTENTS))}"
+        "Target regions:\n"
+        + ("\n".join(region_lines) or "- (none — modifiers cannot be added)")
+        + "\n"
+        f"Protected regions (NEVER valid targets): "
+        f"{', '.join(protected) or '-'}.\n"
+        + (f"The user selected region {selected.id!r} — any modifiers.add "
+           "MUST target exactly it.\n" if selected is not None else "")
+        + f"Known intents: {', '.join(sorted(INTENTS))}"
     )
     raw = llm.complete(system, f"{current_yaml}\n\nREQUEST: {text}", schema,
                        cache_system=False)
-    patch = raw.get("patch")
-    notes = []
-    if patch and patch.get("preserve"):
+    patch = _coerce_obj(raw.get("patch"), "patch", notes)
+    mods = None
+    if patch is not None:
+        mods = _coerce_obj(patch.get("modifiers"), "modifiers", notes)
+        patch["modifiers"] = mods or {}
+    if mods:
+        for key in ("add", "update", "remove"):
+            if key in mods and not isinstance(mods[key], list):
+                notes.append(f"modifiers.{key}: not a list — dropped")
+                mods[key] = []
+    if mods and mods.get("add"):
+        raw_add = mods["add"] if isinstance(mods["add"], list) else []
+        add_entries = [e for e in raw_add if isinstance(e, dict)]
+        if len(add_entries) != len(raw_add):
+            notes.append("dropped malformed modifiers.add entries")
+        existing = {
+            (str(m.get("id")), str(m.get("target")))
+            for m in doc.get("modifiers", []) if isinstance(m, dict)
+        }
+        kept = []
+        for entry in add_entries:
+            _ground_add_target(entry, archetype, compat, selected, notes)
+            key = (str(entry.get("id")), str(entry.get("target")))
+            if key in existing:
+                # apply_patch silently skips duplicate adds — say it and
+                # turn the request into an update on the existing use
+                mods.setdefault("update", []).append(entry)
+                notes.append(
+                    f"{entry.get('id')} is already on {entry.get('target')!r}"
+                    " — converted add to update (tune its params: 'more/"
+                    "denser/larger…')")
+            else:
+                kept.append(entry)
+        mods["add"] = kept
+    if patch and isinstance(patch.get("preserve"), list):
         keep, dropped = [], []
         for name in patch["preserve"]:
             (keep if name in preserve_ok else dropped).append(name)
         patch["preserve"] = keep
         if dropped:
             notes.append(f"dropped invalid preserve entries: {', '.join(dropped)}")
-    return {"ok": True, "intent": raw.get("intent"), "patch": patch,
+    intent_name = raw.get("intent")
+    intent_name = intent_name if isinstance(intent_name, str) else None
+    if intent_name is None and patch is None:
+        # nothing actionable came back — an honest failure WITH the drop
+        # notes beats ok:true that downstream turns into 'edit.input'
+        from .serialize import error_finding
+
+        detail = "; ".join(notes) or (
+            "raw answer: " + json.dumps(raw, ensure_ascii=False)[:300])
+        return {"ok": False, "findings": [error_finding(
+            f"LLM returned neither a known intent nor a patch ({detail}) — "
+            "try rephrasing the request", "edit.nl")],
             "notes": "; ".join(notes)}
+    return {"ok": True,
+            "intent": intent_name,
+            "patch": patch,
+            "notes": "; ".join(notes)}
+
+
+def _coerce_obj(value: Any, where: str, notes: list[str]) -> dict[str, Any] | None:
+    """The forced tool call keeps the TOP shape honest, but the model still
+    sometimes emits a nested object as its JSON string. Decode that case;
+    drop (with a note, never a traceback) anything that is not an object."""
+    if value is None or isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except ValueError:
+            decoded = None
+        if isinstance(decoded, dict):
+            notes.append(f"{where}: decoded JSON-string object from the LLM")
+            return decoded
+    notes.append(f"{where}: LLM returned {type(value).__name__} instead of "
+                 "an object — dropped")
+    return None
+
+
+def _ground_add_target(entry: dict[str, Any], archetype,
+                       compat: dict[str, list[str]],
+                       selected, notes: list[str]) -> None:
+    """Server-side ground truth for one modifiers.add entry: the schema
+    enum only CONSTRAINS the model, it does not guarantee — aliases are
+    canonicalized, and an empty/illegal target is auto-filled when the
+    answer is unambiguous (the UI-selected region, or the single
+    compatible one). Anything still wrong fails the preview with a
+    did-you-mean, never silently."""
+    from ..catalog.loader import resolve_region_name
+
+    legal = compat.get(str(entry.get("id")), [])
+    target = str(entry.get("target") or "")
+    if target and target not in legal:
+        hit = resolve_region_name(archetype, target)
+        if hit is not None and hit.id in legal:
+            notes.append(f"target {target!r} -> canonical region {hit.id!r}")
+            entry["target"] = hit.id
+            return
+    if target in legal and target:
+        return
+    if selected is not None and selected.id in legal:
+        entry["target"] = selected.id
+        notes.append(f"auto-targeted {entry.get('id')}: "
+                     f"selected region {selected.id!r}")
+    elif len(legal) == 1:
+        entry["target"] = legal[0]
+        notes.append(f"auto-targeted {entry.get('id')} -> {legal[0]!r}: "
+                     "only compatible editable region")

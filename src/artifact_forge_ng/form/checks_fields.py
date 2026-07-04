@@ -70,4 +70,47 @@ def check_min_ligament_ok(form: PartForm) -> Finding:
     )
 
 
+def check_field_cells_present(form: PartForm) -> Finding:
+    """Pre-CAD mirror of topology.hex_field_present's zero-cell rule: a
+    declared field whose every cell was vetoed by margins/keepouts does
+    not exist — the requested feature is a lie. Caught at validate time
+    (the IR knows the surviving cells), not after a CAD build fails."""
+    if not form.fields:
+        return Finding(
+            check="form.field_cells_present",
+            status=Status.PASS,
+            level=Level.FORM,
+            message="no fields declared",
+        )
+    dead = []
+    for f in form.fields:
+        if f.centers or f.polygons:
+            continue
+        where = f.pattern
+        if f.window is not None:
+            where += (f" (window {f.window.u1 - f.window.u0:.1f}x"
+                      f"{f.window.v1 - f.window.v0:.1f}mm, "
+                      f"ligament {f.min_ligament:g})")
+        dead.append(where)
+    ok = not dead
+    return Finding(
+        check="form.field_cells_present",
+        status=Status.PASS if ok else Status.FAIL,
+        level=Level.FORM,
+        message=(
+            f"{sum(len(f.centers) + len(f.polygons) for f in form.fields)} "
+            "cells survived across all fields"
+            if ok
+            else "zero cells survived the keepouts: " + ", ".join(dead)
+        ),
+        critical=not ok,
+        suggestion=""
+        if ok
+        else "reduce edge_margin (narrow windows want 0.5-0.8mm), lower "
+             "sites, or shrink min_ligament — every cell shrinks by "
+             "ligament/2 per side and dies when nothing remains",
+    )
+
+
 register_probe("form.min_ligament_ok")(lambda form, ctx: check_min_ligament_ok(form))
+register_probe("form.field_cells_present")(lambda form, ctx: check_field_cells_present(form))

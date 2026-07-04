@@ -49,9 +49,13 @@ form:
                corner_r: corner_r, size_clearance: size_clearance}
 
 regions:
-  - {id: band_outer_surface, role: aesthetic_lightening, editable: true}
-  - {id: bore_contact, role: soft_contact_surface, editable: false}
-  - {id: seam_keepout, role: high_stress_region, editable: false}
+  - {id: band_outer_surface, role: aesthetic_lightening, editable: true,
+     label: outer ring band,
+     aliases: [ring band, outer wall, outside surface]}
+  - {id: bore_contact, role: soft_contact_surface, editable: false,
+     label: inner bore, aliases: [bore, finger surface]}
+  - {id: seam_keepout, role: high_stress_region, editable: false,
+     label: seam column, aliases: [seam]}
 
 surface_style: molded_utility_part
 

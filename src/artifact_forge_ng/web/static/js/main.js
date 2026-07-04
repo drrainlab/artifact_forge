@@ -6,6 +6,9 @@ import { ThreeView } from "app/three_view.js";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const screenEl = $("#screen");
+//: EDIT lens hook — a region pick in the main viewport/tree routes here to
+//: update the target select (null whenever the EDIT lens is not showing).
+let editSetTarget = null;
 const state = {
   status: null,
   catalog: null,
@@ -13,6 +16,8 @@ const state = {
   validation: null,    // last /api/validate view model
   buildReport: null,   // last build job result
   lens: "3d",
+  selectedRegion: null, // region id targeted by semantic edits
+  stlFiles: [],        // {url, file} actually loaded into the 3D view
 };
 
 function esc(s) {
@@ -330,9 +335,10 @@ function renderWorkspace() {
     <div class="ws-tree tree" id="tree"></div>
     <div class="ws-view">
       <div class="lenses" id="lenses">
-        ${["3d", "section", "region", "honesty", "manufacturing"].map((l) =>
+        ${["3d", "section", "honesty", "manufacturing"].map((l) =>
           `<button data-lens="${l}" class="${state.lens === l ? "active" : ""}">${l.toUpperCase()}</button>`).join("")}
-        <button data-lens="edit">EDIT</button>
+        <button data-lens="edit" class="${state.lens === "edit" ? "active" : ""}">REGION / EDIT</button>
+        <button id="dl-stl" style="display:none" title="download the STL artifact shown in the viewport">⭳ STL</button>
       </div>
       <div id="viewport3d"></div>
       <div id="viewport-section" style="display:none"></div>
@@ -345,8 +351,9 @@ function renderWorkspace() {
   buildConsole(v, isAssembly);
   const view = new ThreeView($("#viewport3d"));
   state.three = view;
+  view.enableRegionPicking((r) => inspect({ kind: "region", region: r }, v));
   load3D(view, v, isAssembly);
-  $("#lenses").querySelectorAll("button").forEach((b) =>
+  $("#lenses").querySelectorAll("button[data-lens]").forEach((b) =>
     b.addEventListener("click", () => setLens(b.dataset.lens, v, isAssembly)));
   setLens(state.lens, v, isAssembly);
 }
@@ -360,6 +367,14 @@ function artifactUrl(path) {
 async function load3D(view, v, isAssembly) {
   view.clear();
   const report = state.buildReport;
+  const docId = v.product || v.assembly || "part";
+  // download offers exactly what the viewport shows — collected per
+  // successful load, so the button can never hand out a 404
+  state.stlFiles = [];
+  const show = async (url, file, pose = null, tint = undefined) => {
+    await view.loadSTL(url, pose, tint);
+    state.stlFiles.push({ url, file });
+  };
   try {
     if (isAssembly && report?.parts) {
       const poses = {};
@@ -368,13 +383,13 @@ async function load3D(view, v, isAssembly) {
         const stl = part.exports?.stl;
         if (!stl) continue;
         const pose = poses[ref]?.rotate ? poses[ref] : null;
-        await view.loadSTL(artifactUrl(stl), pose);
+        await show(artifactUrl(stl), `${docId}__${ref}.stl`, pose);
       }
     } else if (report?.exports?.stl) {
-      await view.loadSTL(artifactUrl(report.exports.stl));
+      await show(artifactUrl(report.exports.stl), `${docId}.stl`);
     } else if (!isAssembly && v.product) {
       // try prebuilt artifact from out/
-      await view.loadSTL(`/artifacts/${v.product}/part.stl`);
+      await show(`/artifacts/${v.product}/part.stl`, `${docId}.stl`);
     } else if (isAssembly && v.assembly) {
       // prebuilt assembly artifacts, placed by the REPORTED poses
       const poses = {};
@@ -383,30 +398,57 @@ async function load3D(view, v, isAssembly) {
       let i = 0;
       for (const ref of Object.keys(v.parts || {})) {
         const pose = poses[ref]?.rotate ? poses[ref] : null;
-        await view.loadSTL(`/artifacts/${v.assembly}/${ref}/part.stl`, pose, tints[i++ % 4]);
+        await show(`/artifacts/${v.assembly}/${ref}/part.stl`,
+          `${docId}__${ref}.stl`, pose, tints[i++ % 4]);
       }
     }
   } catch (e) {
     $("#console").insertAdjacentHTML("afterbegin",
       `<div class="dim">no STL artifact yet — Build to see 3D (section/region lenses work without CAD)</div>`);
   }
-  view.showRegions(v.form?.regions, state.lens === "region");
+  wireStlDownload();
+  view.showRegions(v.form?.regions, state.lens === "edit");
+  if (state.lens === "edit") view.highlightRegion(state.selectedRegion);
   view.fit();
 }
 
+function wireStlDownload() {
+  const btn = $("#dl-stl");
+  if (!btn) return;
+  const files = state.stlFiles;
+  btn.style.display = files.length ? "" : "none";
+  btn.textContent = files.length > 1 ? `⭳ STL ×${files.length}` : "⭳ STL";
+  btn.onclick = () => {
+    for (const f of files) {
+      const a = document.createElement("a");
+      a.href = f.url;
+      a.download = f.file;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+  };
+}
+
 function setLens(lens, v, isAssembly) {
+  if (lens === "region") lens = "edit"; // merged: REGION lives inside EDIT
   state.lens = lens;
-  $("#lenses").querySelectorAll("button").forEach((b) =>
+  $("#lenses").querySelectorAll("button[data-lens]").forEach((b) =>
     b.classList.toggle("active", b.dataset.lens === lens));
   const v3 = $("#viewport3d"), vs = $("#viewport-section"), vp = $("#viewport-panel");
-  v3.style.display = lens === "3d" || lens === "region" ? "block" : "none";
+  // EDIT is a split lens: the edit panel on the left, the REAL region
+  // viewport (same ThreeView, same STL, same picking) on the right.
+  const split = lens === "edit";
+  v3.parentElement.classList.toggle("split", split);
+  v3.style.display = lens === "3d" || split ? "block" : "none";
   vs.style.display = lens === "section" ? "flex" : "none";
   vp.style.display = ["honesty", "manufacturing", "edit"].includes(lens) ? "block" : "none";
-  if (state.three) state.three.showRegions(v.form?.regions, lens === "region");
+  if (state.three) state.three.showRegions(v.form?.regions, split);
+  if (lens !== "edit") editSetTarget = null;
   if (lens === "section") renderSection(vs, v.form);
   if (lens === "honesty") vp.innerHTML = honestyPanel(v, isAssembly);
   if (lens === "manufacturing") vp.innerHTML = manufacturingPanel(v);
-  if (lens === "edit") { vp.innerHTML = editPanel(); wireEdit(); }
+  if (lens === "edit") { vp.innerHTML = editPanel(); wireEdit(v); }
 }
 
 function honestyPanel(v, isAssembly) {
@@ -446,8 +488,13 @@ function manufacturingPanel(v) {
 }
 
 function editPanel() {
-  return `<h3 class="dim">SEMANTIC EDIT — patch preview before anything is built</h3>
-    <div class="row"><input id="nl" type="text" placeholder="сделай без поддержек / make it stronger…" style="flex:1">
+  return `<h3 class="dim">SEMANTIC EDIT — patch preview before anything is built · click a region in the viewport to set the target</h3>
+    <div class="row" id="targetrow" style="display:none">
+      <span class="dim">Target region:</span>
+      <select id="target"><option value="">— auto —</option></select>
+      <span id="targetmeta" class="faint"></span>
+    </div>
+    <div class="row mt"><input id="nl" type="text" placeholder="сделай без поддержек / make it stronger…" style="flex:1">
     <button class="forge" id="nlgo">Propose patch</button></div>
     <div class="row mt dim">intents:
       ${["make_support_free", "make_stronger", "make_biomorphic", "remove_perforation"].map((i) =>
@@ -455,25 +502,94 @@ function editPanel() {
     <div id="editout" class="mt"></div>`;
 }
 
-function wireEdit() {
+async function wireEdit(v) {
   const out = $("#editout");
-  const preview = async (intent, patch) => {
+  // an apply that just succeeded re-rendered the whole workspace — show
+  // its report instead of an empty panel
+  if (state.lastEditReport) {
+    out.innerHTML = state.lastEditReport;
+    state.lastEditReport = null;
+  }
+
+  // -- grounded region targeting: picker + mini region viewport ----------
+  if (!state.catalog) state.catalog = await api.catalog();
+  const archId = String(v.archetype || "").split("@")[0];
+  const card = state.catalog.archetypes.find((a) => a.id === archId);
+  const regions = card?.regions || [];
+  const targetable = regions.filter((r) => r.editable && r.compatible_modifiers.length);
+  const sel = $("#target");
+  const setTarget = (id) => {
+    state.selectedRegion = id || null;
+    if (sel) sel.value = id || "";
+    const r = regions.find((x) => x.id === id);
+    $("#targetmeta").textContent = r
+      ? `${r.label ? r.label + " · " : ""}role: ${r.role} · modifiers: ${r.compatible_modifiers.join(", ")}`
+      : "backend auto-targets when unambiguous";
+    state.three?.highlightRegion(id || null);
+  };
+  if (targetable.length) {
+    $("#targetrow").style.display = "flex";
+    sel.innerHTML = `<option value="">— auto —</option>` + targetable.map((r) =>
+      `<option value="${esc(r.id)}">${esc(r.label || r.id)} (${esc(r.id)})</option>`).join("");
+    const keep = targetable.some((r) => r.id === state.selectedRegion)
+      ? state.selectedRegion
+      : targetable.length === 1 ? targetable[0].id : null;
+    sel.addEventListener("change", () => setTarget(sel.value));
+    // region picks land here from the REAL viewport (workspace ThreeView)
+    editSetTarget = (name) => {
+      if (!targetable.some((t) => t.id === name)) {
+        $("#targetmeta").textContent = `${name}: protected — not a valid edit target`;
+        return;
+      }
+      setTarget(name);
+    };
+    setTarget(keep);
+  }
+
+  const preview = async (intent, patch, note = "") => {
     out.innerHTML = `<span class="dim">computing patch…</span>`;
     const p = await api.editPreview(state.yaml, intent, patch);
-    if (!p.ok) { out.innerHTML = findingsTable(p.findings); return; }
+    if (!p.ok) {
+      out.innerHTML = findingsTable(p.findings);
+      // did-you-mean: the pipeline proposes the fix, the user confirms
+      if (p.did_you_mean?.length) {
+        out.insertAdjacentHTML("beforeend", `<div class="row mt">${p.did_you_mean.map((d, i) =>
+          `<button class="forge" data-dym="${i}">Fix target → ${esc(d.suggestion)}${d.label ? ` (${esc(d.label)})` : ""}</button>`).join("")}</div>`);
+        out.querySelectorAll("[data-dym]").forEach((b) =>
+          b.addEventListener("click", () => {
+            const d = p.did_you_mean[+b.dataset.dym];
+            const fixed = JSON.parse(JSON.stringify(patch || {}));
+            for (const key of ["add", "update"])
+              for (const m of fixed.modifiers?.[key] || [])
+                if (m.target === d.given) m.target = d.suggestion;
+            preview(intent, fixed, `target fixed: ${d.given} → ${d.suggestion}`);
+          }));
+      }
+      return;
+    }
     const val = p.validation;
+    const noteHtml = note ? `<div class="dim mt">${esc(note)}</div>` : "";
+    const noopHtml = p.noop
+      ? `<div class="mt"><span class="badge warn">NO-OP</span> this patch changes nothing — the instance already satisfies it</div>`
+      : "";
     const cb = (p.ir_diff?.field_cells_before || []).reduce((a, b) => a + b, 0);
     const ca = (p.ir_diff?.field_cells_after || []).reduce((a, b) => a + b, 0);
     const cellsNote = (cb || ca) && cb !== ca
       ? `<div class="mt ${ca < cb ? "" : "dim"}">field cells: ${cb} → ${ca}${ca < cb ? ' <span class="badge warn">fewer cells — likely the OPPOSITE of the intent</span>' : ""}</div>`
       : "";
+    // a patch whose RESULT fails validation must not be appliable — the
+    // build would only fail later with the same findings
+    const blocked = val.status === "fail";
     out.innerHTML = `
+      ${noteHtml}
+      ${noopHtml}
       <div class="yaml-pane">${esc(jsyaml(p.patch))}</div>
       ${cellsNote}
       <div class="mt">edited product validates: <span class="badge ${val.status}">${val.status}</span></div>
       ${findingsTable((val.findings || []).filter((f) => f.status !== "pass"))}
+      ${blocked ? `<div class="mt dim">fix the request (see suggestions above) and propose again — applying would fail the build with these findings</div>` : ""}
       <div class="row mt">
-        <button class="forge" id="apply">Apply patch (rebuild + verify preserve)</button>
+        <button class="forge" id="apply" ${p.noop || blocked ? "disabled" : ""}>Apply patch (rebuild + verify preserve)</button>
         <button class="ghost" id="cancel">Cancel</button></div>`;
     $("#cancel").addEventListener("click", () => (out.innerHTML = ""));
     $("#apply").addEventListener("click", async () => {
@@ -482,15 +598,25 @@ function wireEdit() {
       const done = await api.waitJob(job);
       const rep = done.result?.edit_report;
       if (!rep) { out.innerHTML = findingsTable([done.error]); return; }
-      out.innerHTML = `
+      const repHtml = `
         <table class="findings">
           <tr><td>status</td><td class="msg"><span class="badge ${rep.status}">${rep.status}</span></td></tr>
           <tr><td>preserved (verified)</td><td class="msg">${rep.preserved.map((x) => esc(x.name)).join(", ")}</td></tr>
           <tr><td>changed</td><td class="msg">${esc(JSON.stringify(rep.changed))}</td></tr>
           <tr><td>supports before → after</td><td class="msg">${rep.printability.supports_recommended_before} → ${rep.printability.supports_recommended_after}</td></tr>
           <tr><td>overhang after</td><td class="msg">${esc(rep.printability.overhang_after.message)}</td></tr>
-        </table>
-        <div class="row mt"><button class="ghost" id="openedited">open edited product in workspace</button></div>`;
+        </table>`;
+      if (rep.status === "pass") {
+        // the edit landed: the workspace must show the NEW truth, not
+        // leave the old part on screen behind a "success" table
+        state.lastEditReport = repHtml +
+          `<div class="dim mt">workspace switched to the edited product</div>`;
+        const txt = await (await fetch(artifactUrl(rep.edited_yaml))).text();
+        await openInWorkspace(txt, { exports: { stl: rep.stl } });
+        return;
+      }
+      out.innerHTML = repHtml +
+        `<div class="row mt"><button class="ghost" id="openedited">open edited product in workspace</button></div>`;
       $("#openedited").addEventListener("click", async () => {
         const txt = await (await fetch(artifactUrl(rep.edited_yaml))).text();
         await openInWorkspace(txt);
@@ -498,10 +624,19 @@ function wireEdit() {
     });
   };
   $("#nlgo").addEventListener("click", async () => {
+    if (!$("#nl").value.trim()) {
+      $("#nl").focus();
+      out.innerHTML = `<div class="dim">describe the change first (e.g. "add voronoi pattern", "сделай без поддержек") — or use an intent button below</div>`;
+      return;
+    }
     out.innerHTML = `<span class="dim">translating…</span>`;
-    const r = await api.nlEdit(state.yaml, $("#nl").value);
-    if (!r.ok) { out.innerHTML = findingsTable(r.findings); return; }
-    if (r.intent) preview(r.intent, null); else preview(null, r.patch);
+    try {
+      const r = await api.nlEdit(state.yaml, $("#nl").value, state.selectedRegion);
+      if (!r.ok) { out.innerHTML = findingsTable(r.findings); return; }
+      if (r.intent) preview(r.intent, null, r.notes); else preview(null, r.patch, r.notes);
+    } catch (e) {
+      out.innerHTML = findingsTable([{ status: "fail", check: "edit.nl", message: String(e) }]);
+    }
   });
   document.querySelectorAll("[data-intent]").forEach((b) =>
     b.addEventListener("click", () => preview(b.dataset.intent, null)));
@@ -556,10 +691,16 @@ function inspect(sel, v) {
       <tr><td>frame keys</td><td>${used.map(esc).join("<br>") || "—"}</td></tr></table>`;
   } else if (sel.kind === "region") {
     const r = sel.region;
+    if (editSetTarget) {
+      editSetTarget(r.name); // validates protected roles, syncs the select
+    } else {
+      state.selectedRegion = r.name;
+      state.three?.highlightRegion(r.name);
+    }
     insp.innerHTML = `<h3>region: ${esc(r.name)}</h3><table>
       <tr><td>role</td><td>${esc(r.role)}</td></tr>
       <tr><td>box</td><td>${esc(JSON.stringify(r.box))}</td></tr></table>
-      <div class="mt dim">modifiers target regions; keepouts derive from protected roles</div>`;
+      <div class="mt dim">selected as EDIT target — modifiers target regions; keepouts derive from protected roles</div>`;
   } else if (sel.kind === "field") {
     insp.innerHTML = `<h3>field: ${esc(sel.field.pattern)}</h3><table>
       <tr><td>cells</td><td>${sel.field.cells}</td></tr>

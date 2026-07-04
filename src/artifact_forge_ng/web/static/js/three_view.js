@@ -101,8 +101,45 @@ export class ThreeView {
     }
   }
 
+  // Click → region (raycast over the region boxes). A short-move guard
+  // keeps orbit drags from counting as picks.
+  enableRegionPicking(onPick) {
+    const ray = new THREE.Raycaster();
+    const ptr = new THREE.Vector2();
+    let down = null;
+    const el = this.renderer.domElement;
+    el.addEventListener("pointerdown", (ev) => { down = [ev.clientX, ev.clientY]; });
+    el.addEventListener("click", (ev) => {
+      if (down && Math.hypot(ev.clientX - down[0], ev.clientY - down[1]) > 5) return;
+      const rect = el.getBoundingClientRect();
+      ptr.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      ptr.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      ray.setFromCamera(ptr, this.camera);
+      const hits = ray.intersectObjects(this.regionGroup.children, false);
+      if (hits.length) onPick(hits[0].object.userData.region);
+    });
+  }
+
+  // Selected region turns amber and opaque; with a selection active the
+  // rest fade to ghosts so keepout boxes cannot drown the target out.
+  highlightRegion(name) {
+    for (const box of this.regionGroup.children) {
+      const r = box.userData.region;
+      const on = !!name && r?.name === name;
+      const base = ROLE_COLORS[r?.role] ?? 0x8a93a3;
+      box.material.color.set(on ? 0xd9b544 : base);
+      box.material.opacity = on ? 0.38 : name ? 0.05 : 0.16;
+      const edges = box.children[0];
+      if (edges) {
+        edges.material.color.set(on ? 0xd9b544 : base);
+        edges.material.opacity = on ? 1.0 : name ? 0.25 : 0.6;
+      }
+    }
+  }
+
   fit() {
-    const box = new THREE.Box3().setFromObject(this.meshes);
+    let box = new THREE.Box3().setFromObject(this.meshes);
+    if (box.isEmpty()) box = new THREE.Box3().setFromObject(this.regionGroup);
     if (box.isEmpty()) return;
     const size = box.getSize(new THREE.Vector3()).length() || 100;
     const center = box.getCenter(new THREE.Vector3());

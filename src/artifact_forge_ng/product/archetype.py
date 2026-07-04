@@ -110,6 +110,11 @@ class RegionSpec(BaseModel):
     role: RegionRole
     editable: bool = True
     forbidden_modifiers: list[str] = []
+    #: Human name shown in the UI ("outer ring band"); ``id`` stays canonical.
+    label: str = ""
+    #: Alternative human names — LLM grounding and did-you-mean matching.
+    #: Patches must still name the canonical ``id``.
+    aliases: list[str] = []
     description: str = ""
 
 
