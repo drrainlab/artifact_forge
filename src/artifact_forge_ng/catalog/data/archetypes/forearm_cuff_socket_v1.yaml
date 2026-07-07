@@ -121,6 +121,7 @@ interfaces:
     type: dovetail_rail
     gender: female
     datum: payload_socket
+    frame: {normal: "+Z", up: "+Y", axis: "+X"}
     clearance: 0.25mm
     region: socket_crown
     keepouts: [socket_crown]
@@ -130,6 +131,9 @@ surface_style: molded_utility_part
 
 validators:
   - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
   - interface.keepouts_preserved
   - form.dovetail_socket_profile_ok
   - form.body_clearance_ok

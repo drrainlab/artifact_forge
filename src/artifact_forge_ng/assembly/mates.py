@@ -16,7 +16,47 @@ from __future__ import annotations
 
 from ..core.findings import Finding, Level, Status
 from ..product.assembly import AssemblyInstance, JointUse
-from ..product.interfaces import INTERFACE_TYPES, InterfaceSpec, mate_problems
+from ..product.interfaces import (
+    AXIS_VECTORS, INTERFACE_TYPES, InterfaceSpec, mate_problems,
+)
+from .joints import rotate_point
+
+
+def _world_dir(token: str, rotate: tuple[float, float, float]) -> tuple[int, int, int]:
+    v = rotate_point(AXIS_VECTORS[token], rotate)
+    return (round(v[0]), round(v[1]), round(v[2]))
+
+
+def _frames_opposed(a: InterfaceSpec, b: InterfaceSpec, joint: JointUse
+                    ) -> list[str]:
+    """A1.5: in the pose, mating normals OPPOSE; orientation-sensitive
+    types additionally demand up-agreement and exact axis continuity
+    (flow direction survives the joint)."""
+    rot = (joint.rotate[0], joint.rotate[1], joint.rotate[2])
+    an, au = AXIS_VECTORS[a.frame.normal], AXIS_VECTORS[a.frame.up]
+    bn, bu = _world_dir(b.frame.normal, rot), _world_dir(b.frame.up, rot)
+    problems: list[str] = []
+    if tuple(-x for x in bn) != an:
+        problems.append(
+            f"normals not opposed in the pose: A {a.frame.normal} vs "
+            f"B {b.frame.normal} rotated {list(rot)}")
+    sensitive = a.decl().orientation_sensitive or b.decl().orientation_sensitive
+    if sensitive and bu != au:
+        problems.append(
+            f"orientation-sensitive mate with disagreeing up: A "
+            f"{a.frame.up} vs B {b.frame.up} rotated {list(rot)}")
+    if a.frame.axis and b.frame.axis:
+        aa = AXIS_VECTORS[a.frame.axis]
+        ba = _world_dir(b.frame.axis, rot)
+        if sensitive and ba != aa:
+            problems.append(
+                f"flow/line axis breaks across the joint: A {a.frame.axis} "
+                f"vs B {b.frame.axis} rotated {list(rot)}")
+        if not sensitive and ba != aa and tuple(-x for x in ba) != aa:
+            problems.append(
+                f"slide axes not collinear: A {a.frame.axis} vs B "
+                f"{b.frame.axis} rotated {list(rot)}")
+    return problems
 
 
 def _finding(check: str, status: Status, message: str,
@@ -70,10 +110,8 @@ def interface_findings(
             arch = states[ref].archetype
             spec = _port_index(arch).get(name)
             sides[side] = (ref, arch, spec)
-            if spec is not None:
-                mated.add((ref, spec.id))
-        _, a_arch, a_spec = sides["a"]
-        _, b_arch, b_spec = sides["b"]
+        a_ref0, a_arch, a_spec = sides["a"]
+        b_ref0, b_arch, b_spec = sides["b"]
         where = f"joint {i} ({joint.type}) {joint.a} <-> {joint.b}"
         if a_spec is None and b_spec is None:
             continue  # fully legacy connection — nothing declared to judge
@@ -85,12 +123,31 @@ def interface_findings(
                 "declared (declare the counterpart interface)",
             ))
             continue
+        # A joint whose type does not realize the port pair is AUXILIARY
+        # (the clamp's compression_gap over the heatset datums): it rides
+        # declared ports without claiming them — legality is judged
+        # without the joint rule, and it does not count as mating for the
+        # orphan check (a realizing joint must still exist).
+        decl_a = a_spec.decl()
+        realizes = joint.type in decl_a.joints
         problems = mate_problems(
             a_spec, b_spec,
             (a_arch.id, a_arch.object_class),
             (b_arch.id, b_arch.object_class),
-            joint_type=joint.type,
+            joint_type=joint.type if realizes else None,
         )
+        if not realizes:
+            findings.append(_finding(
+                "interface.mate_compatible",
+                Status.PASS if not problems else Status.FAIL,
+                f"{where}: auxiliary {joint.type} over {a_spec.type} ports "
+                "(a realizing joint must mate them separately)"
+                if not problems else f"{where}: " + "; ".join(problems),
+                critical=bool(problems),
+            ))
+            continue
+        mated.add((a_ref0, a_spec.id))
+        mated.add((b_ref0, b_spec.id))
         # declared-fit agreement is its own check, not a mate blocker
         fit = [p for p in problems if "clearances disagree" in p]
         legal = [p for p in problems if p not in fit]
@@ -101,6 +158,25 @@ def interface_findings(
             if not legal else f"{where}: " + "; ".join(legal),
             critical=bool(legal),
         ))
+        if a_spec.frame is not None and b_spec.frame is not None:
+            frame_problems = _frames_opposed(a_spec, b_spec, joint)
+            findings.append(_finding(
+                "interface.mate_frames_opposed",
+                Status.PASS if not frame_problems else Status.FAIL,
+                f"{where}: normals opposed"
+                + (", orientation locked"
+                   if (a_spec.decl().orientation_sensitive
+                       or b_spec.decl().orientation_sensitive) else "")
+                if not frame_problems else f"{where}: "
+                + "; ".join(frame_problems),
+                critical=bool(frame_problems),
+            ))
+        elif a_spec.frame is not None or b_spec.frame is not None:
+            findings.append(_finding(
+                "interface.mate_frames_opposed", Status.WARN,
+                f"{where}: only one side declares a frame — orientation "
+                "unverifiable",
+            ))
         if a_spec.clearance is not None or b_spec.clearance is not None:
             findings.append(_finding(
                 "interface.clearance_ok",

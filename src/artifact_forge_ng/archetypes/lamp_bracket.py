@@ -165,6 +165,7 @@ def build_form(
     if mount_bc > 1e-6:
         frame["mount_c_y"] = mount_c_y
         frame["mount_bc"] = mount_bc
+        frame["mount_bc_n"] = float(m_count)
         frame["channel_drop_y"] = mount_c_y
         # The cup mounts against the arm's BOTTOM face at the tip.
         datums["mount_bc"] = {

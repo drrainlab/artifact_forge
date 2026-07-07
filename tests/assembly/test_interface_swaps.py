@@ -39,8 +39,10 @@ def test_vf_cassette_swaps_to_sprout(catalog):
         "manufacturing": {**PETG, "bed": ["250mm", "250mm", "250mm"]},
     }, catalog=catalog)
     assert finding.status is Status.PASS, finding.message
-    assert summary["parts"] == {"rail": "pass", "cassette": "pass",
-                                "frame": "pass"}
+    # the retainer frame carries an honest WARN (ring-centered port datum
+    # — normal_points_outward cannot see material behind a void center)
+    assert all(v in ("pass", "warn") for v in summary["parts"].values()), \
+        summary["parts"]
 
 
 def test_vf_swap_keeps_the_rail_untouched(catalog):
@@ -155,3 +157,45 @@ def test_wrong_port_is_incompatible_and_orphans_the_foot(catalog, tmp_path):
     assert "types differ" in checks["interface.mate_compatible"].message
     assert checks["assembly.no_orphan_ports"].status is Status.FAIL
     assert "mount_foot" in checks["assembly.no_orphan_ports"].message
+
+
+# -- A1.5: frame opposition + auxiliary joints -------------------------------
+
+def test_mate_frames_opposed_on_the_goldens(catalog):
+    for path in (CUFF_ASM, VF_CELL):
+        checks = _findings_of(path, catalog)
+        f = checks.get("interface.mate_frames_opposed")
+        assert f is not None and f.status is Status.PASS, path
+
+
+def test_flipped_line_module_fails_frames(catalog, tmp_path):
+    import yaml
+
+    src = EXAMPLES / "vertical_farm" / "two_cell_line_petg.yaml"
+    doc = yaml.safe_load(src.read_text())
+    joint = next(j for j in doc["joints"] if j["type"] == "tongue_groove")
+    joint["rotate"] = [0, 0, 180]
+    p = tmp_path / "flipped.yaml"
+    p.write_text(yaml.safe_dump(doc, sort_keys=False))
+    checks = _findings_of(p, catalog)
+    f = checks["interface.mate_frames_opposed"]
+    assert f.status is Status.FAIL
+    assert "not opposed" in f.message or "up" in f.message
+
+
+def test_auxiliary_joint_rides_ports_without_claiming(catalog):
+    clamp = EXAMPLES / "branch_lamp_clamp_60.yaml"
+    from artifact_forge_ng.assembly.pipeline import (
+        _inject_shared, _joint_findings, load_assembly)
+    from artifact_forge_ng.pipeline import pre_cad_from_instance
+
+    asm = load_assembly(clamp)
+    instances = _inject_shared(asm, catalog)
+    states = {r: pre_cad_from_instance(i, catalog, True)
+              for r, i in instances.items()}
+    findings, _, _ = _joint_findings(asm, states)
+    mates = [f for f in findings if f.check == "interface.mate_compatible"]
+    assert any("auxiliary" in f.message for f in mates)
+    assert all(f.status is Status.PASS for f in mates)
+    orphans = [f for f in findings if f.check == "assembly.no_orphan_ports"]
+    assert orphans and orphans[0].status is Status.PASS

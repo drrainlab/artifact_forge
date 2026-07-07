@@ -935,3 +935,58 @@ _register(JointDecl(
     ir_check=_dovetail_ir,
     cad_checks=("assembly.no_interference",),
 ))
+
+
+_FLUID_A_KEYS = ("channel_center_x", "channel_w", "channel_top_z",
+                 "channel_floor_z_outlet", "channel_y_outlet")
+_FLUID_B_KEYS = ("channel_center_x", "channel_w", "channel_top_z",
+                 "channel_floor_z_inlet", "channel_y_inlet")
+
+
+def _fluid_joint_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """Water handover, verified in the pose: A's outlet hands to B's inlet
+    DOWNHILL (gravity is the pump — an uphill handover is a pond), with
+    compatible channel widths on a shared axis. First real client lands
+    with the VF-3 inlet/outlet adapters; the physics is ready now."""
+    check = "assembly.fluid_joint_ir"
+    fa, fb = form_a.frame, form_b.frame
+    missing = [k for k in _FLUID_A_KEYS if k not in fa]
+    missing += [f"B:{k}" for k in _FLUID_B_KEYS if k not in fb]
+    if missing:
+        return [_finding(
+            check, False,
+            f"fluid frame keys missing: {', '.join(missing)} — a part does "
+            "not carry a transient water channel",
+        )]
+    problems: list[str] = []
+    if abs(fa["channel_w"] - fb["channel_w"]) > 1.0:
+        problems.append(
+            f"channel widths differ: {fa['channel_w']:g} vs "
+            f"{fb['channel_w']:g}")
+    out_floor = fa["channel_floor_z_outlet"]
+    in_floor_posed = pose.apply(
+        (fb["channel_center_x"], fb["channel_y_inlet"],
+         fb["channel_floor_z_inlet"])
+    )[2]
+    if in_floor_posed > out_floor + 0.05:
+        problems.append(
+            f"handover flows UPHILL: outlet floor {out_floor:.2f} into "
+            f"inlet floor {in_floor_posed:.2f} — gravity will not pump")
+    return [_finding(
+        check, not problems,
+        f"downhill handover ({out_floor:.2f} -> {in_floor_posed:.2f}) with "
+        "matched channels" if not problems else "; ".join(problems),
+        measured=out_floor - in_floor_posed, limit=0.0,
+    )]
+
+
+_register(JointDecl(
+    name="fluid_joint",
+    description="water/nutrient line handover: outlet hands to inlet "
+                "downhill with matched channel widths (VF-3 adapters are "
+                "the first client; the physics is ready)",
+    ir_check=_fluid_joint_ir,
+    cad_checks=("assembly.no_interference",),
+))

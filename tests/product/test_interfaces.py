@@ -78,8 +78,8 @@ def test_joint_must_realize_the_type():
 
 
 def test_declared_ahead_of_joint_is_an_honest_problem():
-    a = _spec(type="fluid_inlet", gender="female")
-    b = _spec(type="fluid_inlet", gender="male")
+    a = _spec(type="cable_pass", gender="neutral")
+    b = _spec(type="cable_pass", gender="neutral")
     bad = mate_problems(a, b, ("x", "cx"), ("y", "cy"),
                         joint_type="screw_joint")
     assert any("no realizing joint yet" in p for p in bad)
@@ -109,3 +109,42 @@ def test_loader_binds_interfaces_fail_fast():
         InterfaceSpec.model_validate(
             {"id": "s", "type": "strap_slot_pair", "gender": "banana",
              "datum": "d"})
+
+# -- A1.5: port frames -------------------------------------------------------
+
+def test_frame_requires_axis_tokens_and_orthogonality():
+    from artifact_forge_ng.product.interfaces import FrameSpec
+
+    f = FrameSpec.model_validate({"normal": "+Z", "up": "+Y", "axis": "+X"})
+    assert f.vectors() == ((0, 0, 1), (0, 1, 0))
+    with pytest.raises(ValidationError, match="axis token"):
+        FrameSpec.model_validate({"normal": "up", "up": "+Y"})
+    with pytest.raises(ValidationError, match="not.*orthogonal"):
+        FrameSpec.model_validate({"normal": "+Z", "up": "-Z"})
+
+
+def test_fluid_types_cross_mate():
+    from artifact_forge_ng.product.interfaces import types_mate
+
+    assert types_mate("fluid_outlet", "fluid_inlet")
+    assert types_mate("fluid_inlet", "fluid_outlet")
+    assert not types_mate("fluid_inlet", "dovetail_rail")
+    out = _spec(type="fluid_outlet", gender="male",
+                frame={"normal": "-Y", "up": "+Z", "axis": "-Y"})
+    inl = _spec(type="fluid_inlet", gender="female",
+                frame={"normal": "+Y", "up": "+Z", "axis": "+Y"})
+    assert mate_problems(out, inl, ("a", "ca"), ("b", "cb"),
+                         joint_type="fluid_joint") == []
+
+
+def test_every_catalog_port_declares_a_frame():
+    """A1.5 hardening: the deprecation window is CLOSED for the builtin
+    catalog — frameless ports may only exist outside it."""
+    from artifact_forge_ng.catalog.loader import load_catalog
+
+    frameless = [
+        f"{a.id}.{i.id}"
+        for a in load_catalog().archetypes.values()
+        for i in a.interfaces if i.frame is None
+    ]
+    assert frameless == []

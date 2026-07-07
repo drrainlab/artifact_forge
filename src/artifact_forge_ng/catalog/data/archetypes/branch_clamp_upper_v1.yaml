@@ -187,7 +187,19 @@ regions:
 
 surface_style: molded_utility_part
 
+interfaces:
+  - id: clamp_mate
+    type: heatset_insert_pattern
+    gender: male
+    datum: clamp_mate
+    frame: {normal: "-Z", up: "+Y"}
+    accepts: [branch_clamp]
+
 validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
   - form.saddle_geometry_ok
   - form.pad_lands_present
   - form.dovetail_rail_profile

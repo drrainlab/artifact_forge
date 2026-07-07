@@ -49,7 +49,11 @@ def test_wrong_pose_creates_real_interference(tmp_path):
     bad.write_text(yaml.safe_dump(doc, sort_keys=False))
     with pytest.raises(PipelineFailure) as exc_info:
         run_assembly_build(bad, tmp_path / "out", None)
-    assert "assembly" in str(exc_info.value)
+    # A1.5: the flipped cup is caught by the port-frame check BEFORE any
+    # CAD (normals not opposed in the pose); the interference probe stays
+    # as the second line for frame-agreeing collisions.
+    msg = str(exc_info.value)
+    assert "mate_frames_opposed" in msg or "assembly" in msg
 
 
 def test_blocked_channel_fails_the_cad_probe(tmp_path):

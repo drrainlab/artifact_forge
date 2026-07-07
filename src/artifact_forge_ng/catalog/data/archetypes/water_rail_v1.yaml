@@ -189,6 +189,7 @@ interfaces:
     type: removable_insert
     gender: female
     datum: cassette_seat
+    frame: {normal: "+Z", up: "+Y"}
     clearance: 0.75mm
     region: cassette_seat_walls
     keepouts: [water_channel]
@@ -197,6 +198,7 @@ interfaces:
     type: tongue_groove
     gender: male
     datum: line_east
+    frame: {normal: "+X", up: "+Z", axis: "+Y"}
     clearance: 0.4mm
     region: tongue_edge
     accepts: [water_rail]
@@ -204,6 +206,7 @@ interfaces:
     type: tongue_groove
     gender: female
     datum: line_west
+    frame: {normal: "-X", up: "+Z", axis: "+Y"}
     clearance: 0.4mm
     region: groove_edge
     accepts: [water_rail]
@@ -211,13 +214,18 @@ interfaces:
     type: fluid_inlet
     gender: female
     datum: inlet
+    frame: {normal: "+Y", up: "+Z", axis: "+Y"}
   - id: outlet
     type: fluid_outlet
-    gender: female
+    gender: male
     datum: outlet
+    frame: {normal: "-Y", up: "+Z", axis: "-Y"}
 
 validators:
   - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
   - interface.keepouts_preserved
   - form.water_channel_slope_ok
   - form.water_channel_dims_ok

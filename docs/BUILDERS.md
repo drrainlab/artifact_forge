@@ -123,6 +123,7 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 | `press_fit_pin_pair` | ✅ R2: PinFeature + interference-контракт (пин ТОЛЩЕ гнезда, overlap измерен и ограничен) |
 | `split_plane_with_alignment` | ✅ суть: butt_pin_joint (секции идентичны + торцевые пины; PinFeature.axis) — raceway_400_split. Авто-генератор из ОДНОГО инстанса = edit-intent следующей итерации |
 | `snap_joint` | ✅ compliant: undercut + insertion strain 1.5·δ·t/L² ≤ 5% (esp32_box_snap_lid) |
+| `fluid_joint` | ✅ A1.5: handover ТОЛЬКО вниз (gravity is the pump) + совместимые ширины каналов; первый клиент — VF-3 адаптеры |
 | `removable_insert` | ✅ vertical farm: drop-in кассета в seat (clearance band, tool-free rim, окно ВНУТРИ желоба, reach 1–2мм, drain gap ≥ 1мм) |
 | `tongue_groove` | ✅ vertical farm: линия модулей — groove глотает tongue в полосе 0.3–0.5, не доставая дна; каналы параллельны и на одной высоте |
 | `dovetail_joint` | ✅ A1: undercut-ретенция + clearance-band + угол фланков + полное зацепление; friction-only осевое удержание (заявлено) |

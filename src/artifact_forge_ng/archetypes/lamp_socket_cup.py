@@ -81,6 +81,8 @@ def build_form(
     effective["depth"] = depth
 
     frame = dict(frame)
+    frame["mount_bc"] = ctx["mount_bc"]
+    frame["mount_bc_n"] = float(len(centers))
     frame.update(width=2 * outer_r, screw_head_r=head_r)
 
     return PartForm(

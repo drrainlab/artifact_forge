@@ -90,7 +90,19 @@ regions:
 
 surface_style: molded_utility_part
 
+interfaces:
+  - id: cup_mount
+    type: screw_pattern
+    gender: female
+    datum: mount_bc
+    frame: {normal: "-Z", up: "+Y"}
+    accepts: [lamp_socket_cup]
+
 validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
   - form.channel_inside_walls
   - form.cuts_respect_keepouts
   - form.flange_above_cradle

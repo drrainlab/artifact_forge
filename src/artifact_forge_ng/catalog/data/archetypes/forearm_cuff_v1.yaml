@@ -150,6 +150,7 @@ interfaces:
     type: cylindrical_payload_socket
     gender: female
     datum: payload_axis
+    frame: {normal: "+Z", up: "+Y", axis: "+X"}
     clearance: 0.3mm
     region: payload_saddle
     keepouts: [payload_saddle]
@@ -158,6 +159,9 @@ surface_style: molded_utility_part
 
 validators:
   - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
   - interface.keepouts_preserved
   - form.body_clearance_ok
   - form.arm_mouth_dons_ok

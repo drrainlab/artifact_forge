@@ -62,7 +62,19 @@ regions:
 
 surface_style: molded_utility_part
 
+interfaces:
+  - id: mount_face
+    type: screw_pattern
+    gender: male
+    datum: mount_face
+    frame: {normal: "-Z", up: "+Y"}
+    accepts: [lamp_bracket]
+
 validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
   - form.revolve_profile_clear_of_axis
   - form.min_web_between_holes
   - form.holes_within_outline

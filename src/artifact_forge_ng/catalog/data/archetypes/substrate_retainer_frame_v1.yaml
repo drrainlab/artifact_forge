@@ -102,10 +102,14 @@ interfaces:
     type: snap_joint
     gender: male
     datum: seat
+    frame: {normal: "+Z", up: "+Y"}
     accepts: [substrate_cassette]
 
 validators:
   - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
   - form.snap_pockets_cleanable
   - topology.cutout_present
   - topology.single_connected_solid

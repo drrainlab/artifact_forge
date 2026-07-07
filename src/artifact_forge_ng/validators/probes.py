@@ -123,6 +123,9 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         # -- interface level (wave A1, form-time) ------------------------------
         _decl("interface.frame_exists", Level.FORM, "every declared interface's datum is published on the form with its type's frame keys"),
         _decl("interface.keepouts_preserved", Level.FORM, "no cut touched a declared interface keepout region"),
+        _decl("interface.frame_orthonormal", Level.FORM, "every port frame is an orthonormal axis-aligned triad (frameless ports WARN for one deprecation cycle)"),
+        _decl("interface.normal_points_outward", Level.FORM, "each port normal leaves the part: no material along +normal, material behind the port"),
+        _decl("interface.up_consistent", Level.FORM, "port up/axis agree with the type semantics (slide axes in the port plane, flow axes on the normal)"),
         # -- topology level: probed on the compiled solid ---------------------
         _decl("topology.single_connected_solid", Level.TOPOLOGY, "exactly one connected valid solid"),
         _decl("topology.cavity_open", Level.TOPOLOGY, "the cable cavity is a real void along the cable axis"),
@@ -176,6 +179,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("interface.clearance_ok", Level.ASSEMBLY, "mated ports declare the same fit within its type's clearance band"),
         _decl("interface.fastener_access_ok", Level.ASSEMBLY, "every fastened interface's screw axes stay reachable in the pose"),
         _decl("interface.swap_part_builds", Level.ASSEMBLY, "a compatible counterpart swapped into the assembly still validates"),
+        _decl("interface.mate_frames_opposed", Level.ASSEMBLY, "mated port normals oppose in the pose; orientation-sensitive types keep up/axis agreement"),
+        _decl("assembly.fluid_joint_ir", Level.ASSEMBLY, "fluid handover flows downhill with compatible channel widths in the pose"),
         _decl("assembly.no_orphan_ports", Level.ASSEMBLY, "every required interface of every part is mated by some joint"),
         _decl("assembly.dovetail_ir", Level.ASSEMBLY, "male dovetail rides its groove with the clearance band, never bottoms, full engagement"),
         # -- vertical farm assembly checks (impls in assembly/joints.py) -------

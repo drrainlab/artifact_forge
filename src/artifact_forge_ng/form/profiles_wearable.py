@@ -493,7 +493,7 @@ def build_dovetail_adapter_profile(
     elif p.head == "plate":
         segs.append(LineSeg(Pt(bw2, base_top), Pt(-bw2, base_top),
                             tags=_EXTERNAL))
-        f.update(mount_bc_r=p.hole_span / 2.0, mount_bc_n=2.0,
+        f.update(mount_bc=p.hole_span, mount_bc_n=2.0,
                  plate_top_v=base_top)
     else:
         raise ValueError(f"unknown adapter head {p.head!r}")

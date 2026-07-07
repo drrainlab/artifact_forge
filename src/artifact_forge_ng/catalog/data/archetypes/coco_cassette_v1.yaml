@@ -152,16 +152,21 @@ interfaces:
     type: removable_insert
     gender: male
     datum: seat
+    frame: {normal: "-Z", up: "+Y"}
     clearance: 0.75mm
     assembly_role: required
   - id: rim
     type: snap_joint
     gender: female
     datum: rim
+    frame: {normal: "+Z", up: "+Y"}
     accepts: [substrate_retainer_frame]
 
 validators:
   - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
   - form.shell_walls_ok
   - form.mesh_floor_orthogonal_ok
   - form.cassette_no_reservoir

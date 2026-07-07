@@ -27,11 +27,59 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from ..core.values import parse_quantity
 
 Gender = Literal["male", "female", "neutral"]
+
+#: Axis tokens — port frames are AXIS-ALIGNED by design, matching the
+#: quarter-turn pose philosophy: deterministic, composable, no arbitrary
+#: vectors until a real client needs them.
+AXIS_VECTORS: dict[str, tuple[int, int, int]] = {
+    "+X": (1, 0, 0), "-X": (-1, 0, 0),
+    "+Y": (0, 1, 0), "-Y": (0, -1, 0),
+    "+Z": (0, 0, 1), "-Z": (0, 0, -1),
+}
+
+
+class FrameSpec(BaseModel):
+    """Orientation of a port (A1.5): origin is the datum; ``normal`` points
+    OUT of the part through the connection; ``up`` disambiguates rotation
+    about the normal; optional ``axis`` is the slide/flow direction.
+    Orthonormality is loader-fail-fast AND re-reported by the
+    interface.frame_orthonormal check (honesty: the report shows the triad
+    that was actually used)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    normal: str
+    up: str
+    axis: str | None = None
+
+    @field_validator("normal", "up", "axis")
+    @classmethod
+    def _token(cls, v: str | None) -> str | None:
+        if v is not None and v not in AXIS_VECTORS:
+            raise ValueError(
+                f"frame direction {v!r} not an axis token "
+                f"({sorted(AXIS_VECTORS)})")
+        return v
+
+    @model_validator(mode="after")
+    def _orthonormal(self) -> "FrameSpec":
+        n, u = AXIS_VECTORS[self.normal], AXIS_VECTORS[self.up]
+        if abs(sum(a * b for a, b in zip(n, u))) > 0:
+            raise ValueError(
+                f"frame normal {self.normal} and up {self.up} are not "
+                "orthogonal")
+        # axis is free by type semantics: slide axes lie in the port plane
+        # (dovetail), flow axes ride the normal (fluid) — the TYPE's checks
+        # judge it, the frame only guarantees it is a legal token.
+        return self
+
+    def vectors(self) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
+        return AXIS_VECTORS[self.normal], AXIS_VECTORS[self.up]
 
 
 @dataclass(frozen=True)
@@ -54,6 +102,11 @@ class InterfaceTypeDecl:
     #: True when the connection is a fastened one — interface.
     #: fastener_access_ok applies.
     fastened: bool = False
+    #: True when rotation about the normal MATTERS (flow direction, line
+    #: continuity) — mate_frames_opposed then demands up-agreement, not
+    #: just opposed normals. Symmetric fits (snap pairs, dovetail feet)
+    #: stay insensitive.
+    orientation_sensitive: bool = False
 
     def keys_for(self, gender: str) -> tuple[str, ...]:
         if not self.frame_keys:
@@ -72,7 +125,7 @@ INTERFACE_TYPES: dict[str, InterfaceTypeDecl] = dict([
     _decl("screw_pattern",
           "bolt circle / hole pattern fastened with screws",
           ("screw_joint",), fastened=True,
-          frame_keys={"*": ("mount_bc_r", "mount_bc_n")}),
+          frame_keys={"*": ("mount_bc", "mount_bc_n")}),
     _decl("heatset_insert_pattern",
           "screw pattern landing in heatset inserts (female carries brass)",
           ("screw_joint",), fastened=True),
@@ -96,7 +149,8 @@ INTERFACE_TYPES: dict[str, InterfaceTypeDecl] = dict([
           ("snap_joint",)),
     _decl("tongue_groove",
           "line alignment tongue/groove (aligns, never carries, never seals)",
-          ("tongue_groove",), clearance_band=(0.1, 1.0)),
+          ("tongue_groove",), clearance_band=(0.1, 1.0),
+          orientation_sensitive=True),
     _decl("removable_insert",
           "tool-free drop-in seat with a graspable rim (cassette standard)",
           ("removable_insert",),
@@ -107,11 +161,11 @@ INTERFACE_TYPES: dict[str, InterfaceTypeDecl] = dict([
           },
           clearance_band=(0.3, 1.5)),
     _decl("fluid_inlet",
-          "water/nutrient line entry (VF-3 adapters land the joint)",
-          ()),
+          "water/nutrient line entry (receives — female side)",
+          ("fluid_joint",), orientation_sensitive=True),
     _decl("fluid_outlet",
-          "water/nutrient line exit / drip edge handover",
-          ()),
+          "water/nutrient line exit / drip edge handover (hands out — male)",
+          ("fluid_joint",), orientation_sensitive=True),
     _decl("cable_pass",
           "cable/wire pass-through continuity point",
           (), genders=("neutral",)),
@@ -142,6 +196,9 @@ class InterfaceSpec(BaseModel):
     #: required = an assembly containing this part must mate the port
     #: (assembly.no_orphan_ports); optional = free-standing use is fine.
     assembly_role: Literal["required", "optional"] = "optional"
+    #: Port orientation (A1.5). Optional for one deprecation cycle —
+    #: frame checks WARN on frameless ports; new ports must declare it.
+    frame: FrameSpec | None = None
 
     @field_validator("clearance", mode="before")
     @classmethod
@@ -163,6 +220,18 @@ class InterfaceSpec(BaseModel):
         return INTERFACE_TYPES[self.type]
 
 
+#: Cross-type pairs that mate each other (directional connections where
+#: the two ends are DIFFERENT types by nature).
+COMPLEMENT_TYPES: dict[str, str] = {
+    "fluid_outlet": "fluid_inlet",
+    "fluid_inlet": "fluid_outlet",
+}
+
+
+def types_mate(a_type: str, b_type: str) -> bool:
+    return a_type == b_type or COMPLEMENT_TYPES.get(a_type) == b_type
+
+
 def mate_problems(
     a: InterfaceSpec, b: InterfaceSpec,
     a_part: tuple[str, str], b_part: tuple[str, str],
@@ -172,7 +241,7 @@ def mate_problems(
     shared by assembly validation and ``forge compat``. ``*_part`` is
     (archetype_id, object_class) of each side. Returns [] when legal."""
     problems: list[str] = []
-    if a.type != b.type:
+    if not types_mate(a.type, b.type):
         problems.append(f"types differ: {a.type} vs {b.type}")
         return problems
     decl = a.decl()
