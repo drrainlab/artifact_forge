@@ -166,6 +166,9 @@ def _joint_findings(
                 critical=True,
             ))
     findings.extend(interface_findings(asm, states))
+    from .carrier import carrier_findings
+
+    findings.extend(carrier_findings(asm, states, poses))
     return findings, poses, pose_report
 
 
@@ -461,6 +464,16 @@ def run_assembly_build(
     bom_path.write_text(yaml.safe_dump(bom, sort_keys=False, allow_unicode=True))
     report["bom"] = bom
     report["exports"]["bom"] = str(bom_path)
+
+    from .frame_report import build_frame_report
+
+    frame = build_frame_report(asm, states, joint_findings)
+    if frame is not None:
+        frame_path = target / "frame_report.yaml"
+        frame_path.write_text(
+            yaml.safe_dump(frame, sort_keys=False, allow_unicode=True))
+        report["frame"] = frame
+        report["exports"]["frame_report"] = str(frame_path)
 
     water = build_water_report(states, joint_findings, asm=asm, poses=poses)
     if water is not None:

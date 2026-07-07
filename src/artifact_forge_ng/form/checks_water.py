@@ -64,11 +64,14 @@ def check_water_channel_slope_ok(form: PartForm) -> Finding:
     deepens = ch.depth_end > ch.depth_start + 1e-6
     declared = form.frame.get("channel_slope_deg")
     consistent = declared is None or abs(declared - slope) <= 0.02
-    ok = SLOPE_BAND[0] <= slope <= SLOPE_BAND[1] and deepens and consistent
+    # band edges are LEGAL: the tan/atan round-trip through the channel
+    # depths loses ~1e-15 — never fail a boundary value on float dust
+    in_band = SLOPE_BAND[0] - 1e-6 <= slope <= SLOPE_BAND[1] + 1e-6
+    ok = in_band and deepens and consistent
     problems: list[str] = []
     if not deepens:
         problems.append("floor does not fall toward the outlet")
-    if not (SLOPE_BAND[0] <= slope <= SLOPE_BAND[1]):
+    if not in_band:
         problems.append(f"slope {slope:.2f} deg outside {SLOPE_BAND[0]}..{SLOPE_BAND[1]}")
     if not consistent:
         problems.append(f"frame declares {declared:g} deg but the IR measures {slope:.2f}")
@@ -487,3 +490,47 @@ register_probe("form.spout_drop_path_ok")(
     lambda form, ctx: check_spout_drop_path_ok(form))
 register_probe("form.collector_tray_drains")(
     lambda form, ctx: check_collector_tray_drains(form))
+
+
+# -- VF-4 profile reference proxy ---------------------------------------------
+
+PROFILE_SLOPE_BAND = (0.0, 3.0)
+
+
+def check_profile_ref_geometry_ok(form: PartForm) -> Finding:
+    f = form.frame
+    keys = ("profile_size", "profile_len", "profile_slope_deg",
+            "profile_y_low", "profile_top_z_low", "station_pitch",
+            "station_count")
+    missing = [k for k in keys if k not in f]
+    if missing:
+        return _finding("form.profile_ref_geometry_ok", False,
+                        f"no profile frame keys: {', '.join(missing)}")
+    problems: list[str] = []
+    if not form.channels:
+        problems.append("no slope cut — the reference proxy top is flat, "
+                        "the cascade would sit on nothing")
+    else:
+        ch = form.channels[0]
+        if ch.depth_end < ch.depth_start:
+            problems.append("slope cut rises toward the collector end — "
+                            "the support line must fall with the cascade")
+    if not (PROFILE_SLOPE_BAND[0] <= f["profile_slope_deg"] <= PROFILE_SLOPE_BAND[1]):
+        problems.append(
+            f"slope {f['profile_slope_deg']:g} outside "
+            f"{PROFILE_SLOPE_BAND[0]}..{PROFILE_SLOPE_BAND[1]}")
+    n = int(f["station_count"])
+    for k in range(1, n + 1):
+        if f"station_{k}_z" not in f:
+            problems.append(f"station_{k} not published")
+    return _finding(
+        "form.profile_ref_geometry_ok", not problems,
+        f"reference proxy: {f['profile_len']:g} long, "
+        f"{f['profile_slope_deg']:g} deg support line, {n} stations"
+        if not problems else "; ".join(problems),
+        measured=f["profile_slope_deg"], limit=PROFILE_SLOPE_BAND[1],
+    )
+
+
+register_probe("form.profile_ref_geometry_ok")(
+    lambda form, ctx: check_profile_ref_geometry_ok(form))

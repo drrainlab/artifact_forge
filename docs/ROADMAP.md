@@ -122,10 +122,26 @@ guard цепочек joints, композиция поз через непрок
 width-rule «приёмник ≥ отдающего», тип `hose_port`, `AssemblyInstance.meta`.
 ⚠️ row — каскад (каждая ячейка ~7.9 мм ниже), НЕ финальная стойка.
 
-Впереди: **VF-4** shelf row / горизонтальный каркас (stepped supports,
-spacer feet или row carrier — снятие каскадного ограничения; 3–6 ячеек,
-collector_side); **VF-5** production readiness (PP food-grade, draft
-angles, no-undercut report); `dry_endcap_v1` для незанятых торцов.
+**VF-4 Profile-Carried Row Reference ✅ (2026-07-08)**: каскад
+механически привязан к РЕАЛЬНОМУ алюминиевому носителю —
+`vertical_farm_row_3x1_carried`: 2 стандартных прямых 2020-профиля под
+глобальным уклоном ряда (reference-суррогат со скошенным верхом — позы
+только 90°; honesty note везде), `process: reference` (внешнее железо без
+FDM-чеков — профили, трубы, стекло, насосы в будущем), joint
+`profile_perch` + row-чеки в глобальных позах (row_supported /
+pitch_aligned / slope_feeds_downhill), **уклон носителя ВЫВОДИТСЯ из
+физики воды** (derived row_slope_deg — «каркас против воды» непредставим),
+frame_report.yaml, профиль в BOM как cut-to-length. Порты паза optional —
+старые goldens не тронуты; обязательность опоры = фича
+row_carried_by_profile в must_have carried-сборки. Контакт по
+upstream-кромке (span gap 7.91 репортится честно) — verification proof,
+не финальная опора.
+
+Впереди: **VF-4.1** anti-slide clips / point pads / end stops
+(полноценная посадка на наклонном профиле); **VF-5 Cassette Family**
+(sprout mesh / microgreen mat / rockwool cube / soil seedling / netpot
+кассеты на Cassette Interface Standard); **VF-6** production readiness
+(PP food-grade, draft angles, no-undercut report); `dry_endcap_v1`.
 
 ---
 

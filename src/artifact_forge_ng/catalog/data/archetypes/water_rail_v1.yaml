@@ -221,6 +221,22 @@ interfaces:
     gender: male
     datum: outlet
     frame: {normal: "-Y", up: "+Z", axis: "-Y"}
+  # VF-4: bottom grooves seat on the aluminum profile carrier. OPTIONAL by
+  # design — a standalone cell and the VF-3 cascade stay legal; a carried
+  # row makes support mandatory via its own contract feature
+  # (row_carried_by_profile), never via a global required port.
+  - id: seat_e
+    type: profile_seat
+    gender: female
+    datum: seat_e
+    accepts: [hardware_reference]
+    frame: {normal: "-Z", up: "+Y", axis: "-Y"}
+  - id: seat_w
+    type: profile_seat
+    gender: female
+    datum: seat_w
+    accepts: [hardware_reference]
+    frame: {normal: "-Z", up: "+Y", axis: "-Y"}
 
 validators:
   - interface.frame_exists

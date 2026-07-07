@@ -105,6 +105,11 @@ def run_build_from_state(state, target: Path) -> tuple[dict[str, Any], "object"]
         "step": str(step),
         "print_orientation": state.form.print_orientation,
         "stl_source": "implicit" if implicit else "brep",
+        # "print" = a part to manufacture; "reference" = external hardware
+        # exported for visual/pose reference only (never print this)
+        "role": ("reference"
+                 if state.instance.manufacturing.process == "reference"
+                 else "print"),
     }
     if implicit:
         out["exports"]["skin"] = skin_meta

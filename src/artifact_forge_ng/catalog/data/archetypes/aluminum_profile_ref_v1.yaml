@@ -1,0 +1,117 @@
+schema: archetype/v1
+id: aluminum_profile_ref_v1
+version: 1
+object_class: hardware_reference
+maturity: sandbox_buildable
+description: >
+  Vertical Farm Pack VF-4: aluminum profile carrier REFERENCE GEOMETRY.
+  IMPORTANT HONESTY NOTE — this does NOT represent a physically milled or
+  sloped aluminum extrusion: the sloped top face is a reference-geometry
+  SURROGATE for a STANDARD STRAIGHT 2020/3030 profile mounted with a
+  global row slope, a workaround for AF poses supporting only 90-degree
+  rotations. The BOM always describes this part as standard rectangular
+  profile CUT TO LENGTH, mounted at the global slope by the frame — never
+  as a custom wedge-cut part. Instances use manufacturing.process:
+  reference (external hardware: no FDM checks, exported STL/STEP are
+  visual references only). Stations along the sloped support line mark
+  where each rail's bottom groove ceiling lands; profile_perch joints
+  verify the local seat fit, assembly.row_supported verifies the row-level
+  support truth in global poses.
+
+provides_features: []
+
+parameters:
+  size:
+    {type: choice, choices: ["2020", "3030"], default: "2020",
+     role: assembly, exposed: true,
+     description: standard aluminum extrusion series}
+  length:
+    {type: length, default: 780mm, min: 200mm, max: 2000mm,
+     role: assembly, exposed: true,
+     description: cut-to-length of the standard straight profile}
+  slope_deg:
+    {type: number, default: 1.25, min: 1.0, max: 1.5, role: assembly,
+     description: "shared RAIL CHANNEL slope; the carrier's own mounting
+       slope is DERIVED from it (row_slope_deg) so the frame can never
+       fight the water"}
+  module_w:
+    {type: length, default: 248mm, min: 200mm, max: 250mm, role: assembly,
+     description: shared rail module depth — the station pitch}
+  stations:
+    {type: count, default: 3, min: 1, max: 8, role: assembly,
+     description: how many rail cells this carrier serves}
+  station_edge:
+    {type: length, default: 20mm, min: 5mm, max: 60mm, role: assembly,
+     description: first station inset from the profile's high end}
+
+derived:
+  # The carrier's mounting slope IS the cascade grade: per-module drop =
+  # in-channel drop (module_w * tan(channel slope)) + the FALL_ENTRY
+  # handover step (2.5, the fluid datum convention). Derived, not
+  # declared — a carrier that fights the water is unrepresentable.
+  row_slope_deg: deg(atan2(module_w * tan(rad(slope_deg)) + 2.5, module_w))
+
+constraints:
+  - length >= station_edge + (stations - 1) * module_w + 8
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: profile_ref_body
+      id: profile
+      params:
+        size: size
+        length: length
+        slope_deg: row_slope_deg
+        station_pitch: module_w
+        stations: stations
+        station_edge: station_edge
+
+regions:
+  - {id: profile_body, role: mounting_surface, editable: false,
+     label: "Profile body (reference)"}
+
+surface_style: molded_utility_part
+
+interfaces:
+  - id: ridge_1
+    type: profile_seat
+    gender: male
+    datum: station_1
+    accepts: [water_rail]
+    # axis = along the profile / the flow; water still travels -Y
+    frame: {normal: "+Z", up: "+Y", axis: "-Y"}
+  - id: ridge_2
+    type: profile_seat
+    gender: male
+    datum: station_2
+    accepts: [water_rail]
+    frame: {normal: "+Z", up: "+Y", axis: "-Y"}
+  - id: ridge_3
+    type: profile_seat
+    gender: male
+    datum: station_3
+    accepts: [water_rail]
+    frame: {normal: "+Z", up: "+Y", axis: "-Y"}
+
+validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
+  - interface.keepouts_preserved
+  - form.profile_ref_geometry_ok
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have: []
+  must_not_have: []
+  invariants:
+    - row_slope_deg >= 0.0 and row_slope_deg <= 3.0

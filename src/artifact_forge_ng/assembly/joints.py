@@ -1072,3 +1072,63 @@ _register(JointDecl(
     ir_check=_saddle_hang_ir,
     cad_checks=("assembly.no_interference",),
 ))
+
+
+# -- profile_perch (VF-4: rail groove on the aluminum carrier) --------------------
+
+PERCH_FIT_BAND = (0.1, 0.5)  # per-side groove clearance over the profile
+
+_PERCH_A_KEYS = ("profile_slot_w", "profile_slot_x", "profile_slot_depth",
+                 "profile_slot_clearance")
+_PERCH_B_KEYS = ("profile_size", "profile_len", "profile_slope_deg")
+
+
+def _profile_perch_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """The rail's bottom groove seats on the aluminum profile carrier:
+    width fit in the push-on band, groove deep enough to swallow the
+    contact, flow axes aligned. A = the rail (groove), B = the profile
+    reference proxy. Row-level support truth (every rail actually rests
+    on the sloped line) lives in assembly.row_supported — this joint
+    verifies the LOCAL seat fit."""
+    check = "assembly.profile_perch_ir"
+    fa, fb = form_a.frame, form_b.frame
+    missing = [k for k in _PERCH_A_KEYS if k not in fa]
+    missing += [f"B:{k}" for k in _PERCH_B_KEYS if k not in fb]
+    if missing:
+        return [_finding(
+            check, False,
+            "profile_perch expects a: the rail (groove keys) and b: the "
+            f"profile reference — missing {', '.join(missing)}",
+        )]
+    problems: list[str] = []
+    per_side = (fa["profile_slot_w"] - fb["profile_size"]) / 2.0
+    if not (PERCH_FIT_BAND[0] - 1e-6 <= per_side <= PERCH_FIT_BAND[1] + 1e-6):
+        problems.append(
+            f"groove {fa['profile_slot_w']:g} over profile "
+            f"{fb['profile_size']:g}: per-side fit {per_side:.2f} outside "
+            f"{PERCH_FIT_BAND[0]}..{PERCH_FIT_BAND[1]} — wrong profile size "
+            "or slot width")
+    if fa["profile_slot_depth"] < 3.0:
+        problems.append(
+            f"groove only {fa['profile_slot_depth']:g} deep — no lateral "
+            "capture on the profile")
+    if problems:
+        return [_finding(check, False, "; ".join(problems))]
+    return [_finding(
+        check, True,
+        f"groove seats the {fb['profile_size']:g} profile with "
+        f"{per_side:.2f} per-side fit",
+        measured=per_side, limit=PERCH_FIT_BAND[1],
+    )]
+
+
+_register(JointDecl(
+    name="profile_perch",
+    description="rail bottom groove seated on the aluminum profile carrier "
+                "(reference proxy): width fit and capture verified locally; "
+                "row-level support truth in assembly.row_supported",
+    ir_check=_profile_perch_ir,
+    cad_checks=("assembly.no_interference",),
+))

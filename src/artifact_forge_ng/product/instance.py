@@ -23,7 +23,11 @@ _REF_RE = re.compile(r"^(?P<id>[a-z0-9_]+)(?:@(?P<version>\d+))?$")
 class ManufacturingSpec(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    process: Literal["fdm"] = "fdm"
+    #: "fdm" = a printed part, the full manufacturing suite applies;
+    #: "reference" = EXTERNAL HARDWARE modeled for poses / interference /
+    #: BOM only (aluminum profile, glass, pumps …) — AF does not verify
+    #: its manufacturability by design.
+    process: Literal["fdm", "reference"] = "fdm"
     material: str = "PETG"
     nozzle: float = 0.4
     layer_height: float = 0.2

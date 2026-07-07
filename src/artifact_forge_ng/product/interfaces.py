@@ -173,6 +173,11 @@ INTERFACE_TYPES: dict[str, InterfaceTypeDecl] = dict([
           "push-in bore for external tubing (silicone hose) — mates "
           "HARDWARE, never a printed part; the tube lands in the BOM",
           (), genders=("neutral",)),
+    _decl("profile_seat",
+          "rail bottom groove seated on an aluminum profile carrier "
+          "(male = the profile's support line, female = the groove)",
+          ("profile_perch",), orientation_sensitive=True,
+          clearance_band=(0.1, 0.5)),
 ])
 
 

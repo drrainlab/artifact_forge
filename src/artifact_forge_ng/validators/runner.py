@@ -23,6 +23,19 @@ def run_geometry_validators(state, geometry: Geometry) -> list[Finding]:
     findings: list[Finding] = []
     form = state.form
     geometry_levels = {Level.TOPOLOGY, Level.REGION, Level.MANUFACTURING}
+    # Reference parts (external hardware modeled for poses/interference/
+    # BOM — process: reference) get NO manufacturing scrutiny by design:
+    # AF does not pretend to verify aluminum. One honest WARN instead.
+    is_reference = state.instance.manufacturing.process == "reference"
+    if is_reference:
+        geometry_levels = {Level.TOPOLOGY, Level.REGION}
+        findings.append(Finding(
+            check="manufacturing.reference_geometry",
+            status=Status.WARN,
+            level=Level.MANUFACTURING,
+            message="reference geometry (external hardware) — "
+                    "manufacturability unverified by design",
+        ))
     for name in state.archetype.validators:
         decl = KNOWN_CHECKS[name]  # loader guaranteed existence
         if decl.level not in geometry_levels:
@@ -48,7 +61,10 @@ def run_geometry_validators(state, geometry: Geometry) -> list[Finding]:
         mod = state.catalog.modifiers.get(use.id)
         if mod is not None:
             extra.extend(mod.validators)
-    extra.extend(n for n, d in KNOWN_CHECKS.items() if d.level is Level.MANUFACTURING)
+    if not is_reference:
+        extra.extend(
+            n for n, d in KNOWN_CHECKS.items() if d.level is Level.MANUFACTURING
+        )
     for name in extra:
         if name in listed:
             continue

@@ -1,0 +1,212 @@
+# Vertical Farm Pack VF-4 golden artifact: the VF-3 fluid cascade row,
+# now mechanically CARRIED by two aluminum profile carriers (reference
+# proxies of standard straight 2020 extrusions mounted at the global row
+# slope 1.827 deg — the slope that exactly matches the cascade grade).
+# Every rail rests on both profiles at its own station; no cell hangs on
+# a fluid joint. Water handovers and cassette removability are unchanged
+# from VF-3 — the carrier only holds what the fluid datums already dictate.
+#
+# Scope honesty: VF-4 validates the support REFERENCE (upstream-edge
+# contact on a sloped line under flat grooves). Anti-slide locking,
+# vibration, full-surface seating -> VF-4.1.
+schema: assembly/v1
+id: vertical_farm_row_3x1_carried
+strict: true
+root: cap
+
+meta:
+  row_kind: fluid_cascade
+  mounting_policy: profile_carried
+
+shared:
+  module_w: 248mm
+  seat_depth: 14mm
+  channel_d: 5mm
+  slope_deg: 1.25
+  channel_w: 16mm
+  cassette_l: 220mm
+  cassette_w: 220mm
+  cassette_h: 26mm
+  seat_clearance: 0.75mm
+  wall: 2.4mm
+  module_pitch: 250mm
+  tube_od: 9mm
+
+parts:
+  - ref: cap
+    product:
+      schema: product/v1
+      id: carried_inlet_cap
+      archetype: inlet_cap_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: rail_1
+    product:
+      schema: product/v1
+      id: carried_rail_1
+      archetype: water_rail_v1@1
+      params: {profile: "2020"}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: rail_2
+    product:
+      schema: product/v1
+      id: carried_rail_2
+      archetype: water_rail_v1@1
+      params: {profile: "2020"}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: rail_3
+    product:
+      schema: product/v1
+      id: carried_rail_3
+      archetype: water_rail_v1@1
+      params: {profile: "2020"}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: cassette_1
+    product:
+      schema: product/v1
+      id: carried_cassette_1
+      archetype: coco_cassette_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: cassette_2
+    product:
+      schema: product/v1
+      id: carried_cassette_2
+      archetype: coco_cassette_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: cassette_3
+    product:
+      schema: product/v1
+      id: carried_cassette_3
+      archetype: coco_cassette_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: collector
+    product:
+      schema: product/v1
+      id: carried_collector
+      archetype: collector_endcap_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  # STANDARD straight 2020 profiles, cut to length, mounted by the frame
+  # at the global row slope — modeled as sloped-top reference proxies
+  # (process: reference => no FDM checks; exports are visual references)
+  - ref: profile_e
+    product:
+      schema: product/v1
+      id: carried_profile_e
+      archetype: aluminum_profile_ref_v1@1
+      params: {size: "2020", length: 780mm, stations: 3}
+      manufacturing:
+        process: reference
+        material: aluminum
+  - ref: profile_w
+    product:
+      schema: product/v1
+      id: carried_profile_w
+      archetype: aluminum_profile_ref_v1@1
+      params: {size: "2020", length: 780mm, stations: 3}
+      manufacturing:
+        process: reference
+        material: aluminum
+
+# Chain order: the fluid cascade poses everything printed; each profile is
+# then posed by ONE perch joint off rail_1; the remaining perch joints
+# verify rails 2/3 against the already-posed profiles.
+joints:
+  - type: fluid_joint
+    a: cap.rail_out
+    b: rail_1.inlet
+    rotate: [0, 0, 0]
+  - type: saddle_hang
+    a: rail_1.inlet
+    b: cap.rail_out
+    rotate: [0, 0, 0]
+  - type: removable_insert
+    a: rail_1.cassette_seat
+    b: cassette_1.seat
+    rotate: [0, 0, 0]
+    params: {lift_margin: 3mm}
+  - type: fluid_joint
+    a: rail_1.outlet
+    b: rail_2.inlet
+    rotate: [0, 0, 0]
+  - type: removable_insert
+    a: rail_2.cassette_seat
+    b: cassette_2.seat
+    rotate: [0, 0, 0]
+    params: {lift_margin: 3mm}
+  - type: fluid_joint
+    a: rail_2.outlet
+    b: rail_3.inlet
+    rotate: [0, 0, 0]
+  - type: removable_insert
+    a: rail_3.cassette_seat
+    b: cassette_3.seat
+    rotate: [0, 0, 0]
+    params: {lift_margin: 3mm}
+  - type: fluid_joint
+    a: rail_3.outlet
+    b: collector.rail_in
+    rotate: [0, 0, 0]
+  - type: saddle_hang
+    a: rail_3.outlet
+    b: collector.rail_in
+    rotate: [0, 0, 0]
+  # carrier: pose each profile off rail_1, verify the rest
+  - type: profile_perch
+    a: rail_1.seat_e
+    b: profile_e.ridge_1
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_1.seat_w
+    b: profile_w.ridge_1
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_2.seat_e
+    b: profile_e.ridge_2
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_2.seat_w
+    b: profile_w.ridge_2
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_3.seat_e
+    b: profile_e.ridge_3
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_3.seat_w
+    b: profile_w.ridge_3
+    rotate: [0, 0, 0]
+
+contract:
+  must_have:
+    - row_fluid_chain
+    - saddle_mount
+    - vertical_farm_cassette_interface
+    - row_carried_by_profile

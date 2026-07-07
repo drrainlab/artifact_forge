@@ -689,3 +689,19 @@ features:
       the pose the fluid joints set — straddle, rest, corridor fit
     verified_by:
       - assembly.saddle_hang_ir
+
+  # VF-4: the row is mechanically CARRIED by the aluminum profile carrier
+  # (reference proxy of a standard straight 2020/3030 at the global row
+  # slope) — every rail rests at its station, pitch aligned, slope matches
+  # the cascade. Required only in carried-row assemblies' contracts.
+  - id: row_carried_by_profile
+    description: >
+      every rail in the row rests on the sloped aluminum profile carrier
+      at its own station (no cell hangs on a fluid joint), rails march at
+      the module pitch, and the carrier's slope preserves every downhill
+      handover
+    verified_by:
+      - assembly.profile_perch_ir
+      - assembly.row_supported
+      - assembly.row_pitch_aligned
+      - assembly.profile_slope_feeds_downhill

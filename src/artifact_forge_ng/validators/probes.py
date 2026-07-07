@@ -123,6 +123,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.hose_bore_ok", Level.FORM, "the hose push-in bore matches the declared tube OD plus a real grip clearance and opens through both ends"),
         _decl("form.spout_drop_path_ok", Level.FORM, "the inlet cap's spout descends below the saddle plane, fits the rail corridor, and carries a straight vertical water path"),
         _decl("form.collector_tray_drains", Level.FORM, "the catch tray floor falls monotonically to a drain bore sitting at the floor's lowest point"),
+        # -- VF-4 profile-carried row (impls in checks_water.py / carrier.py)
+        _decl("form.profile_ref_geometry_ok", Level.FORM, "the profile reference proxy: sloped top monotonic, long enough for its stations, slope in band"),
         _decl("form.lift_access_ok", Level.FORM, "rim carries two finger notches wide enough for tool-free removal"),
         # -- interface level (wave A1, form-time) ------------------------------
         _decl("interface.frame_exists", Level.FORM, "every declared interface's datum is published on the form with its type's frame keys"),
@@ -192,6 +194,10 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.removable_insert_ir", Level.ASSEMBLY, "cassette drops into the seat with the clearance band, window over the channel, pulse-only water contact"),
         _decl("assembly.tongue_groove_ir", Level.ASSEMBLY, "adjacent modules align on tongue/groove with channel centerlines continuous at the pitch"),
         _decl("assembly.saddle_hang_ir", Level.ASSEMBLY, "auxiliary verification: the adapter's saddle really straddles the rail wall in the pose the fluid joint set, and its spout/bib fits the corridor"),
+        _decl("assembly.profile_perch_ir", Level.ASSEMBLY, "the rail's bottom groove seats on the aluminum profile: width fit in band, axes aligned"),
+        _decl("assembly.row_supported", Level.ASSEMBLY, "every rail in a carried row rests on the profile's sloped support line at its station — no cell hangs on a fluid joint"),
+        _decl("assembly.row_pitch_aligned", Level.ASSEMBLY, "adjacent rails march at the module pitch and the profile stations land under their grooves"),
+        _decl("assembly.profile_slope_feeds_downhill", Level.ASSEMBLY, "the carrier's global slope matches the fluid cascade — the profile preserves every downhill handover"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),
@@ -204,6 +210,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("manufacturing.brush_access_to_water_channel", Level.MANUFACTURING, "the water channel opens to free air along its whole run and is wide enough to brush"),
         _decl("manufacturing.no_hidden_wet_crevices", Level.MANUFACTURING, "no sub-2mm crevice between cuts inside a wet region — water enters, a brush cannot"),
         _decl("manufacturing.no_unwashable_snap_pockets", Level.MANUFACTURING, "every snap window is void through the full wall on the compiled solid"),
+        _decl("manufacturing.reference_geometry", Level.MANUFACTURING, "honesty note: this part is external hardware reference — manufacturability unverified by design"),
         # -- implicit exoskeleton skin (Bio-4M; findings emitted by the skin export stage)
         _decl("manufacturing.mesh_watertight", Level.MANUFACTURING, "exported implicit-skin mesh is edge-manifold watertight"),
         _decl("manufacturing.mesh_min_feature", Level.MANUFACTURING, "informational facet statistics of the implicit-skin mesh"),

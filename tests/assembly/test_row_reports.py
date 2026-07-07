@@ -86,3 +86,63 @@ def test_bom_lite_derived(row_ctx):
     assert bom["print"]["bed_min_mm"] == [250.0, 250.0, 250.0]
     # no screws in the row -> no phantom screw lines
     assert not any("screw" in h["item"] for h in bom["hardware"])
+
+
+# -- VF-4: frame report + BOM with the aluminum carrier -------------------------
+
+CARRIED = EXAMPLES / "vertical_farm_carried_smoke.yaml"
+
+
+@pytest.fixture(scope="module")
+def carried_ctx():
+    catalog = load_catalog()
+    asm = load_assembly(CARRIED)
+    instances = _inject_shared(asm, catalog)
+    states = {ref: pre_cad_from_instance(inst, catalog, True)
+              for ref, inst in instances.items()}
+    findings, poses, _ = _joint_findings(asm, states)
+    return catalog, asm, states, findings, poses
+
+
+def test_frame_report(carried_ctx):
+    from artifact_forge_ng.assembly.frame_report import build_frame_report
+
+    catalog, asm, states, findings, poses = carried_ctx
+    frame = build_frame_report(asm, states, findings)
+    assert frame is not None
+    assert frame["support_verdict"] == "pass"
+    assert frame["pitch_verdict"] == "pass"
+    assert frame["slope_verdict"] == "pass"
+    prof = frame["carrier"][0]
+    assert prof["size"] == "2020"
+    assert prof["slope_deg"] == pytest.approx(1.827, abs=0.01)
+    assert "reference proxy" in prof["geometry"]
+    assert frame["rails"][0]["perched_on"] == ["profile_e"]
+    assert frame["rails"][0]["contact"] == "upstream_edge"
+    assert "VF-4.1" in frame["scope"]
+
+
+def test_frame_report_absent_without_carrier(row_ctx):
+    from artifact_forge_ng.assembly.frame_report import build_frame_report
+
+    catalog, asm, states, findings, poses = row_ctx
+    assert build_frame_report(asm, states, findings) is None
+
+
+def test_bom_carried_profile_line(carried_ctx):
+    catalog, asm, states, findings, poses = carried_ctx
+    bom = build_bom(asm, states, catalog)
+    printed = {e["archetype"] for e in bom["printed_parts"]}
+    # the reference profile is NOT a printed part
+    assert "aluminum_profile_ref_v1" not in printed
+    items = {h["item"]: h for h in bom["hardware"]}
+    line = items["aluminum profile 2020, standard straight, cut to length"]
+    assert line["qty"] == 1
+    assert line["length_mm"] == pytest.approx(280.0)
+    assert "reference proxy" in line["note"]
+    assert "NOT a wedge-cut" in line["note"]
+    # the old per-slot heuristic must NOT double count
+    assert "aluminum profile 2020" not in items or \
+        items.get("aluminum profile 2020") is None
+    # print rollup ignores the aluminum
+    assert bom["print"]["materials"] == ["PETG"]

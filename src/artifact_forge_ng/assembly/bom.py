@@ -19,10 +19,16 @@ from ..core.fasteners import screw_spec
 
 def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
     printed: dict[str, dict[str, Any]] = {}
+    reference_parts: list[tuple[str, Any]] = []
     for part in asm.parts:
         ref = part.ref
         state = states.get(ref)
         if state is None:
+            continue
+        if state.instance.manufacturing.process == "reference":
+            # external hardware modeled as reference geometry — never a
+            # printed part; it becomes a hardware line below
+            reference_parts.append((ref, state))
             continue
         aid = state.archetype.id
         entry = printed.setdefault(aid, {
@@ -36,6 +42,36 @@ def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
         entry["refs"].append(ref)
 
     hardware: list[dict[str, Any]] = []
+
+    # reference geometry -> hardware lines (STANDARD parts, cut to length;
+    # the sloped model face is a reference PROXY of a straight profile
+    # mounted at the global row slope, never a wedge-cut part)
+    ref_lines: dict[str, dict[str, Any]] = {}
+    for ref, state in reference_parts:
+        fr = state.form.frame if state.form is not None else {}
+        size = fr.get("profile_size")
+        if size is not None:
+            key = f"{int(size)}{int(size)}"
+            line = ref_lines.setdefault(key, {
+                "item": f"aluminum profile {key}, standard straight, cut to length",
+                "qty": 0,
+                "length_mm": round(fr.get("profile_len", 0.0), 1),
+                "note": (
+                    f"mounted at global row slope "
+                    f"{fr.get('profile_slope_deg', 0.0):g} deg (frame's "
+                    "responsibility); the sloped model face is a reference "
+                    "proxy, NOT a wedge-cut part; anti-slide clips/stops — "
+                    "VF-4.1"
+                ),
+            })
+            line["qty"] += 1
+        else:
+            ref_lines.setdefault(ref, {
+                "item": f"reference hardware: {state.archetype.id}",
+                "qty": 1,
+                "note": "external part — spec external",
+            })
+    hardware.extend(ref_lines.values())
 
     # screws: derived from screw joints, never declared
     screw_lines: dict[str, int] = {}
@@ -74,33 +110,40 @@ def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
             ),
         })
 
-    # aluminum profile: derived from the rails' profile seats
-    profiles: dict[str, int] = {}
-    for ref, state in states.items():
-        size = (state.form.frame.get("profile_size")
-                if state.form is not None else None)
-        if size:
-            key = f"{int(size)}{int(size)}"
-            profiles[key] = profiles.get(key, 0) + 2  # two slots per module
-    for key, slots in sorted(profiles.items()):
-        hardware.append({
-            "item": f"aluminum profile {key}",
-            "qty": slots,
-            "note": "profile seats per module (2 rails under each); "
-                    "lengths and rack layout external — the row is a fluid "
-                    "cascade proof, not the final rack (VF-4/VF-5)",
-        })
+    # aluminum profile slot heuristic — ONLY when no reference profile
+    # parts exist in the assembly (otherwise the reference geometry above
+    # already carries the real profile line; double counting is a lie)
+    if not ref_lines:
+        profiles: dict[str, int] = {}
+        for ref, state in states.items():
+            if state.instance.manufacturing.process == "reference":
+                continue
+            size = (state.form.frame.get("profile_size")
+                    if state.form is not None else None)
+            if size:
+                key = f"{int(size)}{int(size)}"
+                profiles[key] = profiles.get(key, 0) + 2  # two slots per module
+        for key, slots in sorted(profiles.items()):
+            hardware.append({
+                "item": f"aluminum profile {key}",
+                "qty": slots,
+                "note": "profile seats per module (2 rails under each); "
+                        "lengths and rack layout external — the row is a fluid "
+                        "cascade proof, not the final rack (VF-4/VF-5)",
+            })
 
-    beds = [s.instance.manufacturing.bed for s in states.values()]
+    fdm_states = [s for s in states.values()
+                  if s.instance.manufacturing.process != "reference"]
+    beds = [s.instance.manufacturing.bed for s in fdm_states]
     bed_min = [max(b[i] for b in beds) for i in range(3)] if beds else None
     return {
         "printed_parts": sorted(printed.values(), key=lambda e: e["archetype"]),
         "hardware": hardware,
         "print": {
             "materials": sorted({s.instance.manufacturing.material
-                                 for s in states.values()}),
+                                 for s in fdm_states}),
             "bed_min_mm": bed_min,
             "support_policy": sorted({s.instance.manufacturing.support_policy
-                                      for s in states.values()}),
+                                      for s in fdm_states}),
         },
     }

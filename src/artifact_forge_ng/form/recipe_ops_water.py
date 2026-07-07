@@ -250,6 +250,16 @@ def _profile_seat_slot(state: RecipeState, p: dict[str, Any], op_id: str) -> Non
         profile_slot_clearance=clearance, profile_slot_depth=depth,
         profile_slot_x=f["rail_x1"] - inset,
     )
+    # Seat datums (VF-4): the point where the groove CEILING rests on the
+    # profile's sloped support line — at the groove's UPSTREAM (+Y) edge,
+    # where a flat groove meets a falling line first. 0.5 in from the face:
+    # any deeper and the rising support line would wedge into the ceiling
+    # upstream of the contact (a real interference, not a modeling nit).
+    edge_y = f["rail_y1"] - 0.5
+    state.datums["seat_e"] = {
+        "at": [f["rail_x1"] - inset, edge_y, depth], "rotate": [0.0, 0.0, 0.0]}
+    state.datums["seat_w"] = {
+        "at": [-(f["rail_x1"] - inset), edge_y, depth], "rotate": [0.0, 0.0, 0.0]}
 
 
 _register(RecipeOpDecl(
@@ -858,4 +868,100 @@ _register(RecipeOpDecl(
     description="catch-tray collector endcap: sloped tray under the rail "
                 "overflow lip draining into a push-in hose bore; "
                 "saddle-hangs on the front wall over the drip band",
+))
+
+
+# -- profile_ref_body (VF-4: the sloped-carrier reference proxy) -----------------
+
+
+def _profile_ref_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Aluminum profile REFERENCE GEOMETRY — an honesty-critical surrogate.
+
+    This does NOT represent a physically milled/sloped aluminum extrusion:
+    the sloped top face is a reference proxy for a STANDARD STRAIGHT
+    2020/3030 profile mounted with a global row slope. AF poses support
+    only 90-degree rotations, so the slope lives in the body's geometry
+    (the same trick as the rail's sloped channel), never in the pose. The
+    BOM must describe this part as a standard rectangular profile CUT TO
+    LENGTH — never as a wedge-cut part.
+
+    Body: an axis-aligned box beheaded by a wide sloped ChannelCutFeature
+    (wider than the body — the U-cutter's floor becomes the top face).
+    Stations along the top line mark where each rail's groove ceiling
+    lands; their datums drive the profile_perch joints."""
+    if state.section is not None:
+        raise RecipeError("profile_ref_body must be the (single) base op")
+    size = 20.0 if p["size"] == "2020" else 30.0
+    length = p["length"]
+    slope = p["slope_deg"]
+    pitch = p["station_pitch"]
+    stations = int(round(p["stations"]))
+    station_edge = p["station_edge"]
+    drop_total = length * math.tan(math.radians(slope))
+    if stations < 1:
+        raise RecipeError("profile needs at least one station")
+    span_needed = station_edge + (stations - 1) * pitch + 8.0
+    if length < span_needed:
+        raise RecipeError(
+            f"profile {length:g} shorter than its stations need "
+            f"({span_needed:g}) — cut it longer")
+
+    y0, y1 = -length / 2.0, length / 2.0
+    height = size + 2.0 + drop_total
+    state.section = SectionProfile(
+        name="recipe",
+        outer=rounded_rect_loop(-size / 2.0, y0, size / 2.0, y1, 1.0),
+        plane="XY", width_axis="Z",
+    )
+    state.width = height
+    name = op_id or "profile"
+
+    # behead: wide sloped U-cutter — its floor IS the sloped top face
+    state.channels.append(ChannelCutFeature(
+        name=f"{name}_slope_cut", center_x=0.0,
+        y0=y1, y1=y0, z_top=height,
+        width=size + 10.0, depth_start=2.0, depth_end=2.0 + drop_total,
+        bottom_r=1.0,
+    ))
+
+    def top_z_at(y: float) -> float:
+        return size + (y - y0) * math.tan(math.radians(slope))
+
+    for k in range(1, stations + 1):
+        yk = y1 - station_edge - (k - 1) * pitch
+        state.datums[f"station_{k}"] = {
+            "at": [0.0, yk, top_z_at(yk)], "rotate": [0.0, 0.0, 0.0]}
+        state.frame[f"station_{k}_y"] = yk
+        state.frame[f"station_{k}_z"] = top_z_at(yk)
+
+    state.regions.append(Region(
+        "profile_body", RegionRole.MOUNTING_SURFACE,
+        Box3(-size / 2.0, y0, 0.0, size / 2.0, y1, height)))
+    state.frame.update(
+        outline_u0=-size / 2.0, outline_v0=y0,
+        outline_u1=size / 2.0, outline_v1=y1,
+        outline_corner_r=1.0,
+        profile_size=size, profile_len=length,
+        profile_slope_deg=slope,
+        profile_y_low=y0, profile_y_high=y1,
+        profile_top_z_low=size,
+        station_pitch=pitch, station_count=float(stations),
+    )
+
+
+_register(RecipeOpDecl(
+    name="profile_ref_body",
+    kind="base",
+    params={
+        "size": ("choice", "2020"), "length": ("length", 780.0),
+        "slope_deg": ("number", 1.827), "station_pitch": ("length", 248.0),
+        "stations": ("count", 3), "station_edge": ("length", 20.0),
+    },
+    validators=(
+        "form.profile_ref_geometry_ok", "topology.single_connected_solid",
+    ),
+    apply=_profile_ref_body,
+    description="aluminum profile reference proxy: standard straight "
+                "2020/3030 mounted at the global row slope, modeled with a "
+                "sloped-top surrogate (poses are quarter-turn only)",
 ))

@@ -191,10 +191,48 @@ cassette_contact, handovers (from/to/status/drop_mm), total_drop_mm
 8-частный row — `uv run forge build
 catalog/examples/vertical_farm/vertical_farm_row_3x1_petg.yaml`.
 
-## Честный остаток (не в VF-3)
+## VF-4 Profile-Carried Row Reference (реализовано)
 
-- горизонтальная стойка/каркас: stepped supports, spacer feet, row carrier
-  (VF-4/VF-5) — row пока каскад;
+**Golden artifact**: `vertical_farm_row_3x1_carried` — VF-3 каскад,
+механически несомый двумя алюминиевыми профилями 2020.
+
+> **Important honesty note.** `aluminum_profile_ref_v1` НЕ представляет
+> физически фрезерованный/скошенный профиль. Скошенная верхняя грань —
+> **reference-суррогат** СТАНДАРТНОГО ПРЯМОГО 2020/3030, смонтированного
+> с глобальным уклоном ряда (позы AF — только 90°). BOM всегда описывает
+> железку как standard rectangular profile CUT TO LENGTH, mounted at the
+> global slope — никогда как wedge-cut деталь.
+
+- **Уклон носителя ВЫВОДИТСЯ из физики воды** (derived, не declared):
+  `row_slope_deg = deg(atan2(module_w·tan(rad(slope_deg)) + FALL_ENTRY,
+  module_w))` ≈ 1.827° — «каркас, воюющий с водой» непредставим. Урок
+  VF-4: shared-имя `slope_deg` чуть не подсунуло профилю уклон желоба —
+  деривация закрыла класс ошибки.
+- **process: reference** (новая инфра): внешнее железо в сборке — без
+  FDM-чеков (одна честная WARN-нота), STL/STEP экспортируются как
+  визуальный референс (`exports.role: reference`), в BOM уходит в
+  hardware, никогда в printed_parts.
+- **profile_perch** (realizing joint, тип `profile_seat`): паз rail ↔
+  верх профиля — локальная посадка (fit 0.1–0.5/сторону). Порты паза
+  **optional** — одиночная ячейка и VF-3 каскад легальны; обязательность
+  опоры = assembly-фича `row_carried_by_profile` в must_have конкретной
+  сборки.
+- **Row-чеки в глобальных позах** (`assembly/carrier.py`):
+  `row_supported` (каждый rail на КАЖДОМ профиле в своей станции, контакт
+  ±0.4 — «не висит на fluid_joint»), `row_pitch_aligned`,
+  `profile_slope_feeds_downhill`.
+- **Модель контакта (честно)**: плоский паз на наклонной линии — контакт
+  по upstream-кромке; зазор к нижней кромке ≈ 7.91 мм РЕПОРТИТСЯ
+  (frame_report.span_gap_mm), не фейлится. **VF-4 — verification proof
+  привязки к носителю, не финальная эксплуатационная опора: anti-slide
+  locking / вибрация / full-surface seating → VF-4.1.**
+- **frame_report.yaml**: carrier (size/slope/length/geometry-нота),
+  per-rail perched_on + contact, вердикты support/pitch/slope, scope-нота.
+
+## Честный остаток (не в VF-3/VF-4)
+
+- **VF-4.1**: anti-slide клипсы / point pads / end stops — замыкание
+  upstream-edge контакта в полноценную посадку;
 - `dry_endcap_v1` (механическая заглушка незанятых торцов);
 - `vertical_farm_shelf_row_v1` (3–6 ячеек, collector_side) (MVP-4);
 - герметичные межмодульные стыки — **никогда** (anti-goal);

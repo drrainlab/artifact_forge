@@ -16,6 +16,8 @@ USER_VOCABULARY = {
     # VF-3: external-hardware tube port (mates a silicone hose, not a
     # printed part — the tube lands in BOM-lite)
     "hose_port",
+    # VF-4: rail groove seated on the aluminum profile carrier
+    "profile_seat",
 }
 
 
