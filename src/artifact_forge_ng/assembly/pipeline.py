@@ -104,6 +104,22 @@ def _joint_findings(
                 message=str(exc), critical=True,
             ))
             continue
+        # Ordering guard: a joint may only hang B off an ALREADY-POSED A.
+        # Without this, a misordered joint list silently posed B against
+        # the root origin — the worst kind of wrong (looks assembled,
+        # water flows nowhere). List joints in chain order.
+        if joint.a_ref != asm.root and joint.a_ref not in poses:
+            findings.append(Finding(
+                check="assembly.joint_pose", status=Status.FAIL,
+                level=Level.ASSEMBLY,
+                message=(
+                    f"joint {i} ({joint.type}): part {joint.a_ref!r} is not "
+                    "posed yet — list joints in chain order (each a: must "
+                    "reference the root or an already-posed part)"
+                ),
+                critical=True,
+            ))
+            continue
         # Chained joints (B mates a part that is itself posed): the global
         # pose composes through the parent. v1 composes pure translations
         # only — a rotated parent would need Euler composition, and no
@@ -178,6 +194,8 @@ def run_assembly_validate(path: Path, strict_flag: bool | None) -> dict[str, Any
         "joints": [f.to_dict() for f in joint_findings],
         "status": status,
     }
+    if asm.meta:
+        out["meta"] = dict(asm.meta)
     if strict:
         for ref, st in states.items():
             st.enforce_strict()
@@ -431,11 +449,20 @@ def run_assembly_build(
         "status": status,
         "grade": grade,
     }
+    if asm.meta:
+        report["meta"] = dict(asm.meta)
     # Vertical farm pack: the water contract report + view metadata, when
     # any part carries a water channel (dry assemblies stay untouched).
+    from .bom import build_bom
     from .water_report import build_views, build_water_report
 
-    water = build_water_report(states, joint_findings)
+    bom = build_bom(asm, states, catalog)
+    bom_path = target / "bom.yaml"
+    bom_path.write_text(yaml.safe_dump(bom, sort_keys=False, allow_unicode=True))
+    report["bom"] = bom
+    report["exports"]["bom"] = str(bom_path)
+
+    water = build_water_report(states, joint_findings, asm=asm, poses=poses)
     if water is not None:
         water_path = target / "water_report.yaml"
         water_path.write_text(

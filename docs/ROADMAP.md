@@ -108,10 +108,24 @@ golden-примеры water_rail_cell_2020_petg (3 части) и two_cell_line_
 Assembly pipeline научился композировать цепочки joints через
 не-повёрнутого родителя (rail → cassette → frame).
 
-Впереди: **VF-3** inlet/outlet/endcap адаптеры; **VF-4** shelf row
-(3–6 ячеек, collector_side; каркас горизонтален — уклон внутри модуля);
-**VF-5** production readiness (PP food-grade, draft angles, no-undercut
-report).
+**VF-3 Fluid Row ✅ (2026-07-07)**: первое настоящее assembly-system
+доказательство — 3-cell fluid cascade row (`vertical_farm_row_3x1_petg`):
+inlet cap (drip tower) → 3 rail-ячейки с кассетами → collector endcap
+(catch tray), все передачи — реальные `fluid_joint` (первый клиент;
+downhill by datum-construction, verified), адаптеры на `saddle_hang`
+(auxiliary verification joint), required fluid-порты без сирот, row-level
+water_report (cells/handovers/total_drop) и **BOM-lite** (derived-only —
+семя A2: printed parts, silicone tube из hose_port, aluminum profile;
+никаких HardwareSpec до A2). VF-3.0 попутно закалил интерфейсное ядро:
+fluid-датумы = точки передачи воды, axis = направление потока, ordering
+guard цепочек joints, композиция поз через непрокрученного родителя,
+width-rule «приёмник ≥ отдающего», тип `hose_port`, `AssemblyInstance.meta`.
+⚠️ row — каскад (каждая ячейка ~7.9 мм ниже), НЕ финальная стойка.
+
+Впереди: **VF-4** shelf row / горизонтальный каркас (stepped supports,
+spacer feet или row carrier — снятие каскадного ограничения; 3–6 ячеек,
+collector_side); **VF-5** production readiness (PP food-grade, draft
+angles, no-undercut report); `dry_endcap_v1` для незанятых торцов.
 
 ---
 

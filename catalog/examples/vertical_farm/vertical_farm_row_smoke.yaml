@@ -1,0 +1,98 @@
+# VF-3 CAD smoke assembly: cap + ONE rail + one cassette + collector —
+# proves both fluid handovers, both saddle hangs and the cassette seat on
+# the compiled solids at a fraction of the full row's build time. The full
+# 3-cell row (vertical_farm_row_3x1_petg.yaml) is the forge-build
+# acceptance artifact; this is the suite-friendly slice.
+schema: assembly/v1
+id: vertical_farm_row_smoke
+strict: true
+root: cap
+
+meta:
+  row_kind: fluid_cascade
+  mounting_policy: not_final_rack
+
+shared:
+  module_w: 248mm
+  seat_depth: 14mm
+  channel_d: 5mm
+  slope_deg: 1.25
+  channel_w: 16mm
+  cassette_l: 220mm
+  cassette_w: 220mm
+  cassette_h: 26mm
+  seat_clearance: 0.75mm
+  wall: 2.4mm
+  module_pitch: 250mm
+  tube_od: 9mm
+
+parts:
+  - ref: cap
+    product:
+      schema: product/v1
+      id: smoke_inlet_cap
+      archetype: inlet_cap_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: rail
+    product:
+      schema: product/v1
+      id: smoke_rail
+      archetype: water_rail_v1@1
+      params: {profile: "2020"}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: cassette
+    product:
+      schema: product/v1
+      id: smoke_cassette
+      archetype: coco_cassette_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: collector
+    product:
+      schema: product/v1
+      id: smoke_collector
+      archetype: collector_endcap_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+
+joints:
+  - type: fluid_joint
+    a: cap.rail_out
+    b: rail.inlet
+    rotate: [0, 0, 0]
+  - type: saddle_hang
+    a: rail.inlet
+    b: cap.rail_out
+    rotate: [0, 0, 0]
+  - type: removable_insert
+    a: rail.cassette_seat
+    b: cassette.seat
+    rotate: [0, 0, 0]
+    params: {lift_margin: 3mm}
+  - type: fluid_joint
+    a: rail.outlet
+    b: collector.rail_in
+    rotate: [0, 0, 0]
+  - type: saddle_hang
+    a: rail.outlet
+    b: collector.rail_in
+    rotate: [0, 0, 0]
+
+contract:
+  must_have:
+    - row_fluid_chain
+    - saddle_mount
+    - vertical_farm_cassette_interface

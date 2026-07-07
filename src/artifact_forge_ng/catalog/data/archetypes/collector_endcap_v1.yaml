@@ -1,0 +1,147 @@
+schema: archetype/v1
+id: collector_endcap_v1
+version: 1
+object_class: water_collector
+maturity: sandbox_buildable
+description: >
+  Vertical Farm Pack VF-3: the Collector/Drain Endcap — a sloped catch
+  tray tucked under the last rail's overflow lip. Droplets detach at the
+  lip, fall catch_fall into the tray mouth, run down the tray floor to a
+  push-in drain bore enclosed below the rim at the floor's lowest point —
+  the tray empties completely, verified not postulated
+  (form.collector_tray_drains + topology.fluid_path_open). Hangs tool-free
+  on the rail FRONT wall: arm over the wall top, bib outside the drip
+  band, dry tongue riding the outlet corridor ABOVE the exiting water.
+  Overflow-safe: the mouth is wider than the drip band and the +Y side is
+  bounded by the rail's own recessed wall. Prints as modeled. Local frame:
+  y=0 = the rail front face = the catch plane, z anchored at the handover
+  datum.
+
+provides_features:
+  - hose_takeoff
+  - catch_tray
+
+parameters:
+  tray_w:
+    {type: length, default: 20mm, min: 16mm, max: 32mm,
+     role: functional, exposed: true,
+     description: tray inner width — wider than the rail channel's drip band}
+  tube_od:
+    {type: length, default: 9mm, min: 6mm, max: 13mm,
+     role: assembly, exposed: true,
+     description: "outer diameter of the silicone drain tube (hardware, BOM)"}
+  bore_clearance:
+    {type: length, default: 0.4mm, min: 0.2mm, max: 0.8mm, role: manufacturing}
+  cassette_w:
+    {type: length, default: 220mm, min: 180mm, max: 236mm, role: assembly}
+  seat_clearance:
+    {type: length, default: 0.75mm, min: 0.5mm, max: 1mm, role: assembly}
+  module_w:
+    {type: length, default: 248mm, min: 200mm, max: 250mm, role: assembly}
+  seat_depth:
+    {type: length, default: 14mm, min: 10mm, max: 20mm, role: assembly}
+  channel_d:
+    {type: length, default: 5mm, min: 4mm, max: 8mm, role: assembly}
+  slope_deg:
+    {type: number, default: 1.25, min: 1.0, max: 1.5, role: assembly,
+     description: shared rail slope — positions the lip the tray sits under}
+  channel_w:
+    {type: length, default: 16mm, min: 12mm, max: 20mm, role: assembly}
+  tongue_w:
+    {type: length, default: 14mm, min: 8mm, max: 18mm, role: functional,
+     description: dry locator tongue width — must fit INSIDE the rail channel}
+  tray_slope_deg:
+    {type: number, default: 1.5, min: 0.8, max: 3.0, role: functional,
+     description: tray floor slope toward the drain}
+  catch_fall:
+    {type: length, default: 8.5mm, min: 6mm, max: 12mm, role: functional,
+     description: drop from the lip to the tray floor — deep enough to
+       enclose the drain bore below the rim}
+  saddle_fit:
+    {type: length, default: 0.4mm, min: 0.2mm, max: 0.8mm, role: manufacturing}
+  corner_r:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: aesthetic}
+
+derived:
+  rail_wall_t: (module_w - cassette_w - 2 * seat_clearance) / 2
+  # lip-to-wall-top drop: outlet floor sits (seat_depth + channel_d +
+  # module_w*tan(slope)) below the rail top
+  hang_drop: seat_depth + channel_d + module_w * tan(rad(slope_deg))
+
+constraints:
+  - tongue_w <= channel_w - 2
+  - tube_od + bore_clearance <= catch_fall + 3 - 1.5
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: collector_endcap_body
+      id: collector
+      params:
+        tray_w: tray_w
+        tube_od: tube_od
+        bore_clearance: bore_clearance
+        rail_wall_t: rail_wall_t
+        saddle_fit: saddle_fit
+        hang_drop: hang_drop
+        tongue_w: tongue_w
+        rail_channel_w: channel_w
+        tray_slope_deg: tray_slope_deg
+        catch_fall: catch_fall
+        corner_r: corner_r
+
+regions:
+  - {id: catch_tray, role: transient_water_path, editable: false,
+     label: "Catch tray",
+     description: the receiving wet volume — nothing may cut into it}
+  - {id: saddle, role: interface_keepout, editable: false,
+     label: "Hanging arm"}
+
+surface_style: molded_utility_part
+
+interfaces:
+  - id: rail_in
+    type: fluid_inlet
+    gender: female
+    datum: catch
+    assembly_role: required
+    accepts: [water_rail]
+    # axis = flow direction: water keeps travelling -Y into the tray
+    frame: {normal: "+Y", up: "+Z", axis: "-Y"}
+  - id: drain_out
+    type: hose_port
+    gender: neutral
+    datum: drain_out
+    frame: {normal: "-Y", up: "+Z", axis: "-Y"}
+
+validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
+  - interface.keepouts_preserved
+  - form.hose_bore_ok
+  - form.collector_tray_drains
+  - form.no_standing_water_ir
+  - topology.fluid_path_open
+  - topology.single_connected_solid
+  - topology.ribs_present
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - hose_takeoff
+    - catch_tray
+  must_not_have:
+    - closed_water_reservoir
+    - dead_water_pocket
+    - hidden_wet_cavity
+  invariants:
+    - tongue_w <= channel_w - 2
+    - tray_slope_deg >= 0.8 and tray_slope_deg <= 3.0

@@ -107,6 +107,10 @@ class AssemblyInstance(VersionedModel):
     joints: list[JointUse]
     wiring: WiringSpec | None = None
     contract: AssemblyContract = AssemblyContract()
+    #: Free-form annotations surfaced verbatim into the assembly report —
+    #: the assembly names what it IS (e.g. row_kind: fluid_cascade,
+    #: mounting_policy: not_final_rack). Never machine-interpreted.
+    meta: dict[str, str] = {}
 
     @model_validator(mode="after")
     def _cross_checks(self) -> "AssemblyInstance":

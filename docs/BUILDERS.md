@@ -66,6 +66,8 @@ Recipe-op без реализации в движке = честный engine-ga
 | `water_rail_body` | ✅ | vertical farm (docs/VERTICAL_FARM_PACK.md): корпус + seat + наклонный ChannelCutFeature + коридоры (water_rail_v1) |
 | `substrate_tray_body` | ✅ | vertical farm: shell кассеты + frame-ключи Cassette Interface Standard (coco_cassette_v1) |
 | `retainer_frame_body` | ✅ | vertical farm: кольцевая рамка-прижим (substrate_retainer_frame_v1) |
+| `inlet_cap_body` | ✅ | VF-3: drip tower — вертикальный hose-бор сквозь спаут в inlet-коридор; saddle-hang на заднюю стенку (inlet_cap_v1) |
+| `collector_endcap_body` | ✅ | VF-3: Γ catch tray под overflow-кромкой, наклонный пол в закрытый дренажный бор; saddle-hang на переднюю стенку (collector_endcap_v1) |
 
 ### feature — крепёж, карманы, вырезы
 
@@ -126,6 +128,8 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 | `fluid_joint` | ✅ A1.5: handover ТОЛЬКО вниз (gravity is the pump) + совместимые ширины каналов; первый клиент — VF-3 адаптеры |
 | `removable_insert` | ✅ vertical farm: drop-in кассета в seat (clearance band, tool-free rim, окно ВНУТРИ желоба, reach 1–2мм, drain gap ≥ 1мм) |
 | `tongue_groove` | ✅ vertical farm: линия модулей — groove глотает tongue в полосе 0.3–0.5, не доставая дна; каналы параллельны и на одной высоте |
+| `fluid_joint` | ✅ VF-3 (первый клиент): передача воды outlet→inlet СТРОГО вниз (gravity is the pump), приёмник ≥ отдающего по ширине; a: = отдающая сторона (говорящий FAIL при путанице) |
+| `saddle_hang` | ✅ VF-3: auxiliary VERIFICATION joint — седло адаптера страддлит стенку rail в позе, заданной fluid_joint; никогда не реализует fluid-порты (no_orphan_ports не считает) |
 | `dovetail_joint` | ✅ A1: undercut-ретенция + clearance-band + угол фланков + полное зацепление; friction-only осевое удержание (заявлено) |
 
 ### interface / joint / механика

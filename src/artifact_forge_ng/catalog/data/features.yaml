@@ -647,3 +647,45 @@ features:
       - interface.mate_compatible
       - assembly.no_orphan_ports
       - assembly.no_interference
+
+  # -- VF-3 fluid row (docs/VERTICAL_FARM_PACK.md) ---------------------------
+
+  - id: hose_takeoff
+    description: >
+      push-in bore gripping an external silicone tube — the tube is
+      hardware (BOM), never a printed mate
+    verified_by:
+      - form.hose_bore_ok
+
+  - id: drip_spout
+    description: >
+      drip-tower water path: a vertical bore falling through a spout that
+      dips into the receiving rail corridor — no pockets by construction
+    verified_by:
+      - form.spout_drop_path_ok
+      - topology.fluid_path_open
+
+  - id: catch_tray
+    description: >
+      sloped catch tray under the rail's overflow lip, draining fully
+      into a through hose bore at the floor's lowest point
+    verified_by:
+      - form.collector_tray_drains
+      - topology.fluid_path_open
+
+  # Assembly-level: the row's fluid story — every handover downhill, every
+  # required fluid port mated by a realizing fluid_joint.
+  - id: row_fluid_chain
+    description: >
+      the water chain inlet -> cells -> collector verified in the pose:
+      gravity is the pump, no orphan required fluid ports
+    verified_by:
+      - assembly.fluid_joint_ir
+      - assembly.no_orphan_ports
+
+  - id: saddle_mount
+    description: >
+      auxiliary verification: adapters really hang on the rail walls in
+      the pose the fluid joints set — straddle, rest, corridor fit
+    verified_by:
+      - assembly.saddle_hang_ir
