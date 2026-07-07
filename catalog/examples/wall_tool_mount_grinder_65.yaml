@@ -1,0 +1,50 @@
+schema: product/v1
+id: wall_tool_mount_grinder_65
+archetype: wall_tool_ring_clamp_v1@1
+strict: true
+
+# Wall Tool Mounts Pack v1 acceptance case: an angle-grinder holder for a
+# 65 mm body, hung on two M5 wall anchors (toggle bolt / plug screw). The
+# flange panel above the collar carries a deterministic voronoi lightening
+# field; every cut answers to the anchor keepouts. Conservative safety
+# factor 3.0 for a workshop tool that gets yanked off the wall daily.
+# AF verifies the plastic — the wall and the anchors stay YOUR assumptions.
+
+requested_features:
+  - tool_saddle_ring
+  - snap_retention_mouth
+  - wall_mount_flange
+  - counterbored_anchor_holes
+  - saddle_buttress_ribs
+  - voronoi_field
+
+params:
+  tool_d: 65mm
+  clearance: 1mm
+  ring_wall: 7mm
+  collar_h: 30mm
+  capture_deg: 220
+  flange_w: 78mm
+  flange_h: 125mm
+  flange_t: 7mm
+  screw: M5
+  rib_t: 3mm
+  tool_mass: 2.5
+  safety_factor: 3.0
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
+
+modifiers:
+  - id: add_voronoi_field
+    target: flange_lightening
+    params:
+      seed: 42
+      sites: 14
+      min_ligament: 3mm
+      edge_margin: 5mm
+      cut_mode: through

@@ -1,0 +1,226 @@
+schema: archetype/v1
+id: branch_clamp_upper_v1
+version: 1
+object_class: branch_clamp
+description: >
+  Biomorphic pack Bio-1 (docs/BIOMORPHIC.md): upper half of the split
+  branch clamp, modeled MATING-FACE-DOWN (mating plane at v=0, so the
+  assembly poses it with rotate [0,0,0] and the male dovetail rail points
+  up). Same constant-YZ-section discipline as the lower half: open saddle
+  with its center compression_gap/2 beyond the mating plane, one recessed
+  TPU pad land at the apex (three-point contact with the lower pair), four
+  counterbored M4 bolt holes through the wings, a straight axial cable
+  channel above the saddle (open both ends — a lamp cable runs along the
+  branch axis), and a REAL dovetail rail (trapezoid in the section, top
+  wider than root) that accessories slide onto. Two blind rail_fix heatset
+  pockets enter from the rail top and must never reach the channel —
+  form.clamp_channel_clear measures exactly that. NOTE: this archetype
+  deliberately does NOT subscribe form.cuts_respect_keepouts — the
+  rail_fix bolt-column keepouts intentionally veto FUTURE cuts under the
+  rail, while the builder's own channel predates them and is verified by
+  its dedicated checks (a builder never declares a keepout over an
+  intended cut, so subscribing would fail the builder's own geometry).
+
+maturity: sandbox_buildable
+
+provides_features:
+  - split_branch_clamp
+  - branch_saddle
+  - three_point_tpu_contact
+  - axial_cable_channel
+  - dovetail_rail
+  - hole_pattern
+  - heatset_pockets
+
+parameters:
+  nominal_branch_d:
+    {type: length, default: 60mm, min: 30mm, max: 100mm,
+     role: functional, exposed: true,
+     description: nominal branch/pipe diameter at the clamping point}
+  clamp_w:
+    {type: length, default: 40mm, min: 32mm, max: 120mm,
+     role: structural, exposed: true,
+     description: clamp body width along the branch axis}
+  compression_gap:
+    {type: length, default: 3mm, min: 1.5mm, max: 6mm,
+     role: functional,
+     description: designed daylight between the bolted mating faces}
+  screw:
+    {type: choice, choices: [M4], default: M4, role: assembly,
+     description: clamp bolts (counterbored clearance holes in this half)}
+  flange_t:
+    {type: length, default: 10mm, min: 8mm, max: 14mm, role: structural,
+     description: bolt wing thickness at the mating plane}
+  wall:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: structural,
+     description: minimum wall between the saddle and the outer shell}
+  bolt_web:
+    {type: length, default: 8mm, min: 0mm, max: 20mm, role: structural,
+     description: web between the saddle edge and the bolt axis —
+       form.saddle_geometry_ok fails a bolt placed over the open mouth}
+  edge_m:
+    {type: length, default: 10mm, min: 6mm, max: 16mm, role: structural}
+  corner_r:
+    {type: length, default: 2.5mm, min: 1mm, max: 5mm, role: aesthetic}
+  land_angle:
+    {type: number, default: 50, min: 30, max: 65, role: functional,
+     description: kept in sync with the lower half's land positions (the
+       upper half carries ONE land at the apex)}
+  land_w:
+    {type: length, default: 14mm, min: 8mm, max: 20mm, role: functional}
+  pad_recess:
+    {type: length, default: 1.2mm, min: 0.6mm, max: 2mm, role: functional}
+  top_t:
+    {type: length, default: 20mm, min: 10mm, max: 30mm, role: structural,
+     description: body above the saddle apex — carries the cable channel}
+  rail_w:
+    {type: length, default: 20mm, min: 12mm, max: 30mm, role: functional,
+     exposed: true, description: dovetail top width (the accessory side)}
+  rail_h:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: functional}
+  rail_angle:
+    {type: number, default: 10, min: 0, max: 20, role: functional,
+     description: dovetail flank angle in degrees — 0 builds a plain ridge
+       and form.dovetail_rail_profile honestly fails it}
+  channel_d:
+    {type: length, default: 10mm, min: 6mm, max: 14mm, role: functional,
+     exposed: true, description: axial cable channel diameter}
+  rail_screw:
+    {type: choice, choices: [M3, M4], default: M3, role: assembly,
+     description: accessory fixing inserts in the rail top}
+  rail_fix_depth:
+    {type: length, default: 6mm, min: 5mm, max: 8mm, role: assembly}
+  min_web:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: manufacturing}
+
+derived:
+  saddle_r: nominal_branch_d / 2
+  saddle_apex: saddle_r - compression_gap / 2
+  channel_z: saddle_apex + 3 + channel_d / 2
+  body_h: saddle_apex + top_t
+  rail_top_z: body_h + rail_h
+  bolt_y: saddle_r + bolt_web
+  bolt_dx: clamp_w - 16
+
+constraints:
+  - compression_gap >= 1.5
+  - rail_top_z - rail_fix_depth - channel_z - channel_d / 2 >= 2
+
+form:
+  type: recipe
+  section: recipe
+  plane: YZ
+  width_axis: X
+  ops:
+    - op: clamp_half_upper
+      id: body
+      params:
+        branch_d: nominal_branch_d
+        clamp_w: clamp_w
+        gap: compression_gap
+        flange_t: flange_t
+        bolt_y: bolt_y
+        edge_m: edge_m
+        wall: wall
+        corner_r: corner_r
+        land_angle: land_angle
+        land_w: land_w
+        pad_recess: pad_recess
+        top_t: top_t
+        rail_w: rail_w
+        rail_h: rail_h
+        rail_angle: rail_angle
+    - op: counterbore_hole_pattern
+      id: bolts_a
+      params:
+        kind: line
+        screw: screw
+        count: 2
+        spacing: bolt_dx
+        cx: "expr(clamp_w / 2)"
+        cy: bolt_y
+        cs_face: top
+        z_top: flange_t
+        through: flange_t
+    - op: counterbore_hole_pattern
+      id: bolts_b
+      params:
+        kind: line
+        screw: screw
+        count: 2
+        spacing: bolt_dx
+        cx: "expr(clamp_w / 2)"
+        cy: "expr(-bolt_y)"
+        cs_face: top
+        z_top: flange_t
+        through: flange_t
+    - op: axial_channel
+      id: cable_channel
+      params:
+        d: channel_d
+        y: 0mm
+        z: channel_z
+    - op: heatset_insert_pocket
+      id: rail_fix
+      params:
+        screw: rail_screw
+        depth: rail_fix_depth
+        spacing: bolt_dx
+        cx: "expr(clamp_w / 2)"
+        cy: 0mm
+        z_top: rail_top_z
+
+regions:
+  - {id: saddle_contact, role: soft_contact_surface, editable: false,
+     label: "Branch contact saddle",
+     description: the open half-circle over the branch with the apex TPU
+       pad land — never cut}
+  - {id: outer_shell, role: exoskeleton_panel, editable: true,
+     label: "Outer shell (bio canvas)",
+     aliases: [outer surface, shell, exoskeleton canvas],
+     description: body flanks above the wings — the biomorphic exoskeleton
+       grows here (materialization lands in Bio-3)}
+  - {id: rail_interface, role: mounting_surface, editable: false,
+     label: "Dovetail rail",
+     description: "the male dovetail accessories slide onto — geometry is
+       the interface, no modifier may restyle it"}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.saddle_geometry_ok
+  - form.pad_lands_present
+  - form.dovetail_rail_profile
+  - form.clamp_channel_clear
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.cavity_open
+  - topology.single_connected_solid
+  - topology.rail_present
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.bores_open
+  - topology.pockets_present
+  - region.keepouts_preserved
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - apply_biomorphic_exoskeleton
+  - add_bone_windows
+  - add_vein_ribs
+
+contract:
+  must_have:
+    - branch_saddle
+    - three_point_tpu_contact
+    - axial_cable_channel
+    - dovetail_rail
+  must_not_have:
+    - closed_branch_hole_without_split
+    - weak_saddle_contact
+    - blocked_cable_channel
+    - perforated_bolt_boss
+  invariants:
+    - compression_gap >= 1.5
+    - rail_top_z - rail_fix_depth - channel_z - channel_d / 2 >= 2

@@ -1,0 +1,100 @@
+# Bio-4M flagship: the split branch clamp grown into a bone/Giger
+# exoskeleton. Both halves carry a load-aware organic rib network on their
+# OUTER SHELL — mapped onto the developable profile_surface (the section
+# unrolled along the extrusion, Bio-4M stage B), not a flat plate. The
+# organic windows are RECESSES (a through-cut would breach the saddle or the
+# cable channel), so the honesty report flags them mode=recessed.
+#
+# The `skin: implicit` flag asks the Bio-4M implicit-SDF exporter (stage A)
+# for the printable STL; the BRep path stays the source of exact mechanical
+# truth (STEP). At `forge validate` (no CAD) the bio features stay honestly
+# supported-but-NOT-built until a build materializes them.
+#
+# The clamp body is 55 mm wide (vs the plain clamp's 40) so the unrolled
+# canvas is wide enough for a rich window field on both halves.
+schema: assembly/v1
+id: biomorphic_branch_clamp_organic
+strict: true
+root: lower
+
+shared:
+  nominal_branch_d: 60mm
+  clamp_w: 55mm
+  compression_gap: 3mm
+  screw: M4
+
+parts:
+  - ref: lower
+    product:
+      schema: product/v1
+      id: clamp_lower_organic
+      archetype: branch_clamp_lower_v1@1
+      params:
+        bolt_web: 8mm
+      manufacturing: {material: PETG, support_policy: none}
+      style:
+        surface: biomechanical_exoskeleton
+        skin: implicit
+        organicity: 0.6
+      requested_features:
+        - biomorphic_exoskeleton
+        - organic_windows
+        - load_path_ribs
+      modifiers:
+        - id: apply_biomorphic_exoskeleton
+          target: outer_shell
+          params:
+            rib_density: 0.7
+            organicity: 0.6
+            rib_d_root: 7mm
+            window_scale: 0.85
+            min_ligament: 2mm
+            primary_rib_d: 7mm
+            secondary_rib_d: 4mm
+            seed: 0
+  - ref: upper
+    product:
+      schema: product/v1
+      id: clamp_upper_organic
+      archetype: branch_clamp_upper_v1@1
+      params:
+        bolt_web: 8mm
+        channel_d: 10mm
+      manufacturing: {material: PETG, support_policy: none}
+      style:
+        surface: biomechanical_exoskeleton
+        skin: implicit
+        organicity: 0.6
+      requested_features:
+        - organic_windows
+      # HONEST SCOPE: the upper shell is split into two disconnected patches
+      # by the dovetail rail (top keepout) and the saddle notch (bottom mate
+      # block), so a single connected LOAD-AWARE rib skeleton is
+      # geometrically impossible on it — form.rib_graph_connected would fail.
+      # It therefore wears graph-less organic RECESSED windows (bone windows)
+      # on the same developable profile_surface, respecting the rail keepout.
+      modifiers:
+        - id: add_bone_windows
+          target: outer_shell
+          params:
+            seed: 7
+            sites: 22
+            window_scale: 0.85
+            min_ligament: 2mm
+
+joints:
+  - type: screw_joint
+    a: lower.clamp_mate
+    b: upper.clamp_mate
+    rotate: [0, 0, 0]
+    params: {screw: M4, count: 4}
+  - type: compression_gap_joint
+    a: lower.clamp_mate
+    b: upper.clamp_mate
+    rotate: [0, 0, 0]
+    params: {gap: 3mm}
+
+contract:
+  must_have:
+    - bolted_interface
+    - compression_clamp_interface

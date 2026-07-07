@@ -1,0 +1,35 @@
+schema: product/v1
+id: forearm_flashlight_cuff
+archetype: forearm_cuff_v1@1
+mode: wearable
+
+# The first P-line wearable: a biomorphic-ready forearm cuff carrying a
+# 25 mm flashlight in a snap clip. The cuff is sized from the body, not
+# from abstract parameters — swap the body_fit block for another arm and
+# rebuild; no other edits.
+body_fit:
+  region: forearm
+  circumference: 270mm
+  length: 240mm
+  clearance: 6mm
+  strap_width: 25mm
+
+requested_features:
+  - body_cradle_fit
+  - strap_mount
+  - skin_safe_edges
+  - tpu_pad_recesses
+  - cylindrical_payload_clamp
+
+params:
+  payload_d: 25mm
+
+modifiers:
+  - id: add_strap_slots
+    target: strap_land_left
+  - id: add_strap_slots
+    target: strap_land_right
+
+manufacturing:
+  material: PETG
+  support_policy: none

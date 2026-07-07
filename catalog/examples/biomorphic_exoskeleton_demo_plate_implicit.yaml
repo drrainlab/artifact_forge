@@ -1,0 +1,55 @@
+# Bio-4M pre-flight gate: the demo plate in IMPLICIT SKIN mode
+# (docs/BIOMORPHIC.md). Same functional core as
+# biomorphic_exoskeleton_demo_plate.yaml (the Bio-3 golden stays untouched),
+# but the production STL comes from the analytic SDF engine: organic base
+# shell + grown bolt bosses + smooth-blended rib capsules + lipped windows,
+# with every fastener cut hard and exact, LAST. part.step remains the
+# simplified BRep reference (engine gap, by design).
+schema: product/v1
+id: biomorphic_exoskeleton_demo_plate_implicit
+archetype: adapter_plate_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - biomorphic_exoskeleton
+  - organic_windows
+
+params:
+  plate_l: 120mm
+  plate_w: 80mm
+  thickness: 6mm
+  corner_r: 6mm
+  a_kind: line
+  a_count: 2
+  a_spacing: 96mm
+  a_screw: M4
+  a_cs_face: top
+
+style:
+  surface: biomechanical_exoskeleton
+  organicity: 0.6
+  skin: implicit
+  skin_resolution: 0.4
+  # base_inflation defaults to 2mm (the organic grown-shell layer);
+  # k_blend/k_weld/k_lip derive from organicity (see form/style.py).
+
+modifiers:
+  - id: apply_biomorphic_exoskeleton
+    target: center_zone
+    params:
+      rib_density: 0.5
+      window_scale: 0.8
+      rib_d_root: 6mm
+      rib_d_tip: 3mm
+      min_ligament: 2mm
+      # seed 0 = stable CRC32 seed derived from the product id
+      seed: 0
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid

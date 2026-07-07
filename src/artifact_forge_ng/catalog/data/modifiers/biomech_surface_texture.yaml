@@ -1,0 +1,18 @@
+schema: modifier/v1
+id: biomech_surface_texture
+category: biomorphic_surface
+description: >
+  Biomechanical micro-texture (grain/speckle/grooves) for a region — the
+  per-region spelling of what the style's vein_rhythm does part-wide.
+  DECLARED AHEAD OF ITS APPLICATOR: applying it today yields an honest
+  engine-gap WARN; it claims no features until Bio-3 emits real geometry.
+applies_to: [exoskeleton_panel, aesthetic_lightening]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   retaining_flexure, seal_surface, interface_keepout]
+params:
+  relief: {type: length, default: 1.2mm, min: 0.4mm, max: 2mm}
+  rhythm: {type: number, default: 0.5, min: 0, max: 1}
+  seed: {type: count, default: 42, min: 0, max: 99999}
+provides_features: []
+validators: []

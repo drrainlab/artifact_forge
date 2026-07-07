@@ -492,6 +492,7 @@ from . import (  # noqa: E402,F401
     checks_stability,
     checks_tunnel,
     checks_wallmount,
+    checks_wearable,
 )
 
 #: Structural sanity every archetype gets whether it asks or not — mirrors

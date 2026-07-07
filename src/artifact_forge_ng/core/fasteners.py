@@ -30,6 +30,34 @@ def screw_spec(name: str) -> dict[str, float]:
     return SCREWS[key]
 
 
+def hole_cut_dims(screw: str, through: float, head_style: str = "cone") -> dict[str, float]:
+    """The ONE source of fastener cutter dimensions (mm) — shared by the
+    BRep hole cutter (cad/holes.py) and the implicit-skin SDF hard cuts
+    (compiler/implicit), so the two paths cannot drift apart.
+
+    Keys: ``bore_d`` (clearance bore diameter incl. FDM slack), ``head_r``
+    (nominal head radius), ``seat_r`` (head recess radius incl. the 0.3 mm
+    fit slack), plus per style: cone countersink ``cs_depth``/``cs_tip_r``
+    or cylindrical counterbore ``cb_depth``.
+    """
+    spec = screw_spec(screw)
+    head_r = spec["head"] / 2.0
+    dims: dict[str, float] = {
+        "bore_d": spec["clear"] + FDM_CLEARANCE,
+        "head_r": head_r,
+        "seat_r": head_r + 0.3,
+    }
+    if head_style == "cylinder":
+        # Counterbore: flat-bottomed recess that swallows a socket-cap
+        # head, never deeper than half the stock.
+        dims["cb_depth"] = min(spec["head"] * 0.8, through * 0.5)
+    else:
+        # Conical countersink for a flat head.
+        dims["cs_depth"] = min(2.0, through * 0.4)
+        dims["cs_tip_r"] = 0.5
+    return dims
+
+
 #: Standard lamp-socket insert housings (nominal; any explicit inner_d in a
 #: product instance overrides the preset).
 SOCKET_INSERTS: dict[str, dict[str, float]] = {

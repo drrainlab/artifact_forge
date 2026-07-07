@@ -1,0 +1,61 @@
+# Bio-1 flagship: a two-half compression clamp for a 60 mm branch — the
+# functional core a branch lamp hangs from. Four M4 bolts pull the halves
+# onto the branch; the 3 mm compression gap keeps the TPU pad lands loaded
+# and the mating faces from ever bottoming out; the dovetail rail on the
+# upper half takes accessories.
+#
+# Honest scope: NO wiring block — the cable channel is a straight
+# single-part X-run through the upper half (verified by
+# form.clamp_channel_clear + topology.bores_open); the cross-part L-path
+# probe does not apply to it.
+schema: assembly/v1
+id: branch_lamp_clamp_60
+strict: true
+root: lower
+
+# Mating dimensions declared ONCE — branch_d / gap / bolt desync between
+# the halves is unrepresentable.
+shared:
+  nominal_branch_d: 60mm
+  clamp_w: 40mm
+  compression_gap: 3mm
+  screw: M4
+
+parts:
+  - ref: lower
+    product:
+      schema: product/v1
+      id: clamp_lower
+      archetype: branch_clamp_lower_v1@1
+      params:
+        bolt_web: 8mm
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: upper
+    product:
+      schema: product/v1
+      id: clamp_upper
+      archetype: branch_clamp_upper_v1@1
+      params:
+        bolt_web: 8mm
+        channel_d: 10mm
+      manufacturing: {material: PETG, support_policy: none}
+
+joints:
+  # The upper half is modeled mating-face-down, so no flip: the lower's
+  # clamp_mate datum bakes the compression gap in (datum-on-datum posing
+  # cannot express offsets).
+  - type: screw_joint
+    a: lower.clamp_mate
+    b: upper.clamp_mate
+    rotate: [0, 0, 0]
+    params: {screw: M4, count: 4}
+  - type: compression_gap_joint
+    a: lower.clamp_mate
+    b: upper.clamp_mate
+    rotate: [0, 0, 0]
+    params: {gap: 3mm}
+
+contract:
+  must_have:
+    - bolted_interface
+    - compression_clamp_interface

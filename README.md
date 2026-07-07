@@ -153,7 +153,17 @@ fit-пробы в собранной позе после per-part билдов: 
 (размерная цепочка плаг↔интерьер−2·clearance до CAD + посадка в позе),
 `screw_joint` в бобышки и `press_fit_pin_pair` (пин ТОЛЩЕ гнезда на
 interference; реальный overlap измеряется и обязан попасть в декларацию).
-Дорожная карта: R3 split_plane → R4 snap/dovetail → R5 assembly-intents.
+Дорожная карта сборочного слоя — [docs/ROADMAP.md](docs/ROADMAP.md)
+(волны A1 ports/interfaces → A2 hardware/BOM → A3 requirements → A4 systems).
+
+## Roadmap (docs/ROADMAP.md)
+
+Мастер-план развития — [docs/ROADMAP.md](docs/ROADMAP.md): «инженерная
+грамматика сборки» (ports/interfaces, BOM, requirements, solver,
+physics-lite, failure critic, workshop memory) волнами A → E → M, плюс
+линия P (Cinema/Props и Fashion/Wearable режимы поверх одного ядра).
+Позиционирование: платформа параметрического создания функциональных
+артефактов — от крепежа до кино-реквизита и носимых конструкций.
 
 ## Geometry Builders & Recipe (docs/BUILDERS.md)
 

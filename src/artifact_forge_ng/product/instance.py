@@ -7,12 +7,14 @@ lives in ``catalog.loader.validate_instance`` because it needs the registry.
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from ..core.values import parse_quantity
+from .modes import MODE_PROFILES
 from .schema_base import VersionedModel
 
 _REF_RE = re.compile(r"^(?P<id>[a-z0-9_]+)(?:@(?P<version>\d+))?$")
@@ -48,6 +50,64 @@ class ManufacturingSpec(BaseModel):
         }
 
 
+#: Body regions the fit layer knows how to measure. Extend together with
+#: the archetypes that consume them (wrist, thigh, … in later P-waves).
+WEARABLE_REGIONS = ("forearm",)
+
+#: Sane human ranges per field (mm) — a typo like 27mm instead of 270mm
+#: must die at the schema, not as an unprintable cuff.
+_BODY_FIT_RANGES = {
+    "circumference": (150.0, 450.0),
+    "length": (80.0, 400.0),
+    "clearance": (0.0, 15.0),
+    "strap_width": (15.0, 40.0),
+}
+
+
+class BodyFitSpec(BaseModel):
+    """Measured body input for wearable artifacts — the same contract as
+    ManufacturingSpec: a typed block whose ``env_context`` feeds flat names
+    into every parameter formula."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    region: Literal["forearm"] = "forearm"
+    circumference: float
+    length: float
+    clearance: float = 6.0
+    strap_width: float = 25.0
+
+    @field_validator(
+        "circumference", "length", "clearance", "strap_width", mode="before"
+    )
+    @classmethod
+    def _parse_length(cls, v: Any) -> float:
+        if isinstance(v, str):
+            return parse_quantity(v, "length", where="body_fit")
+        return float(v)
+
+    @model_validator(mode="after")
+    def _human_ranges(self) -> "BodyFitSpec":
+        for name, (lo, hi) in _BODY_FIT_RANGES.items():
+            v = getattr(self, name)
+            if not lo <= v <= hi:
+                raise ValueError(
+                    f"body_fit.{name} = {v:g}mm outside the human range "
+                    f"[{lo:g}, {hi:g}] for region {self.region!r}"
+                )
+        return self
+
+    def env_context(self) -> dict[str, float]:
+        return {
+            "body_circumference": self.circumference,
+            "body_length": self.length,
+            "body_clearance": self.clearance,
+            "body_strap_width": self.strap_width,
+            #: Effective limb diameter — the number saddle math wants.
+            "body_d_eff": self.circumference / math.pi,
+        }
+
+
 class ModifierUse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -71,6 +131,11 @@ class ProductInstance(VersionedModel):
     style: dict[str, Any] = {}
     manufacturing: ManufacturingSpec = ManufacturingSpec()
     modifiers: list[ModifierUse] = []
+    #: Mode scaffold (wave P2): validated against the MODE_PROFILES
+    #: registry — the registry IS the enum. Behavior, not decoration: a
+    #: mode's required_context blocks must be present on the instance.
+    mode: str = "engineering"
+    body_fit: BodyFitSpec | None = None
 
     @field_validator("archetype")
     @classmethod
@@ -80,6 +145,28 @@ class ProductInstance(VersionedModel):
                 f"malformed archetype ref {v!r}; expected 'id' or 'id@version'"
             )
         return v
+
+    @field_validator("mode")
+    @classmethod
+    def _check_mode(cls, v: str) -> str:
+        if v not in MODE_PROFILES:
+            raise ValueError(
+                f"unknown mode {v!r}; known modes: {sorted(MODE_PROFILES)}"
+            )
+        return v
+
+    @model_validator(mode="after")
+    def _mode_context(self) -> "ProductInstance":
+        missing = [
+            block
+            for block in MODE_PROFILES[self.mode].required_context
+            if getattr(self, block, None) is None
+        ]
+        if missing:
+            raise ValueError(
+                f"mode {self.mode!r} requires context: {', '.join(missing)}"
+            )
+        return self
 
     @property
     def archetype_id(self) -> str:

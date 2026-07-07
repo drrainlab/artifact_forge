@@ -1,0 +1,196 @@
+schema: archetype/v1
+id: wall_tool_ring_clamp_v1
+version: 1
+object_class: wall_tool_mount
+description: >
+  Wall Tool Mounts Pack v1: one-piece wall holder for a power tool with a
+  cylindrical body (angle grinder, router, heat gun, drill). A wall flange
+  carries two counterbored anchors above a C-ring saddle fused into the
+  flange bottom and buttressed by gusset ribs — the classic hook load path
+  (top screw in tension, flange heel bearing on the wall). Axial retention
+  is the tool's wider body resting on the collar top; radial retention is
+  the snap mouth. Model frame: Z = wall normal, X = vertical = tool axis;
+  prints upright (side_profile), everything rises from the bed. AF verifies
+  the plastic geometry and load path only — wall material and anchor rating
+  stay external assumptions (see form.anchor_wall_strength_unverified).
+  Pack roadmap (NOT in v1): wall_tool_hook_v1, wall_tool_cradle_v1,
+  anti_rotation_ears, wide_flange_mode, third_screw_triangle,
+  rubber_wall_pad, biomorphic outer_shell mapping, teardrop counterbores.
+
+provides_features:
+  - tool_saddle_ring
+  - snap_retention_mouth
+  - wall_mount_flange
+  - counterbored_anchor_holes
+  - saddle_buttress_ribs
+  - rounded_contact_edges
+
+parameters:
+  tool_d:
+    {type: length, default: 65mm, min: 35mm, max: 90mm,
+     role: functional, exposed: true,
+     description: diameter of the held tool section}
+  clearance:
+    {type: length, default: 1mm, min: 0.5mm, max: 2mm,
+     role: manufacturing,
+     description: "radial gap around the tool: 0.5 tight (machined cylinders),
+       1.0 normal (rubbery/textured bodies), 1.5 loose"}
+  ring_wall:
+    {type: length, default: 7mm, min: 4mm, max: 10mm, role: structural,
+     description: C-ring wall thickness}
+  collar_h:
+    {type: length, default: 30mm, min: 18mm, max: 60mm,
+     role: structural, exposed: true,
+     description: saddle height along the tool axis}
+  capture_deg:
+    {type: number, default: 220, min: 195, max: 262,
+     role: functional, exposed: true,
+     description: "saddle coverage; more arc = stronger retention, harder
+       entry — must out-wrap the clearance (see the retention invariant)"}
+  flange_w:
+    {type: length, default: 78mm, min: 60mm, max: 120mm, role: structural}
+  flange_h:
+    {type: length, default: 125mm, min: 90mm, max: 180mm, role: structural}
+  flange_t:
+    {type: length, default: 7mm, min: 5mm, max: 10mm, role: structural}
+  flange_corner_r:
+    {type: length, default: 6mm, min: 2mm, max: 12mm, role: aesthetic}
+  standoff:
+    {type: length,
+     default: expr(flange_t + tool_d / 2 + clearance + 2),
+     min: expr(flange_t + tool_d / 2 + clearance + 1.5),
+     max: 70mm,
+     role: functional,
+     description: tool axis distance from the wall face — derived from the
+       geometry so the saddle cavity clears the flange}
+  screw:
+    {type: choice, choices: [M4, M5], default: M5, role: assembly,
+     description: wall anchor screw (toggle-bolt / plug screw)}
+  mount_spacing:
+    {type: length,
+     default: "expr(min(85, flange_h - collar_h - 22))",
+     min: 55mm,
+     max: expr(flange_h - collar_h - 22),
+     role: structural,
+     description: vertical distance between the two anchors — wider spreads
+       the moment better; capped so both stay above the collar}
+  rib_t:
+    {type: length, default: 3mm, min: 2.4mm, max: 5mm, role: structural}
+  tool_mass:
+    {type: number, default: 2.5, min: 0.5, max: 5.0, role: structural,
+     description: expected tool mass in kg (drives the honesty moment note)}
+  safety_factor:
+    {type: number, default: 2.5, min: 1.5, max: 5.0, role: structural}
+  min_web:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: manufacturing,
+     description: minimum web around the anchor holes}
+
+derived:
+  # thinnest designed wall — feeds manufacturing.min_wall honestly
+  wall: min(ring_wall, min(flange_t, rib_t))
+
+constraints:
+  - flange_h >= collar_h + 24
+
+form:
+  type: recipe
+  section: recipe
+  plane: YZ
+  width_axis: X
+  ops:
+    - op: wall_ring_mount
+      id: body
+      params:
+        tool_d: tool_d
+        clearance: clearance
+        ring_wall: ring_wall
+        collar_h: collar_h
+        capture_deg: capture_deg
+        standoff: standoff
+        flange_w: flange_w
+        flange_h: flange_h
+        flange_t: flange_t
+        flange_corner_r: flange_corner_r
+        rib_t: rib_t
+        tool_mass_kg: tool_mass
+        safety_factor: safety_factor
+    - op: counterbore_hole_pattern
+      id: anchors
+      params:
+        kind: line
+        screw: screw
+        count: 2
+        spacing: mount_spacing
+        cx: "expr((collar_h + flange_h) / 2)"
+        cy: 0mm
+        cs_face: top
+        z_top: flange_t
+        through: flange_t
+
+regions:
+  - {id: wall_flange, role: mounting_surface, editable: false,
+     label: "Wall mounting flange"}
+  - {id: anchors_0, role: fastener_keepout, editable: false,
+     label: "Lower anchor zone"}
+  - {id: anchors_1, role: fastener_keepout, editable: false,
+     label: "Upper anchor zone"}
+  - {id: saddle_contact, role: soft_contact_surface, editable: false,
+     label: "Tool contact saddle",
+     description: surface the tool body rests against — never cut}
+  - {id: retaining_lip, role: retaining_flexure, editable: false,
+     label: "Snap mouth prongs"}
+  - {id: load_rib_zone, role: high_stress_region, editable: false,
+     label: "Ring-to-flange load path",
+     description: fusion neck and gusset ribs — the whole moment goes
+       through here}
+  - {id: flange_lightening, role: aesthetic_lightening, editable: true,
+     label: "Flange lightening panel",
+     aliases: [outer shell, side panels, flange face, lightening zone],
+     description: safe canvas for lightening fields between the collar and
+       the anchors}
+  - {id: outer_shell, role: aesthetic_lightening, editable: false,
+     label: "Ring outer band",
+     description: reserved for v2 cylindrical/biomorphic field mapping —
+       editable false in v1 because field mapping around the X axis is not
+       supported yet}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.tool_saddle_radius_ok
+  - form.tool_clearance_ok
+  - form.retention_angle_ok
+  - form.mouth_gap_ok
+  - form.mount_hole_positions_ok
+  - form.ribs_connect_saddle_to_flange
+  - form.anchor_wall_strength_unverified
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - form.screw_access_clear
+  - form.contact_edges_rounded
+  - topology.tool_void_open
+  - topology.single_connected_solid
+  - topology.ribs_present
+  - topology.screw_holes_open
+  - topology.countersinks_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_voronoi_field
+  - add_hex_perforation
+  - add_grid_slot_field
+  - fillet_soften
+
+contract:
+  must_have:
+    - tool_saddle_ring
+    - snap_retention_mouth
+    - wall_mount_flange
+    - counterbored_anchor_holes
+    - saddle_buttress_ribs
+  must_not_have: []
+  invariants:
+    - standoff >= flange_t + tool_d / 2 + clearance + 1.5
+    - mount_spacing <= flange_h - collar_h - 22
+    - tool_d - (tool_d + 2 * clearance) * sin(rad((360 - capture_deg) / 2)) >= 0.8

@@ -456,3 +456,45 @@ features:
       - assembly.clamp_gap_ir
       - assembly.screw_axes_clear
       - assembly.no_interference
+
+  # -- wearable pack (wave P2, docs/ROADMAP.md line P) ---------------------
+
+  - id: body_cradle_fit
+    description: >
+      the cavity is the measured limb circle plus the declared skin
+      clearance, with a mouth inside the donning window — a cuff that
+      actually fits the body_fit block, not a pipe clamp renamed
+    verified_by:
+      - form.body_clearance_ok
+      - form.arm_mouth_dons_ok
+      - topology.cavity_open
+
+  - id: strap_mount
+    description: >
+      through strap-slot pairs in the closure tabs — the strap threads
+      down, under the bar, up, and never cuts toward the skin
+    verified_by:
+      - form.strap_access_ok
+      - form.cuts_respect_keepouts
+      - topology.cutout_present
+
+  - id: skin_safe_edges
+    description: every body-contact edge joint carries a comfort fillet
+    verified_by:
+      - form.comfort_edge_radius_ok
+
+  - id: tpu_pad_recesses
+    description: >
+      recessed flat lands in the body saddle for glued TPU/foam pads —
+      recess goes OUTWARD, a pad pocket, never a pressure ridge
+    verified_by:
+      - form.pad_recess_exists
+
+  - id: cylindrical_payload_clamp
+    description: >
+      snap C-clip payload seat riding OUTSIDE the body ring, mouth away
+      from the skin, with measured arc retention
+    verified_by:
+      - form.payload_retention_ok
+      - form.payload_mount_not_on_skin_side
+      - topology.payload_void_open

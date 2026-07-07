@@ -1201,6 +1201,78 @@ def _clamp_finish(
     )
 
 
+def _clamp_bio_canvas(
+    state: RecipeState, p: dict[str, Any], profile: Any, f: dict[str, float]
+) -> None:
+    """Publish the outer_shell as a developable ``profile_surface`` canvas
+    (Bio-4M stage B) — the pattern of ``_revolve_band``'s cylindrical window,
+    now the section unrolled along the extrusion. The bio applicator grows
+    ribs + RECESSED organic windows there; a through-cut would breach the
+    saddle, so the op computes ``safe_recess`` = the min wall from the canvas
+    to the saddle circle minus a residual skin margin (the ONE internal
+    feature sharing the base op's frame; the axial channel and cord slots sit
+    farther out or are masked) and publishes it as FaceWindow.depth."""
+    from .exoskeleton.profile_surface import profile_surface_canvas
+    from .part import FaceWindow
+    from .regions import Rect2D as _Rect2D, Region2D
+
+    width = p["clamp_w"]
+    canvas = profile_surface_canvas(profile.outer, width)
+    surface = canvas.surface
+    s0, s1 = canvas.s0, canvas.s1
+    # seam MUST sit off the canvas (inside the mate/saddle block) — a rib
+    # graph never crosses a discontinuity.
+    if not (canvas.seam_s > s1 - 1e-6):
+        raise RecipeError("profile_surface seam landed on the canvas")
+    edge = 3.0
+    win_s0, win_s1 = s0 + edge, s1 - edge
+    x0, x1 = edge, width - edge
+    if win_s1 <= win_s0 + 1.0 or x1 <= x0 + 1.0:
+        return  # body too small for a bio skin — leave the region window-less
+    window = _Rect2D(win_s0, x0, win_s1, x1)
+
+    scz, sr = f["saddle_cz"], f["saddle_r"]
+    wall_margin = p.get("window_wall", 1.2)
+    min_wall = math.inf
+    for s, (u, v) in zip(surface.s_breaks, surface.points):
+        if s < s0 - 1e-9 or s > s1 + 1e-9:
+            continue
+        min_wall = min(min_wall, abs(math.hypot(u, v - scz) - sr))
+    if not math.isfinite(min_wall):
+        min_wall = wall_margin + 0.8
+    safe_recess = max(0.8, min_wall - wall_margin)
+    cap = p.get("window_depth", 0.0)
+    if cap and cap > 0.0:
+        safe_recess = min(safe_recess, cap)
+
+    keepouts: list[Region2D] = []
+    if canvas.rail_interval is not None:
+        r_lo, r_hi = canvas.rail_interval
+        k_lo, k_hi = max(win_s0, r_lo - 2.0), min(win_s1, r_hi + 2.0)
+        if k_hi > k_lo + 1e-6:
+            keepouts.append(Region2D(
+                "rail_keepout", RegionRole.MOUNTING_SURFACE,
+                _Rect2D(k_lo, x0, k_hi, x1)))
+
+    state.windows["outer_shell"] = FaceWindow(
+        origin=(0.0, 0.0, 0.0), tilt_deg=0.0,
+        window=window, depth=safe_recess,
+        keepouts=tuple(keepouts),
+        mapping="profile_surface", surface=surface,
+        note="profile_surface (Bio-4M stage B): developable section-sweep; "
+             "organic windows are RECESSED (through-cuts would breach the "
+             "saddle/channel)",
+    )
+    state.frame.update(
+        skin_safe_recess=safe_recess,
+        skin_canvas_s0=s0, skin_canvas_s1=s1,
+        skin_canvas_span=s1 - s0, skin_seam_s=canvas.seam_s,
+        skin_total_s=surface.total_s,
+    )
+    if p.get("skin_depth", 0.0):
+        state.frame["skin_depth"] = p["skin_depth"]
+
+
 def _clamp_half_lower(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     """Lower half of the split branch clamp: base slab, open saddle notch
     in the mating (top) edge, wing flanges carrying the bolt columns.
@@ -1217,6 +1289,7 @@ def _clamp_half_lower(state: RecipeState, p: dict[str, Any], op_id: str) -> None
     except ValueError as exc:
         raise RecipeError(f"clamp_half_lower: {exc}") from exc
     _clamp_finish(state, p, profile, f)
+    _clamp_bio_canvas(state, p, profile, f)
     w, mh = p["clamp_w"], f["saddle_mouth_half"]
     state.regions.extend([
         Region("saddle_contact", RegionRole.SOFT_CONTACT_SURFACE,
@@ -1243,6 +1316,8 @@ _register(RecipeOpDecl(
         "edge_m": ("length", 10.0), "wall": ("length", 4.0),
         "corner_r": ("length", 2.5), "land_angle": ("angle", 50.0),
         "land_w": ("length", 14.0), "pad_recess": ("length", 1.2),
+        "window_wall": ("length", 1.2), "window_depth": ("length", 0.0),
+        "skin_depth": ("length", 0.0),
     },
     validators=(
         "form.saddle_geometry_ok",
@@ -1269,6 +1344,7 @@ def _clamp_half_upper(state: RecipeState, p: dict[str, Any], op_id: str) -> None
     except ValueError as exc:
         raise RecipeError(f"clamp_half_upper: {exc}") from exc
     _clamp_finish(state, p, profile, f)
+    _clamp_bio_canvas(state, p, profile, f)
     w, mh = p["clamp_w"], f["saddle_mouth_half"]
     state.regions.extend([
         Region("saddle_contact", RegionRole.SOFT_CONTACT_SURFACE,
@@ -1300,6 +1376,8 @@ _register(RecipeOpDecl(
         "pad_recess": ("length", 1.2), "top_t": ("length", 20.0),
         "rail_w": ("length", 20.0), "rail_h": ("length", 6.0),
         "rail_angle": ("angle", 10.0),
+        "window_wall": ("length", 1.2), "window_depth": ("length", 0.0),
+        "skin_depth": ("length", 0.0),
     },
     validators=(
         "form.saddle_geometry_ok",
@@ -1377,4 +1455,116 @@ _register(RecipeOpDecl(
     validators=("form.cuts_respect_keepouts", "topology.cutout_present"),
     apply=_cord_slot_pair,
     description="through cord/tie slot pair exiting into the saddle void",
+))
+
+
+def _forearm_cuff_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Wearable forearm cuff (wave P2): open C-ring sized from body_fit,
+    strap tabs at the mouth tips, three recessed TPU pad lands, payload
+    snap-C on top — ONE constant section, printed on its profile.
+
+    The ``outer_aesthetic_shell`` region is RESERVED for the bio skin: no
+    profile_surface FaceWindow is published in v1 (mirror _clamp_bio_canvas
+    here once the Bio-4M stage-B canvas lands for two-cavity sections)."""
+    from .profiles_wearable import CuffParams, build_forearm_cuff_profile
+
+    if state.section is not None:
+        raise RecipeError("forearm_cuff_body must be the (single) base op")
+    cp = CuffParams(
+        arm_circumference=p["arm_circumference"],
+        arm_clearance=p["arm_clearance"], wall=p["wall"],
+        arm_capture_deg=p["arm_capture_deg"], land_angle=p["land_angle"],
+        land_w=p["land_w"], pad_recess=p["pad_recess"],
+        comfort_edge_r=p["comfort_edge_r"], tab_t=p["tab_t"],
+        tab_len=p["tab_len"], payload_d=p["payload_d"],
+        payload_clearance=p["payload_clearance"],
+        payload_arc_deg=p["payload_arc_deg"], clip_wall=p["clip_wall"],
+        neck_drop=p["neck_drop"],
+    )
+    try:
+        profile, f = build_forearm_cuff_profile(cp)
+    except ValueError as exc:
+        raise RecipeError(f"forearm_cuff_body: {exc}") from exc
+    w = p["cuff_l"]
+    state.section = profile
+    state.width = w
+    state.kind = "section_extrude"
+    state.print_orientation = "side_profile"
+    state.frame.update(f)
+    v_ext = max(f["tab_u_out"], f["arm_r_outer"])
+    state.frame.update(
+        outline_u0=0.0, outline_v0=-v_ext, outline_u1=w, outline_v1=v_ext,
+        outline_corner_r=0.0,
+    )
+    r_ai, r_ao = f["arm_r_inner"], f["arm_r_outer"]
+    r_pi, r_po = f["payload_r_inner"], f["payload_r_outer"]
+    p_cv, n = f["payload_cv"], f["neck_half_w"]
+    p_h = (360.0 - f["payload_arc_deg"]) / 2.0
+    tip_u = r_pi * math.cos(math.radians(90.0 - p_h))
+    tip_v = p_cv + r_pi * math.sin(math.radians(90.0 - p_h))
+    tip_o = p_cv + r_po * math.sin(math.radians(90.0 - p_h))
+    state.regions.extend([
+        # The BODY_CONTACT keepout deliberately starts 2 mm ABOVE the mouth
+        # tips: tabs and strap slots live at/below tip level, so the coarse
+        # AABB never vetoes a legal strap cut; the precise circle guard is
+        # form.strap_access_ok + the applicator's own check.
+        Region("arm_contact", RegionRole.BODY_CONTACT_SURFACE,
+               Box3(0.0, -r_ai, f["arm_mouth_tip_v"] + 2.0, w, r_ai, r_ai)),
+        # Strap windows start OUTSIDE the ring wall (tab_u_x, the chord-
+        # mouth junction) — the modifier can only pierce clear tab plate.
+        Region("strap_land_left", RegionRole.MOUNTING_SURFACE,
+               Box3(0.0, -f["tab_u_out"], f["tab_v_bot"],
+                    w, -f["tab_u_x"] - 1.0, f["tab_v_top"])),
+        Region("strap_land_right", RegionRole.MOUNTING_SURFACE,
+               Box3(0.0, f["tab_u_x"] + 1.0, f["tab_v_bot"],
+                    w, f["tab_u_out"], f["tab_v_top"])),
+        Region("payload_saddle", RegionRole.SOFT_CONTACT_SURFACE,
+               Box3(0.0, -r_pi, p_cv - r_pi, w, r_pi, p_cv + r_pi)),
+        Region("clip_flexure_left", RegionRole.HIGH_STRESS_REGION,
+               Box3(0.0, -tip_u - 3.0, tip_v - 3.0, w, -tip_u + 3.0,
+                    tip_o + 2.0)),
+        Region("clip_flexure_right", RegionRole.HIGH_STRESS_REGION,
+               Box3(0.0, tip_u - 3.0, tip_v - 3.0, w, tip_u + 3.0,
+                    tip_o + 2.0)),
+        Region("outer_aesthetic_shell", RegionRole.EXOSKELETON_PANEL,
+               Box3(0.0, -r_ao, 0.0, w, r_ao,
+                    math.sqrt(r_ao * r_ao - n * n))),
+    ])
+    state.datums["arm_axis"] = {
+        "at": [w / 2.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0],
+    }
+    state.datums["payload_axis"] = {
+        "at": [w / 2.0, 0.0, p_cv], "rotate": [0.0, 0.0, 0.0],
+    }
+
+
+_register(RecipeOpDecl(
+    name="forearm_cuff_body",
+    kind="base",
+    params={
+        "arm_circumference": ("length", None), "cuff_l": ("length", None),
+        "arm_clearance": ("length", 6.0), "wall": ("length", 4.0),
+        "arm_capture_deg": ("angle", 240.0), "land_angle": ("angle", 45.0),
+        "land_w": ("length", 14.0), "pad_recess": ("length", 1.5),
+        "comfort_edge_r": ("length", 2.0), "tab_t": ("length", 4.0),
+        "tab_len": ("length", 26.0), "payload_d": ("length", 25.0),
+        "payload_clearance": ("length", 0.3),
+        "payload_arc_deg": ("angle", 240.0), "clip_wall": ("length", 3.0),
+        "neck_drop": ("length", 4.0),
+    },
+    validators=(
+        "form.body_clearance_ok",
+        "form.arm_mouth_dons_ok",
+        "form.comfort_edge_radius_ok",
+        "form.pad_recess_exists",
+        "form.payload_mount_not_on_skin_side",
+        "form.payload_retention_ok",
+        "topology.cavity_open",
+        "topology.payload_void_open",
+        "topology.single_connected_solid",
+    ),
+    apply=_forearm_cuff_body,
+    description="wearable forearm cuff: body_fit C-ring + strap tabs + "
+                "TPU pad lands + payload snap-C (X = forearm axis, "
+                "prints on its section)",
 ))

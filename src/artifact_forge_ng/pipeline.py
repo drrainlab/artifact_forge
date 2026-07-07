@@ -18,6 +18,7 @@ from .form.validators import validate_form
 from .product.archetype import ArchetypeSpec
 from .product.capability import CapabilityReport, resolve_capability
 from .product.instance import ProductInstance
+from .product.modes import MODE_PROFILES
 from .product.resolve import ResolvedParams, resolve_params
 
 
@@ -73,10 +74,11 @@ class PipelineState:
         return checks
 
     def summary(self) -> dict[str, Any]:
-        return {
+        out: dict[str, Any] = {
             "product": self.instance.id,
             "archetype": self.archetype.ref,
             "strict": self.strict,
+            "mode": self.instance.mode,
             "form_checks": self.form_checks(),
             "capability": {
                 "requested_features": self.capability.requested_features,
@@ -89,6 +91,10 @@ class PipelineState:
             ],
             "status": self.report.status.value,
         }
+        tags = MODE_PROFILES[self.instance.mode].summary_tags
+        if tags:
+            out["mode_tags"] = list(tags)
+        return out
 
     def enforce_strict(self) -> None:
         if not self.strict:

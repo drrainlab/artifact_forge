@@ -10,6 +10,7 @@ import math
 from dataclasses import dataclass
 
 from ..core.findings import Finding, Level, Status
+from ..form.exoskeleton.ir import ProfileSurfaceMap
 from ..form.part import PartForm, PlateFeature
 from ..form.regions import Circle2D, Rect2D, Region2D
 from ..form.section import Pt
@@ -17,7 +18,7 @@ from ..product.archetype import RegionRole
 
 PROTECTED_ROLES = frozenset(
     {RegionRole.FASTENER_KEEPOUT, RegionRole.HIGH_STRESS_REGION,
-     RegionRole.INTERFACE_KEEPOUT}
+     RegionRole.INTERFACE_KEEPOUT, RegionRole.BODY_CONTACT_SURFACE}
 )
 
 
@@ -59,6 +60,8 @@ class PlateWindow:
     cyl_r: float = 0.0
     cyl_r_outer: float = 0.0
     cyl_z0: float = 0.0
+    #: profile_surface passthrough (Bio-4M stage B) — the developable map.
+    surface: ProfileSurfaceMap | None = None
 
 
 def plate_window(
@@ -83,6 +86,7 @@ def plate_window(
             cyl_r=face.cyl_r,
             cyl_r_outer=face.cyl_r_outer,
             cyl_z0=face.cyl_z0,
+            surface=face.surface,
         )
     region = form.region(region_name)
     if region is None:

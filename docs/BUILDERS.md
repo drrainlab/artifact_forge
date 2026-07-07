@@ -55,7 +55,8 @@ Recipe-op без реализации в движке = честный engine-ga
 | `device_slot_profile` | ✅ | phone_stand (slot = f(tilt), COM-гейт) |
 | `open_c_channel_profile` | ✅ | cable_raceway_v1 (raceway_200): U-канал, constant section, wall меряется |
 | `snap_c_clip_profile` | ✅ | snap_c_tongue (pipe_clip_v1_sideprint): арк-ретенция + балка в профиле, sideprint |
-| `cylindrical_cradle` | 🔶 | = зеркальный snap_c (arc<180, рот вверх); билдер-флип при первом клиенте |
+| `cylindrical_cradle` | ✅ | первый клиент: payload snap-C манжеты (рот вверх, arc 210–268) внутри `forearm_cuff_body` |
+| `forearm_cuff_body` | ✅ | wearable P2: body_fit C-ring c хордовым ртом + строп-табы + TPU-ланды + payload snap-C, sideprint (profiles_wearable.py) |
 | `device_cradle` | 🔶 | покрыт device_slot_profile (phone_stand параметрический) |
 | `rounded_box_shell` | ✅ | recipe-op: outer body + interior cut, form.shell_walls_ok |
 | `sweep_profile_along_path` | ✅ | kind section_sweep: дуга по 3 точкам + topology.bar_follows_arc (grab_handle_v1) |
@@ -92,7 +93,7 @@ Recipe-op без реализации в движке = честный engine-ga
 | `grid_slot_field` | ✅ add_grid_slot_field |
 | `voronoi_field` | ✅ add_voronoi_field (stable seed, Lloyd, Chaikin, лигамент гарантирован) |
 | `magnet_pocket_pattern` | ✅ add_magnet_pockets (глухие, кожа проверяется) |
-| `strap_slot_pair` | ✅ add_zip_tie_slots |
+| `strap_slot_pair` | ✅ add_zip_tie_slots (стяжки ≤10мм) + add_strap_slots (стропы 15–40мм, skin-guard; wearable P2) |
 | `rib_field` | ✅ add_ribs (аддитивные, topology.ribs_present) |
 | `phyllotaxis_field` | ✅ add_phyllotaxis_field (Vogel-спираль, лигамент by construction + измерен) |
 | `vein_rib_field` | ✅ | add_vein_ribs (standalone, seeded rhythm, additive) + вены biomorphic в style |
@@ -155,6 +156,10 @@ controlled passes, preserve by construction). Не смешивать с recipe.
   friction hinge.
 
 ## Честный остаток (глубокая механика — по итерации на штуку)
+
+Остатки волн сведены в мастер-план [ROADMAP.md](ROADMAP.md): dovetail →
+волна A1 (ports/interfaces), rail_slider → A4 (Workshop Wall System),
+петли/резьбы/ratchet → E-этап.
 
 `dovetail`/`tongue_groove` и `rail_slider` — скользящие посадки (трение,
 допуски по направлению хода); `pin_hinge` и `friction_hinge` — подвижные

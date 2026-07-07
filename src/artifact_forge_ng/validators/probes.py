@@ -95,6 +95,14 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.pad_lands_present", Level.FORM, "the saddle carries its flat recessed TPU pad lands"),
         _decl("form.clamp_channel_clear", Level.FORM, "the axial cable channel spans the body with open ends and clear walls"),
         _decl("form.dovetail_rail_profile", Level.FORM, "the rail section is a real dovetail — top measurably wider than root"),
+        # -- wearable cuff form checks (impls in form/checks_wearable.py) -----
+        _decl("form.body_clearance_ok", Level.FORM, "arm cavity radius equals the measured limb radius plus the declared skin clearance"),
+        _decl("form.arm_mouth_dons_ok", Level.FORM, "the cuff mouth is wide enough to don over flesh yet narrower than the limb diameter"),
+        _decl("form.comfort_edge_radius_ok", Level.FORM, "every body-contact edge joint carries a fillet at least comfort_edge_r"),
+        _decl("form.pad_recess_exists", Level.FORM, "all declared TPU pad lands are present and recessed outward from the skin"),
+        _decl("form.payload_mount_not_on_skin_side", Level.FORM, "the payload clip sits outside the arm ring and opens away from the body"),
+        _decl("form.payload_retention_ok", Level.FORM, "payload cavity coverage and mouth gap give real snap retention"),
+        _decl("form.strap_access_ok", Level.FORM, "each strap tab carries a through slot pair clear of the arm circle with a solid strap bar"),
         # -- topology level: probed on the compiled solid ---------------------
         _decl("topology.single_connected_solid", Level.TOPOLOGY, "exactly one connected valid solid"),
         _decl("topology.cavity_open", Level.TOPOLOGY, "the cable cavity is a real void along the cable axis"),
@@ -121,6 +129,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.bar_follows_arc", Level.TOPOLOGY, "the swept bar is solid along its whole declared arc"),
         # -- biomorphic / clamp topology probes --------------------------------
         _decl("topology.rail_present", Level.TOPOLOGY, "the dovetail rail core is solid material along the body"),
+        _decl("topology.payload_void_open", Level.TOPOLOGY, "the payload cylinder and its upward mouth window are real voids on the solid"),
         _decl("topology.exoskeleton_ribs_materialized", Level.TOPOLOGY, "every rib graph edge is solid material on the compiled part (Bio-3)"),
         _decl("topology.organic_windows_open", Level.TOPOLOGY, "every organic window removed material through the panel (Bio-3)"),
         # -- assembly level: cross-part checks in the assembled pose ----------
@@ -145,10 +154,19 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("manufacturing.bed_fit", Level.MANUFACTURING, "bounding box fits the print bed"),
         _decl("manufacturing.overhang", Level.MANUFACTURING, "overhang fraction acceptable for the support policy"),
         _decl("manufacturing.max_opening_span", Level.MANUFACTURING, "widest through-wall opening bridges without support"),
+        # -- implicit exoskeleton skin (Bio-4M; findings emitted by the skin export stage)
+        _decl("manufacturing.mesh_watertight", Level.MANUFACTURING, "exported implicit-skin mesh is edge-manifold watertight"),
+        _decl("manufacturing.mesh_min_feature", Level.MANUFACTURING, "informational facet statistics of the implicit-skin mesh"),
+        _decl("manufacturing.implicit_skin_fidelity", Level.MANUFACTURING, "analytic SDF honors the IR: ribs solid, windows void, functional holes exact"),
+        _decl("manufacturing.skin_assembly_clearance", Level.MANUFACTURING, "skin never crosses mate/rail/seat/saddle/exit interfaces in the assembled pose"),
+        _decl("manufacturing.boss_growth_preserves_fastener_access", Level.MANUFACTURING, "grown bosses keep head seats, driver access and open bores"),
         # -- quality level ------------------------------------------------------
         _decl("quality.moldedness", Level.QUALITY, "molded-utility family score"),
         _decl("quality.boxiness", Level.QUALITY, "boxy-primitive penalty score"),
         _decl("quality.silhouette_match", Level.QUALITY, "mesh silhouette agrees with the Form IR"),
+        # -- Bio-4M visual metrics (gate on the pre-flight demo plate; WARN-only elsewhere)
+        _decl("quality.rectangularity_reduced", Level.QUALITY, "skin-zone surface is measurably non-rectangular (axis-normal area fraction below threshold)"),
+        _decl("quality.window_shadow_present", Level.QUALITY, "organic window recesses are deep enough to read as shadows, not engraving"),
     ]
 )
 
@@ -173,6 +191,10 @@ FORBIDDEN_FORM_DETECTORS: dict[str, str] = {
     "weak_saddle_contact": "form.pad_lands_present",
     "perforated_bolt_boss": "region.keepouts_preserved",
     "floating_ribs": "topology.ribs_present",
+    # wearable cuff (wave P2): the cuff's must_not_have set
+    "closed_cuff_ring": "form.arm_mouth_dons_ok",
+    "payload_on_skin_side": "form.payload_mount_not_on_skin_side",
+    "sharp_body_edges": "form.comfort_edge_radius_ok",
 }
 
 

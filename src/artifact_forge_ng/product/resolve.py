@@ -111,6 +111,8 @@ def resolve_params(
     findings: list[Finding] = []
     ctx, choices, deferred = _seed_context(archetype, instance.params, findings)
     ctx.update(instance.manufacturing.env_context())
+    if instance.body_fit is not None:
+        ctx.update(instance.body_fit.env_context())
 
     for name, spec in archetype.parameters.items():
         if spec.type == "choice":
@@ -137,6 +139,23 @@ def resolve_params(
             v = _safe_resolve(spec.default, ctx)
             if v is not None:
                 ctx[name] = v
+            else:
+                # A formula default that cannot resolve is a FAIL, never a
+                # silent skip — this is how an archetype REQUIRES a context
+                # block: default expr(body_circumference) + no body_fit: →
+                # a named, actionable finding right here.
+                findings.append(
+                    Finding(
+                        check=f"param:{name}",
+                        status=Status.FAIL,
+                        level=Level.SCHEMA,
+                        message=(
+                            f"default for {name!r} could not be resolved: "
+                            f"{spec.default.source} — missing names (does this "
+                            "archetype require a body_fit: block?)"
+                        ),
+                    )
+                )
         if name not in ctx:
             if spec.default is None:
                 findings.append(

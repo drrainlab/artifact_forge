@@ -1,0 +1,75 @@
+schema: modifier/v1
+id: apply_biomorphic_exoskeleton
+category: biomorphic
+description: >
+  Grows a load-aware organic rib network over a panel: keepout masks ->
+  surface samples -> rib graph (Gabriel, seeded, deterministic) ->
+  root-to-tip tapered ribs -> organic windows between them. Primary
+  target is an exoskeleton_panel (rib growth surface); aesthetic_lightening
+  is the fallback for plate-like cores. IR-first: Bio-2 attaches the
+  checkable skeleton intent, Bio-3 materializes it in CAD — the bio
+  features stay honestly un-built until the topology probes pass.
+  Windows are the DUAL of the rib graph (cells around rib-face centers),
+  explicitly clipped to rib_radius + min_ligament/2 clearance from every
+  rib. On a horizontal/tilted panel the windows cut through; on a
+  developable profile_surface (Bio-4M stage B — the branch clamp body
+  unrolled to (s, x)) the ribs are hierarchical (fat PRIMARY diameter on the
+  load paths, thin SECONDARY elsewhere) and the windows are RECESSES, never
+  through-cuts — a see-through window would breach the saddle/channel, so
+  the builder publishes a safe_recess depth. A side-profile body WITHOUT a
+  declared face window is still refused (the AABB fallback would slice the
+  interior).
+applies_to: [exoskeleton_panel, aesthetic_lightening]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   retaining_flexure, seal_surface, interface_keepout]
+params:
+  organicity: {type: number, default: 0.5, min: 0, max: 1,
+               description: "surface sample jitter = (0.15 + 0.4*organicity)
+                 of the pitch: 0 grows a near-regular lattice, 1 a wild
+                 scatter; 0.5 keeps the historical 0.35 fraction"}
+  rib_density: {type: number, default: 0.5, min: 0, max: 1}
+  window_scale: {type: number, default: 0.8, min: 0.3, max: 1}
+  rib_d_root: {type: length, default: 6mm, min: 2.4mm, max: 12mm}
+  rib_d_tip: {type: length, default: 3mm, min: 1.6mm, max: 8mm,
+              description: clamped to rib_d_root by the applicator}
+  node_blend: {type: length, default: 2mm, min: 0.5mm, max: 5mm}
+  min_ligament: {type: length, default: 2mm, min: 1.2mm, max: 5mm}
+  seed: {type: count, default: 0, min: 0, max: 99999,
+         description: "0 = stable seed derived from the product id"}
+  # -- profile_surface (Bio-4M stage B) hierarchical ribs + recessed windows.
+  #    These only take effect on a developable profile_surface canvas; on a
+  #    flat/tilted panel the applicator ignores them (zero movement).
+  primary_rib_d: {type: length, default: 7mm, min: 3mm, max: 12mm,
+                  description: "PRIMARY (load-path) rib diameter on a
+                    profile_surface — the structural spine"}
+  secondary_rib_d: {type: length, default: 4mm, min: 2mm, max: 8mm,
+                    description: "SECONDARY (rest-of-graph) rib diameter"}
+  vein_rib_d: {type: length, default: 1.8mm, min: 1mm, max: 4mm,
+               description: "THIRD-tier thin veins along the window rims —
+                 DECLARED but MVP-DEFERRED (nothing emitted yet; lands after
+                 the first visual pass)"}
+  primary_bias_to_load_paths: {type: number, default: 1, min: 0, max: 1,
+               description: "1 = the primary diameter follows the load paths"}
+  secondary_density: {type: number, default: 0.5, min: 0, max: 1,
+               description: "reserved density knob for the secondary tier"}
+  lip_radius: {type: length, default: 2mm, min: 0.5mm, max: 5mm,
+               description: "recessed-window lip radius (the organic shadow
+                 rim around each window)"}
+  inner_shadow_depth_min: {type: length, default: 2.5mm, min: 1mm, max: 6mm,
+               description: "when safe_recess drops below this the applicator
+                 WARNs: windows read as shallow engraving, not deep shadow
+                 (quality.window_shadow_present)"}
+provides_features: [biomorphic_exoskeleton, organic_windows, load_path_ribs]
+validators:
+  - form.rib_graph_connected
+  - form.no_rib_islands
+  - form.rib_roots_touch_substrate
+  - form.min_rib_diameter_ok
+  - form.windows_inside_safe_regions
+  - form.min_ligament_ok
+  - form.primary_load_path_has_ribs
+  # Bio-3 materialization probes — run only at CAD build; a pure validate
+  # leaves them unrun, so the bio features stay honestly not-built.
+  - topology.exoskeleton_ribs_materialized
+  - topology.organic_windows_open

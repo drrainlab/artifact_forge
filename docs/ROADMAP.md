@@ -1,0 +1,461 @@
+# Artifact Forge — мастер-план: инженерная грамматика сборки
+
+Позиционирование: **Artifact Forge — платформа параметрического создания
+функциональных артефактов**: инженерных изделий, крепежей, оснастки,
+кино-реквизита, носимых конструкций и биоморфных объектов. Не «AI CAD
+generator», а parametric artifact atelier: одно ядро, несколько режимов
+(см. «Режимы поверх одного ядра»).
+
+Цель: AF — не каталог отдельных изделий, а **система сборки конструкций из
+проверенных функциональных «органов»**. Архетипы и модификаторы — только
+словарь. Сложность изделий рождается не из количества деталей, а из
+способности системы понимать, как детали соединяются, какие силы через них
+проходят, как это печатать, собирать, обслуживать и как это сломается.
+
+```text
+Catalog
++ Interfaces (ports/mates)
++ Assembly Graph
++ Constraint Solver
++ Physics-lite
++ Manufacturing Planner
++ Failure Critic
++ Workshop Memory
++ Modes (Engineering | Workshop | Cinema | Fashion | Creature)
+= генератор функциональных артефактов
+```
+
+Принцип развития: **меньше архетипов — больше интерфейсов, solver-ов и
+валидаторов**. Каждая волна подчиняется канону honesty: фича без
+validator-backed геометрии = галлюцинация; волна закрыта только когда есть
+golden-пример + тесты + измеряемые проверки.
+
+Этот документ — главный роудмап. [BUILDERS.md](BUILDERS.md) остаётся каноном
+слоя билдеров, [BIOMORPHIC.md](BIOMORPHIC.md) — каноном био-раздела; их
+«честные остатки» поглощены волнами ниже (см. «Поглощённые дорожки»).
+
+---
+
+## Режимы поверх одного ядра
+
+Четыре аудитории — инженеры, мейкеры, киношники, фэшн-дизайнеры — это НЕ
+четыре платформы. Ядро одно (archetypes + modifiers + ports/assembly +
+materials/manufacturing + validation + export); **режим = профиль
+приоритетов** поверх него: дефолтные requirements (волна A3), состав
+production package (волна A2), набор гейт-валидаторов и стиль-пресеты.
+Режим не имеет права ослаблять honesty — он меняет, ЧТО важно, а не ЧТО
+проверяется.
+
+| Режим | Главные приоритеты | Специфичные сущности (словарь режима) |
+|---|---|---|
+| Engineering | прочность, крепёж, допуски, нагрузки, BOM, STEP | — (сегодняшний дефолт) |
+| Workshop | системность крепления, совместимость, экономия пластика | rail/dovetail-интерфейсы, единый шаг (волна A4) |
+| Cinema / Props | силуэт, стиль, скорость печати, разборность, покраска, вес | hero/stunt/background_prop, paintable_surface, LED_channel, rigging_point, hidden_mount, quick_repair_joint |
+| Fashion / Wearable | тело, движение, комфорт, вес, безопасность краёв, размерная сетка | body_anchor, strap_slot, fabric_stitch_hole, skin_clearance, flex_zone, quick_release, size_grading |
+| Biomorphic / Creature | выращенность формы, органика поверх честного ядра | канон BIOMORPHIC.md + implicit skin Bio-4M — мост между всеми режимами |
+
+Архитектурное следствие **уже сейчас** (чтобы не ломать схемы под
+кино/фэшн потом): язык ядра нейтрален — «artifact», не «mechanical_part»;
+новые region-роли (body_contact_region, fabric_interface, paint_surface)
+добавляются строго по закону «роль приходит со своим потребителем»
+(BIOMORPHIC.md) — enum не раздувается заранее, но и не зашивается
+инженерная семантика туда, где хватает нейтральной.
+
+---
+
+## Где мы сейчас (статус на 2026-07-05)
+
+✅ = реализовано · 🔶 = частично / в другом слое · ⬜ = не начато
+
+| Слой концепции | Статус | Где сейчас |
+|---|---|---|
+| Полезные одиночные изделия (AF v1) | ✅ | 26 архетипов, 14 модификаторов, recipe kernel R1, honesty-пайплайн, 487 тестов |
+| Assembly Graph | 🔶 | `assembly/v1`: typed-сборки, root+joints, позы quarter-turn, fit-пробы в позе, wiring-проверка (`product/assembly.py`, `assembly/joints.py`, `assembly/pipeline.py`). Плоский список joints, не иерархический граф |
+| Ports / Interfaces / Mates | ⬜ | сегодня только прото-порты: голые datums + semantic regions/keepouts. Ни типов портов, ни interface_profile, ни матрицы совместимости |
+| Functional Grammar (verbs) | ⬜ | intents `forge edit` — зачаток; функционального плана (clamp_around → support_payload → route_cable) нет |
+| Constraint / Param Solver | ⬜ | `product/resolve.py` — линейный однопроходный resolve (units/expr/clamp), обратных задач и компромиссов нет |
+| Load Path Analyzer | 🔶 | точечно: snap strain 1.5·δ·t/L², `form.stability_footprint` (COM), min_web; `load_paths:` на био-архетипах (Dijkstra по rib-графу). Цепочки момент → крепёж → стенка → запас нет |
+| Hardware / Fastener Ontology | 🔶 | `core/fasteners.py` (M2–M5, heatset, гайки, E27/GU10), PORT_SIZES, подшипники 608/625/6001 — разрозненные таблицы без единой схемы |
+| Assembly Planner / BOM | ⬜ | `assembly_report.yaml` есть (позы/joints/grade), но BOM, шаги сборки и build package не генерируются |
+| Manufacturing Planner | 🔶 | bed_fit, min_wall, overhang (знает `print_orientation`), max_opening_span, sideprint «ноль нависаний by construction». Нет split-стратегии и материальных профилей |
+| Failure Mode Critic | ⬜ | findings-механика готова, критика отказов как слоя нет |
+| Design Memory / Workshop Feedback | ⬜ | repair-ledger есть; `build_observation` из мастерской не существует |
+| Product System Templates | ⬜ | пара кронштейн+чашка стыкуется datum-ами — прецедент, не система |
+| Design Intent / Requirements Model | 🔶 | `requested_features` + capability report (built ⊆ supported) — плоский список фич, не структурированные требования |
+| Region Editor + Visual Grounding | 🔶 | Cockpit: Region-линза, patch-preview; NL-edit по выбранному региону не закреплён |
+| Compatibility Matrix | ⬜ | появится как ВЫВОДИМАЯ из портов (волна A1), не как рукописный файл |
+| Multi-Resolution Design (L0–L5) | ⬜ | сегодня вход сразу на уровне product YAML (L2) |
+| Режимы поверх ядра | 🔶 | mode scaffold P2: `mode:` + MODE_PROFILES (product/modes.py), wearable требует body_fit; приоритеты/пакеты — впереди |
+| Body / Human Fit Layer | 🔶 | P2 ядро: body_fit (forearm) + forearm_cuff_v1 grade A; wrist/thigh и size grading впереди |
+| Soft–Hard интерфейсы | 🔶 | zip-tie слоты, TPU-рекессы, магнитные карманы + **add_strap_slots** (стропы 15–40мм, P2); нет sew/velcro/elastic/foam/LED |
+| Style Grammar | 🔶 | biomorphic_utility_part + BIOMECHANICAL_EXOSKELETON + **Bio-4M implicit SDF skin** (STL-first, honesty экспорта); один стиль-род, не грамматика стилей |
+| Production Package per mode | ⬜ | базовый пакет — волна A2; cinema/fashion-варианты — волна P4 |
+
+Итог: **AF v1 закрыт, assembly/v1 — уже половина AF v2.** Дальше три
+макро-этапа: A-волны (composable system), E-волны (engineering reasoner),
+M-волны (self-extending platform) — плюс параллельные линии Bio
+(BIOMORPHIC.md) и P (Props & Wearables, ниже).
+
+---
+
+## AF v2 — Composable Workshop System (волны A1–A4)
+
+Цель: изделия начинают стыковаться друг с другом. Самый важный скачок.
+
+### A1 — Ports & Interfaces v1 ⬜ ← СЛЕДУЮЩАЯ
+
+Порты превращают каталог в LEGO Technic: агент перестаёт «лепить рядом
+формы» и начинает понимать совместимость, переходники, clearance и
+направление нагрузки.
+
+Содержимое:
+
+1. **PortSpec** в YAML архетипа (fail-fast привязка к существующим
+   datums/regions при загрузке каталога):
+
+   ```yaml
+   ports:
+     - id: front_dovetail
+       type: slide_interface     # mount_surface | slide_interface | cable_port | screw_boss | payload_seat
+       frame: {datum: arm_tip, normal: +Y, up: +Z}
+       interface: AF_dovetail_12_v1
+       accepts: [socket_holder, tool_hook]
+       load_rating_hint: medium
+   ```
+
+2. **Реестр interface_profile** — `catalog/data/interfaces/*.yaml`,
+   первый профиль:
+
+   ```yaml
+   interface_profile:
+     id: AF_dovetail_12_v1
+     male_clearance: 0.25mm
+     female_clearance: 0.35mm
+     printable_without_support: true
+     recommended_materials: [PETG, ASA, PETG-CF]
+   ```
+
+3. **Joints учатся port↔port**: `a: part.port_id` наравне с легаси
+   `ref.datum` (обратная совместимость). Легальность mate = совпадение
+   interface-профиля + пересечение accepts. Несовместимый mate падает на
+   IR **до CAD**.
+4. **`forge compat`** — выводимая матрица совместимости каталога (какие
+   детали стыкуются какими портами). Рукописной матрицы не существует
+   by design.
+5. **Драйвер-клиент: `dovetail_joint`** (честный остаток R4) — скользящая
+   посадка со своей механикой: допуски по направлению хода, male/female
+   clearance из профиля, печатаемость паза.
+6. **Валидаторы**: `form.port_frames_bound` (порт привязан к реальному
+   датуму/региону), `assembly.mate_interfaces_match`,
+   `assembly.mate_clearance_ok` (зазор мерится в собранной позе, не
+   постулируется).
+
+Критерий приёмки: wall-плита + съёмный держатель стыкуются ЧЕРЕЗ порты
+dovetail-профилем; несовместимый mate — fail на IR; `forge compat`
+показывает матрицу; golden-тесты по образцу assembly-тестов.
+
+### A2 — Hardware Ontology + Build Package (BOM) ⬜
+
+Из разрозненных таблиц — единая онтология покупных компонентов; из
+одиночного STL — комплект.
+
+1. **`catalog/data/hardware/*.yaml`** — typed HardwareSpec: винты, heatset,
+   дюбели (incl. butterfly), подшипники, патроны E27/GU10, магниты,
+   стяжки, TPU-пады:
+
+   ```yaml
+   id: heat_insert_M4_standard
+   hole_diameter: 5.6mm
+   boss_min_outer_d: 9.5mm
+   boss_min_height: 7mm
+   clearance_required: true
+   install_direction: Z
+   ```
+
+   `core/fasteners.py` становится загрузчиком этой онтологии (существующие
+   константы — первые записи, API сохраняется).
+2. **BOM выводится**, не декларируется: винты — из screw_joints, вставки —
+   из heatset-ops, дюбели — из hardware-ссылок анкерных отверстий.
+3. **Build Package Generator**: `parts/*.stl` (каждая в своей ориентации) +
+   `bom.yaml`/`bom.md` + `assembly_steps` (порядок из joints: inserts →
+   pads → cable → close → bolts) + risk report (существующие findings) +
+   рекомендация материала.
+
+Критерий: `esp32_box_with_lid` и `desk_lamp_e27` выдают build package;
+тест сверяет количество крепежа в BOM с joints (рассинхрон непредставим).
+
+### A3 — Requirements Model ⬜
+
+Не терять смысл запроса. Блок `requirements:` в product YAML:
+
+```yaml
+requirements:
+  functional:      [hold cylindrical handle Ø65mm, wall mounted, removable by hand]
+  structural:      [support 2kg static load, two fasteners only]
+  manufacturing:   [FDM printable, minimal supports, low plastic use]
+  aesthetic:       [biomorphic, not boxy]
+  safety:          [no sharp contact edges]
+```
+
+Каждое требование маппится на features/validators/params; capability report
+расширяется до вердикта по требованию: **выполнено / частично / не
+выполнено / невозможно**. Прямое развитие `requested_features` и
+инварианта built ⊆ supported — та же honesty, уровнем выше.
+
+Критерий: golden-инстанс с требованиями получает пер-requirement вердикты;
+невыполнимое требование даёт честный engine_gap, не молчаливый pass.
+
+### A4 — Product Systems v1: Workshop Wall System ⬜
+
+Выше уровня архетипов — совместимая экосистема: рейки, крючки, держатели,
+адаптеры с единым шагом крепления и единым rail/dovetail-интерфейсом из A1.
+
+- Спецификация системы: общий interface_profile, единый шаг крепления,
+  family/extends/preset (механизм Bio-4A из BIOMORPHIC.md), maturity на
+  пресетах.
+- Сюда же поглощается `rail_slider` (остаток R5) — рельс системы и есть
+  его первый клиент.
+
+Критерий: рейка + 2–3 съёмных держателя; каждая пара подтверждена
+`forge compat` и mate-пробами в позе; био-пресеты держателей — поверх тех
+же ядер (закон «Bio package не владеет generic mounting logic»).
+
+---
+
+## AF v3 — Engineering Reasoner (волны E1–E4)
+
+Цель: система думает про нагрузки, риски и компромиссы, а не только про
+форму. Детализация волн уточняется по завершении A-этапа.
+
+### E1 — Param Solver v1 ⬜
+
+Requirements → derived dimensions → constraints → conflicts → suggested
+compromises. НЕ общий CSP: библиотека детерминированных правил вывода
+поверх `product/resolve.py` (порядок фиксирован, детерминизм и
+воспроизводимость сохраняются). Конфликты — typed findings с предлагаемыми
+компромиссами («2 винта + ребро снизу + шире плита»), в духе repair-правил.
+
+Критерий-пример: «держатель для ручки 65 мм, 2 дюбель-бабочки, экономно, но
+крепко» → saddle_d, mouth_gap, wall, screw_spacing, rib_count выведены и
+каждое значение обосновано ссылкой на правило.
+
+### E2 — Load Path Analyzer (physics-lite) ⬜
+
+Цепочка: нагрузка → рычаг → момент → крепёж → стенка → материал → запас.
+Без FEA: `cantilever_moment_check`, `screw_edge_distance_check` (обобщение
+min_web), `boss_strength_check`, `heat_zone_material_check`; материальные
+профили (PLA/PETG/ASA/PETG-CF) с температурными ограничениями. `load_paths:`
+обобщаются с био-архетипов на все силовые архетипы; на уровне сборки force
+chain идёт через joints (момент лампы → dovetail → плита → дюбели).
+
+Критерий: golden-кейс «фитолампа 1.2 кг, вынос 180 мм» получает
+estimated_moment, risk-грейд и рекомендации, подтверждённые измеряемыми
+пробами.
+
+### E3 — Failure Mode Critic ⬜
+
+Отдельный слой «как это сломается»: детерминированное правило-ядро над
+IR+assembly (тонкий корень dovetail у босса, канал через силовое ребро,
+доступ отвёртки/гайки, острый внутренний угол в TPU-нише, флекс плиты) +
+LLM-критик строго как генератор гипотез — каждая гипотеза обязана
+подтвердиться измеряемой пробой, иначе она WARN-note, не finding. Выход:
+top risks + suggested patches (типизированные, как repair).
+
+### E4 — Manufacturing Planner ⬜
+
+AF думает как 3D-печатник: `split_if: max_dimension_gt` (разрез через
+butt_pin/dovetail из A1), ориентация per part, tolerance/nozzle/material
+profiles, `avoid_supports_in` (каналы, бобышки, dovetail-пазы),
+strength_direction vs направление слоёв (связь с E2). Отдельная забота —
+держать биоморфные поверхности в рамках реальной печати.
+
+Клиенты глубокой механики по итерации на штуку (как в BUILDERS.md):
+`pin_hinge`, `friction_hinge`, `living_hinge` (усталость), резьбы,
+`ratchet_teeth` — каждый приходит со своей физикой и валидаторами внутри
+E-этапа.
+
+---
+
+## AF v4 — Self-Extending Platform (волны M1–M3)
+
+Цель: система расширяет себя и учится у мастерской. Крупные мазки —
+детализация после E-этапа.
+
+### M1 — Functional Grammar & Multi-Resolution ⬜
+
+Глаголы инженерного действия как внутренний язык: `attach_to_wall`,
+`clamp_around`, `support_payload`, `route_cable`, `snap_fit`,
+`split_for_printing`, … Запрос раскладывается в функциональный план, потом
+в геометрию:
+
+```text
+L0 functional block diagram → L1 layout volumes → L2 Form IR
+  → L3 CAD solids → L4 manufacturing split → L5 print package
+```
+
+Здесь же слот LLM-фазы 4: LLM — переводчик intent → функциональный план /
+requirements (A3); подбор архетипов и портов делает движок. Поглощает
+«R5 assembly-intents» из README.
+
+### M2 — Design Memory / Workshop Feedback Loop ⬜
+
+Каждое напечатанное изделие возвращается в систему:
+
+```yaml
+build_observation:
+  artifact_id: wall_tool_mount_65mm_v1
+  print_success: true
+  assembly_success: partial
+  field_test: failed_after_2_days
+  notes: "wall plate flexes"
+  recommended_catalog_patch: [increase_backplate_ribs, add_triangular_buttress]
+```
+
+Observations → ledger → рекомендованные catalog-патчи (через существующий
+repair-механизм). Главный moat проекта: накопление реального опыта печати
+и эксплуатации, не абстрактное «обучение».
+
+### M3 — Catalog Authoring Pipeline ⬜
+
+Саморасширение каталога: анализ запроса → YAML-вариант / composite / recipe
+на существующих ops / новый builder через sandbox → golden-тесты →
+benchmark suite → промоушен по maturity-лестнице (`draft → … →
+production_buildable`, уже введена в BIOMORPHIC.md). Новые builders
+рождаются как draft/coding-agent task, никогда как произвольный Python в
+runtime (закон из BUILDERS.md).
+
+---
+
+## Параллельная линия P — Props & Wearables (волны P1–P4)
+
+Расширение аудиторий: кино (production design + functional fabrication) и
+фэшн (parametric atelier). Линия параллельна A/E-волнам, как Bio-линия;
+опирается на A1 (порты), A2 (пакеты), A3 (requirements). Биоморфная линия —
+её мост: инженерному AF она даёт стиль, киношному — biomech props и creature
+parts, фэшн — wearable armor и органические аксессуары.
+
+### P1 — Neutral Core & Mode Scaffolding ⬜
+
+- Аудит языка ядра: терминология «artifact» в схемах/доках, нейтральные
+  имена там, где инженерная семантика не обязательна.
+- `mode:` как профиль поверх A3/A2: дефолтные requirements, состав пакета,
+  weights гейтов; переключатель режима в Cockpit. Никакой новой геометрии —
+  только приоритеты и словари.
+- Критерий: один и тот же артефакт, прогнанный в Engineering и Cinema
+  режимах, даёт разные requirements-дефолты и разные пакеты при идентичной
+  геометрии и идентичных honesty-вердиктах.
+
+### P2 — Body / Human Fit Layer v1 🔶 (ядро реализовано 2026-07-07)
+
+Реализовано (первый wearable-артефакт AF): `forearm_cuff_v1` +
+`catalog/examples/forearm_flashlight_cuff.yaml` — grade A, side_profile,
+S/M/L из одного YAML сменой body_fit (закреплено тестом). Вошло:
+
+- `body_fit:` блок на ProductInstance (`BodyFitSpec`, человеческие
+  диапазоны, `env_context()` → body_* имена в resolve);
+- микро-P1: `mode:` + реестр `MODE_PROFILES` (product/modes.py;
+  wearable требует body_fit ПОВЕДЕНЧЕСКИ, mode/mode_tags в summary);
+- honesty-фикс resolve: нерезолвящийся formula-default = именованный
+  FAIL (это и есть require-механизм body_fit);
+- роль `BODY_CONTACT_SURFACE` (абсолютная защита кожи во всех
+  PROTECTED-наборах) + 7 измеряющих проверок (donning-горло, skin
+  clearance, comfort edges, pad recesses, payload not-on-skin,
+  snap-ретенция, strap access) + `topology.payload_void_open`;
+- op `forearm_cuff_body` (хордовый рот + строп-табы + snap-C фонаря =
+  первый клиент `cylindrical_cradle`), модификатор `add_strap_slots`
+  (превью P3, 15–40мм стропы, skin-guard по кругу руки).
+
+Остаток P2: другие регионы тела (wrist/thigh/…), size grading через
+families (A4), био-скин на манжету (Bio-4M stage B канвас).
+
+Тело как first-class вход — без сканера, параметрически:
+
+```yaml
+body_fit:
+  region: forearm        # head | neck | shoulder | forearm | wrist | chest | waist | thigh | foot
+  circumference: 270mm
+  length: 240mm
+  clearance: 6mm
+  strap_width: 25mm
+```
+
+- Таблица антропометрических регионов с дефолтными диапазонами; size
+  grading = параметрические families (механизм extends/preset из A4).
+- Роль `body_contact_region` приходит вместе со своим потребителем:
+  валидаторы skin_clearance (зазор к телу измерен), edge safety (контактные
+  кромки скруглены — обобщение contact_r), вес (масса из объёма × материал).
+- Драйвер-клиент: **держатель фонаря на предплечье** («биомеханический
+  держатель на руку актёра») — body-cradle ядро + strap-интерфейсы (P3) +
+  био-скин Bio-4M. Один артефакт закрывает cinema и wearable сразу.
+- Критерий: golden-пример собирается под два разных `body_fit` (перчаточный
+  размер S и L) без правки геометрии руками; clearance и края измерены.
+
+### P3 — Soft–Hard Interfaces ⬜
+
+Стык жёсткой печати с мягким миром — как interface-профили/порты (механизм
+A1) и модификаторы (кернел уже умеет):
+
+- `strap_slot` (обобщение zip_tie слотов на ремни 20/25/38 мм),
+  `sew_hole_row` (пришивание к ткани), `velcro_patch_zone`,
+  `elastic_band_anchor`, `foam_pad_recess` (родня TPU-рекессов клампа),
+  `fabric_clamp`; для кино — `LED_channel` (родня cable_channel +
+  диффузорное окно), `rigging_point` (провереная точка подвеса с
+  load_rating), `hidden_mount`, `quick_release`/`quick_repair_joint`
+  (быстрая замена сломанной части на площадке).
+- Каждый интерфейс — типизированный, с валидатором (слот меряется, ряд
+  отверстий не рвёт кромку, LED-канал непрерывен — реюз
+  channel_continuous).
+- Критерий: артефакт P2 получает ремни + пришивные точки; BOM (A2)
+  автоматически включает ремень/липучку как hardware-позиции.
+
+### P4 — Style Grammar + Mode Production Packages ⬜
+
+- **Грамматика стилей**: реестр стиль-паков поверх SurfaceStyle/Bio-4M —
+  `giger_exoskeleton` (движок уже есть: implicit SDF skin),
+  `retro_sci_fi`, `alien_organic`, `brutalist_utility`, `ritual_object`,
+  `soft_biomorphic`, … Закон неизменен: стиль применяется только через
+  regions/keepouts и НЕ имеет права ломать функцию (канон BIOMORPHIC.md);
+  каждый пак — слайдеры → контролируемые form/SDF-проходы, не «сделай
+  красиво».
+- **Пакеты по режимам** (расширение A2): cinema — split для покраски,
+  места под магниты, LED-разводка, схема сборки, варианты
+  hero/stunt/background одного артефакта (разный вес/детализация/материал
+  из одного YAML); fashion — размеры, вес, схема пришивания/ремней,
+  контактные зоны, рекомендации материала, отчёт безопасности краёв.
+- Критерий: один артефакт выдаёт hero (implicit skin, высокая детализация)
+  и stunt (лёгкий, TPU, упрощённый) варианты одной командой; отчёты честно
+  различают, что проверено в каждом.
+
+---
+
+## Поглощённые дорожки
+
+| Прежний план | Куда встроен |
+|---|---|
+| `dovetail_joint` / `tongue_groove` (остаток R4) | **A1** — драйвер-клиент портов |
+| `rail_slider` (остаток R5) | **A4** — рельс Workshop Wall System |
+| «R3 split_plane → R4 snap/dovetail → R5 assembly-intents» (README) | split_plane ✅ (butt_pin), snap ✅; dovetail → **A1**, assembly-intents → **M1** |
+| `pin_hinge`, `friction_hinge`, `living_hinge`, threads, `ratchet_teeth` | **E-этап**, по итерации на штуку со своей физикой |
+| Bio-4A (extends/preset/family) | механизм строится в **A4** |
+| Bio-4B пресеты, Bio-5 curved, Bio-6 motifs & assemblies | параллельная линия; multi-part био-сборки — после **A1** (порты) |
+| Bio-4M implicit SDF skin (BIOMORPHIC.md) | движок стиль-паков giger/creature в **P4**; stage B (кламп-интеграция) остаётся в Bio-линии |
+| `space_colonization_branching` | после Bio-5, вне критического пути |
+| Фаза 4 «LLM frontend» (README) | requirements-переводчик в **A3**, functional plan в **M1**; LLM никогда не мозг геометрии |
+| add_zip_tie_slots, TPU-рекессы, магнитные карманы | прародители soft–hard интерфейсов **P3** |
+
+## Правила движения
+
+1. Волна закрыта только при: golden-пример + тесты + `verified_by`-валидаторы
+   на каждую заявленную фичу. Статус в таблицах меняется на ✅ только после
+   этого.
+2. Ничего не помечается сделанным без измеряемой проверки — canon honesty
+   распространяется и на сам роудмап.
+3. Порядок волн можно менять по обстоятельствам мастерской; критерии приёмки
+   волны — нет (их можно только честно пересматривать отдельным коммитом).
+4. Документ обновляется в конце каждой волны; устаревшие дорожки не
+   стираются, а переносятся в «Поглощённые дорожки».
+5. Ядро одно на все аудитории: режим меняет приоритеты, словари и состав
+   пакетов — никогда не ослабляет проверки и не форкает геометрию.
+6. Новые region-роли и сущности режимов — строго по закону «роль приходит
+   со своим потребителем»: сущность появляется вместе с валидатором,
+   который её измеряет, иначе это словарная галлюцинация.

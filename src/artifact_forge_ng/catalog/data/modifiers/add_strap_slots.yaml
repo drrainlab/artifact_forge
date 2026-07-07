@@ -1,0 +1,22 @@
+schema: modifier/v1
+id: add_strap_slots
+category: interface
+description: >
+  A pair of wide through slots in a strap tab — a 15..40 mm webbing/velcro
+  strap threads down one slot, under the strap bar, up the other (wave P2
+  wearable closure). The slot pair pierces the tab and is guarded against
+  the arm circle: a strap cut can never breach the body cavity. Fails
+  loudly when the tab cannot host the pair.
+applies_to: [mounting_surface]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   body_contact_surface, retaining_flexure, seal_surface, exoskeleton_panel]
+params:
+  strap_w: {type: length, default: 25mm, min: 15mm, max: 40mm}
+  strap_t: {type: length, default: 2mm, min: 1mm, max: 3mm}
+  bridge_w: {type: length, default: 8mm, min: 5mm, max: 16mm}
+provides_features: [strap_mount]
+validators:
+  - form.strap_access_ok
+  - form.cuts_respect_keepouts
+  - topology.cutout_present

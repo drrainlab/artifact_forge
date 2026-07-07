@@ -28,6 +28,7 @@ from ..cad.fillets import safe_fillet_edges, safe_fillet_ladder
 from ..cad.geometry import Geometry
 from ..cad.holes import cut_countersunk_hole
 from ..form.part import PartForm, PlateFeature
+from .exoskeleton import build_exoskeleton_solid
 from .fields import cut_field
 from .wires import extrude_section_profile, revolve_section_profile
 
@@ -42,6 +43,8 @@ class CompileLog:
     bores_cut: int = 0
     boxes_cut: int = 0
     ribs_welded: int = 0
+    #: Bio-3: rib/node solids of the exoskeleton graph welded onto the body.
+    exoskeleton_ribs_welded: int = 0
     field_cut: bool = False
     blends_applied: list[float] = field(default_factory=list)
     blends_skipped: int = 0
@@ -174,5 +177,63 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
         if f.centers and not cut:
             log.notes.append("hex field cut reverted (would fragment the body)")
 
+    # Bio-3: the exoskeleton welds AFTER the field cuts — windows first,
+    # then ribs. The IR clearance guarantee means they never fight, but
+    # this order makes the rib material immune to the window cutters by
+    # construction, not by luck.
+    exo_solids = build_exoskeleton_solid(form)
+    if form.exoskeleton is not None and exo_solids is None:
+        log.notes.append(
+            "exoskeleton declared but produced no rib solids — "
+            "topology probes will fail honestly"
+        )
+    if exo_solids is not None:
+        mass = _weld_exoskeleton(mass, exo_solids, log)
+
     mass = keep_largest(mass)
     return Geometry(mass), log
+
+
+def _weld_exoskeleton(
+    mass: cq.Workplane, solids: list[cq.Solid], log: CompileLog
+) -> cq.Workplane:
+    """Weld the whole rib network in ONE boolean (a compound of every
+    tube and node sphere — per-tube booleans are OCC fragility bait).
+    If that one fuse fails, retry in three batches; if OCC still refuses,
+    report honestly and ship NO ribs — the materialization probes fail
+    loudly instead of a workaround hack shipping garbage."""
+    try:
+        compound = cq.Compound.makeCompound(solids)
+        mass = weld(mass, cq.Workplane(obj=compound), what="exoskeleton ribs")
+        log.exoskeleton_ribs_welded = len(solids)
+        log.notes.append(
+            f"exoskeleton: {len(solids)} rib/node solids welded in one boolean"
+        )
+        return mass
+    except Exception as exc:  # noqa: BLE001 — OCC raises anything
+        log.notes.append(
+            f"one-boolean exoskeleton weld failed ({exc}); retrying in batches"
+        )
+    n = 3
+    chunks = [solids[i::n] for i in range(n) if solids[i::n]]
+    current = mass
+    welded = 0
+    try:
+        for k, chunk in enumerate(chunks):
+            compound = cq.Compound.makeCompound(chunk)
+            current = weld(
+                current, cq.Workplane(obj=compound),
+                what=f"exoskeleton batch {k + 1}/{len(chunks)}",
+            )
+            welded += len(chunk)
+    except Exception as exc:  # noqa: BLE001
+        log.exoskeleton_ribs_welded = 0
+        log.notes.append(
+            f"exoskeleton batch weld failed ({exc}) — ribs NOT materialized"
+        )
+        return mass
+    log.exoskeleton_ribs_welded = welded
+    log.notes.append(
+        f"exoskeleton: {welded} rib/node solids welded in {len(chunks)} batches"
+    )
+    return current

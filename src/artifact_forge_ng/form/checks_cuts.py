@@ -10,7 +10,8 @@ from .part import BoreFeature, PartForm
 from .regions import Box3, RegionRole
 
 _PROTECTED_ROLES = frozenset(
-    {RegionRole.FASTENER_KEEPOUT, RegionRole.HIGH_STRESS_REGION}
+    {RegionRole.FASTENER_KEEPOUT, RegionRole.HIGH_STRESS_REGION,
+     RegionRole.BODY_CONTACT_SURFACE}
 )
 
 

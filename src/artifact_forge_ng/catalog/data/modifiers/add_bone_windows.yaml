@@ -1,0 +1,28 @@
+schema: modifier/v1
+id: add_bone_windows
+category: biomorphic
+description: >
+  Bone-like organic lightening windows: seeded voronoi cells with heavy
+  corner smoothing, shrunk for a guaranteed ligament and filtered against
+  every keepout. The main consumer of aesthetic_lightening zones — no rib
+  graph, just honest organic perforation. Planar faces only: side-profile
+  bodies without a declared face window are refused until Bio-3's
+  oriented windows.
+applies_to: [exoskeleton_panel, aesthetic_lightening]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   retaining_flexure, seal_surface, interface_keepout]
+params:
+  sites: {type: count, default: 14, min: 6, max: 40}
+  window_scale: {type: number, default: 0.85, min: 0.3, max: 1}
+  min_ligament: {type: length, default: 2.2mm, min: 1.2mm, max: 5mm}
+  edge_margin: {type: length, default: 2mm, min: 0.5mm, max: 16mm}
+  corner_smooth: {type: count, default: 3, min: 2, max: 4}
+  seed: {type: count, default: 42, min: 0, max: 99999}
+provides_features: [organic_windows]
+validators:
+  - form.windows_inside_safe_regions
+  - form.min_ligament_ok
+  - form.field_cells_present
+  # Bio-3 materialization probe — runs only at CAD build.
+  - topology.organic_windows_open

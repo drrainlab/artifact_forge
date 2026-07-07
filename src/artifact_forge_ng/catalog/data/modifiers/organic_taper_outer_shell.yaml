@@ -1,0 +1,18 @@
+schema: modifier/v1
+id: organic_taper_outer_shell
+category: biomorphic_surface
+description: >
+  Organic taper/flow of the outer shell silhouette (bone-like swell and
+  thinning). DECLARED AHEAD OF ITS APPLICATOR: applying it today yields an
+  honest engine-gap WARN and promises nothing — it claims no features and
+  subscribes no validators until the Bio-3 surface engine lands.
+applies_to: [exoskeleton_panel, aesthetic_lightening]
+forbidden_targets:
+  [fastener_keepout, high_stress_region, soft_contact_surface,
+   retaining_flexure, seal_surface, interface_keepout]
+params:
+  taper_ratio: {type: number, default: 0.8, min: 0.5, max: 1}
+  flow_bias: {type: number, default: 0.5, min: 0, max: 1}
+  seed: {type: count, default: 42, min: 0, max: 99999}
+provides_features: []
+validators: []

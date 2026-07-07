@@ -1,0 +1,191 @@
+schema: archetype/v1
+id: forearm_cuff_v1
+version: 1
+object_class: wearable_cuff
+description: >
+  Wave P2 (docs/ROADMAP.md, линия P): the first wearable — a forearm cuff
+  with a cylindrical payload snap-clip (flashlight / prop cylinder
+  20..30 mm) on top. ONE constant YZ section extruded along X (X = the
+  forearm axis), printed on its profile: support-free by construction.
+  The arm saddle is sized from the body_fit block (circumference +
+  clearance), only LIGHTLY clips the limb (donning window measured
+  against flesh diameter — retention belongs to the STRAPS through the
+  two mouth-tip tabs), carries three recessed TPU pad lands and comfort
+  fillets on every skin edge. The payload snap-C rides outside the ring,
+  mouth away from the body (pipe-clip arc-retention physics — the first
+  client of BUILDERS.md cylindrical_cradle). The outer shell is an
+  exoskeleton_panel reserved for the bio skin (Bio-4M stage B canvas —
+  next iteration).
+
+maturity: sandbox_buildable
+
+provides_features:
+  - body_cradle_fit
+  - skin_safe_edges
+  - tpu_pad_recesses
+  - cylindrical_payload_clamp
+
+parameters:
+  arm_circumference:
+    {type: length, default: expr(body_circumference), min: 150mm, max: 450mm,
+     role: functional, exposed: true,
+     description: "forearm circumference at the cuff seat — defaults to the
+       body_fit block; without body_fit this parameter honestly FAILs"}
+  arm_clearance:
+    {type: length, default: expr(body_clearance), min: 2mm, max: 12mm,
+     role: functional,
+     description: radial air between skin and cuff (donning + comfort)}
+  cuff_l:
+    {type: length, default: "expr(min(body_length * 0.35, 90))",
+     min: 40mm, max: 120mm, role: structural, exposed: true,
+     description: cuff width along the forearm axis}
+  strap_w:
+    {type: length, default: expr(body_strap_width), min: 15mm, max: 40mm,
+     role: assembly,
+     description: strap width the tabs must host (add_strap_slots matches it)}
+  wall:
+    {type: length, default: 4mm, min: "expr(2 * printer_min_wall)", max: 8mm,
+     role: structural,
+     description: ring wall between the arm cavity and the outer shell}
+  arm_capture_deg:
+    {type: number, default: 240, min: 210, max: 262, role: functional,
+     description: "arm saddle coverage: below ~240 with a generous clearance
+       the mouth exceeds the flesh diameter and form.arm_mouth_dons_ok
+       honestly fails"}
+  land_angle:
+    {type: number, default: 45, min: 25, max: 60, role: functional,
+     description: "pad land positions, degrees each side of the saddle top"}
+  land_w:
+    {type: length, default: 14mm, min: 8mm, max: 20mm, role: functional}
+  pad_recess:
+    {type: length, default: 1.5mm, min: 0.8mm, max: 2.5mm, role: functional,
+     description: radial pocket depth for glued TPU/foam pads (outward)}
+  comfort_edge_r:
+    {type: length, default: 2mm, min: 1.2mm, max: 4mm, role: functional,
+     description: minimum fillet on every skin-contact edge}
+  tab_t:
+    {type: length, default: 4mm, min: 3mm, max: 6mm, role: structural,
+     description: strap tab thickness}
+  tab_len:
+    {type: length, default: 26mm, min: 20mm, max: 40mm, role: structural,
+     description: strap tab reach beyond the mouth tip}
+  payload_d:
+    {type: length, default: 25mm, min: 20mm, max: 30mm,
+     role: functional, exposed: true,
+     description: payload cylinder diameter (flashlight body)}
+  payload_clearance:
+    {type: length, default: 0.3mm, min: 0.1mm, max: 0.8mm, role: functional}
+  payload_arc_deg:
+    {type: number, default: 240, min: 210, max: 268, role: functional,
+     description: "payload snap coverage — arc retention, not lips"}
+  clip_wall:
+    {type: length, default: 3mm, min: 2.4mm, max: 5mm, role: structural}
+  neck_drop:
+    {type: length, default: 4mm, min: 2mm, max: 10mm, role: structural,
+     description: bridge between the ring crown and the payload clip}
+
+derived:
+  arm_d_eff: arm_circumference / 3.141592653589793
+  arm_r_in: arm_d_eff / 2 + arm_clearance
+
+constraints:
+  - arm_clearance >= 2
+  - cuff_l >= strap_w + 12
+  - payload_d < arm_d_eff
+
+form:
+  type: recipe
+  section: recipe
+  plane: YZ
+  width_axis: X
+  ops:
+    - op: forearm_cuff_body
+      id: body
+      params:
+        arm_circumference: arm_circumference
+        cuff_l: cuff_l
+        arm_clearance: arm_clearance
+        wall: wall
+        arm_capture_deg: arm_capture_deg
+        land_angle: land_angle
+        land_w: land_w
+        pad_recess: pad_recess
+        comfort_edge_r: comfort_edge_r
+        tab_t: tab_t
+        tab_len: tab_len
+        payload_d: payload_d
+        payload_clearance: payload_clearance
+        payload_arc_deg: payload_arc_deg
+        clip_wall: clip_wall
+        neck_drop: neck_drop
+
+regions:
+  - {id: arm_contact, role: body_contact_surface, editable: false,
+     label: "Skin contact saddle",
+     description: "the arm cavity band — touches the wearer, absolutely
+       cut-protected"}
+  - {id: strap_land_left, role: mounting_surface, editable: true,
+     label: "Left strap tab", aliases: [left tab, left strap land],
+     description: flat closure tab at the left mouth tip — add_strap_slots
+       pierces it}
+  - {id: strap_land_right, role: mounting_surface, editable: true,
+     label: "Right strap tab", aliases: [right tab, right strap land],
+     description: flat closure tab at the right mouth tip}
+  - {id: payload_saddle, role: soft_contact_surface, editable: false,
+     label: "Payload seat",
+     description: the flashlight cradle arc — never cut}
+  - {id: clip_flexure_left, role: high_stress_region, editable: false,
+     label: "Snap tip (left)",
+     description: payload snap mouth tip — flexes on every insertion}
+  - {id: clip_flexure_right, role: high_stress_region, editable: false,
+     label: "Snap tip (right)"}
+  - {id: outer_aesthetic_shell, role: exoskeleton_panel, editable: true,
+     label: "Outer shell (bio canvas)",
+     aliases: [outer surface, shell, exoskeleton canvas],
+     description: ring flanks reserved for the biomorphic skin — the
+       Bio-4M stage-B canvas lands here next iteration}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.body_clearance_ok
+  - form.arm_mouth_dons_ok
+  - form.comfort_edge_radius_ok
+  - form.pad_recess_exists
+  - form.payload_mount_not_on_skin_side
+  - form.payload_retention_ok
+  - form.cuts_respect_keepouts
+  - topology.cavity_open
+  - topology.payload_void_open
+  - topology.single_connected_solid
+  - topology.cutout_present
+  - region.keepouts_preserved
+  - manufacturing.min_wall
+  - manufacturing.bed_fit
+  - manufacturing.overhang
+
+forbidden_forms:
+  - closed_cuff_ring
+  - payload_on_skin_side
+  - sharp_body_edges
+
+allowed_modifiers:
+  - add_strap_slots
+  - apply_biomorphic_exoskeleton
+  - add_bone_windows
+  - add_vein_ribs
+
+contract:
+  must_have:
+    - body_cradle_fit
+    - strap_mount
+    - skin_safe_edges
+    - tpu_pad_recesses
+    - cylindrical_payload_clamp
+  must_not_have:
+    - closed_cuff_ring
+    - payload_on_skin_side
+    - sharp_body_edges
+  invariants:
+    - arm_clearance >= 2
+    - cuff_l >= strap_w + 12

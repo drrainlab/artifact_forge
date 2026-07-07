@@ -50,7 +50,41 @@ def run_build_from_state(state, target: Path) -> tuple[dict[str, Any], "object"]
     state.report.extend(_run_geometry_validators(state, geometry))
 
     oriented = orient_for_print(geometry, state.form)
-    stl = oriented.export_stl(target / "part.stl")
+    # Bio-4M fork: style.skin=implicit writes part.stl from the analytic
+    # SDF (marching cubes); part.step stays the simplified BRep reference.
+    # If the implicit export is impossible the build FAILS loudly — handing
+    # back a BRep STL under a skin request would be a hallucination.
+    implicit = bool(getattr(state.form.style, "implicit_skin", False))
+    skin_meta: dict[str, Any] = {}
+    if implicit:
+        from .implicit.skin import ImplicitSkinError, export_implicit_skin
+
+        try:
+            stl, skin_findings, skin_meta = export_implicit_skin(
+                state.form, target / "part.stl"
+            )
+        except ImplicitSkinError as exc:
+            raise PipelineFailure(
+                f"style.skin: implicit requested but the implicit engine "
+                f"cannot honor it — {exc}",
+                code=5,
+            ) from exc
+        # skin findings land BEFORE _finalize so score/honesty see them
+        state.report.extend(skin_findings)
+        from ..product.capability import EngineGap
+
+        state.capability.engine_gaps = [
+            *state.capability.engine_gaps,
+            EngineGap(
+                feature_or_check="exports.step",
+                suggestion=(
+                    "part.step is the simplified BRep reference; production "
+                    "output is part.stl (implicit skin)"
+                ),
+            ),
+        ]
+    else:
+        stl = oriented.export_stl(target / "part.stl")
     step = oriented.export_step(target / "part.step")
 
     out = state.summary()
@@ -60,6 +94,7 @@ def run_build_from_state(state, target: Path) -> tuple[dict[str, Any], "object"]
         "bores_cut": log.bores_cut,
         "boxes_cut": log.boxes_cut,
         "ribs_welded": log.ribs_welded,
+        "exoskeleton_ribs_welded": log.exoskeleton_ribs_welded,
         "field_cut": log.field_cut,
         "blends_applied": log.blends_applied,
         "blends_skipped": log.blends_skipped,
@@ -69,7 +104,10 @@ def run_build_from_state(state, target: Path) -> tuple[dict[str, Any], "object"]
         "stl": str(stl),
         "step": str(step),
         "print_orientation": state.form.print_orientation,
+        "stl_source": "implicit" if implicit else "brep",
     }
+    if implicit:
+        out["exports"]["skin"] = skin_meta
     out["status"] = state.report.status.value
     out["findings"] = [
         f.to_dict() for f in state.report.findings if f.status is not Status.PASS

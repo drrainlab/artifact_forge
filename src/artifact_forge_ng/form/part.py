@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from .exoskeleton.ir import ExoskeletonIR
+from .exoskeleton.ir import ExoskeletonIR, ProfileSurfaceMap
 from .regions import Box3, Rect2D, Region, Region2D
 from .section import SectionProfile
 from .style import SurfaceStyle
@@ -81,17 +81,22 @@ class FieldFeature:
     #: midline), b = height above cyl_z0, n = radial depth INWARD from the
     #: OUTER surface. Deliberate MVP limits: axis Z only, one seam, full
     #: 360 band, no periodic wrapping.
-    mapping: str = "planar"  # "planar" | "cylindrical"
+    mapping: str = "planar"  # "planar" | "cylindrical" | "profile_surface"
     cyl_center: tuple[float, float] = (0.0, 0.0)
     cyl_r: float = 0.0
     cyl_r_outer: float = 0.0
     cyl_z0: float = 0.0
+    #: The developable surface when ``mapping == "profile_surface"`` — cell
+    #: coords are then ``(s, x)`` unrolled from the section contour.
+    surface: ProfileSurfaceMap | None = None
 
     def local_to_world(self, a: float, b: float, n: float = 0.0) -> tuple[float, float, float]:
         """Map local (a, b, n) — in-plane coords + offset ALONG the cut
         direction (into the material) — to world XYZ."""
         import math
 
+        if self.mapping == "profile_surface" and self.surface is not None:
+            return self.surface.to_world(a, b, n)
         if self.mapping == "cylindrical":
             theta = a / self.cyl_r
             r = self.cyl_r_outer - n
@@ -175,11 +180,15 @@ class FaceWindow:
     note: str = ""
     #: cylindrical_z_mapping_v1 (see FieldFeature): a Z-axis cylinder wall
     #: window; local a = arc length at cyl_r, b = height above cyl_z0.
+    #: "profile_surface" (Bio-4M stage B): a developable section-sweep; local
+    #: (a, b) = (s, x), keepouts/window in that unrolled frame.
     mapping: str = "planar"
     cyl_center: tuple[float, float] = (0.0, 0.0)
     cyl_r: float = 0.0
     cyl_r_outer: float = 0.0
     cyl_z0: float = 0.0
+    #: The developable surface when ``mapping == "profile_surface"``.
+    surface: ProfileSurfaceMap | None = None
 
 
 @dataclass(frozen=True)

@@ -12,6 +12,8 @@ dependencies = [
 cad = [
     "cadquery>=2.4,<3",
     "numpy>=1.26",
+    # marching cubes for the implicit exoskeleton skin (Bio-4M, STL-first)
+    "scikit-image>=0.22",
 ]
 web = [
     "fastapi>=0.111",

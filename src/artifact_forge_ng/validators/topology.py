@@ -647,3 +647,165 @@ def rail_present(geometry: Geometry, form: PartForm) -> Finding:
         measured=frac,
         limit=0.9,
     )
+
+
+@register_probe("topology.exoskeleton_ribs_materialized")
+def exoskeleton_ribs_materialized(geometry: Geometry, form: PartForm) -> Finding:
+    """Bio-3: every rib graph edge must be REAL material on the compiled
+    part. A small cube probe sits in the PROUD half of each capsule —
+    centered 0.5*r outside the panel plane at the edge midpoint (fully
+    inside the tube by construction), plus probes in 2-3 node spheres.
+    An IR that was never welded (or a weld OCC dropped) fails here."""
+    ir = form.exoskeleton
+    if ir is None:
+        return Finding(
+            check="topology.exoskeleton_ribs_materialized",
+            status=Status.PASS,
+            level=Level.TOPOLOGY,
+            message="no exoskeleton declared",
+        )
+    graph = ir.graph
+    if not graph.edges:
+        return _finding(
+            "topology.exoskeleton_ribs_materialized", False,
+            "exoskeleton declared but its graph has no edges",
+        )
+    radii = graph.edge_radius or tuple(ir.min_rib_d / 2.0 for _ in graph.edges)
+    missing: list[str] = []
+    worst = 1.0
+    for (i, j), r in zip(graph.edges, radii):
+        na, nb = graph.nodes[i], graph.nodes[j]
+        mid = ((na[0] + nb[0]) / 2.0, (na[1] + nb[1]) / 2.0,
+               (na[2] + nb[2]) / 2.0)
+        # proud half: n is INTO the material, so -0.5*r is 0.5*r above the
+        # surface; a cube of half-size 0.25*r there lies inside the tube.
+        cx, cy, cz = ir.local_to_world(mid[0], mid[1], mid[2] - 0.5 * r)
+        h = max(0.2, 0.25 * r)
+        probe = box_probe(cx - h, cy - h, cz - h, cx + h, cy + h, cz + h)
+        frac = solid_fraction(geometry.workplane, probe)
+        worst = min(worst, frac)
+        if frac < 0.5:
+            missing.append(f"edge ({i},{j}) fill {frac:.2f}")
+    # node blends: the roots plus a mid node must be spherical material
+    node_idxs = list(graph.root_nodes[:2])
+    mid_idx = len(graph.nodes) // 2
+    if mid_idx not in node_idxs:
+        node_idxs.append(mid_idx)
+    blends = graph.node_blend_radius
+    for idx in node_idxs:
+        r = blends[idx] if idx < len(blends) else ir.min_rib_d / 2.0
+        if r < 0.4:
+            continue
+        node = graph.nodes[idx]
+        cx, cy, cz = ir.local_to_world(node[0], node[1], node[2] - 0.4 * r)
+        h = max(0.2, 0.25 * r)
+        probe = box_probe(cx - h, cy - h, cz - h, cx + h, cy + h, cz + h)
+        frac = solid_fraction(geometry.workplane, probe)
+        worst = min(worst, frac)
+        if frac < 0.5:
+            missing.append(f"node {idx} fill {frac:.2f}")
+    return _finding(
+        "topology.exoskeleton_ribs_materialized",
+        not missing,
+        f"all {len(graph.edges)} rib edges + {len(node_idxs)} node blends "
+        "are solid material"
+        if not missing else "ribs missing on the solid: " + ", ".join(missing[:6]),
+        measured=worst,
+        limit=0.5,
+    )
+
+
+@register_probe("topology.organic_windows_open")
+def organic_windows_open(geometry: Geometry, form: PartForm) -> Finding:
+    """Bio-3: every organic window polygon must have removed material —
+    probed at the polygon centroid at mid-depth (through-cut semantics;
+    probe sized by the NARROW bbox dimension, the hex_field_present
+    lesson). A declared organic field with zero polygons is a failed
+    field, not a vacuous pass."""
+    organic = [f for f in form.fields if f.pattern == "organic"]
+    if not organic:
+        return Finding(
+            check="topology.organic_windows_open",
+            status=Status.PASS,
+            level=Level.TOPOLOGY,
+            message="no organic windows declared",
+        )
+    import math
+
+    def _centroid_clearance(poly, cu, cv):
+        """Min distance from the centroid to the polygon boundary — the
+        probe must fit INSIDE the cell, and a clipped slender cell is much
+        narrower at its centroid than its bbox hints."""
+        best = math.inf
+        for p, q in zip(poly, list(poly[1:]) + [poly[0]]):
+            dx, dy = q[0] - p[0], q[1] - p[1]
+            l2 = dx * dx + dy * dy
+            if l2 < 1e-18:
+                continue
+            t = max(0.0, min(1.0, ((cu - p[0]) * dx + (cv - p[1]) * dy) / l2))
+            best = min(best, math.hypot(cu - (p[0] + t * dx), cv - (p[1] + t * dy)))
+        return best
+
+    problems: list[str] = []
+    worst = 0.0
+    total = 0
+    for f in organic:
+        if not f.polygons:
+            problems.append("organic field has zero window polygons")
+            continue
+        for k, poly in enumerate(f.polygons):
+            total += 1
+            cu = sum(p[0] for p in poly) / len(poly)
+            cv = sum(p[1] for p in poly) / len(poly)
+            # in-plane half-extent: a box of half-diagonal <= the centroid
+            # clearance stays inside the (convex) cell by construction
+            h = max(0.3, 0.65 * _centroid_clearance(poly, cu, cv))
+            wx, wy, wz = f.local_to_world(cu, cv, f.depth * 0.45)
+            zh = max(0.5, f.depth * 0.4)
+            probe = box_probe(
+                wx - h, wy - h, wz - zh, wx + h, wy + h, wz + zh
+            )
+            frac = solid_fraction(geometry.workplane, probe)
+            worst = max(worst, frac)
+            if frac > 0.1:
+                problems.append(f"window {k} still solid (fill {frac:.2f})")
+    return _finding(
+        "topology.organic_windows_open",
+        not problems,
+        f"all {total} organic windows are open voids"
+        if not problems else "; ".join(problems[:6]),
+        measured=worst,
+        limit=0.1,
+    )
+
+
+@register_probe("topology.payload_void_open")
+def payload_void_open(geometry: Geometry, form: PartForm) -> Finding:
+    """Wearable cuff (wave P2): the payload cylinder along X must be void,
+    and the upward mouth window must be pierced through the clip wall —
+    the flashlight really drops in from above."""
+    f = form.frame
+    if "payload_cv" not in f:
+        return _finding("topology.payload_void_open", False,
+                        "no payload frame keys on this form")
+    p_cv, r_pi, r_po = f["payload_cv"], f["payload_r_inner"], f["payload_r_outer"]
+    gap = f["payload_mouth_gap"]
+    probe = channel_probe(
+        [(-2.0, 0.0, p_cv), (form.width + 2.0, 0.0, p_cv)],
+        d=2.0 * r_pi - 0.4,
+    )
+    frac_cyl = solid_fraction(geometry.workplane, probe)
+    window = box_probe(
+        form.width * 0.25, -gap * 0.3, p_cv + r_pi * 0.6,
+        form.width * 0.75, gap * 0.3, p_cv + r_po + 1.0,
+    )
+    frac_win = solid_fraction(geometry.workplane, window)
+    ok = frac_cyl < 0.05 and frac_win < 0.25
+    return _finding(
+        "topology.payload_void_open",
+        ok,
+        f"payload cylinder solid fraction {frac_cyl:.3f}, mouth window "
+        f"{frac_win:.3f}",
+        measured=max(frac_cyl, frac_win),
+        limit=0.25,
+    )

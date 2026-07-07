@@ -113,3 +113,65 @@ def add_zip_tie_slots(
     for i, box in enumerate(slots):
         form.cutboxes.append(CutBoxFeature(f"zip_slot_{i}", box))
     return [note(use.id, f"zip-tie slot pair (bridge {bridge:g} mm) on {use.target}")]
+
+
+@register_applicator("add_strap_slots")
+def add_strap_slots(
+    form: PartForm, use: ModifierUse, params: dict[str, Any], archetype: ArchetypeSpec
+) -> list[Finding]:
+    """A pair of WIDE through slots in a strap tab (wave P2 wearable
+    closure): the strap runs along the extrusion axis, so the slot pair
+    flanks the strap bar along the tab's outward axis and each slot spans
+    the strap width along X. Every slot corner is additionally guarded
+    against the arm circle — a strap cut can never breach the body cavity."""
+    import math as _math
+
+    pw = plate_window(form, use.target)
+    if pw is None:
+        return [fail(use.id, f"target region {use.target!r} has no usable window")]
+    strap_w = params.get("strap_w", 25.0)
+    slot_len = strap_w + 1.2  # along X: the strap must slide through
+    slot_t = params.get("strap_t", 2.0) + 1.2  # along Y: thickness + slack
+    bridge = params.get("bridge_w", 8.0)
+    cu = (pw.window.u0 + pw.window.u1) / 2.0
+    cv = (pw.window.v0 + pw.window.v1) / 2.0
+    z0, z1 = pw.z_top - pw.depth - 1.0, pw.z_top + 1.0
+    arm_r = form.frame.get("arm_r_inner")
+    slots: list[Box3] = []
+    for side in (-1.0, 1.0):
+        v_c = cv + side * (bridge / 2.0 + slot_t / 2.0)
+        box = Box3(
+            cu - slot_len / 2.0, v_c - slot_t / 2.0, z0,
+            cu + slot_len / 2.0, v_c + slot_t / 2.0, z1,
+        )
+        corners = [Pt(box.x0, box.y0), Pt(box.x1, box.y1),
+                   Pt(box.x0, box.y1), Pt(box.x1, box.y0)]
+        if any(
+            any(k.shape.distance(p) <= k.clearance + 0.5 or k.shape.contains(p)
+                for p in corners)
+            for k in pw.keepouts
+        ):
+            return [fail(use.id, "strap slots would violate a keepout")]
+        if not (pw.window.contains(corners[0]) and pw.window.contains(corners[1])):
+            return [fail(
+                use.id,
+                f"tab {use.target!r} too small for a {strap_w:g} mm strap pair",
+            )]
+        if arm_r is not None:
+            # nearest point of the (y, z) rectangle to the arm center (0, 0)
+            ny = min(max(0.0, box.y0), box.y1)
+            nz = min(max(0.0, box.z0), box.z1)
+            if _math.hypot(ny, nz) < arm_r + 0.5:
+                return [fail(
+                    use.id,
+                    f"strap slot on {use.target!r} would cut into the arm "
+                    f"circle (r={arm_r:g})",
+                )]
+        slots.append(box)
+    for i, box in enumerate(slots):
+        form.cutboxes.append(CutBoxFeature(f"strap_slot_{use.target}_{i}", box))
+    return [note(
+        use.id,
+        f"strap slot pair ({strap_w:g} mm strap, bar {bridge:g} mm) on "
+        f"{use.target}",
+    )]

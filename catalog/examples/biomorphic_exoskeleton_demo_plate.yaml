@@ -1,0 +1,50 @@
+# The stable Bio-2 demo product (docs/BIOMORPHIC.md): an adapter plate
+# growing a biomorphic exoskeleton on its lightening zone (the documented
+# aesthetic_lightening FALLBACK target — the applicator notes it). The
+# golden point for `forge validate [--debug-ir]`, the Cockpit preview and
+# the honesty asymmetry: form checks PASS on the IR while the bio features
+# stay supported-but-NOT-built until Bio-3 materializes them in CAD.
+schema: product/v1
+id: biomorphic_exoskeleton_demo_plate
+archetype: adapter_plate_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - biomorphic_exoskeleton
+  - organic_windows
+
+params:
+  plate_l: 120mm
+  plate_w: 80mm
+  thickness: 6mm
+  corner_r: 6mm
+  a_kind: line
+  a_count: 2
+  a_spacing: 96mm
+  a_screw: M4
+  a_cs_face: top
+
+style:
+  surface: biomechanical_exoskeleton
+  organicity: 0.6
+
+modifiers:
+  - id: apply_biomorphic_exoskeleton
+    target: center_zone
+    params:
+      rib_density: 0.5
+      window_scale: 0.8
+      rib_d_root: 6mm
+      rib_d_tip: 3mm
+      min_ligament: 2mm
+      # seed 0 = stable CRC32 seed derived from the product id
+      seed: 0
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid

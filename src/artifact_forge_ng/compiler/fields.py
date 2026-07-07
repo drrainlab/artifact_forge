@@ -70,9 +70,68 @@ def _cut_cylindrical_field(
     return cut_keep_solid(body, cutter)
 
 
+def _cut_profile_surface_field(
+    body: cq.Workplane, field: FieldFeature
+) -> tuple[cq.Workplane, bool]:
+    """profile_surface (Bio-4M stage B): each organic window polygon (local
+    (s, x)) becomes a RECESS — a flat pocket built in the tangent plane of
+    its own centroid and extruded INWARD by ``field.depth`` (the op's
+    ``safe_recess``). Never a through-cut: the depth is capped so the pocket
+    floor stays clear of the saddle/channel. Cosmetic chord flattening is
+    bounded (the surface is developable, gently curved)."""
+    surface = field.surface
+    if surface is None or not field.polygons:
+        return body, False
+    eps = 1e-3
+    proud = 0.6  # start the cutter this far OUTSIDE the surface
+    cutter: cq.Workplane | None = None
+    for poly in field.polygons:
+        if len(poly) < 3:
+            continue
+        sc = sum(p[0] for p in poly) / len(poly)
+        xc = sum(p[1] for p in poly) / len(poly)
+        u, v, nu, nv = surface.sample(sc)
+        # tangent frame at the centroid: x = world +X (extrusion), s = the
+        # surface tangent (finite difference), inward = -outward normal.
+        p0 = surface.to_world(sc, xc, 0.0)
+        ps = surface.to_world(sc + eps, xc, 0.0)
+        s_dir = cq.Vector(ps[0] - p0[0], ps[1] - p0[1], ps[2] - p0[2])
+        if s_dir.Length < 1e-9:
+            continue
+        s_dir = s_dir.normalized()
+        x_dir = cq.Vector(1.0, 0.0, 0.0)
+        inward = cq.Vector(0.0, -nu, -nv)
+        if inward.Length < 1e-9:
+            continue
+        inward = inward.normalized()
+        outward = inward.multiply(-1.0)
+        origin = cq.Vector(*p0).add(outward.multiply(proud))
+        pts3d = [
+            origin
+            .add(s_dir.multiply(p[0] - sc))
+            .add(x_dir.multiply(p[1] - xc))
+            for p in poly
+        ]
+        try:
+            wire = cq.Wire.makePolygon(pts3d + [pts3d[0]])
+            face = cq.Face.makeFromWires(wire)
+            piece = cq.Solid.extrudeLinear(
+                face, inward.multiply(field.depth + proud)
+            )
+        except Exception:  # noqa: BLE001 — a degenerate cell is skipped
+            continue
+        wp = cq.Workplane(obj=piece)
+        cutter = wp if cutter is None else cutter.union(wp)
+    if cutter is None:
+        return body, False
+    return cut_keep_solid(body, cutter)
+
+
 def cut_field(body: cq.Workplane, field: FieldFeature) -> tuple[cq.Workplane, bool]:
     if not field.centers and not field.polygons:
         return body, False
+    if field.mapping == "profile_surface":
+        return _cut_profile_surface_field(body, field)
     if field.mapping == "cylindrical":
         return _cut_cylindrical_field(body, field)
     depth = field.depth + (2.0 if field.depth > 2.0 else 1.0)

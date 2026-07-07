@@ -1,0 +1,180 @@
+schema: archetype/v1
+id: branch_clamp_lower_v1
+version: 1
+object_class: branch_clamp
+description: >
+  Biomorphic pack Bio-1 (docs/BIOMORPHIC.md): lower half of the split
+  branch/pipe clamp — the functional core a lamp arm or tool mount hangs
+  from a living branch with. Constant YZ section extruded along X (X = the
+  branch axis), printed on its section (side_profile, support-free by
+  construction). The open saddle notch is HALF the nominal branch circle
+  whose center sits compression_gap/2 beyond the mating plane, so the
+  bolted pair always squeezes the branch and never closes a hole around it
+  (the split-clamp law — a tree grows). Two flat pad lands recessed into
+  the saddle take glued TPU strips; two heatset bolt columns in the wings
+  (id mount_pilot_* — the screw_joint pilot convention) receive the upper
+  half; a cord slot pair near the saddle center takes a shock cord for
+  one-handed mounting. The clamp_mate datum bakes the compression gap in
+  (joints land datum-on-datum and cannot express offsets). The outer shell
+  is an exoskeleton_panel canvas — the bio skin grows there in Bio-3+.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - split_branch_clamp
+  - branch_saddle
+  - three_point_tpu_contact
+  - heatset_pockets
+  - tie_slots
+
+parameters:
+  nominal_branch_d:
+    {type: length, default: 60mm, min: 30mm, max: 100mm,
+     role: functional, exposed: true,
+     description: nominal branch/pipe diameter at the clamping point}
+  clamp_w:
+    {type: length, default: 40mm, min: 32mm, max: 120mm,
+     role: structural, exposed: true,
+     description: clamp body width along the branch axis}
+  compression_gap:
+    {type: length, default: 3mm, min: 1.5mm, max: 6mm,
+     role: functional,
+     description: "designed daylight between the bolted mating faces: the
+       TPU pads always stay compressed, the faces never bottom out"}
+  screw:
+    {type: choice, choices: [M4], default: M4, role: assembly,
+     description: clamp bolts (heatset inserts in this half)}
+  base_t:
+    {type: length, default: 8mm, min: 5mm, max: 14mm, role: structural,
+     description: floor thickness under the deepest saddle point}
+  flange_t:
+    {type: length, default: 10mm, min: 8mm, max: 14mm, role: structural,
+     description: bolt wing thickness at the mating plane}
+  wall:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: structural,
+     description: minimum wall between the saddle and the outer shell}
+  bolt_web:
+    {type: length, default: 8mm, min: 0mm, max: 20mm, role: structural,
+     description: web between the saddle edge and the bolt axis —
+       form.saddle_geometry_ok fails a bolt placed over the open mouth}
+  edge_m:
+    {type: length, default: 10mm, min: 6mm, max: 16mm, role: structural,
+     description: wing material beyond the bolt axis}
+  corner_r:
+    {type: length, default: 2.5mm, min: 1mm, max: 5mm, role: aesthetic}
+  land_angle:
+    {type: number, default: 50, min: 30, max: 65, role: functional,
+     description: "pad land positions, degrees from the saddle bottom —
+       with the upper apex land this is three-point contact by construction"}
+  land_w:
+    {type: length, default: 14mm, min: 8mm, max: 20mm, role: functional,
+     description: flat width of each TPU pad land}
+  pad_recess:
+    {type: length, default: 1.2mm, min: 0.6mm, max: 2mm, role: functional,
+     description: radial recess of the pad lands (glued TPU strip thickness)}
+  insert_depth:
+    {type: length, default: 6mm, min: 5mm, max: 8mm, role: assembly,
+     description: heatset insert pocket depth in the wings}
+  cord_y:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: functional,
+     description: cord slot offset from the saddle centerline}
+
+derived:
+  saddle_r: nominal_branch_d / 2
+  mate_z: base_t + saddle_r - compression_gap / 2
+  bolt_y: saddle_r + bolt_web
+  bolt_dx: clamp_w - 16
+
+constraints:
+  - compression_gap >= 1.5
+  - mate_z > flange_t + 1
+
+form:
+  type: recipe
+  section: recipe
+  plane: YZ
+  width_axis: X
+  ops:
+    - op: clamp_half_lower
+      id: body
+      params:
+        branch_d: nominal_branch_d
+        clamp_w: clamp_w
+        gap: compression_gap
+        base_t: base_t
+        flange_t: flange_t
+        bolt_y: bolt_y
+        edge_m: edge_m
+        wall: wall
+        corner_r: corner_r
+        land_angle: land_angle
+        land_w: land_w
+        pad_recess: pad_recess
+    - op: heatset_insert_pocket
+      id: mount_pilot_a
+      params:
+        screw: screw
+        depth: insert_depth
+        spacing: bolt_dx
+        cx: "expr(clamp_w / 2)"
+        cy: bolt_y
+        z_top: mate_z
+    - op: heatset_insert_pocket
+      id: mount_pilot_b
+      params:
+        screw: screw
+        depth: insert_depth
+        spacing: bolt_dx
+        cx: "expr(clamp_w / 2)"
+        cy: "expr(-bolt_y)"
+        z_top: mate_z
+    - op: cord_slot_pair
+      id: cord_slots
+      params:
+        slot_l: 8mm
+        slot_w: 4mm
+        spacing: "expr(2 * cord_y)"
+
+regions:
+  - {id: saddle_contact, role: soft_contact_surface, editable: false,
+     label: "Branch contact saddle",
+     description: "the open half-circle the branch rests in, including the
+       recessed TPU pad lands — never cut"}
+  - {id: outer_shell, role: exoskeleton_panel, editable: true,
+     label: "Outer shell (bio canvas)",
+     aliases: [outer surface, shell, exoskeleton canvas],
+     description: body flanks and belly — the biomorphic exoskeleton grows
+       here (materialization lands in Bio-3)}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.saddle_geometry_ok
+  - form.pad_lands_present
+  - form.cuts_respect_keepouts
+  - topology.cavity_open
+  - topology.single_connected_solid
+  - topology.pockets_present
+  - topology.cutout_present
+  - region.keepouts_preserved
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - apply_biomorphic_exoskeleton
+  - add_bone_windows
+  - add_vein_ribs
+
+contract:
+  must_have:
+    - branch_saddle
+    - three_point_tpu_contact
+    - heatset_pockets
+    - tie_slots
+  must_not_have:
+    - closed_branch_hole_without_split
+    - weak_saddle_contact
+    - perforated_bolt_boss
+  invariants:
+    - compression_gap >= 1.5
+    - bolt_dx >= 12
