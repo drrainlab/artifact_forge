@@ -146,8 +146,43 @@ def _load_archetype(
                     f"{where} load_path {lp.from_!r} -> {lp.to!r}: "
                     f"{name!r} is not a declared region"
                 )
+    _bind_interfaces(spec, region_ids, where)
     _bind_recipe_ops(spec, where)
     return spec
+
+
+def _bind_interfaces(
+    spec: ArchetypeSpec, region_ids: set[str], where: str
+) -> None:
+    """Wave A1 fail-fast: interface ids unique, gender legal for the type,
+    region/keepout ids declared. The datum anchor is runtime truth (ops
+    publish datums at build) — interface.frame_exists measures it on the
+    real form, the loader cannot."""
+    seen: set[str] = set()
+    for spec_i in spec.interfaces:
+        w = f"{where} interface {spec_i.id!r}"
+        if spec_i.id in seen:
+            raise CatalogError(f"{w}: duplicate interface id")
+        seen.add(spec_i.id)
+        decl = spec_i.decl()
+        if spec_i.gender not in decl.genders:
+            raise CatalogError(
+                f"{w}: gender {spec_i.gender!r} illegal for type "
+                f"{spec_i.type!r} (allowed: {list(decl.genders)})"
+            )
+        if spec_i.region is not None and spec_i.region not in region_ids:
+            raise CatalogError(
+                f"{w}: region {spec_i.region!r} is not a declared region")
+        for k in spec_i.keepouts:
+            if k not in region_ids:
+                raise CatalogError(
+                    f"{w}: keepout {k!r} is not a declared region")
+        lo, hi = decl.clearance_band
+        if spec_i.clearance is not None and not lo <= spec_i.clearance <= hi:
+            raise CatalogError(
+                f"{w}: clearance {spec_i.clearance:g} outside the "
+                f"{spec_i.type} band [{lo:g}, {hi:g}]"
+            )
 
 
 def _bind_recipe_ops(spec: ArchetypeSpec, where: str) -> None:

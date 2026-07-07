@@ -97,7 +97,15 @@ regions:
 
 surface_style: molded_utility_part
 
+interfaces:
+  - id: seat
+    type: snap_joint
+    gender: male
+    datum: seat
+    accepts: [substrate_cassette]
+
 validators:
+  - interface.frame_exists
   - form.snap_pockets_cleanable
   - topology.cutout_present
   - topology.single_connected_solid

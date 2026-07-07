@@ -851,3 +851,87 @@ _register(JointDecl(
     ir_check=_tongue_groove_ir,
     cad_checks=("assembly.no_interference",),
 ))
+
+
+_DOVETAIL_A_KEYS = ("groove_top_w", "groove_bottom_w", "groove_depth",
+                    "socket_top_v")
+_DOVETAIL_B_KEYS = ("dovetail_root_w", "dovetail_top_w", "dovetail_h",
+                    "foot_plane_v")
+#: Per-side sliding clearance band (mm): tighter than the drop-in insert,
+#: looser than a press fit — the adapter must SLIDE by hand yet not rattle.
+DOVETAIL_CLEARANCE_BAND = (0.1, 0.8)
+#: The wide end of the male must exceed the groove OPENING by at least
+#: this much — the retention that makes a dovetail a dovetail.
+MIN_DOVETAIL_RETENTION = 0.5
+
+
+def _dovetail_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """The wearable adapter standard, verified in the pose: the male foot
+    rides the female groove flanks inside the sliding band, cannot lift
+    straight out (wide end > opening), never bottoms (seats on flanks),
+    matches the flank angle, and engages the socket over its full length.
+    Axial retention is friction-only in v1 — stated in the report, not
+    hidden."""
+    check = "assembly.dovetail_ir"
+    fa, fb = form_a.frame, form_b.frame
+    missing = [k for k in _DOVETAIL_A_KEYS if k not in fa]
+    missing += [f"B:{k}" for k in _DOVETAIL_B_KEYS if k not in fb]
+    if missing:
+        return [_finding(
+            check, False,
+            f"dovetail frame keys missing: {', '.join(missing)} — a part "
+            "does not implement the adapter socket standard",
+        )]
+    problems: list[str] = []
+    gt, gb = fa["groove_top_w"], fa["groove_bottom_w"]
+    gd = fa["groove_depth"]
+    mt, mb, mh = fb["dovetail_root_w"], fb["dovetail_top_w"], fb["dovetail_h"]
+    lo, hi = DOVETAIL_CLEARANCE_BAND
+    for name, female, male in (("flank", gb, mb), ("opening", gt, mt)):
+        side = (female - male) / 2.0
+        if not lo <= side <= hi:
+            problems.append(
+                f"{name} clearance {side:.2f}/side outside [{lo:g}, {hi:g}]")
+    if mb < gt + MIN_DOVETAIL_RETENTION:
+        problems.append(
+            f"male wide end {mb:.1f} does not exceed the opening {gt:.1f} "
+            f"by {MIN_DOVETAIL_RETENTION:g} — lifts straight out, no dovetail")
+    if mh > gd - 0.2:
+        problems.append(
+            f"male height {mh:.1f} bottoms in the {gd:.1f} groove — the "
+            "foot must seat on the flanks")
+    import math as _math
+    ang_f = _math.degrees(_math.atan2((gb - gt) / 2.0, gd))
+    ang_m = _math.degrees(_math.atan2((mb - mt) / 2.0, mh))
+    if abs(ang_f - ang_m) > 3.0:
+        problems.append(
+            f"flank angles differ: female {ang_f:.1f} vs male {ang_m:.1f} deg")
+    if form_b.width > form_a.width + 0.1:
+        problems.append(
+            f"adapter length {form_b.width:g} overhangs the {form_a.width:g} "
+            "socket")
+    # posed foot plane must land on the socket top plane
+    foot_global_z = pose.apply((0.0, 0.0, fb["foot_plane_v"]))[2]
+    if abs(foot_global_z - fa["socket_top_v"]) > 0.05:
+        problems.append(
+            f"posed foot plane at {foot_global_z:.2f}, socket top at "
+            f"{fa['socket_top_v']:.2f} — datum chain broken")
+    return [_finding(
+        check, not problems,
+        "male dovetail rides the socket in the sliding band, retained "
+        "against lift-out; axial retention friction-only (v1)"
+        if not problems else "; ".join(problems),
+        measured=(gb - mb) / 2.0, limit=hi,
+    )]
+
+
+_register(JointDecl(
+    name="dovetail_joint",
+    description="slide-on payload adapter: male dovetail foot in the "
+                "female socket groove, clearance band per side, lift-out "
+                "retention by undercut, friction-only axial hold (v1)",
+    ir_check=_dovetail_ir,
+    cad_checks=("assembly.no_interference",),
+))

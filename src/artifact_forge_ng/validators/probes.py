@@ -103,6 +103,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.payload_mount_not_on_skin_side", Level.FORM, "the payload clip sits outside the arm ring and opens away from the body"),
         _decl("form.payload_retention_ok", Level.FORM, "payload cavity coverage and mouth gap give real snap retention"),
         _decl("form.strap_access_ok", Level.FORM, "each strap tab carries a through slot pair clear of the arm circle with a solid strap bar"),
+        _decl("form.dovetail_socket_profile_ok", Level.FORM, "the payload socket groove is a measured female dovetail at the declared widths and depth"),
+        _decl("form.dovetail_foot_profile_ok", Level.FORM, "the adapter foot is a measured male dovetail whose free end is the wide end"),
         # -- vertical farm water checks (impls in form/checks_water.py) -------
         _decl("form.water_channel_slope_ok", Level.FORM, "channel floor falls monotonically toward the outlet at 1.0-1.5 degrees"),
         _decl("form.water_channel_dims_ok", Level.FORM, "channel width/depth/bottom radius in band and the run spans both body faces"),
@@ -118,6 +120,9 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.contact_window_geometry_ok", Level.FORM, "contact window drop 1-2mm, centered over the channel, meshed underside"),
         _decl("form.snap_pockets_cleanable", Level.FORM, "every snap window pierces the full wall — no blind wet pocket"),
         _decl("form.lift_access_ok", Level.FORM, "rim carries two finger notches wide enough for tool-free removal"),
+        # -- interface level (wave A1, form-time) ------------------------------
+        _decl("interface.frame_exists", Level.FORM, "every declared interface's datum is published on the form with its type's frame keys"),
+        _decl("interface.keepouts_preserved", Level.FORM, "no cut touched a declared interface keepout region"),
         # -- topology level: probed on the compiled solid ---------------------
         _decl("topology.single_connected_solid", Level.TOPOLOGY, "exactly one connected valid solid"),
         _decl("topology.cavity_open", Level.TOPOLOGY, "the cable cavity is a real void along the cable axis"),
@@ -166,6 +171,13 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.snap_joint_ir", Level.ASSEMBLY, "snap hooks reach their windows with printable flexure strain"),
         _decl("assembly.hooks_engage", Level.ASSEMBLY, "every snap hook lip occupies its window in the pose"),
         _decl("assembly.clamp_gap_ir", Level.ASSEMBLY, "posed clamp halves keep the declared compression gap with coincident saddle centers"),
+        # -- interface level (wave A1, assembly-time) --------------------------
+        _decl("interface.mate_compatible", Level.ASSEMBLY, "every joint lands on declared ports of one type with complementary genders and mutual accepts"),
+        _decl("interface.clearance_ok", Level.ASSEMBLY, "mated ports declare the same fit within its type's clearance band"),
+        _decl("interface.fastener_access_ok", Level.ASSEMBLY, "every fastened interface's screw axes stay reachable in the pose"),
+        _decl("interface.swap_part_builds", Level.ASSEMBLY, "a compatible counterpart swapped into the assembly still validates"),
+        _decl("assembly.no_orphan_ports", Level.ASSEMBLY, "every required interface of every part is mated by some joint"),
+        _decl("assembly.dovetail_ir", Level.ASSEMBLY, "male dovetail rides its groove with the clearance band, never bottoms, full engagement"),
         # -- vertical farm assembly checks (impls in assembly/joints.py) -------
         _decl("assembly.removable_insert_ir", Level.ASSEMBLY, "cassette drops into the seat with the clearance band, window over the channel, pulse-only water contact"),
         _decl("assembly.tongue_groove_ir", Level.ASSEMBLY, "adjacent modules align on tongue/groove with channel centerlines continuous at the pitch"),

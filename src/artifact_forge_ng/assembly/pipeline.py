@@ -21,6 +21,7 @@ from ..core.findings import Finding, Level, Status
 from ..pipeline import PipelineFailure, PipelineState, pre_cad_from_instance
 from ..product.assembly import AssemblyInstance, JointUse
 from .joints import IDENTITY_POSE, JOINT_TYPES, JointError, Pose, compute_pose
+from .mates import interface_findings, resolve_port_anchor
 
 
 def load_assembly(path: Path) -> AssemblyInstance:
@@ -83,6 +84,7 @@ def _joint_findings(
     ]
     for i, joint in enumerate(asm.joints):
         decl = JOINT_TYPES[joint.type]
+        joint = resolve_port_anchor(joint, states)
         form_a = states[joint.a_ref].form
         form_b = states[joint.b_ref].form
         if form_a is None or form_b is None:
@@ -147,6 +149,7 @@ def _joint_findings(
                 message=f"part {part.ref!r} is not posed by any joint",
                 critical=True,
             ))
+    findings.extend(interface_findings(asm, states))
     return findings, poses, pose_report
 
 

@@ -612,3 +612,38 @@ features:
     verified_by:
       - assembly.snap_joint_ir
       - assembly.hooks_engage
+
+  # -- wave A1: swappable payload interfaces -------------------------------
+
+  - id: swappable_payload_socket
+    description: >
+      female dovetail crown on the cuff — payload adapters slide in along
+      the arm axis; the cuff never changes when the payload does
+    verified_by:
+      - form.dovetail_socket_profile_ok
+      - interface.frame_exists
+      - interface.keepouts_preserved
+
+  - id: dovetail_mount_foot
+    description: >
+      male dovetail foot measured against the socket standard — wide end
+      free (lift-out retention), flanks in the sliding band
+    verified_by:
+      - form.dovetail_foot_profile_ok
+      - interface.frame_exists
+
+  - id: accessory_plate
+    description: flat adapter head with a real through-hole pattern
+    verified_by:
+      - topology.bores_open
+
+  - id: swappable_payload_interface
+    description: >
+      the adapter foot rides the cuff socket in the sliding band, retained
+      against lift-out, mated through DECLARED typed ports with no orphan
+      required port — the machine-checked half of the adapter standard
+    verified_by:
+      - assembly.dovetail_ir
+      - interface.mate_compatible
+      - assembly.no_orphan_ports
+      - assembly.no_interference

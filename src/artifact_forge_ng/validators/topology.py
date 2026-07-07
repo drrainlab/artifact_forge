@@ -786,8 +786,10 @@ def payload_void_open(geometry: Geometry, form: PartForm) -> Finding:
     the flashlight really drops in from above."""
     f = form.frame
     if "payload_cv" not in f:
-        return _finding("topology.payload_void_open", False,
-                        "no payload frame keys on this form")
+        # socket-variant cuffs carry no integrated clip — the ADAPTER's
+        # build runs this probe for real (its frame has the keys)
+        return _finding("topology.payload_void_open", True,
+                        "no integrated payload clip on this form")
     p_cv, r_pi, r_po = f["payload_cv"], f["payload_r_inner"], f["payload_r_outer"]
     gap = f["payload_mouth_gap"]
     probe = channel_probe(

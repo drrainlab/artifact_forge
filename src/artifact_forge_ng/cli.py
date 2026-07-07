@@ -92,8 +92,26 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("ui", help="launch the Product Cockpit (local web)")
 
+    p_compat = sub.add_parser(
+        "compat",
+        help="derived interface compatibility matrix of the whole catalog",
+    )
+    p_compat.add_argument(
+        "--yaml", action="store_true",
+        help="emit the raw matrix as YAML instead of the table",
+    )
+
     args = parser.parse_args(argv)
     try:
+        if args.command == "compat":
+            from .catalog.compat import compat_matrix, render_compat
+
+            matrix = compat_matrix()
+            if args.yaml:
+                _print(matrix)
+            else:
+                print(render_compat(matrix))
+            return 0
         if args.command == "validate":
             if _schema_kind(args.product) == "assembly":
                 from .assembly.pipeline import run_assembly_validate

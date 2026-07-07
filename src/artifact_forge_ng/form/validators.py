@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import Any
 
 from ..core.findings import Finding, Level, Status
 from ..validators.probes import KNOWN_CHECKS, register_probe
@@ -28,6 +29,9 @@ class FormCheckContext:
     """Extra inputs a form check may need beyond the PartForm itself."""
 
     declared_region_ids: tuple[str, ...] = ()
+    #: Declared connection ports (wave A1) — interface.* form checks read
+    #: them; empty for interface-less archetypes (checks pass vacuously).
+    interfaces: tuple[Any, ...] = ()
 
 
 def _finding(
@@ -493,6 +497,7 @@ from . import (  # noqa: E402,F401
     checks_substrate_cassette,
     checks_tunnel,
     checks_wallmount,
+    checks_interfaces,
     checks_water,
     checks_wearable,
 )
@@ -519,7 +524,8 @@ def validate_form(
     yields an engine-gap WARN, never a silent skip.
     """
     ctx = FormCheckContext(
-        declared_region_ids=tuple(r.id for r in archetype.regions)
+        declared_region_ids=tuple(r.id for r in archetype.regions),
+        interfaces=tuple(getattr(archetype, "interfaces", ()) or ()),
     )
     findings: list[Finding] = []
     ran: set[str] = set()

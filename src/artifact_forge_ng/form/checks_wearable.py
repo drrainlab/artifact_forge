@@ -44,12 +44,18 @@ def _finding(check: str, ok: bool, message: str, *, measured: float | None = Non
 
 
 def _not_a_cuff(form: PartForm) -> bool:
-    return "arm_r_inner" not in form.frame or "payload_cv" not in form.frame
+    return "arm_r_inner" not in form.frame
 
 
-def _vacuous(check: str) -> Finding:
+def _no_payload_clip(form: PartForm) -> bool:
+    """Socket-variant cuffs carry no integrated snap-C — payload checks
+    gate on their own keys, never hiding the ARM checks."""
+    return "payload_cv" not in form.frame
+
+
+def _vacuous(check: str, why: str = "not a cuff form") -> Finding:
     return Finding(check=check, status=Status.PASS, level=Level.FORM,
-                   message="not a cuff form")
+                   message=why)
 
 
 def _sweep_deg(arc: ArcSeg) -> float:
@@ -226,8 +232,8 @@ def check_pad_recess_exists(form: PartForm, ctx=None) -> Finding:
 @register_probe("form.payload_mount_not_on_skin_side")
 def check_payload_mount_not_on_skin_side(form: PartForm, ctx=None) -> Finding:
     check = "form.payload_mount_not_on_skin_side"
-    if _not_a_cuff(form):
-        return _vacuous(check)
+    if _no_payload_clip(form):
+        return _vacuous(check, "no integrated payload clip on this form")
     f = form.frame
     p_cv, r_ao, r_pi = f["payload_cv"], f["arm_r_outer"], f["payload_r_inner"]
     problems: list[str] = []
@@ -253,8 +259,8 @@ def check_payload_mount_not_on_skin_side(form: PartForm, ctx=None) -> Finding:
 @register_probe("form.payload_retention_ok")
 def check_payload_retention_ok(form: PartForm, ctx=None) -> Finding:
     check = "form.payload_retention_ok"
-    if _not_a_cuff(form):
-        return _vacuous(check)
+    if _no_payload_clip(form):
+        return _vacuous(check, "no integrated payload clip on this form")
     f = form.frame
     declared = f["payload_arc_deg"]
     arcs = [s for s in form.section.outer.tagged("payload_contact")
@@ -324,4 +330,81 @@ def check_strap_access_ok(form: PartForm, ctx=None) -> Finding:
         check, not problems,
         f"strap slot pairs pierce {len(tabs)} tabs clear of the skin"
         if not problems else "; ".join(problems),
+    )
+
+
+@register_probe("form.dovetail_socket_profile_ok")
+def check_dovetail_socket_profile_ok(form: PartForm, ctx=None) -> Finding:
+    """The socket groove is a REAL dovetail, measured on the loop: two
+    flank segments whose bottom ends sit wider apart than their top ends
+    by >= 1 mm total, at the declared widths and depth."""
+    check = "form.dovetail_socket_profile_ok"
+    f = form.frame
+    if "groove_top_w" not in f:
+        return _vacuous(check, "no dovetail socket on this form")
+    flanks = [s for s in form.section.outer.tagged("groove_flank")
+              if isinstance(s, LineSeg)]
+    if len(flanks) != 2:
+        return _finding(check, False,
+                        f"{len(flanks)} groove flanks in the profile, need 2")
+    problems: list[str] = []
+    tops, bottoms = [], []
+    for s in flanks:
+        top, bot = (s.a, s.b) if s.a.v > s.b.v else (s.b, s.a)
+        tops.append(top)
+        bottoms.append(bot)
+    top_w = abs(tops[0].u - tops[1].u)
+    bot_w = abs(bottoms[0].u - bottoms[1].u)
+    depth = abs(tops[0].v - bottoms[0].v)
+    if abs(top_w - f["groove_top_w"]) > 0.05:
+        problems.append(f"opening {top_w:.2f} != declared {f['groove_top_w']:g}")
+    if abs(bot_w - f["groove_bottom_w"]) > 0.05:
+        problems.append(f"bottom {bot_w:.2f} != declared {f['groove_bottom_w']:g}")
+    if bot_w < top_w + 1.0:
+        problems.append(f"no undercut: bottom {bot_w:.2f} vs top {top_w:.2f}")
+    if abs(depth - f["groove_depth"]) > 0.05:
+        problems.append(f"depth {depth:.2f} != declared {f['groove_depth']:g}")
+    return _finding(
+        check, not problems,
+        f"female dovetail {top_w:.1f}/{bot_w:.1f} x {depth:.1f} measured"
+        if not problems else "; ".join(problems),
+        measured=bot_w - top_w, limit=1.0,
+    )
+
+
+@register_probe("form.dovetail_foot_profile_ok")
+def check_dovetail_foot_profile_ok(form: PartForm, ctx=None) -> Finding:
+    """The adapter foot is a REAL male dovetail: measured flank widths
+    match the frame and the wide end is the FREE end (retention)."""
+    check = "form.dovetail_foot_profile_ok"
+    f = form.frame
+    if "dovetail_root_w" not in f:
+        return _vacuous(check, "no dovetail foot on this form")
+    flanks = [s for s in form.section.outer.tagged("dovetail_flank")
+              if isinstance(s, LineSeg)]
+    if len(flanks) != 2:
+        return _finding(check, False,
+                        f"{len(flanks)} foot flanks in the profile, need 2")
+    tops, bottoms = [], []
+    for s in flanks:
+        top, bot = (s.a, s.b) if s.a.v > s.b.v else (s.b, s.a)
+        tops.append(top)
+        bottoms.append(bot)
+    root_w = abs(tops[0].u - tops[1].u)
+    wide_w = abs(bottoms[0].u - bottoms[1].u)
+    height = abs(tops[0].v - bottoms[0].v)
+    problems: list[str] = []
+    if abs(root_w - f["dovetail_root_w"]) > 0.05:
+        problems.append(f"root {root_w:.2f} != declared {f['dovetail_root_w']:g}")
+    if abs(wide_w - f["dovetail_top_w"]) > 0.05:
+        problems.append(f"wide end {wide_w:.2f} != declared {f['dovetail_top_w']:g}")
+    if wide_w < root_w + 0.5:
+        problems.append("free end not wider than root — no retention")
+    if abs(height - f["dovetail_h"]) > 0.05:
+        problems.append(f"height {height:.2f} != declared {f['dovetail_h']:g}")
+    return _finding(
+        check, not problems,
+        f"male dovetail {root_w:.1f}/{wide_w:.1f} x {height:.1f} measured"
+        if not problems else "; ".join(problems),
+        measured=wide_w - root_w, limit=0.5,
     )

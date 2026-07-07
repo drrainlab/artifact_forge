@@ -147,7 +147,21 @@ regions:
 
 surface_style: molded_utility_part
 
+interfaces:
+  - id: seat
+    type: removable_insert
+    gender: male
+    datum: seat
+    clearance: 0.75mm
+    assembly_role: required
+  - id: rim
+    type: snap_joint
+    gender: female
+    datum: rim
+    accepts: [substrate_retainer_frame]
+
 validators:
+  - interface.frame_exists
   - form.shell_walls_ok
   - form.mesh_floor_orthogonal_ok
   - form.cassette_no_reservoir

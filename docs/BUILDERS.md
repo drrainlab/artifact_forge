@@ -125,7 +125,7 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 | `snap_joint` | ✅ compliant: undercut + insertion strain 1.5·δ·t/L² ≤ 5% (esp32_box_snap_lid) |
 | `removable_insert` | ✅ vertical farm: drop-in кассета в seat (clearance band, tool-free rim, окно ВНУТРИ желоба, reach 1–2мм, drain gap ≥ 1мм) |
 | `tongue_groove` | ✅ vertical farm: линия модулей — groove глотает tongue в полосе 0.3–0.5, не доставая дна; каналы параллельны и на одной высоте |
-| dovetail | ⬜ скользящая посадка — своя механика |
+| `dovetail_joint` | ✅ A1: undercut-ретенция + clearance-band + угол фланков + полное зацепление; friction-only осевое удержание (заявлено) |
 
 ### interface / joint / механика
 
@@ -134,7 +134,7 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 | `gusset_pair` | ✅ shelf_bracket_v1 (web-косынки как рёбра) |
 | `snap_hook` / `snap_receiver` | ✅ | ops snap_hook_pair / snap_window_pair + snap_joint (strain-физика поймала первый дизайн: 9мм балка ломалась) |
 | `press_fit_pin_pair` | ✅ (см. assembly joints) |
-| `dovetail_joint` | ⬜ R4 |
+| `dovetail_joint` | ✅ A1: сокет-корона манжеты + male-нога адаптеров (forearm_cuff_body payload_mount=dovetail_socket / dovetail_adapter_body) |
 | `tongue_groove_joint` | ✅ vertical farm: tongue_groove_edges op + tongue_groove joint (выравнивание линии, non-bearing/non-sealing, соосность желобов в позе) |
 | `split_plane_with_alignment` | ✅ (см. assembly joints: butt_pin_joint) |
 | `pin_hinge` | ⬜ R4 |
@@ -191,3 +191,14 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 `as_modeled`), а overhang-валидатор — знать его. Урок sideprint-клипсы:
 константная экструзия профилем на стол = ноль нависаний by construction;
 это свойство ПРОВЕРЯЕТСЯ (`form.constant_section`), а не постулируется.
+
+## Интерфейсы (wave A1 — docs/ROADMAP.md)
+
+Соединение = ДЕКЛАРИРОВАННЫЙ порт: `interfaces:` на архетипе (id, type,
+gender, datum, clearance, region, keepouts, accepts, assembly_role) из
+реестра 11 типов (`product/interfaces.py`). Joint реализует тип порта;
+mate легален только при совпадении типа + комплементарном гендере +
+взаимном accepts (`assembly/mates.py`); `forge compat` выводит матрицу
+совместимости каталога; `assembly/swap.py` верифицирует замену детали
+(interface.swap_part_builds). Билдер, публикующий порт, обязан издать его
+датум и frame-ключи типа — `interface.frame_exists` меряет.

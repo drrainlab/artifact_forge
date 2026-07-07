@@ -184,7 +184,41 @@ regions:
 
 surface_style: molded_utility_part
 
+interfaces:
+  - id: cassette_seat
+    type: removable_insert
+    gender: female
+    datum: cassette_seat
+    clearance: 0.75mm
+    region: cassette_seat_walls
+    keepouts: [water_channel]
+    accepts: [substrate_cassette]
+  - id: line_east
+    type: tongue_groove
+    gender: male
+    datum: line_east
+    clearance: 0.4mm
+    region: tongue_edge
+    accepts: [water_rail]
+  - id: line_west
+    type: tongue_groove
+    gender: female
+    datum: line_west
+    clearance: 0.4mm
+    region: groove_edge
+    accepts: [water_rail]
+  - id: inlet
+    type: fluid_inlet
+    gender: female
+    datum: inlet
+  - id: outlet
+    type: fluid_outlet
+    gender: female
+    datum: outlet
+
 validators:
+  - interface.frame_exists
+  - interface.keepouts_preserved
   - form.water_channel_slope_ok
   - form.water_channel_dims_ok
   - form.no_standing_water_ir

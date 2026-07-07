@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from ..core.values import ValueSpec, normalize_formula, parse_value
 from .contract import ContractSpec
+from .interfaces import InterfaceSpec
 from .schema_base import VersionedModel
 
 PARAM_ROLES = (
@@ -219,6 +220,8 @@ class ArchetypeSpec(VersionedModel):
     constraints: list[str] = []
     form: FormSpec
     regions: list[RegionSpec] = []
+    #: Declared typed connection ports (wave A1) — see product/interfaces.py.
+    interfaces: list[InterfaceSpec] = []
     #: Declared force routes between regions — see LoadPathSpec.
     load_paths: list[LoadPathSpec] = []
     #: Informational lifecycle stage; buildability truth stays computed.

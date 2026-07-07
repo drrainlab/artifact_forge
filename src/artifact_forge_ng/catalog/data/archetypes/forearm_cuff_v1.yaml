@@ -145,9 +145,20 @@ regions:
      description: ring flanks reserved for the biomorphic skin — the
        Bio-4M stage-B canvas lands here next iteration}
 
+interfaces:
+  - id: payload_seat
+    type: cylindrical_payload_socket
+    gender: female
+    datum: payload_axis
+    clearance: 0.3mm
+    region: payload_saddle
+    keepouts: [payload_saddle]
+
 surface_style: molded_utility_part
 
 validators:
+  - interface.frame_exists
+  - interface.keepouts_preserved
   - form.body_clearance_ok
   - form.arm_mouth_dons_ok
   - form.comfort_edge_radius_ok
