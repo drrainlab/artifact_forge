@@ -1,0 +1,126 @@
+schema: archetype/v1
+id: flashlight_adapter_25_v1
+version: 1
+object_class: payload_adapter
+description: >
+  Wave A1 swap driver, payload side: the flashlight adapter — a male
+  dovetail foot (the cuff socket standard) carrying the P2 snap-C clip
+  for a 20..30 mm cylinder. Slides onto forearm_cuff_socket_v1 along the
+  arm axis; swaps for any other payload_adapter without touching the
+  cuff. Constant YZ section, sideprint, support-free.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - dovetail_mount_foot
+  - cylindrical_payload_clamp
+
+parameters:
+  adapter_l:
+    {type: length, default: 84mm, min: 40mm, max: 120mm,
+     role: assembly, exposed: true,
+     description: slide length along the arm axis — never exceeds the cuff}
+  head:
+    {type: choice, choices: [snap_clip], default: snap_clip, role: assembly}
+  groove_top_w:
+    {type: length, default: 12mm, min: 8mm, max: 20mm, role: assembly,
+     description: socket standard the foot is sized against}
+  groove_bottom_w:
+    {type: length, default: 17mm, min: 10mm, max: 26mm, role: assembly}
+  groove_depth:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: assembly}
+  fit_clearance:
+    {type: length, default: 0.25mm, min: 0.1mm, max: 0.6mm, role: assembly,
+     description: per-side sliding clearance of the foot in the groove}
+  base_w:
+    {type: length, default: 30mm, min: 24mm, max: 60mm, role: structural}
+  base_t:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: structural}
+  payload_d:
+    {type: length, default: 25mm, min: 20mm, max: 30mm,
+     role: functional, exposed: true}
+  payload_clearance:
+    {type: length, default: 0.3mm, min: 0.1mm, max: 0.8mm, role: functional}
+  payload_arc_deg:
+    {type: number, default: 240, min: 210, max: 268, role: functional}
+  clip_wall:
+    {type: length, default: 3mm, min: 2.4mm, max: 5mm, role: structural}
+  neck_drop:
+    {type: length, default: 4mm, min: 2mm, max: 10mm, role: structural}
+
+constraints:
+  - groove_bottom_w >= groove_top_w + 1
+
+form:
+  type: recipe
+  section: recipe
+  plane: YZ
+  width_axis: X
+  ops:
+    - op: dovetail_adapter_body
+      id: body
+      params:
+        head: head
+        adapter_l: adapter_l
+        groove_top_w: groove_top_w
+        groove_bottom_w: groove_bottom_w
+        groove_depth: groove_depth
+        fit_clearance: fit_clearance
+        base_w: base_w
+        base_t: base_t
+        payload_d: payload_d
+        payload_clearance: payload_clearance
+        payload_arc_deg: payload_arc_deg
+        clip_wall: clip_wall
+        neck_drop: neck_drop
+
+regions:
+  - {id: foot_interface, role: interface_keepout, editable: false,
+     label: "Dovetail foot",
+     description: the retained flanks — never cut}
+  - {id: payload_saddle, role: soft_contact_surface, editable: false,
+     label: "Payload seat"}
+
+interfaces:
+  - id: mount_foot
+    type: dovetail_rail
+    gender: male
+    datum: mount_foot
+    clearance: 0.25mm
+    region: foot_interface
+    keepouts: [foot_interface]
+    accepts: [wearable_cuff]
+    assembly_role: required
+  - id: payload_seat
+    type: cylindrical_payload_socket
+    gender: female
+    datum: payload_axis
+    clearance: 0.3mm
+    region: payload_saddle
+    keepouts: [payload_saddle]
+
+surface_style: molded_utility_part
+
+validators:
+  - interface.frame_exists
+  - interface.keepouts_preserved
+  - form.dovetail_foot_profile_ok
+  - form.payload_mount_not_on_skin_side
+  - form.payload_retention_ok
+  - topology.payload_void_open
+  - topology.single_connected_solid
+  - manufacturing.min_wall
+  - manufacturing.bed_fit
+  - manufacturing.overhang
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - dovetail_mount_foot
+    - cylindrical_payload_clamp
+  must_not_have: []
+  invariants:
+    - groove_bottom_w >= groove_top_w + 1

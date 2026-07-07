@@ -1,0 +1,61 @@
+# Wave A1 golden: the wearable adapter swap. The cuff body is fixed; the
+# payload rides a dovetail socket. Swap flashlight_adapter -> rail_plate
+# adapter (tests do it live via assembly/swap.py) and the cuff YAML below
+# does not change by a single byte — that is the interface promise.
+schema: assembly/v1
+id: cuff_flashlight_25
+strict: true
+root: cuff
+
+# The adapter socket standard, stated ONCE — groove desync between cuff
+# and adapter is unrepresentable.
+shared:
+  groove_top_w: 12mm
+  groove_bottom_w: 17mm
+  groove_depth: 6mm
+
+parts:
+  - ref: cuff
+    product:
+      schema: product/v1
+      id: cuff_socket_270
+      archetype: forearm_cuff_socket_v1@1
+      mode: wearable
+      body_fit:
+        region: forearm
+        circumference: 270mm
+        length: 240mm
+        clearance: 6mm
+        strap_width: 25mm
+      params: {}
+      modifiers:
+        - id: add_strap_slots
+          target: strap_land_left
+        - id: add_strap_slots
+          target: strap_land_right
+      manufacturing:
+        material: PETG
+        support_policy: none
+  - ref: adapter
+    product:
+      schema: product/v1
+      id: flashlight_adapter
+      archetype: flashlight_adapter_25_v1@1
+      params:
+        payload_d: 25mm
+        adapter_l: 84mm
+      manufacturing:
+        material: PETG
+        support_policy: none
+
+joints:
+  # Port-to-port anchoring (A1): both names below are interface ids, not
+  # bare datums — the mate is typed, gendered and accepts-checked.
+  - type: dovetail_joint
+    a: cuff.payload_socket
+    b: adapter.mount_foot
+    rotate: [0, 0, 0]
+
+contract:
+  must_have:
+    - swappable_payload_interface

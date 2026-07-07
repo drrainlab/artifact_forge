@@ -1,0 +1,173 @@
+schema: archetype/v1
+id: forearm_cuff_socket_v1
+version: 1
+object_class: wearable_cuff
+description: >
+  Wave A1 swap driver: the forearm cuff with a SWAPPABLE payload — the
+  integrated snap-C of forearm_cuff_v1 is replaced by a female dovetail
+  socket crown. Payload adapters (flashlight clip, accessory plate,
+  future GoPro/LED/sensor feet) slide in along the arm axis; the cuff
+  body never changes when the payload does. Same body_fit sizing, strap
+  closure, TPU pads and comfort fillets as the P2 cuff; same sideprint
+  discipline. Axial retention of the adapter is friction-only in v1 —
+  stated by the dovetail joint report, not hidden.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - body_cradle_fit
+  - skin_safe_edges
+  - tpu_pad_recesses
+  - swappable_payload_socket
+
+parameters:
+  arm_circumference:
+    {type: length, default: expr(body_circumference), min: 150mm, max: 450mm,
+     role: functional, exposed: true,
+     description: "forearm circumference — defaults to the body_fit block"}
+  arm_clearance:
+    {type: length, default: expr(body_clearance), min: 2mm, max: 12mm,
+     role: functional}
+  cuff_l:
+    {type: length, default: "expr(min(body_length * 0.35, 90))",
+     min: 40mm, max: 120mm, role: structural, exposed: true}
+  strap_w:
+    {type: length, default: expr(body_strap_width), min: 15mm, max: 40mm,
+     role: assembly}
+  wall:
+    {type: length, default: 4mm, min: "expr(2 * printer_min_wall)", max: 8mm,
+     role: structural}
+  arm_capture_deg:
+    {type: number, default: 240, min: 210, max: 262, role: functional}
+  land_angle:
+    {type: number, default: 45, min: 25, max: 60, role: functional}
+  land_w:
+    {type: length, default: 14mm, min: 8mm, max: 20mm, role: functional}
+  pad_recess:
+    {type: length, default: 1.5mm, min: 0.8mm, max: 2.5mm, role: functional}
+  comfort_edge_r:
+    {type: length, default: 2mm, min: 1.2mm, max: 4mm, role: functional}
+  tab_t:
+    {type: length, default: 4mm, min: 3mm, max: 6mm, role: structural}
+  tab_len:
+    {type: length, default: 26mm, min: 20mm, max: 40mm, role: structural}
+  payload_mount:
+    {type: choice, choices: [dovetail_socket], default: dovetail_socket,
+     role: assembly, description: this variant IS the socket}
+  groove_top_w:
+    {type: length, default: 12mm, min: 8mm, max: 20mm,
+     role: assembly, exposed: true,
+     description: dovetail groove opening — the adapter standard dimension}
+  groove_bottom_w:
+    {type: length, default: 17mm, min: 10mm, max: 26mm, role: assembly,
+     description: groove bottom (wider — the undercut that retains)}
+  groove_depth:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: assembly}
+  crown_wall:
+    {type: length, default: 3.5mm, min: 3mm, max: 6mm, role: structural}
+  crown_floor:
+    {type: length, default: 3mm, min: 2.5mm, max: 6mm, role: structural}
+
+derived:
+  arm_d_eff: arm_circumference / 3.141592653589793
+
+constraints:
+  - arm_clearance >= 2
+  - cuff_l >= strap_w + 12
+  - groove_bottom_w >= groove_top_w + 1
+
+form:
+  type: recipe
+  section: recipe
+  plane: YZ
+  width_axis: X
+  ops:
+    - op: forearm_cuff_body
+      id: body
+      params:
+        arm_circumference: arm_circumference
+        cuff_l: cuff_l
+        arm_clearance: arm_clearance
+        wall: wall
+        arm_capture_deg: arm_capture_deg
+        land_angle: land_angle
+        land_w: land_w
+        pad_recess: pad_recess
+        comfort_edge_r: comfort_edge_r
+        tab_t: tab_t
+        tab_len: tab_len
+        payload_mount: payload_mount
+        groove_top_w: groove_top_w
+        groove_bottom_w: groove_bottom_w
+        groove_depth: groove_depth
+        crown_wall: crown_wall
+        crown_floor: crown_floor
+
+regions:
+  - {id: arm_contact, role: body_contact_surface, editable: false,
+     label: "Skin contact saddle"}
+  - {id: strap_land_left, role: mounting_surface, editable: true,
+     label: "Left strap tab", aliases: [left tab]}
+  - {id: strap_land_right, role: mounting_surface, editable: true,
+     label: "Right strap tab", aliases: [right tab]}
+  - {id: socket_crown, role: interface_keepout, editable: false,
+     label: "Payload socket crown",
+     description: the dovetail walls that retain the adapter — never cut}
+  - {id: outer_aesthetic_shell, role: exoskeleton_panel, editable: true,
+     label: "Outer shell (bio canvas)"}
+
+interfaces:
+  - id: payload_socket
+    type: dovetail_rail
+    gender: female
+    datum: payload_socket
+    clearance: 0.25mm
+    region: socket_crown
+    keepouts: [socket_crown]
+    accepts: [payload_adapter]
+
+surface_style: molded_utility_part
+
+validators:
+  - interface.frame_exists
+  - interface.keepouts_preserved
+  - form.dovetail_socket_profile_ok
+  - form.body_clearance_ok
+  - form.arm_mouth_dons_ok
+  - form.comfort_edge_radius_ok
+  - form.pad_recess_exists
+  - form.payload_mount_not_on_skin_side
+  - form.payload_retention_ok
+  - form.cuts_respect_keepouts
+  - topology.cavity_open
+  - topology.payload_void_open
+  - topology.single_connected_solid
+  - topology.cutout_present
+  - region.keepouts_preserved
+  - manufacturing.min_wall
+  - manufacturing.bed_fit
+  - manufacturing.overhang
+
+forbidden_forms:
+  - closed_cuff_ring
+  - sharp_body_edges
+
+allowed_modifiers:
+  - add_strap_slots
+  - apply_biomorphic_exoskeleton
+  - add_bone_windows
+  - add_vein_ribs
+
+contract:
+  must_have:
+    - body_cradle_fit
+    - strap_mount
+    - skin_safe_edges
+    - tpu_pad_recesses
+    - swappable_payload_socket
+  must_not_have:
+    - closed_cuff_ring
+    - sharp_body_edges
+  invariants:
+    - arm_clearance >= 2
+    - cuff_l >= strap_w + 12

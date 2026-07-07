@@ -1,0 +1,122 @@
+schema: archetype/v1
+id: rail_plate_adapter_v1
+version: 1
+object_class: payload_adapter
+description: >
+  Wave A1 swap driver, payload side: the accessory plate adapter — the
+  same male dovetail foot as the flashlight adapter, carrying a flat
+  plate with a two-hole pattern (action-camera mounts, hooks, LED bars,
+  prop elements bolt onto it). Proof that the cuff socket is a STANDARD:
+  this part and flashlight_adapter_25_v1 are interchangeable on the same
+  cuff, and the cuff YAML never changes.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - dovetail_mount_foot
+  - accessory_plate
+
+parameters:
+  adapter_l:
+    {type: length, default: 84mm, min: 40mm, max: 120mm,
+     role: assembly, exposed: true}
+  head:
+    {type: choice, choices: [plate], default: plate, role: assembly}
+  groove_top_w:
+    {type: length, default: 12mm, min: 8mm, max: 20mm, role: assembly}
+  groove_bottom_w:
+    {type: length, default: 17mm, min: 10mm, max: 26mm, role: assembly}
+  groove_depth:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: assembly}
+  fit_clearance:
+    {type: length, default: 0.25mm, min: 0.1mm, max: 0.6mm, role: assembly}
+  base_w:
+    {type: length, default: 30mm, min: 24mm, max: 60mm, role: structural}
+  base_t:
+    {type: length, default: 5mm, min: 3mm, max: 8mm, role: structural}
+  plate_w:
+    {type: length, default: 40mm, min: 28mm, max: 70mm,
+     role: functional, exposed: true}
+  hole_span:
+    {type: length, default: 26mm, min: 12mm, max: 50mm,
+     role: assembly, exposed: true,
+     description: accessory hole pattern span across the plate}
+  hole_d:
+    {type: length, default: 4.5mm, min: 3mm, max: 6mm, role: assembly,
+     description: clearance holes (M4 default)}
+
+constraints:
+  - groove_bottom_w >= groove_top_w + 1
+  - plate_w >= hole_span + 10
+  - hole_span >= groove_bottom_w + hole_d + 3
+
+form:
+  type: recipe
+  section: recipe
+  plane: YZ
+  width_axis: X
+  ops:
+    - op: dovetail_adapter_body
+      id: body
+      params:
+        head: head
+        adapter_l: adapter_l
+        groove_top_w: groove_top_w
+        groove_bottom_w: groove_bottom_w
+        groove_depth: groove_depth
+        fit_clearance: fit_clearance
+        base_w: base_w
+        base_t: base_t
+        plate_w: plate_w
+        hole_span: hole_span
+        hole_d: hole_d
+
+regions:
+  - {id: foot_interface, role: interface_keepout, editable: false,
+     label: "Dovetail foot"}
+  - {id: accessory_plate, role: mounting_surface, editable: true,
+     label: "Accessory plate",
+     description: the flat head accessories bolt onto}
+
+interfaces:
+  - id: mount_foot
+    type: dovetail_rail
+    gender: male
+    datum: mount_foot
+    clearance: 0.25mm
+    region: foot_interface
+    keepouts: [foot_interface]
+    accepts: [wearable_cuff]
+    assembly_role: required
+  - id: accessory_pattern
+    type: screw_pattern
+    gender: female
+    datum: plate_top
+    region: accessory_plate
+
+surface_style: molded_utility_part
+
+validators:
+  - interface.frame_exists
+  - interface.keepouts_preserved
+  - form.dovetail_foot_profile_ok
+  - form.payload_mount_not_on_skin_side
+  - form.payload_retention_ok
+  - topology.payload_void_open
+  - topology.bores_open
+  - topology.single_connected_solid
+  - manufacturing.min_wall
+  - manufacturing.bed_fit
+  - manufacturing.overhang
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - dovetail_mount_foot
+    - accessory_plate
+  must_not_have: []
+  invariants:
+    - groove_bottom_w >= groove_top_w + 1
