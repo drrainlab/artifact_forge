@@ -162,6 +162,64 @@ class CutBoxFeature:
 
 
 @dataclass(frozen=True)
+class ChannelCutFeature:
+    """An open U-channel cut from the top face: constant width, rounded
+    bottom corners, floor sloping LINEARLY along the flow axis while the
+    body stays level — the water rail's transient path. v1 limits: flow
+    axis Y only, straight run, opens through both end faces (the cutter
+    overshoots, so the water always has an exit by construction).
+
+    ``y0`` is the inlet end, ``y1`` the outlet end; ``depth_start`` /
+    ``depth_end`` are floor depths below ``z_top`` at those stations, and
+    the slope is their linear interpolation (extrapolated through the
+    overshoot so the floor plane is exact past the faces)."""
+
+    name: str
+    center_x: float
+    y0: float  # inlet station on the flow axis
+    y1: float  # outlet station (y0 != y1; either ordering is legal)
+    z_top: float  # entry plane — the rail top face
+    width: float
+    depth_start: float  # floor depth at y0 (shallow, inlet)
+    depth_end: float  # floor depth at y1 (deep, outlet)
+    bottom_r: float = 1.2
+    axis: str = "Y"
+
+    def __post_init__(self) -> None:
+        if self.axis != "Y":
+            raise ValueError(f"ChannelCutFeature {self.name!r}: v1 supports axis Y only")
+        if abs(self.y1 - self.y0) < 1e-9:
+            raise ValueError(f"ChannelCutFeature {self.name!r} needs a nonzero flow span")
+        if self.width <= 0 or self.depth_start <= 0 or self.depth_end <= 0:
+            raise ValueError(f"ChannelCutFeature {self.name!r} needs positive width/depths")
+        if self.bottom_r < 0 or 2.0 * self.bottom_r > self.width + 1e-9:
+            raise ValueError(f"ChannelCutFeature {self.name!r}: bottom_r must fit the width")
+
+    def depth_at(self, y: float) -> float:
+        """Floor depth below z_top at station y — linear, extrapolates."""
+        t = (y - self.y0) / (self.y1 - self.y0)
+        return self.depth_start + t * (self.depth_end - self.depth_start)
+
+    def floor_z_at(self, y: float) -> float:
+        return self.z_top - self.depth_at(y)
+
+    @property
+    def slope_deg(self) -> float:
+        import math
+
+        rise = abs(self.depth_end - self.depth_start)
+        run = abs(self.y1 - self.y0)
+        return math.degrees(math.atan(rise / run))
+
+    def centerline(self, lift: float = 1.0, stations: int = 9) -> list[tuple[float, float, float]]:
+        """Sampled probe polyline offset ``lift`` above the floor — the
+        water path itself (lift > 0) or the material beneath it (lift < 0)."""
+        n = max(2, stations)
+        ys = [self.y0 + k / (n - 1) * (self.y1 - self.y0) for k in range(n)]
+        return [(self.center_x, y, self.floor_z_at(y) + lift) for y in ys]
+
+
+@dataclass(frozen=True)
 class FaceWindow:
     """An ORIENTED modifier canvas the builder declares for a region whose
     face is not horizontal (the phone stand's tilted back). Local frame:
@@ -305,6 +363,7 @@ class PartForm:
     holes: list[HoleFeature] = field(default_factory=list)
     bores: list[BoreFeature] = field(default_factory=list)
     cutboxes: list[CutBoxFeature] = field(default_factory=list)
+    channels: list[ChannelCutFeature] = field(default_factory=list)
     ribs: list[RibFeature] = field(default_factory=list)
     lofts: list[LoftFeature] = field(default_factory=list)
     pins: list[PinFeature] = field(default_factory=list)

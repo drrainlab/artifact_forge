@@ -25,7 +25,12 @@ def _finding(check: str, status: Status, message: str, *, measured: float | None
 def bed_fit(geometry: Geometry, form: PartForm) -> Finding:
     bb = geometry.bounding_box()
     size = sorted(bb.size, reverse=True)
-    bed = sorted(BED, reverse=True)
+    declared = (
+        form.params.get("bed_x"), form.params.get("bed_y"), form.params.get("bed_z")
+    )
+    bed = sorted(
+        (d if d is not None else b for d, b in zip(declared, BED)), reverse=True
+    )
     ok = all(s <= b + 1e-6 for s, b in zip(size, bed))
     return _finding(
         "manufacturing.bed_fit",
@@ -183,4 +188,123 @@ def max_opening_span(geometry: Geometry, form: PartForm) -> Finding:
            else "— roof bridging is doubtful, supports likely"),
         measured=worst,
         limit=12.0,
+    )
+
+
+# -- vertical farm cleanability (docs/VERTICAL_FARM_PACK.md) -----------------
+# These run on EVERY part (the always-on manufacturing suite), so each one
+# short-circuits to PASS "not applicable" when the form carries no water
+# geometry — a cable clip must never pay for the water contract.
+
+BRUSH_D = 8.0
+BRUSH_MIN_CHANNEL_W = 10.0
+CREVICE_MIN_OPENING = 2.0
+
+
+@register_probe("manufacturing.brush_access_to_water_channel")
+def brush_access_to_water_channel(geometry: Geometry, form: PartForm) -> Finding:
+    if not form.channels:
+        return _finding(
+            "manufacturing.brush_access_to_water_channel", Status.PASS,
+            "not applicable — no water channel on this part",
+        )
+    from ..cad.probes import channel_probe, solid_fraction
+
+    ch = form.channels[0]
+    if ch.width < BRUSH_MIN_CHANNEL_W:
+        return _finding(
+            "manufacturing.brush_access_to_water_channel", Status.FAIL,
+            f"channel {ch.width:g} narrower than a {BRUSH_MIN_CHANNEL_W:g} brush",
+            measured=ch.width, limit=BRUSH_MIN_CHANNEL_W,
+        )
+    top = form.frame.get("channel_top_z", ch.z_top)
+    worst = 0.0
+    for x, y, floor_z in ch.centerline(lift=1.0):
+        probe = channel_probe([(x, y, floor_z), (x, y, top + 14.0)], d=BRUSH_D)
+        worst = max(worst, solid_fraction(geometry.workplane, probe))
+    ok = worst < 0.05
+    return _finding(
+        "manufacturing.brush_access_to_water_channel",
+        Status.PASS if ok else Status.FAIL,
+        f"vertical brush path worst solid fraction {worst:.3f} along the run"
+        + ("" if ok else " — something roofs the channel"),
+        measured=worst, limit=0.05,
+    )
+
+
+@register_probe("manufacturing.no_hidden_wet_crevices")
+def no_hidden_wet_crevices(geometry: Geometry, form: PartForm) -> Finding:
+    from ..product.archetype import RegionRole
+
+    wet = [r for r in form.regions if r.role is RegionRole.TRANSIENT_WATER_PATH]
+    if not wet:
+        return _finding(
+            "manufacturing.no_hidden_wet_crevices", Status.PASS,
+            "not applicable — no wet regions on this part",
+        )
+
+    def _overlaps(b, w) -> bool:
+        return (b.x0 <= w.x1 and w.x0 <= b.x1 and b.y0 <= w.y1
+                and w.y0 <= b.y1 and b.z0 <= w.z1 and w.z0 <= b.z1)
+
+    offenders: list[str] = []
+    for cut in form.cutboxes:
+        b = cut.box
+        if not any(_overlaps(b, w.box) for w in wet):
+            continue
+        narrowest = min(b.x1 - b.x0, b.y1 - b.y0, b.z1 - b.z0)
+        if narrowest < CREVICE_MIN_OPENING:
+            offenders.append(
+                f"cut {cut.name!r} opens only {narrowest:.2f} in the wet path")
+    for bore in form.bores:
+        x, y, z = bore.center
+        r = bore.d / 2.0
+        from ..form.regions import Box3
+
+        lo, hi = bore.span
+        if bore.axis == "Z":
+            bbox = Box3(x - r, y - r, lo, x + r, y + r, hi)
+        elif bore.axis == "Y":
+            bbox = Box3(x - r, lo, z - r, x + r, hi, z + r)
+        else:
+            bbox = Box3(lo, y - r, z - r, hi, y + r, z + r)
+        if bore.d < CREVICE_MIN_OPENING and any(_overlaps(bbox, w.box) for w in wet):
+            offenders.append(f"bore {bore.name!r} d={bore.d:g} in the wet path")
+    ok = not offenders
+    return _finding(
+        "manufacturing.no_hidden_wet_crevices",
+        Status.PASS if ok else Status.FAIL,
+        "every wet-path opening admits a brush"
+        if ok else "; ".join(offenders),
+        measured=None if ok else CREVICE_MIN_OPENING,
+        suggestion="" if ok else "widen the opening past 2 mm or move it out of the wet path",
+    )
+
+
+@register_probe("manufacturing.no_unwashable_snap_pockets")
+def no_unwashable_snap_pockets(geometry: Geometry, form: PartForm) -> Finding:
+    windows = [c for c in form.cutboxes if "snap_window" in c.name]
+    if not windows:
+        return _finding(
+            "manufacturing.no_unwashable_snap_pockets", Status.PASS,
+            "not applicable — no snap windows on this part",
+        )
+    from ..cad.probes import box_probe, solid_fraction
+
+    blocked: list[str] = []
+    for win in windows:
+        b = win.box
+        probe = box_probe(
+            b.x0 + 0.2, b.y0 + 0.2, b.z0 + 0.2,
+            b.x1 - 0.2, b.y1 - 0.2, b.z1 - 0.2,
+        )
+        frac = solid_fraction(geometry.workplane, probe)
+        if frac > 0.05:
+            blocked.append(f"{win.name!r} solid fraction {frac:.2f}")
+    ok = not blocked
+    return _finding(
+        "manufacturing.no_unwashable_snap_pockets",
+        Status.PASS if ok else Status.FAIL,
+        f"{len(windows)} snap window(s) verified void through the wall"
+        if ok else "; ".join(blocked),
     )

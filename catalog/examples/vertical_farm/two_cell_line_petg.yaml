@@ -1,0 +1,54 @@
+# Vertical Farm Pack v1, MVP-2: two Base Water Rails joined in a line by
+# the tongue/groove interface — the joint aligns, never carries, never
+# seals. What this proves: channel centerlines continuous across the
+# joint, entry planes level, both inlets on the same edge (a flipped
+# module fails loudly), faces mating flush at the module length.
+#
+# Rails only, deliberately: the cassette/frame stack is proven by
+# water_rail_cell_2020_petg.yaml; repeating it here would triple the build
+# for nothing new.
+schema: assembly/v1
+id: two_cell_line_petg
+strict: true
+root: rail_a
+
+shared:
+  module_pitch: 250mm
+  channel_w: 16mm
+  slope_deg: 1.25
+  cassette_l: 220mm
+  cassette_w: 220mm
+
+parts:
+  - ref: rail_a
+    product:
+      schema: product/v1
+      id: rail_a
+      archetype: water_rail_v1@1
+      params:
+        profile: "2020"
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: rail_b
+    product:
+      schema: product/v1
+      id: rail_b
+      archetype: water_rail_v1@1
+      params:
+        profile: "2020"
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+
+joints:
+  - type: tongue_groove
+    a: rail_a.line_east
+    b: rail_b.line_west
+    rotate: [0, 0, 0]
+
+contract:
+  must_have:
+    - module_line_interface

@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 import cadquery as cq
 
 from ..cad.booleans import keep_largest, weld
-from ..cad.bores import cut_bore, cut_box
+from ..cad.bores import cut_bore, cut_box, cut_channel
 from ..cad.fillets import safe_fillet_edges, safe_fillet_ladder
 from ..cad.geometry import Geometry
 from ..cad.holes import cut_countersunk_hole
@@ -42,6 +42,7 @@ class CompileLog:
     holes_countersunk: int = 0
     bores_cut: int = 0
     boxes_cut: int = 0
+    channels_cut: int = 0
     ribs_welded: int = 0
     #: Bio-3: rib/node solids of the exoskeleton graph welded onto the body.
     exoskeleton_ribs_welded: int = 0
@@ -130,6 +131,15 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
         log.boxes_cut += int(cut)
         if not cut:
             log.notes.append(f"box cut {cutbox.name!r} could not be applied")
+
+    # Channel cuts are base-level like box cuts: they run before additive
+    # ribs so a rib declared inside the module (the cassette's contact
+    # window slab) survives the water path subtraction.
+    for channel in form.channels:
+        mass, cut = cut_channel(mass, channel)
+        log.channels_cut += int(cut)
+        if not cut:
+            log.notes.append(f"channel cut {channel.name!r} could not be applied")
 
     for rib in form.ribs:
         b = rib.box

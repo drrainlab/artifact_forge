@@ -102,14 +102,42 @@ def _joint_findings(
                 message=str(exc), critical=True,
             ))
             continue
+        # Chained joints (B mates a part that is itself posed): the global
+        # pose composes through the parent. v1 composes pure translations
+        # only — a rotated parent would need Euler composition, and no
+        # current pack chains through one; refuse honestly instead.
+        parent = poses.get(joint.a_ref)
+        pose_global = pose
+        if parent is not None and parent is not IDENTITY_POSE:
+            if any(abs(a) > 1e-9 for a in parent.rotate):
+                findings.append(Finding(
+                    check="assembly.joint_pose", status=Status.FAIL,
+                    level=Level.ASSEMBLY,
+                    message=(
+                        f"joint {i} ({joint.type}): chaining through the "
+                        f"ROTATED part {joint.a_ref!r} is not supported in v1"
+                    ),
+                    critical=True,
+                ))
+                continue
+            pose_global = Pose(
+                rotate=pose.rotate,
+                translate=(
+                    pose.translate[0] + parent.translate[0],
+                    pose.translate[1] + parent.translate[1],
+                    pose.translate[2] + parent.translate[2],
+                ),
+            )
         if joint.b_ref != asm.root and joint.b_ref not in poses:
-            poses[joint.b_ref] = pose
+            poses[joint.b_ref] = pose_global
             pose_report.append({
                 "part": joint.b_ref,
-                "rotate": list(pose.rotate),
-                "translate": [round(v, 4) for v in pose.translate],
+                "rotate": list(pose_global.rotate),
+                "translate": [round(v, 4) for v in pose_global.translate],
                 "derived_from": f"{joint.type}_{i}",
             })
+        # IR checks always see the RELATIVE pose (B in A's frame) — that is
+        # what the mating arithmetic is written against.
         findings.extend(decl.ir_check(form_a, form_b, pose, joint))
     for part in asm.parts:
         if part.ref not in poses:
@@ -400,6 +428,21 @@ def run_assembly_build(
         "status": status,
         "grade": grade,
     }
+    # Vertical farm pack: the water contract report + view metadata, when
+    # any part carries a water channel (dry assemblies stay untouched).
+    from .water_report import build_views, build_water_report
+
+    water = build_water_report(states, joint_findings)
+    if water is not None:
+        water_path = target / "water_report.yaml"
+        water_path.write_text(
+            yaml.safe_dump(water, sort_keys=False, allow_unicode=True)
+        )
+        report["water"] = water
+        report["exports"]["water_report"] = str(water_path)
+    views = build_views(asm, states, poses)
+    if views is not None:
+        report["views"] = views
     (target / "assembly_report.yaml").write_text(
         yaml.safe_dump(report, sort_keys=False, allow_unicode=True)
     )

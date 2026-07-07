@@ -498,3 +498,117 @@ features:
       - form.payload_retention_ok
       - form.payload_mount_not_on_skin_side
       - topology.payload_void_open
+
+  # -- vertical farm pack v1 (docs/VERTICAL_FARM_PACK.md) --------------------
+
+  - id: sloped_water_channel
+    description: >
+      open U-channel falling 1.0-1.5 deg toward the outlet inside a level
+      body — transient pulse transport, monotonic by construction, exits
+      through both faces
+    verified_by:
+      - form.water_channel_slope_ok
+      - form.water_channel_dims_ok
+      - topology.water_channel_open
+      - topology.water_channel_floor_solid
+
+  - id: overflow_drip_edge
+    description: >
+      sharp overflow lip over an air-gap undercut — water detaches as
+      droplets instead of wicking down the outer wall
+    verified_by:
+      - form.overflow_lip_geometry_ok
+      - topology.overflow_relief_open
+
+  - id: open_drip_receiver
+    description: >
+      the relief void under the lip stays an open, visually inspectable
+      drop zone — never a second trough, never standing water
+    verified_by:
+      - form.no_secondary_water_channel
+      - form.no_standing_water_ir
+
+  - id: cassette_seat
+    description: >
+      recessed drop-in seat matching the shared cassette envelope with
+      the declared clearance, floor on the channel entry plane
+    verified_by:
+      - form.cassette_seat_fit_ok
+
+  - id: module_alignment_edges
+    description: >
+      tongue (+X) / groove (-X) line-alignment interface — positions
+      neighbouring modules, carries nothing, seals nothing
+    verified_by:
+      - form.tongue_groove_profile_ok
+      - topology.ribs_present
+
+  - id: aluminum_profile_seat
+    description: >
+      bottom slots dropping the module onto 2020/3030 aluminum rails,
+      tool-free and fully outside the water path
+    verified_by:
+      - form.profile_seat_dry_ok
+      - topology.cutout_present
+
+  - id: substrate_mesh_floor
+    description: >
+      flat orthogonal through-mesh across the cassette floor — holds coco,
+      aerates roots, directs no flow
+    verified_by:
+      - form.mesh_floor_orthogonal_ok
+      - form.min_ligament_ok
+      - topology.hex_field_present
+
+  - id: pulse_contact_window
+    description: >
+      localized lowered window reaching 1-2 mm into the channel's upper
+      zone — substrate touches pulse water only, drained water never
+    verified_by:
+      - form.contact_window_geometry_ok
+      - topology.contact_window_present
+
+  - id: tool_free_removal
+    description: finger notches through the rim — lifts out by hand
+    verified_by:
+      - form.lift_access_ok
+      - topology.cutout_present
+
+  - id: cleanable_snap_interface
+    description: >
+      every snap pocket pierces its wall — open both sides, brushable,
+      no hidden wet cavity
+    verified_by:
+      - form.snap_pockets_cleanable
+
+  # Cassette Interface Standard: the assembly-level contract ANY cassette
+  # archetype must satisfy against the rail. The frame-key contract:
+  # rail publishes seat_u0/v0/u1/v1, seat_floor_z, seat_depth,
+  # channel_center_x/top_z/floor_z_inlet/floor_z_outlet; the cassette
+  # publishes cassette_u0/v0/u1/v1, cassette_h, floor_bottom_z,
+  # window_cx/window_w/window_floor_z. Verified in the assembled pose.
+  - id: vertical_farm_cassette_interface
+    description: >
+      the cassette drops into the rail seat within the clearance band,
+      lifts out by hand, and its contact window rides over the channel in
+      pulse-only reach — the machine-checked half of the Cassette
+      Interface Standard
+    verified_by:
+      - assembly.removable_insert_ir
+      - assembly.no_interference
+
+  - id: module_line_interface
+    description: >
+      adjacent modules align on tongue/groove at the grid pitch with
+      channel centerlines continuous — a line, not a seal
+    verified_by:
+      - assembly.tongue_groove_ir
+      - assembly.no_interference
+
+  - id: snapped_retainer
+    description: >
+      the retainer frame clicks onto the cassette with printable flexure
+      strain and real lip engagement
+    verified_by:
+      - assembly.snap_joint_ir
+      - assembly.hooks_engage

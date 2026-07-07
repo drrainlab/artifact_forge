@@ -34,6 +34,8 @@ EXO_PROTECTED_ROLES = frozenset(
         RegionRole.SEAL_SURFACE,
         RegionRole.RETAINING_FLEXURE,
         RegionRole.BODY_CONTACT_SURFACE,
+        RegionRole.TRANSIENT_WATER_PATH,
+        RegionRole.SUBSTRATE_SUPPORT_MESH,
     }
 )
 

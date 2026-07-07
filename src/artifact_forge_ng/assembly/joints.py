@@ -630,3 +630,224 @@ _register(JointDecl(
     ir_check=_compression_gap_ir,
     cad_checks=("assembly.no_interference",),
 ))
+
+
+# -- removable_insert (vertical farm: cassette into rail seat) ------------------
+
+#: Per-side drop-in clearance band: tighter binds when the print swells,
+#: looser lets the cassette rattle over the water.
+INSERT_CLEARANCE_BAND = (0.5, 1.0)
+#: Water must always pass UNDER the seated contact window.
+MIN_DRAIN_GAP = 1.0
+#: The window's reach into the channel's upper zone — pulse contact only.
+WINDOW_REACH_BAND = (1.0, 2.0)
+
+_INSERT_A_KEYS = (
+    "seat_u0", "seat_v0", "seat_u1", "seat_v1", "seat_floor_z",
+    "seat_clearance", "channel_center_x", "channel_w", "channel_top_z",
+    "channel_floor_z_inlet", "channel_floor_z_outlet",
+    "channel_y_inlet", "channel_y_outlet", "body_h",
+)
+_INSERT_B_KEYS = (
+    "cassette_u0", "cassette_v0", "cassette_u1", "cassette_v1",
+    "cassette_h", "window_cx", "window_w", "window_floor_z",
+)
+
+
+def _removable_insert_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """The Cassette Interface Standard, verified in the pose: the cassette
+    drops into the rail seat within the clearance band, its rim stays
+    graspable above the rail top (tool-free), and its contact window rides
+    INSIDE the channel with pulse-only reach — water always drains under
+    it, so permanent flooding is unrepresentable."""
+    check = "assembly.removable_insert_ir"
+    fa, fb = form_a.frame, form_b.frame
+    missing = [k for k in _INSERT_A_KEYS if k not in fa]
+    missing += [f"B:{k}" for k in _INSERT_B_KEYS if k not in fb]
+    if missing:
+        return [_finding(
+            check, False,
+            f"interface frame keys missing: {', '.join(missing)} — the part "
+            "does not implement the Cassette Interface Standard",
+        )]
+    from ..core.values import parse_quantity
+
+    raw_lift = joint.params.get("lift_margin", 3.0)
+    lift_margin = (parse_quantity(raw_lift, "length", where="removable_insert")
+                   if isinstance(raw_lift, str) else float(raw_lift))
+
+    lo = pose.apply((fb["cassette_u0"], fb["cassette_v0"], 0.0))
+    hi = pose.apply((fb["cassette_u1"], fb["cassette_v1"], fb["cassette_h"]))
+    pu0, pu1 = sorted((lo[0], hi[0]))
+    pv0, pv1 = sorted((lo[1], hi[1]))
+    pz0, pz1 = sorted((lo[2], hi[2]))
+
+    problems: list[str] = []
+    clearance = fa["seat_clearance"]
+    gaps = {
+        "west": pu0 - fa["seat_u0"], "east": fa["seat_u1"] - pu1,
+        "front": pv0 - fa["seat_v0"], "back": fa["seat_v1"] - pv1,
+    }
+    for side, gap in gaps.items():
+        if not (INSERT_CLEARANCE_BAND[0] - 1e-6 <= gap <= INSERT_CLEARANCE_BAND[1] + 1e-6):
+            problems.append(
+                f"{side} gap {gap:.2f} outside "
+                f"{INSERT_CLEARANCE_BAND[0]}..{INSERT_CLEARANCE_BAND[1]}")
+        elif abs(gap - clearance) > 0.3:
+            problems.append(
+                f"{side} gap {gap:.2f} != declared clearance {clearance:g}")
+    if abs(pz0 - fa["seat_floor_z"]) > 0.05:
+        problems.append(
+            f"cassette floor lands at z={pz0:.2f}, the seat floor is "
+            f"{fa['seat_floor_z']:g} — it floats or clips")
+    rim_above = pz1 - fa["body_h"]
+    if rim_above < lift_margin:
+        problems.append(
+            f"rim only {rim_above:.1f} above the rail top (needs >= "
+            f"{lift_margin:g}) — no tool-free grip")
+
+    # The window must ride INSIDE the channel and reach pulse water only.
+    wx = pose.apply((fb["window_cx"], 0.0, 0.0))[0]
+    half_w = fb["window_w"] / 2.0
+    ch_half = fa["channel_w"] / 2.0
+    if abs(wx - fa["channel_center_x"]) > 2.0:
+        problems.append(
+            f"window center {wx:.1f} vs channel {fa['channel_center_x']:g} — "
+            "not aligned")
+    if (wx - half_w < fa["channel_center_x"] - ch_half + 0.5
+            or wx + half_w > fa["channel_center_x"] + ch_half - 0.5):
+        problems.append(
+            f"window {fb['window_w']:g} wide does not fit inside the "
+            f"{fa['channel_w']:g} channel — its edges would sit in water "
+            "on the seat floor")
+    wz = pose.apply((0.0, 0.0, fb["window_floor_z"]))[2]
+    y_in, y_out = fa["channel_y_inlet"], fa["channel_y_outlet"]
+    t = (0.0 - y_in) / (y_out - y_in)
+    floor_here = (fa["channel_floor_z_inlet"]
+                  + t * (fa["channel_floor_z_outlet"] - fa["channel_floor_z_inlet"]))
+    drain_gap = wz - floor_here
+    reach = fa["channel_top_z"] - wz
+    if drain_gap < MIN_DRAIN_GAP:
+        problems.append(
+            f"window floor {drain_gap:.2f} above the channel floor — it dams "
+            f"the flow (needs >= {MIN_DRAIN_GAP:g}); the substrate would sit in water")
+    if not (WINDOW_REACH_BAND[0] - 1e-6 <= reach <= WINDOW_REACH_BAND[1] + 1e-6):
+        problems.append(
+            f"window reaches {reach:.2f} into the channel (band "
+            f"{WINDOW_REACH_BAND[0]}..{WINDOW_REACH_BAND[1]}) — shallower "
+            "never touches pulse water, deeper floods the substrate")
+    if problems:
+        return [_finding(check, False, "; ".join(problems))]
+    return [_finding(
+        check, True,
+        f"cassette seats with {clearance:g} clearance, rim {rim_above:.1f} "
+        f"proud for fingers, window reaches {reach:.2f} into the channel "
+        f"with {drain_gap:.1f} drain gap under it",
+        measured=reach, limit=WINDOW_REACH_BAND[1],
+    )]
+
+
+_register(JointDecl(
+    name="removable_insert",
+    description="drop-in cassette in the rail seat: clearance band, "
+                "tool-free rim, contact window inside the channel with "
+                "pulse-only reach and a guaranteed drain gap",
+    ir_check=_removable_insert_ir,
+    cad_checks=("assembly.no_interference",),
+))
+
+
+# -- tongue_groove (vertical farm: module-to-module line alignment) --------------
+
+TG_SIDE_BAND = (0.3, 0.5)
+TG_BOTTOM_MARGIN = 0.3
+
+_TG_KEYS = ("channel_center_x", "channel_top_z", "channel_y_inlet",
+            "module_pitch", "rail_x0", "rail_x1")
+
+
+def _tongue_groove_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """Line alignment, verified in the pose: B's groove swallows A's tongue
+    with the per-side clearance band and never bottoms (aligns, never
+    carries, never seals), the faces mate flush at the module length, both
+    channels stay parallel at the same height with inlets on the same
+    edge — a flipped module fails loudly."""
+    check = "assembly.tongue_groove_ir"
+    fa, fb = form_a.frame, form_b.frame
+    missing = [k for k in _TG_KEYS if k not in fa]
+    missing += [f"B:{k}" for k in _TG_KEYS if k not in fb]
+    if missing:
+        return [_finding(check, False,
+                         f"line-interface frame keys missing: {', '.join(missing)}")]
+    tongue = next((r for r in form_a.ribs if "tongue" in r.name), None)
+    groove = next((c for c in form_b.cutboxes if "groove" in c.name), None)
+    if tongue is None or groove is None:
+        return [_finding(
+            check, False,
+            f"{joint.a_ref} tongue: {tongue is not None}, "
+            f"{joint.b_ref} groove: {groove is not None}",
+        )]
+    g1 = pose.apply((groove.box.x0, groove.box.y0, groove.box.z0))
+    g2 = pose.apply((groove.box.x1, groove.box.y1, groove.box.z1))
+    gx0, gx1 = sorted((g1[0], g2[0]))
+    gy0, gy1 = sorted((g1[1], g2[1]))
+    gz0, gz1 = sorted((g1[2], g2[2]))
+    t = tongue.box
+
+    problems: list[str] = []
+    for label, gap in (
+        ("y-", t.y0 - gy0), ("y+", gy1 - t.y1),
+        ("z-", t.z0 - gz0), ("z+", gz1 - t.z1),
+    ):
+        if not (TG_SIDE_BAND[0] - 1e-6 <= gap <= TG_SIDE_BAND[1] + 1e-6):
+            problems.append(
+                f"{label} clearance {gap:.2f} outside {TG_SIDE_BAND[0]}..{TG_SIDE_BAND[1]}")
+    if t.x0 < gx0 - 1e-6:
+        problems.append("tongue starts before the groove mouth — faces do not mate")
+    bottom_margin = gx1 - t.x1
+    if bottom_margin < TG_BOTTOM_MARGIN:
+        problems.append(
+            f"tongue bottoms in the groove (margin {bottom_margin:.2f} < "
+            f"{TG_BOTTOM_MARGIN:g}) — the joint must align, never carry")
+
+    module_l = fa["rail_x1"] - fa["rail_x0"]
+    measured_pitch = pose.translate[0]
+    if abs(measured_pitch - module_l) > 0.2:
+        problems.append(
+            f"posed pitch {measured_pitch:.2f} != mating module length "
+            f"{module_l:g} — the faces do not sit flush")
+    p_center = pose.apply((fb["channel_center_x"], 0.0, fb["channel_top_z"]))
+    ch_off = abs(p_center[0] - fa["channel_center_x"] - measured_pitch)
+    if ch_off > 0.5:
+        problems.append(f"channel centerlines offset {ch_off:.2f} across the joint")
+    dz = abs(p_center[2] - fa["channel_top_z"])
+    if dz > 0.3:
+        problems.append(f"channel entry planes differ by {dz:.2f} across the joint")
+    p_inlet_y = pose.apply((0.0, fb["channel_y_inlet"], 0.0))[1]
+    inlet_off = abs(p_inlet_y - fa["channel_y_inlet"])
+    if inlet_off > 1.0:
+        problems.append(
+            f"inlet edges offset {inlet_off:.1f} — one module is flipped in the line")
+    if problems:
+        return [_finding(check, False, "; ".join(problems))]
+    return [_finding(
+        check, True,
+        f"modules mate flush at {measured_pitch:.1f} (nominal grid "
+        f"{fa['module_pitch']:g}), tongue floats {bottom_margin:.1f} short of "
+        f"the groove bottom, channels parallel within {ch_off:.2f}",
+        measured=measured_pitch, limit=fa["module_pitch"],
+    )]
+
+
+_register(JointDecl(
+    name="tongue_groove",
+    description="module line alignment: groove swallows tongue in the "
+                "clearance band without bottoming; channels stay parallel, "
+                "level, and same-facing across the joint",
+    ir_check=_tongue_groove_ir,
+    cad_checks=("assembly.no_interference",),
+))

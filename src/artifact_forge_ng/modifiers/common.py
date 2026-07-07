@@ -18,7 +18,8 @@ from ..product.archetype import RegionRole
 
 PROTECTED_ROLES = frozenset(
     {RegionRole.FASTENER_KEEPOUT, RegionRole.HIGH_STRESS_REGION,
-     RegionRole.INTERFACE_KEEPOUT, RegionRole.BODY_CONTACT_SURFACE}
+     RegionRole.INTERFACE_KEEPOUT, RegionRole.BODY_CONTACT_SURFACE,
+     RegionRole.TRANSIENT_WATER_PATH, RegionRole.SUBSTRATE_SUPPORT_MESH}
 )
 
 

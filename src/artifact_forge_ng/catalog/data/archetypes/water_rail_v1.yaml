@@ -1,0 +1,223 @@
+schema: archetype/v1
+id: water_rail_v1
+version: 1
+object_class: water_rail
+maturity: sandbox_buildable
+description: >
+  Vertical Farm Pack v1: the Base Water Rail — a level 248x248 module on a
+  250 nominal grid that transports and constrains a transient water pulse,
+  never stores it. A recessed drop-in seat carries any cassette honoring
+  the Cassette Interface Standard; the open U-channel is cut from the SEAT
+  FLOOR and falls 1.25 deg toward the front face (the body stays
+  horizontal, the water falls), exits over a sharp overflow lip with an
+  air-gap undercut so droplets detach instead of wicking down the wall.
+  Corridor notches through both seat walls keep the whole run open to a
+  brush. Tongue/groove edges align neighbouring modules on the grid pitch;
+  bottom slots drop the module onto 2020/3030 aluminum rails, far from the
+  water. Flow axis Y: inlet back (+Y), outlet front (-Y); prints flat,
+  channel up, no supports in the wet path. Optional magnet pockets go in
+  dry_zone_back only. Pack roadmap (NOT in v1): inlet_adapter_v1,
+  outlet_collector_adapter_v1, dry_endcap_v1, shelf_row composites.
+
+provides_features:
+  - sloped_water_channel
+  - overflow_drip_edge
+  - open_drip_receiver
+  - cassette_seat
+  - module_alignment_edges
+  - aluminum_profile_seat
+
+parameters:
+  module_l:
+    {type: length, default: 248mm, min: 200mm, max: 250mm,
+     role: functional, exposed: true,
+     description: outer module size along the line axis X (grid nominal 250)}
+  module_w:
+    {type: length, default: 248mm, min: 200mm, max: 250mm,
+     role: functional, exposed: true,
+     description: outer module size along the flow axis Y}
+  body_h:
+    {type: length, default: 30mm, min: 24mm, max: 60mm, role: structural,
+     description: rail body height; the seat and channel nest inside it}
+  channel_w:
+    {type: length, default: 16mm, min: 12mm, max: 20mm,
+     role: functional, exposed: true,
+     description: water channel width — wide enough for a brush}
+  channel_d:
+    {type: length, default: 5mm, min: 4mm, max: 8mm, role: functional,
+     description: channel depth at the INLET; the slope deepens it toward the outlet}
+  slope_deg:
+    {type: number, default: 1.25, min: 1.0, max: 1.5,
+     role: functional, exposed: true,
+     description: channel floor slope — the whole transient water contract}
+  channel_bottom_r:
+    {type: length, default: 1.2mm, min: 0.8mm, max: 2mm, role: manufacturing,
+     description: "rounded channel floor corners — cleanable, no crud line"}
+  cassette_l:
+    {type: length, default: 220mm, min: 180mm, max: 236mm, role: assembly,
+     description: shared cassette envelope X — the Cassette Interface Standard}
+  cassette_w:
+    {type: length, default: 220mm, min: 180mm, max: 236mm, role: assembly,
+     description: shared cassette envelope Y}
+  seat_depth:
+    {type: length, default: 14mm, min: 10mm, max: 20mm, role: structural,
+     description: how deep the cassette sits in the rail}
+  seat_clearance:
+    {type: length, default: 0.75mm, min: 0.5mm, max: 1mm, role: assembly,
+     description: per-side drop-in clearance around the cassette}
+  module_pitch:
+    {type: length, default: 250mm, min: 200mm, max: 300mm, role: assembly,
+     description: nominal grid pitch between module origins in a line}
+  corner_r:
+    {type: length, default: 4mm, min: 2mm, max: 8mm, role: aesthetic}
+  lip_h:
+    {type: length, default: 2mm, min: 1mm, max: 3mm, role: functional,
+     description: overflow lip tongue thickness left over the relief}
+  air_gap:
+    {type: length, default: 1.5mm, min: 1.2mm, max: 3mm,
+     role: functional, exposed: true,
+     description: horizontal free air behind the drip edge}
+  lip_r:
+    {type: length, default: 0.4mm, min: 0.2mm, max: 0.5mm, role: manufacturing,
+     description: assumed printed edge radius — the lip is never blended}
+  profile:
+    {type: choice, choices: ["2020", "3030"], default: "2020",
+     role: assembly, exposed: true,
+     description: aluminum profile the module drops onto}
+  profile_clearance:
+    {type: length, default: 0.2mm, min: 0.1mm, max: 0.5mm, role: manufacturing}
+  profile_depth:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: structural}
+  profile_inset:
+    {type: length, default: 24mm, min: 16mm, max: 60mm, role: assembly,
+     description: profile slot centerline distance from the +-X edges}
+  tongue_w:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: assembly}
+  tongue_h:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: assembly}
+  tongue_len:
+    {type: length, default: 3.6mm, min: 2mm, max: 6mm, role: assembly,
+     description: tongue protrusion past the +X face}
+  edge_clearance:
+    {type: length, default: 0.4mm, min: 0.3mm, max: 0.5mm, role: assembly,
+     description: "per-side tongue/groove clearance — aligns, never binds"}
+  tongue_z0:
+    {type: length, default: 4mm, min: 2mm, max: 12mm, role: assembly}
+  tongue_bottom_margin:
+    {type: length, default: 0.4mm, min: 0.3mm, max: 1mm, role: assembly,
+     description: extra groove depth so the tongue never bottoms}
+
+constraints:
+  - body_h - seat_depth - (channel_d + module_w * tan(rad(slope_deg))) >= 2
+  - cassette_l + 2 * seat_clearance + 16 <= module_l
+  - cassette_w + 2 * seat_clearance + 16 <= module_w
+  - profile_depth <= body_h - seat_depth - 2
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: water_rail_body
+      id: body
+      params:
+        module_l: module_l
+        module_w: module_w
+        body_h: body_h
+        channel_w: channel_w
+        channel_d: channel_d
+        slope_deg: slope_deg
+        channel_bottom_r: channel_bottom_r
+        cassette_l: cassette_l
+        cassette_w: cassette_w
+        seat_depth: seat_depth
+        seat_clearance: seat_clearance
+        module_pitch: module_pitch
+        corner_r: corner_r
+    - op: overflow_lip
+      id: lip
+      params:
+        lip_h: lip_h
+        air_gap: air_gap
+        lip_r: lip_r
+    - op: profile_seat_slot
+      id: profile
+      params:
+        profile: profile
+        clearance: profile_clearance
+        depth: profile_depth
+        inset: profile_inset
+    - op: tongue_groove_edges
+      id: edges
+      params:
+        tongue_w: tongue_w
+        tongue_h: tongue_h
+        tongue_len: tongue_len
+        clearance: edge_clearance
+        z0: tongue_z0
+        bottom_margin: tongue_bottom_margin
+
+regions:
+  - {id: water_channel, role: transient_water_path, editable: false,
+     label: "Water channel",
+     description: the sloped transient path — nothing may cut into it}
+  - {id: overflow_lip, role: transient_water_path, editable: false,
+     label: "Overflow drip edge",
+     description: "stays sharp — never blended, never perforated"}
+  - {id: drip_receiver, role: transient_water_path, editable: false,
+     label: "Open drip receiver",
+     description: "the air-gap void under the lip — open, inspectable"}
+  - {id: cassette_seat_walls, role: interface_keepout, editable: false,
+     label: "Cassette seat walls"}
+  - {id: tongue_edge, role: interface_keepout, editable: false,
+     label: "Line tongue (+X)"}
+  - {id: groove_edge, role: interface_keepout, editable: false,
+     label: "Line groove (-X)"}
+  - {id: profile_seat_e, role: interface_keepout, editable: false,
+     label: "Profile slot (east)"}
+  - {id: profile_seat_w, role: interface_keepout, editable: false,
+     label: "Profile slot (west)"}
+  - {id: dry_zone_back, role: mounting_surface, editable: true,
+     label: "Dry back zone",
+     description: the only place optional magnet pockets may go}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.water_channel_slope_ok
+  - form.water_channel_dims_ok
+  - form.no_standing_water_ir
+  - form.no_secondary_water_channel
+  - form.overflow_lip_geometry_ok
+  - form.cassette_seat_fit_ok
+  - form.tongue_groove_profile_ok
+  - form.profile_seat_dry_ok
+  - topology.water_channel_open
+  - topology.water_channel_floor_solid
+  - topology.overflow_relief_open
+  - topology.single_connected_solid
+  - topology.cutout_present
+  - topology.ribs_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_magnet_pockets
+
+contract:
+  must_have:
+    - sloped_water_channel
+    - overflow_drip_edge
+    - open_drip_receiver
+    - cassette_seat
+  must_not_have:
+    - closed_water_reservoir
+    - dead_water_pocket
+    - secondary_water_channel
+    - hidden_wet_cavity
+  invariants:
+    - slope_deg >= 1.0 and slope_deg <= 1.5
+    - air_gap >= 1.2
+    - seat_clearance >= 0.5 and seat_clearance <= 1.0
+    - edge_clearance >= 0.3 and edge_clearance <= 0.5

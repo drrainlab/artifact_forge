@@ -490,8 +490,10 @@ from . import (  # noqa: E402,F401
     checks_slots,
     checks_snap,
     checks_stability,
+    checks_substrate_cassette,
     checks_tunnel,
     checks_wallmount,
+    checks_water,
     checks_wearable,
 )
 

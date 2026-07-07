@@ -1,0 +1,116 @@
+schema: archetype/v1
+id: substrate_retainer_frame_v1
+version: 1
+object_class: substrate_retainer_frame
+maturity: sandbox_buildable
+description: >
+  Vertical Farm Pack v1: the Snap Retainer Frame — a flat ring plate that
+  clicks onto the coco cassette and holds the mat down LIGHTLY (retention,
+  not compression: coco breathes, roots pass the opening). Four cantilever
+  hooks (two per +-X side) flip down into the cassette's snap windows; the
+  insertion strain and lip engagement are verified by the snap joint in
+  the assembled pose, not hoped for. Everything is open geometry — no
+  pocket a brush cannot reach, nothing that traps water. Removes by hand:
+  flex two hooks, lift.
+
+provides_features:
+  - cleanable_snap_interface
+
+parameters:
+  cassette_l:
+    {type: length, default: 220mm, min: 180mm, max: 236mm,
+     role: assembly, exposed: true,
+     description: cassette envelope the frame rides — shared with the cassette}
+  cassette_wall:
+    {type: length, default: 2.4mm, min: 2mm, max: 3.2mm, role: assembly,
+     description: cassette wall thickness — positions the hooks inside it}
+  frame_t:
+    {type: length, default: 3mm, min: 2.4mm, max: 4mm, role: structural}
+  band_w:
+    {type: length, default: 10mm, min: 8mm, max: 16mm,
+     role: functional, exposed: true,
+     description: ring band width pressing the substrate rim}
+  corner_r:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: aesthetic}
+  beam_t:
+    {type: length, default: 1.6mm, min: 1.2mm, max: 2.2mm, role: structural,
+     description: hook beam thickness — thinner flexes easier}
+  hook_w:
+    {type: length, default: 8mm, min: 6mm, max: 12mm, role: structural}
+  hook_len:
+    {type: length, default: 9mm, min: 7mm, max: 14mm, role: structural,
+     description: cantilever length — longer means lower insertion strain}
+  lip_d:
+    {type: length, default: 1.4mm, min: 1mm, max: 2mm, role: assembly,
+     description: lip undercut depth into the snap window}
+  lip_h:
+    {type: length, default: 3mm, min: 2mm, max: 4mm, role: assembly}
+  sy:
+    {type: length, default: 120mm, min: 60mm, max: 200mm, role: assembly,
+     description: Y spacing between the two hooks on each side}
+
+derived:
+  frame_l: cassette_l - 1
+  hook_span: cassette_l - 2 * cassette_wall - 0.6
+
+constraints:
+  - 1.5 * lip_d * beam_t / (hook_len * hook_len) <= 0.05
+  - 2 * band_w + 20 <= frame_l
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: retainer_frame_body
+      id: frame
+      params:
+        l: frame_l
+        w: frame_l
+        t: frame_t
+        band_w: band_w
+        corner_r: corner_r
+    - op: frame_snap_hooks
+      id: snap
+      params:
+        beam_t: beam_t
+        hook_w: hook_w
+        hook_len: hook_len
+        lip_d: lip_d
+        lip_h: lip_h
+        hook_span: hook_span
+        sy: sy
+
+regions:
+  - {id: frame_band, role: mounting_surface, editable: false,
+     label: "Retainer band"}
+  - {id: snap_root_0, role: high_stress_region, editable: false,
+     label: "Snap root 0",
+     description: "the flexure root — solid, never perforated"}
+  - {id: snap_root_1, role: high_stress_region, editable: false,
+     label: "Snap root 1"}
+  - {id: snap_root_2, role: high_stress_region, editable: false,
+     label: "Snap root 2"}
+  - {id: snap_root_3, role: high_stress_region, editable: false,
+     label: "Snap root 3"}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.snap_pockets_cleanable
+  - topology.cutout_present
+  - topology.single_connected_solid
+  - topology.ribs_present
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - cleanable_snap_interface
+  must_not_have:
+    - uncleanable_snap_cavity
+  invariants:
+    - 1.5 * lip_d * beam_t / (hook_len * hook_len) <= 0.05

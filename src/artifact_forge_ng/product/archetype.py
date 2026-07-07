@@ -57,6 +57,16 @@ class RegionRole(StrEnum):
     #: NOT soft_contact_surface, which is deliberately cuttable-into
     #: (cord slots exit through the clamp saddle).
     BODY_CONTACT_SURFACE = "body_contact_surface"
+    # -- vertical farm pack (docs/VERTICAL_FARM_PACK.md) --------------------
+    #: The transient water path: channel, overflow lip, drip receiver,
+    #: contact window. Modifier-protected (never cut the wet path); the
+    #: base op's OWN channel/relief cuts live inside these regions, so the
+    #: role stays out of the checks_cuts protected set (bearing_seat
+    #: precedent).
+    TRANSIENT_WATER_PATH = "transient_water_path"
+    #: The cassette's orthogonal mesh-floor canvas — fully specified by its
+    #: op; no modifier may re-pattern it.
+    SUBSTRATE_SUPPORT_MESH = "substrate_support_mesh"
 
 
 class ParamSpec(BaseModel):

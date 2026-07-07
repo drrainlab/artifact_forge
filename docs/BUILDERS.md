@@ -63,6 +63,9 @@ Recipe-op без реализации в движке = честный engine-ga
 | `loft_between_sections` | 🔶 | rect→rect есть (LoftFeature/tapered_beam); rect→circle при первом клиенте |
 | `tapered_beam` | ✅ | LoftFeature (конус по построению) + topology.arm_reaches_tip (shelf_bracket_v1) |
 | `truss_beam` | ✅ | truss_web_cutouts op: warren-треугольники, лигамент = strut by construction (truss_beam_180) |
+| `water_rail_body` | ✅ | vertical farm (docs/VERTICAL_FARM_PACK.md): корпус + seat + наклонный ChannelCutFeature + коридоры (water_rail_v1) |
+| `substrate_tray_body` | ✅ | vertical farm: shell кассеты + frame-ключи Cassette Interface Standard (coco_cassette_v1) |
+| `retainer_frame_body` | ✅ | vertical farm: кольцевая рамка-прижим (substrate_retainer_frame_v1) |
 
 ### feature — крепёж, карманы, вырезы
 
@@ -79,6 +82,13 @@ Recipe-op без реализации в движке = честный engine-ga
 | `boss_pattern` | ✅ | recipe-op: 4 бобышки + глухие pilot-боры, keepout в слое пола |
 | `standoff_pattern` | ✅ | recipe-op: PCB-стойки на плите + глухие pilot'ы |
 | `lid_seat` | ✅ | inset_plug op + lid_seat joint: размерная цепочка + pose-проба (esp32_box_with_lid) |
+| `overflow_lip` | ✅ | vertical farm: relief-подрез = air gap под кромкой перелива + drip receiver |
+| `profile_seat_slot` | ✅ | vertical farm: пазы под 2020/3030, сухая зона верифицирована |
+| `tongue_groove_edges` | ✅ | vertical farm: tongue/groove кромки линии модулей |
+| `contact_window` | ✅ | vertical farm: слэб контактного окна под дном кассеты (topology.contact_window_present: есть И прошит сеткой) |
+| `mesh_floor` | ✅ | vertical farm: плоская ортогональная сквозная сетка (slots-FieldFeature) |
+| `lift_tabs` | ✅ | vertical farm: пальцевые пазы tool-free съёма |
+| `frame_snap_hooks` | ✅ | vertical farm: 4 крюка рамки (2 на сторону, snap_joint-совместимые) |
 
 ### field — модификаторы (уже region-bound, композиция через keepouts)
 
@@ -113,6 +123,8 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 | `press_fit_pin_pair` | ✅ R2: PinFeature + interference-контракт (пин ТОЛЩЕ гнезда, overlap измерен и ограничен) |
 | `split_plane_with_alignment` | ✅ суть: butt_pin_joint (секции идентичны + торцевые пины; PinFeature.axis) — raceway_400_split. Авто-генератор из ОДНОГО инстанса = edit-intent следующей итерации |
 | `snap_joint` | ✅ compliant: undercut + insertion strain 1.5·δ·t/L² ≤ 5% (esp32_box_snap_lid) |
+| `removable_insert` | ✅ vertical farm: drop-in кассета в seat (clearance band, tool-free rim, окно ВНУТРИ желоба, reach 1–2мм, drain gap ≥ 1мм) |
+| `tongue_groove` | ✅ vertical farm: линия модулей — groove глотает tongue в полосе 0.3–0.5, не доставая дна; каналы параллельны и на одной высоте |
 | dovetail | ⬜ скользящая посадка — своя механика |
 
 ### interface / joint / механика
@@ -122,7 +134,8 @@ controlled passes, preserve by construction). Не смешивать с recipe.
 | `gusset_pair` | ✅ shelf_bracket_v1 (web-косынки как рёбра) |
 | `snap_hook` / `snap_receiver` | ✅ | ops snap_hook_pair / snap_window_pair + snap_joint (strain-физика поймала первый дизайн: 9мм балка ломалась) |
 | `press_fit_pin_pair` | ✅ (см. assembly joints) |
-| `dovetail_joint` / `tongue_groove_joint` | ⬜ R4 |
+| `dovetail_joint` | ⬜ R4 |
+| `tongue_groove_joint` | ✅ vertical farm: tongue_groove_edges op + tongue_groove joint (выравнивание линии, non-bearing/non-sealing, соосность желобов в позе) |
 | `split_plane_with_alignment` | ✅ (см. assembly joints: butt_pin_joint) |
 | `pin_hinge` | ⬜ R4 |
 | `rail_slider` | ⬜ R5 |

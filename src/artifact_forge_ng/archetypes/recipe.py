@@ -84,6 +84,7 @@ def build_form(
         print_orientation=state.print_orientation,
         holes=state.holes,
         cutboxes=state.cutboxes,
+        channels=state.channels,
         bores=state.bores,
         ribs=state.ribs,
         plates=state.plates,

@@ -1,0 +1,85 @@
+# Vertical Farm Pack v1 golden artifact: one modular grow cell on the 250
+# nominal grid — Base Water Rail (transient sloped channel, overflow drip
+# edge, 2020 profile slots) + removable Coco Cassette (orthogonal mesh
+# floor, pulse contact window) + Snap Retainer Frame. The rail transports
+# and constrains water; the cassette decides substrate contact; the module
+# never stores water.
+#
+# Honest scope: no inlet adapter, no collector, no magnets (MVP-1). The
+# tongue/groove edges exist on the rail but the line interface is proven
+# by two_cell_line_petg.yaml.
+schema: assembly/v1
+id: water_rail_cell_2020_petg
+strict: true
+root: rail
+
+# The Cassette Interface Standard, stated ONCE: envelope + clearance
+# desync between rail and cassette is unrepresentable. (`wall` lands in
+# the cassette, `cassette_wall` in the frame — same steel, two views.)
+shared:
+  cassette_l: 220mm
+  cassette_w: 220mm
+  cassette_h: 26mm
+  seat_clearance: 0.75mm
+  wall: 2.4mm
+  cassette_wall: 2.4mm
+  module_pitch: 250mm
+
+parts:
+  - ref: rail
+    product:
+      schema: product/v1
+      id: water_rail_2020
+      archetype: water_rail_v1@1
+      params:
+        profile: "2020"
+        slope_deg: 1.25
+        channel_w: 16mm
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: cassette
+    product:
+      schema: product/v1
+      id: coco_cassette
+      archetype: coco_cassette_v1@1
+      params:
+        mesh_cell: 6mm
+        window_drop: 1.5mm
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: frame
+    product:
+      schema: product/v1
+      id: retainer_frame
+      archetype: substrate_retainer_frame_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+
+joints:
+  # The cassette drops straight down into the seat — the seat datum bakes
+  # the floor plane in; the joint verifies clearance band, tool-free rim,
+  # and the pulse-only contact window over the channel.
+  - type: removable_insert
+    a: rail.cassette_seat
+    b: cassette.seat
+    rotate: [0, 0, 0]
+    params: {lift_margin: 3mm}
+  # The frame flips onto the cassette rim (lid precedent): hooks descend
+  # inside the walls, lips click into the snap windows.
+  - type: snap_joint
+    a: cassette.rim
+    b: frame.seat
+    rotate: [180, 0, 0]
+    params: {hooks: snap}
+
+contract:
+  must_have:
+    - vertical_farm_cassette_interface
+    - snapped_retainer

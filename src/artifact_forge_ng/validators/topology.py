@@ -809,3 +809,104 @@ def payload_void_open(geometry: Geometry, form: PartForm) -> Finding:
         measured=max(frac_cyl, frac_win),
         limit=0.25,
     )
+
+
+# -- vertical farm water probes (docs/VERTICAL_FARM_PACK.md) ------------------
+
+
+@register_probe("topology.water_channel_open")
+def water_channel_open(geometry: Geometry, form: PartForm) -> Finding:
+    """The transient water path, verified on the solid: a probe swept just
+    above the sloped floor along the sampled centerline must be void."""
+    if not form.channels:
+        return _finding("topology.water_channel_open", False,
+                        "no water channel on this form")
+    ch = form.channels[0]
+    d = min(ch.width * 0.4, 6.0)
+    # lift the swept cylinder so its underside clears the sloped floor
+    probe = channel_probe(ch.centerline(lift=d / 2.0 + 0.8), d=d)
+    frac = solid_fraction(geometry.workplane, probe)
+    return _finding(
+        "topology.water_channel_open",
+        frac < 0.05,
+        f"water path solid fraction {frac:.3f} along the sampled centerline",
+        measured=frac,
+        limit=0.05,
+    )
+
+
+@register_probe("topology.water_channel_floor_solid")
+def water_channel_floor_solid(geometry: Geometry, form: PartForm) -> Finding:
+    """The same centerline mirrored below the floor must be solid — the
+    channel never leaks into the body or a hidden cavity."""
+    if not form.channels:
+        return _finding("topology.water_channel_floor_solid", False,
+                        "no water channel on this form")
+    ch = form.channels[0]
+    probe = channel_probe(ch.centerline(lift=-1.2), d=2.0)
+    frac = solid_fraction(geometry.workplane, probe)
+    return _finding(
+        "topology.water_channel_floor_solid",
+        frac > 0.95,
+        f"floor solid fraction {frac:.3f} just below the channel",
+        measured=frac,
+        limit=0.95,
+    )
+
+
+@register_probe("topology.overflow_relief_open")
+def overflow_relief_open(geometry: Geometry, form: PartForm) -> Finding:
+    """The air-gap relief under the overflow lip removed real material —
+    probed inside the relief cut that overlaps the drip receiver region."""
+    receiver = form.region("drip_receiver")
+    if receiver is None:
+        return _finding("topology.overflow_relief_open", False,
+                        "no drip_receiver region on this form")
+    rb = receiver.box
+
+    def _overlaps(b) -> bool:
+        return (b.x0 <= rb.x1 and rb.x0 <= b.x1 and b.y0 <= rb.y1
+                and rb.y0 <= b.y1 and b.z0 <= rb.z1 and rb.z0 <= b.z1)
+
+    relief = next((c for c in form.cutboxes if _overlaps(c.box)), None)
+    if relief is None:
+        return _finding("topology.overflow_relief_open", False,
+                        "no relief cut overlaps the drip receiver")
+    b = relief.box
+    probe = box_probe(b.x0 + 0.3, b.y0 + 0.3, max(b.z0, 0.0) + 0.3,
+                      b.x1 - 0.3, b.y1 - 0.3, b.z1 - 0.3)
+    frac = solid_fraction(geometry.workplane, probe)
+    return _finding(
+        "topology.overflow_relief_open",
+        frac < 0.05,
+        f"relief volume solid fraction {frac:.3f} — droplets have their air gap",
+        measured=frac,
+        limit=0.05,
+    )
+
+
+@register_probe("topology.contact_window_present")
+def contact_window_present(geometry: Geometry, form: PartForm) -> Finding:
+    """The cassette's lowered contact slab is deliberately MESHED: the
+    probe must find real material in its box (the slab exists) but far
+    from solid (the mesh pierces it — water passes, coco is held). A solid
+    slab is a dam; a missing slab never touches pulse water."""
+    slabs = [r for r in form.ribs if "window" in r.name]
+    if not slabs:
+        return _finding("topology.contact_window_present", False,
+                        "no contact window slab declared on this form")
+    b = slabs[0].box
+    mx, my = (b.x1 - b.x0) * 0.15, (b.y1 - b.y0) * 0.15
+    probe = box_probe(b.x0 + mx, b.y0 + my, b.z0 + 0.2,
+                      b.x1 - mx, b.y1 - my, min(b.z1, 0.0) - 0.05)
+    frac = solid_fraction(geometry.workplane, probe)
+    ok = 0.15 <= frac <= 0.92
+    return _finding(
+        "topology.contact_window_present",
+        ok,
+        f"contact slab solid fraction {frac:.2f} — "
+        + ("meshed material, as designed" if ok
+           else "missing" if frac < 0.15 else "SOLID (a dam, not a window)"),
+        measured=frac,
+        limit=0.92,
+    )

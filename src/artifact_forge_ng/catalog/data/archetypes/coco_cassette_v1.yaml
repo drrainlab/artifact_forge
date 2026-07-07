@@ -1,0 +1,184 @@
+schema: archetype/v1
+id: coco_cassette_v1
+version: 1
+object_class: substrate_cassette
+maturity: sandbox_buildable
+description: >
+  Vertical Farm Pack v1: the Coco Cassette — the first implementation of
+  the Cassette Interface Standard. A removable tray that drops into the
+  water rail seat from above and lifts out by hand: flat ORTHOGONAL mesh
+  floor (holds coco, aerates roots, directs no flow), one localized
+  contact window reaching 1-2 mm into the channel's upper zone so the
+  substrate touches PULSE water only and drained water never, snap windows
+  through the walls for the retainer frame (pierced = brushable), finger
+  notches in the rim. The cassette is the agrotech adapter, the rail is
+  the water infrastructure: future sprout_mesh / rockwool_cube / netpot
+  cassettes publish the same cassette_*/window_* frame keys and mate with
+  the same rail untouched. Never a second water tray: the floor pierces
+  through everywhere, nothing under the coco can pool.
+
+provides_features:
+  - substrate_mesh_floor
+  - pulse_contact_window
+  - tool_free_removal
+  - cleanable_snap_interface
+
+parameters:
+  cassette_l:
+    {type: length, default: 220mm, min: 180mm, max: 236mm,
+     role: assembly, exposed: true,
+     description: outer envelope X — shared with the rail seat}
+  cassette_w:
+    {type: length, default: 220mm, min: 180mm, max: 236mm,
+     role: assembly, exposed: true,
+     description: outer envelope Y — shared with the rail seat}
+  cassette_h:
+    {type: length, default: 26mm, min: 18mm, max: 40mm,
+     role: functional, exposed: true,
+     description: tray height — the substrate depth budget}
+  wall:
+    {type: length, default: 2.4mm, min: 2mm, max: 3.2mm, role: structural}
+  floor_t:
+    {type: length, default: 2mm, min: 1.6mm, max: 3mm, role: structural}
+  corner_r:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: aesthetic}
+  mesh_cell:
+    {type: length, default: 6mm, min: 4mm, max: 8mm,
+     role: functional, exposed: true,
+     description: "square mesh opening — holds coco, passes water and air"}
+  mesh_rib:
+    {type: length, default: 1.3mm, min: 1.2mm, max: 1.5mm, role: manufacturing,
+     description: web between mesh cells}
+  mesh_margin:
+    {type: length, default: 6mm, min: 4mm, max: 12mm, role: structural,
+     description: solid rim inside the walls before the mesh starts}
+  window_w:
+    {type: length, default: 12mm, min: 8mm, max: 40mm,
+     role: functional, exposed: true,
+     description: "contact window width — must drop INSIDE the rail channel
+       (verified in the assembled pose); contact area scales with window_l"}
+  window_l:
+    {type: length, default: 60mm, min: 40mm, max: 120mm, role: functional,
+     description: contact window length along the flow axis}
+  window_drop:
+    {type: length, default: 1.5mm, min: 1mm, max: 2mm,
+     role: functional, exposed: true,
+     description: how deep the window reaches into the channel's upper zone}
+  snap_w:
+    {type: length, default: 10mm, min: 8mm, max: 14mm, role: assembly}
+  snap_h:
+    {type: length, default: 4mm, min: 3.5mm, max: 6mm, role: assembly}
+  snap_top_offset:
+    {type: length, default: 5.5mm, min: 4mm, max: 12mm, role: assembly,
+     description: window top below the rim — positions the frame hook lips}
+  snap_offset:
+    {type: length, default: 60mm, min: 30mm, max: 100mm, role: assembly,
+     description: Y offset of each snap window pair from the center}
+  notch_w:
+    {type: length, default: 18mm, min: 16mm, max: 30mm, role: functional}
+  notch_d:
+    {type: length, default: 8mm, min: 6mm, max: 14mm, role: functional}
+
+constraints:
+  - 2 * wall + 2 * mesh_margin + mesh_cell <= min(cassette_l, cassette_w)
+  - floor_t + 2 <= cassette_h
+  - window_w + 4 + 2 * wall + 4 <= cassette_l
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: substrate_tray_body
+      id: tray
+      params:
+        cassette_l: cassette_l
+        cassette_w: cassette_w
+        h: cassette_h
+        wall: wall
+        floor_t: floor_t
+        corner_r: corner_r
+    - op: contact_window
+      id: window
+      params:
+        window_w: window_w
+        window_l: window_l
+        drop: window_drop
+        cx: 0mm
+        cy: 0mm
+    - op: mesh_floor
+      id: mesh
+      params:
+        cell: mesh_cell
+        rib: mesh_rib
+        margin: mesh_margin
+    - op: snap_window_pair
+      id: snap_window_a
+      params:
+        w: snap_w
+        h: snap_h
+        top_offset: snap_top_offset
+        offset: "expr(0 - snap_offset)"
+    - op: snap_window_pair
+      id: snap_window_b
+      params:
+        w: snap_w
+        h: snap_h
+        top_offset: snap_top_offset
+        offset: snap_offset
+    - op: lift_tabs
+      id: lift
+      params:
+        notch_w: notch_w
+        notch_d: notch_d
+
+regions:
+  - {id: contact_window, role: transient_water_path, editable: false,
+     label: "Pulse contact window",
+     description: the only place substrate meets water — pulse reach only}
+  - {id: mesh_canvas, role: substrate_support_mesh, editable: false,
+     label: "Mesh floor",
+     description: fully specified by the op — no modifier may re-pattern it}
+  - {id: floor, role: aesthetic_lightening, editable: false,
+     label: "Tray floor"}
+  - {id: tray, role: mounting_surface, editable: false,
+     label: "Tray body"}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.shell_walls_ok
+  - form.mesh_floor_orthogonal_ok
+  - form.cassette_no_reservoir
+  - form.min_ligament_ok
+  - form.no_secondary_water_channel
+  - form.no_standing_water_ir
+  - form.contact_window_geometry_ok
+  - form.snap_pockets_cleanable
+  - form.lift_access_ok
+  - form.cuts_respect_keepouts
+  - topology.cutout_present
+  - topology.single_connected_solid
+  - topology.contact_window_present
+  - topology.hex_field_present
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - substrate_mesh_floor
+    - pulse_contact_window
+    - tool_free_removal
+    - cleanable_snap_interface
+  must_not_have:
+    - permanent_substrate_flooding
+    - secondary_water_channel
+    - closed_water_reservoir
+    - uncleanable_snap_cavity
+  invariants:
+    - mesh_cell >= 4 and mesh_cell <= 8
+    - mesh_rib >= 1.2
+    - window_drop >= 1.0 and window_drop <= 2.0

@@ -103,6 +103,21 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.payload_mount_not_on_skin_side", Level.FORM, "the payload clip sits outside the arm ring and opens away from the body"),
         _decl("form.payload_retention_ok", Level.FORM, "payload cavity coverage and mouth gap give real snap retention"),
         _decl("form.strap_access_ok", Level.FORM, "each strap tab carries a through slot pair clear of the arm circle with a solid strap bar"),
+        # -- vertical farm water checks (impls in form/checks_water.py) -------
+        _decl("form.water_channel_slope_ok", Level.FORM, "channel floor falls monotonically toward the outlet at 1.0-1.5 degrees"),
+        _decl("form.water_channel_dims_ok", Level.FORM, "channel width/depth/bottom radius in band and the run spans both body faces"),
+        _decl("form.no_standing_water_ir", Level.FORM, "no blind pocket or above-bottom floor can hold water in the wet path"),
+        _decl("form.overflow_lip_geometry_ok", Level.FORM, "overflow lip stays sharp (no blend zone) with the declared air gap relief below"),
+        _decl("form.no_secondary_water_channel", Level.FORM, "exactly one water path; the drip receiver and cassette floor form no second trough"),
+        _decl("form.cassette_seat_fit_ok", Level.FORM, "seat pocket matches the shared cassette envelope minus clearance, floor above the channel"),
+        _decl("form.tongue_groove_profile_ok", Level.FORM, "groove = tongue + 2x clearance in the 0.3-0.5 band and the tongue never bottoms"),
+        _decl("form.profile_seat_dry_ok", Level.FORM, "aluminum profile pocket sits fully outside every wet region"),
+        # -- vertical farm cassette checks (impls in form/checks_substrate_cassette.py)
+        _decl("form.mesh_floor_orthogonal_ok", Level.FORM, "floor mesh is one planar orthogonal slot grid, cell 4-8mm, ribs >= 1.2mm"),
+        _decl("form.cassette_no_reservoir", Level.FORM, "the meshed floor covers the tray and nothing below it can hold water"),
+        _decl("form.contact_window_geometry_ok", Level.FORM, "contact window drop 1-2mm, centered over the channel, meshed underside"),
+        _decl("form.snap_pockets_cleanable", Level.FORM, "every snap window pierces the full wall — no blind wet pocket"),
+        _decl("form.lift_access_ok", Level.FORM, "rim carries two finger notches wide enough for tool-free removal"),
         # -- topology level: probed on the compiled solid ---------------------
         _decl("topology.single_connected_solid", Level.TOPOLOGY, "exactly one connected valid solid"),
         _decl("topology.cavity_open", Level.TOPOLOGY, "the cable cavity is a real void along the cable axis"),
@@ -132,6 +147,11 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.payload_void_open", Level.TOPOLOGY, "the payload cylinder and its upward mouth window are real voids on the solid"),
         _decl("topology.exoskeleton_ribs_materialized", Level.TOPOLOGY, "every rib graph edge is solid material on the compiled part (Bio-3)"),
         _decl("topology.organic_windows_open", Level.TOPOLOGY, "every organic window removed material through the panel (Bio-3)"),
+        # -- vertical farm topology probes --------------------------------------
+        _decl("topology.water_channel_open", Level.TOPOLOGY, "the water path is void along the sampled centerline just above the floor"),
+        _decl("topology.water_channel_floor_solid", Level.TOPOLOGY, "material is solid just below the channel floor — no leaks into the body"),
+        _decl("topology.overflow_relief_open", Level.TOPOLOGY, "the air-gap relief under the overflow lip is a real void"),
+        _decl("topology.contact_window_present", Level.TOPOLOGY, "the lowered contact slab exists under the floor AND the mesh pierces it — material in the band, never solid, never gone"),
         # -- assembly level: cross-part checks in the assembled pose ----------
         _decl("assembly.screw_joint_ir", Level.ASSEMBLY, "bolt patterns coincide with compatible diameters in the pose"),
         _decl("assembly.joint_pose", Level.ASSEMBLY, "every part is posed by a joint against existing datums"),
@@ -146,6 +166,9 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.snap_joint_ir", Level.ASSEMBLY, "snap hooks reach their windows with printable flexure strain"),
         _decl("assembly.hooks_engage", Level.ASSEMBLY, "every snap hook lip occupies its window in the pose"),
         _decl("assembly.clamp_gap_ir", Level.ASSEMBLY, "posed clamp halves keep the declared compression gap with coincident saddle centers"),
+        # -- vertical farm assembly checks (impls in assembly/joints.py) -------
+        _decl("assembly.removable_insert_ir", Level.ASSEMBLY, "cassette drops into the seat with the clearance band, window over the channel, pulse-only water contact"),
+        _decl("assembly.tongue_groove_ir", Level.ASSEMBLY, "adjacent modules align on tongue/groove with channel centerlines continuous at the pitch"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),
@@ -154,6 +177,10 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("manufacturing.bed_fit", Level.MANUFACTURING, "bounding box fits the print bed"),
         _decl("manufacturing.overhang", Level.MANUFACTURING, "overhang fraction acceptable for the support policy"),
         _decl("manufacturing.max_opening_span", Level.MANUFACTURING, "widest through-wall opening bridges without support"),
+        # -- vertical farm cleanability (n/a fast-path on non-water parts) ------
+        _decl("manufacturing.brush_access_to_water_channel", Level.MANUFACTURING, "the water channel opens to free air along its whole run and is wide enough to brush"),
+        _decl("manufacturing.no_hidden_wet_crevices", Level.MANUFACTURING, "no sub-2mm crevice between cuts inside a wet region — water enters, a brush cannot"),
+        _decl("manufacturing.no_unwashable_snap_pockets", Level.MANUFACTURING, "every snap window is void through the full wall on the compiled solid"),
         # -- implicit exoskeleton skin (Bio-4M; findings emitted by the skin export stage)
         _decl("manufacturing.mesh_watertight", Level.MANUFACTURING, "exported implicit-skin mesh is edge-manifold watertight"),
         _decl("manufacturing.mesh_min_feature", Level.MANUFACTURING, "informational facet statistics of the implicit-skin mesh"),
@@ -195,6 +222,13 @@ FORBIDDEN_FORM_DETECTORS: dict[str, str] = {
     "closed_cuff_ring": "form.arm_mouth_dons_ok",
     "payload_on_skin_side": "form.payload_mount_not_on_skin_side",
     "sharp_body_edges": "form.comfort_edge_radius_ok",
+    # vertical farm pack (docs/VERTICAL_FARM_PACK.md): transient water honesty
+    "closed_water_reservoir": "form.no_standing_water_ir",
+    "dead_water_pocket": "form.no_standing_water_ir",
+    "secondary_water_channel": "form.no_secondary_water_channel",
+    "permanent_substrate_flooding": "form.contact_window_geometry_ok",
+    "hidden_wet_cavity": "manufacturing.no_hidden_wet_crevices",
+    "uncleanable_snap_cavity": "form.snap_pockets_cleanable",
 }
 
 

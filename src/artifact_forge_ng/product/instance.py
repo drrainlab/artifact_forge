@@ -28,6 +28,10 @@ class ManufacturingSpec(BaseModel):
     nozzle: float = 0.4
     layer_height: float = 0.2
     support_policy: Literal["avoid", "none", "allow"] = "avoid"
+    #: Print bed (x, y, z). The default mirrors manufacturing.BED; a larger
+    #: declared machine (e.g. 250-class for the vertical farm modules) is an
+    #: explicit instance-level claim, checked by manufacturing.bed_fit.
+    bed: list[float] = [220.0, 220.0, 250.0]
 
     @field_validator("nozzle", "layer_height", mode="before")
     @classmethod
@@ -35,6 +39,17 @@ class ManufacturingSpec(BaseModel):
         if isinstance(v, str):
             return parse_quantity(v, "length", where="manufacturing")
         return float(v)
+
+    @field_validator("bed", mode="before")
+    @classmethod
+    def _parse_bed(cls, v: Any) -> list[float]:
+        if not isinstance(v, (list, tuple)) or len(v) != 3:
+            raise ValueError("manufacturing.bed must be [x, y, z]")
+        return [
+            parse_quantity(e, "length", where="manufacturing.bed")
+            if isinstance(e, str) else float(e)
+            for e in v
+        ]
 
     def env_context(self) -> dict[str, float]:
         """The flat-name environment injected into every formula context.
@@ -47,6 +62,9 @@ class ManufacturingSpec(BaseModel):
             "layer_height": self.layer_height,
             # Printable-wall floor: two perimeters, never below 1.2 mm.
             "printer_min_wall": max(2.0 * self.nozzle, 1.2),
+            "bed_x": self.bed[0],
+            "bed_y": self.bed[1],
+            "bed_z": self.bed[2],
         }
 
 

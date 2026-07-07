@@ -113,6 +113,14 @@ def run_build_from_state(state, target: Path) -> tuple[dict[str, Any], "object"]
         f.to_dict() for f in state.report.findings if f.status is not Status.PASS
     ]
 
+    # Vertical farm pack: a single-part rail build gets its water story too.
+    if "channel_slope_deg" in state.form.frame:
+        from ..assembly.water_report import build_water_report
+
+        water = build_water_report({"part": state})
+        if water is not None:
+            out["water"] = water
+
     _finalize(state, geometry, out, target)
 
     state.enforce_strict()

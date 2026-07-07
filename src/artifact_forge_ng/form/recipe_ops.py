@@ -22,7 +22,15 @@ from typing import Any, Callable
 import math
 
 from ..core.fasteners import screw_spec
-from .part import BoreFeature, CutBoxFeature, HoleFeature, PinFeature, PlateFeature, RibFeature
+from .part import (
+    BoreFeature,
+    ChannelCutFeature,
+    CutBoxFeature,
+    HoleFeature,
+    PinFeature,
+    PlateFeature,
+    RibFeature,
+)
 from .patterns import bolt_circle_centers, holes_from_centers, line_centers
 from .profiles_plate import rounded_rect_loop
 from .regions import Box3, Region
@@ -65,6 +73,7 @@ class RecipeState:
     print_orientation: str = "as_modeled"
     holes: list[HoleFeature] = field(default_factory=list)
     cutboxes: list[CutBoxFeature] = field(default_factory=list)
+    channels: list[ChannelCutFeature] = field(default_factory=list)
     bores: list[BoreFeature] = field(default_factory=list)
     ribs: list[RibFeature] = field(default_factory=list)
     plates: list[PlateFeature] = field(default_factory=list)
@@ -838,12 +847,15 @@ _register(RecipeOpDecl(
 
 
 def _snap_window_pair(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """Receiver windows through the +-X shell walls for a snap lid."""
+    """Receiver windows through the +-X shell walls for a snap lid.
+    ``offset`` shifts the pair along Y so several pairs stack on one shell
+    (the vertical farm retainer frame runs four hooks)."""
     state.require_base("snap_window_pair")
     f = state.frame
     if "shell_wall" not in f:
         raise RecipeError("snap_window_pair needs a rounded_box_shell base")
     w_win, h_win, off = p["w"], p["h"], p["top_offset"]
+    cy = p["offset"]
     h_shell = f["shell_h"]
     name = op_id or "snap_window"
     for i, (x0, x1) in enumerate((
@@ -852,8 +864,8 @@ def _snap_window_pair(state: RecipeState, p: dict[str, Any], op_id: str) -> None
     )):
         state.cutboxes.append(CutBoxFeature(
             name=f"{name}_{i}",
-            box=Box3(x0, -w_win / 2.0, h_shell - off - h_win,
-                     x1, w_win / 2.0, h_shell - off),
+            box=Box3(x0, cy - w_win / 2.0, h_shell - off - h_win,
+                     x1, cy + w_win / 2.0, h_shell - off),
         ))
     state.frame[f"{name}_w"] = w_win
     state.frame[f"{name}_h"] = h_win
@@ -865,7 +877,7 @@ _register(RecipeOpDecl(
     kind="feature",
     params={
         "w": ("length", 8.8), "h": ("length", 3.8),
-        "top_offset": ("length", 6.0),
+        "top_offset": ("length", 6.0), "offset": ("length", 0.0),
     },
     validators=("form.cuts_respect_keepouts", "topology.cutout_present"),
     apply=_snap_window_pair,
@@ -1568,3 +1580,7 @@ _register(RecipeOpDecl(
                 "TPU pad lands + payload snap-C (X = forearm axis, "
                 "prints on its section)",
 ))
+
+# Vertical Farm Pack ops live in their own module (this file is long
+# enough); importing it runs its _register calls into the same registry.
+from . import recipe_ops_water  # noqa: E402,F401

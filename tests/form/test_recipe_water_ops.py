@@ -1,0 +1,204 @@
+"""Vertical farm recipe ops: each op emits its declared IR, regions and
+frame keys, and — the real interface proof — forms assembled from the op
+chains PASS the water/cassette checks from checks_water.py and
+checks_substrate_cassette.py (the ops publish exactly the frame contract
+the checks read)."""
+
+import pytest
+
+from artifact_forge_ng.core.findings import Status
+from artifact_forge_ng.form.checks_substrate_cassette import (
+    check_cassette_no_reservoir,
+    check_contact_window_geometry_ok,
+    check_lift_access_ok,
+    check_mesh_floor_orthogonal_ok,
+    check_snap_pockets_cleanable,
+)
+from artifact_forge_ng.form.checks_water import (
+    check_cassette_seat_fit_ok,
+    check_no_secondary_water_channel,
+    check_no_standing_water_ir,
+    check_overflow_lip_geometry_ok,
+    check_profile_seat_dry_ok,
+    check_tongue_groove_profile_ok,
+    check_water_channel_dims_ok,
+    check_water_channel_slope_ok,
+)
+from artifact_forge_ng.form.part import PartForm
+from artifact_forge_ng.form.recipe_ops import RECIPE_OPS, RecipeError, RecipeState
+from artifact_forge_ng.form.style import MOLDED_UTILITY_PART
+from artifact_forge_ng.validators.probes import KNOWN_CHECKS
+
+RAIL_PARAMS = dict(
+    module_l=248.0, module_w=248.0, body_h=30.0,
+    channel_w=16.0, channel_d=5.0, slope_deg=1.25, channel_bottom_r=1.2,
+    cassette_l=220.0, cassette_w=220.0,
+    seat_depth=14.0, seat_clearance=0.75,
+    module_pitch=250.0, corner_r=4.0,
+)
+
+
+def build_rail(**over) -> RecipeState:
+    st = RecipeState()
+    p = dict(RAIL_PARAMS)
+    p.update(over)
+    RECIPE_OPS["water_rail_body"].apply(st, p, "body")
+    RECIPE_OPS["overflow_lip"].apply(
+        st, {"lip_h": 2.0, "air_gap": 1.5, "lip_r": 0.4}, "lip")
+    RECIPE_OPS["profile_seat_slot"].apply(
+        st, {"profile": "2020", "clearance": 0.2, "depth": 6.0, "inset": 24.0},
+        "profile")
+    RECIPE_OPS["tongue_groove_edges"].apply(
+        st, {"tongue_w": 6.0, "tongue_h": 4.0, "tongue_len": 3.6,
+             "clearance": 0.4, "z0": 4.0, "bottom_margin": 0.4}, "edges")
+    return st
+
+
+def build_cassette() -> RecipeState:
+    st = RecipeState()
+    RECIPE_OPS["substrate_tray_body"].apply(
+        st, {"cassette_l": 220.0, "cassette_w": 220.0, "h": 26.0,
+             "wall": 2.4, "floor_t": 2.0, "corner_r": 3.0}, "tray")
+    RECIPE_OPS["contact_window"].apply(
+        st, {"window_w": 12.0, "window_l": 60.0, "drop": 1.5,
+             "cx": 0.0, "cy": 0.0}, "window")
+    RECIPE_OPS["mesh_floor"].apply(
+        st, {"cell": 6.0, "rib": 1.3, "margin": 6.0}, "mesh")
+    for op_id, off in (("snap_window_a", -60.0), ("snap_window_b", 60.0)):
+        RECIPE_OPS["snap_window_pair"].apply(
+            st, {"w": 10.0, "h": 4.0, "top_offset": 8.5, "offset": off}, op_id)
+    RECIPE_OPS["lift_tabs"].apply(st, {"notch_w": 18.0, "notch_d": 8.0}, "lift")
+    return st
+
+
+def build_frame() -> RecipeState:
+    st = RecipeState()
+    RECIPE_OPS["retainer_frame_body"].apply(
+        st, {"l": 219.0, "w": 219.0, "t": 3.0, "band_w": 10.0, "corner_r": 3.0},
+        "frame")
+    RECIPE_OPS["frame_snap_hooks"].apply(
+        st, {"beam_t": 1.6, "hook_w": 8.0, "hook_len": 9.0, "lip_d": 1.4,
+             "lip_h": 3.0, "hook_span": 214.6, "sy": 120.0}, "snap")
+    return st
+
+
+def to_form(st: RecipeState, name: str, params: dict | None = None) -> PartForm:
+    return PartForm(
+        name=name, params=params or {}, frame=st.frame,
+        section=st.section, width=st.width, style=MOLDED_UTILITY_PART,
+        channels=st.channels, cutboxes=st.cutboxes, bores=st.bores,
+        ribs=st.ribs, fields=st.fields, regions=st.regions, datums=st.datums,
+    )
+
+
+def test_all_declared_validators_exist():
+    for op in ("water_rail_body", "overflow_lip", "profile_seat_slot",
+               "tongue_groove_edges", "substrate_tray_body", "contact_window",
+               "mesh_floor", "lift_tabs", "retainer_frame_body",
+               "frame_snap_hooks"):
+        for check in RECIPE_OPS[op].validators:
+            assert check in KNOWN_CHECKS, (op, check)
+
+
+def test_rail_ops_satisfy_water_checks():
+    form = to_form(build_rail(), "rail",
+                   {"cassette_l": 220.0, "cassette_w": 220.0})
+    for check in (check_water_channel_slope_ok, check_water_channel_dims_ok,
+                  check_no_standing_water_ir, check_overflow_lip_geometry_ok,
+                  check_no_secondary_water_channel, check_cassette_seat_fit_ok,
+                  check_tongue_groove_profile_ok, check_profile_seat_dry_ok):
+        finding = check(form)
+        assert finding.status is Status.PASS, (finding.check, finding.message)
+
+
+def test_rail_frame_contract_keys():
+    st = build_rail()
+    for key in ("channel_center_x", "channel_w", "channel_top_z",
+                "channel_floor_z_inlet", "channel_floor_z_outlet",
+                "channel_slope_deg", "channel_floor_margin",
+                "seat_u0", "seat_v0", "seat_u1", "seat_v1", "seat_floor_z",
+                "seat_depth", "seat_clearance", "lip_z", "air_gap",
+                "tongue_w", "groove_w", "module_pitch", "profile_size"):
+        assert key in st.frame, key
+    for datum in ("cassette_seat", "module_origin", "line_east", "line_west",
+                  "inlet", "outlet"):
+        assert datum in st.datums, datum
+    names = {r.name for r in st.regions}
+    assert {"water_channel", "overflow_lip", "drip_receiver",
+            "cassette_seat_walls"} <= names
+
+
+def test_rail_channel_deepens_toward_front():
+    st = build_rail()
+    ch = st.channels[0]
+    assert ch.y0 > ch.y1  # inlet back (+Y), outlet front (-Y)
+    assert ch.depth_end > ch.depth_start
+    assert ch.slope_deg == pytest.approx(1.25, abs=0.01)
+
+
+def test_rail_refuses_thin_floor():
+    with pytest.raises(RecipeError):
+        build_rail(body_h=22.0)  # seat floor 8 < channel 10.4 deep
+
+
+def test_rail_refuses_oversized_cassette():
+    with pytest.raises(RecipeError):
+        build_rail(cassette_l=240.0)
+
+
+def test_cassette_ops_satisfy_cassette_checks():
+    form = to_form(build_cassette(), "cassette")
+    for check in (check_mesh_floor_orthogonal_ok, check_cassette_no_reservoir,
+                  check_contact_window_geometry_ok, check_snap_pockets_cleanable,
+                  check_lift_access_ok, check_no_secondary_water_channel):
+        finding = check(form)
+        assert finding.status is Status.PASS, (finding.check, finding.message)
+
+
+def test_cassette_frame_contract_keys():
+    st = build_cassette()
+    for key in ("cassette_u0", "cassette_v0", "cassette_u1", "cassette_v1",
+                "cassette_h", "floor_bottom_z", "window_cx", "window_w",
+                "window_floor_z", "shell_wall", "inner_u0", "inner_u1",
+                "lift_notch_count"):
+        assert key in st.frame, key
+    assert "seat" in st.datums and "rim" in st.datums
+    assert len([c for c in st.cutboxes if "snap_window" in c.name]) == 4
+
+
+def test_mesh_pierces_window_slab():
+    st = build_cassette()
+    fld = st.fields[0]
+    assert fld.depth >= 2.0 + 1.5 + 0.5  # floor + drop + margin
+
+
+def test_contact_window_must_run_before_mesh_for_depth():
+    st = RecipeState()
+    RECIPE_OPS["substrate_tray_body"].apply(
+        st, {"cassette_l": 220.0, "cassette_w": 220.0, "h": 26.0,
+             "wall": 2.4, "floor_t": 2.0, "corner_r": 3.0}, "tray")
+    RECIPE_OPS["mesh_floor"].apply(
+        st, {"cell": 6.0, "rib": 1.3, "margin": 6.0}, "mesh")
+    # without a window first, the mesh only pierces the bare floor
+    assert st.fields[0].depth == pytest.approx(3.0)
+
+
+def test_frame_ops_emit_snap_contract():
+    st = build_frame()
+    lips = [r for r in st.ribs if r.name.startswith("snap_lip")]
+    assert len(lips) == 4
+    for key in ("snap_beam_t", "snap_hook_len", "snap_lip_d", "snap_hook_w"):
+        assert key in st.frame, key
+    # printable insertion strain (the snap_joint formula)
+    strain = 1.5 * st.frame["snap_lip_d"] * st.frame["snap_beam_t"] / (
+        st.frame["snap_hook_len"] ** 2)
+    assert strain <= 0.05
+    assert "seat" in st.datums
+
+
+def test_frame_refuses_no_opening():
+    st = RecipeState()
+    with pytest.raises(RecipeError):
+        RECIPE_OPS["retainer_frame_body"].apply(
+            st, {"l": 60.0, "w": 60.0, "t": 3.0, "band_w": 25.0,
+                 "corner_r": 3.0}, "frame")
