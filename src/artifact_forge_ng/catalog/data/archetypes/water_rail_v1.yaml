@@ -214,7 +214,8 @@ interfaces:
     type: fluid_inlet
     gender: female
     datum: inlet
-    frame: {normal: "+Y", up: "+Z", axis: "+Y"}
+    # axis = flow direction: water travels -Y through every port in a row
+    frame: {normal: "+Y", up: "+Z", axis: "-Y"}
   - id: outlet
     type: fluid_outlet
     gender: male

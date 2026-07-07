@@ -952,19 +952,26 @@ def _fluid_joint_ir(
     with the VF-3 inlet/outlet adapters; the physics is ready now."""
     check = "assembly.fluid_joint_ir"
     fa, fb = form_a.frame, form_b.frame
-    missing = [k for k in _FLUID_A_KEYS if k not in fa]
-    missing += [f"B:{k}" for k in _FLUID_B_KEYS if k not in fb]
-    if missing:
+    missing_a = [k for k in _FLUID_A_KEYS if k not in fa]
+    missing_b = [k for k in _FLUID_B_KEYS if k not in fb]
+    if missing_a or missing_b:
+        sides = []
+        if missing_a:
+            sides.append(f"{joint.a_ref} lacks {', '.join(missing_a)}")
+        if missing_b:
+            sides.append(f"{joint.b_ref} lacks {', '.join(missing_b)}")
         return [_finding(
             check, False,
-            f"fluid frame keys missing: {', '.join(missing)} — a part does "
-            "not carry a transient water channel",
+            "fluid_joint expects a: the OUTLET-carrying part and b: the "
+            "INLET-carrying part — " + "; ".join(sides),
         )]
     problems: list[str] = []
-    if abs(fa["channel_w"] - fb["channel_w"]) > 1.0:
+    # The receiver must be at least as wide as the giver — a rail happily
+    # catches a narrow spout, but a wide stream into a narrow inlet spills.
+    if fb["channel_w"] < fa["channel_w"] - 0.5:
         problems.append(
-            f"channel widths differ: {fa['channel_w']:g} vs "
-            f"{fb['channel_w']:g}")
+            f"receiving channel {fb['channel_w']:g} narrower than the "
+            f"giving {fa['channel_w']:g} — the handover spills")
     out_floor = fa["channel_floor_z_outlet"]
     in_floor_posed = pose.apply(
         (fb["channel_center_x"], fb["channel_y_inlet"],
@@ -988,5 +995,80 @@ _register(JointDecl(
                 "downhill with matched channel widths (VF-3 adapters are "
                 "the first client; the physics is ready)",
     ir_check=_fluid_joint_ir,
+    cad_checks=("assembly.no_interference",),
+))
+
+
+# -- saddle_hang (vertical farm: adapter hangs on a rail wall) -------------------
+#
+# An AUXILIARY VERIFICATION JOINT: it never realizes a fluid port (it is
+# not in fluid_inlet/fluid_outlet's joints tuple, so no_orphan_ports does
+# not count it). fluid_joint sets the pose; saddle_hang proves the
+# adapter's physical hang is CONSISTENT with that pose — the saddle really
+# straddles the wall, rests on its top, and the spout/tongue fits the
+# corridor it dips through.
+
+SADDLE_PLAY_BAND = (0.2, 2.0)
+SADDLE_REST_TOL = 0.3
+
+_SADDLE_A_KEYS = ("rail_y0", "rail_y1", "seat_v0", "seat_v1", "body_h", "channel_w")
+_SADDLE_B_KEYS = ("saddle_slot_y0", "saddle_slot_y1", "saddle_floor_z", "spout_w")
+
+
+def _saddle_hang_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    check = "assembly.saddle_hang_ir"
+    fa, fb = form_a.frame, form_b.frame
+    missing = [k for k in _SADDLE_A_KEYS if k not in fa]
+    missing += [f"B:{k}" for k in _SADDLE_B_KEYS if k not in fb]
+    if missing:
+        return [_finding(
+            check, False,
+            f"saddle frame keys missing: {', '.join(missing)} — a: must be "
+            "the rail, b: the hanging adapter",
+        )]
+    lo = pose.apply((0.0, fb["saddle_slot_y0"], 0.0))[1]
+    hi = pose.apply((0.0, fb["saddle_slot_y1"], 0.0))[1]
+    slot_y0, slot_y1 = sorted((lo, hi))
+    # which wall the adapter hangs on: the one whose span the slot covers
+    if (slot_y0 + slot_y1) / 2.0 > 0.0:
+        wall_lo, wall_hi = fa["seat_v1"], fa["rail_y1"]
+    else:
+        wall_lo, wall_hi = fa["rail_y0"], fa["seat_v0"]
+    problems: list[str] = []
+    play_lo = wall_lo - slot_y0
+    play_hi = slot_y1 - wall_hi
+    for label, play in (("inner", play_lo), ("outer", play_hi)):
+        if not (SADDLE_PLAY_BAND[0] - 1e-6 <= play <= SADDLE_PLAY_BAND[1] + 1e-6):
+            problems.append(
+                f"{label} saddle play {play:.2f} outside "
+                f"{SADDLE_PLAY_BAND[0]}..{SADDLE_PLAY_BAND[1]} — the saddle "
+                "does not straddle the wall in this pose")
+    rest_z = pose.apply((0.0, 0.0, fb["saddle_floor_z"]))[2]
+    if abs(rest_z - fa["body_h"]) > SADDLE_REST_TOL:
+        problems.append(
+            f"saddle floor lands at z={rest_z:.2f}, the wall top is "
+            f"{fa['body_h']:g} — the adapter floats or clips")
+    if fb["spout_w"] > fa["channel_w"] - 2.0:
+        problems.append(
+            f"spout/tongue {fb['spout_w']:g} does not fit the "
+            f"{fa['channel_w']:g} channel it dips into")
+    if problems:
+        return [_finding(check, False, "; ".join(problems))]
+    return [_finding(
+        check, True,
+        f"saddle straddles the wall (play {play_lo:.2f}/{play_hi:.2f}), "
+        f"rests on its top at z={rest_z:.1f}, spout fits the channel",
+        measured=rest_z, limit=fa["body_h"],
+    )]
+
+
+_register(JointDecl(
+    name="saddle_hang",
+    description="auxiliary verification joint: the adapter's saddle "
+                "straddles and rests on the rail wall in the pose the "
+                "fluid joint set — never realizes a fluid port",
+    ir_check=_saddle_hang_ir,
     cad_checks=("assembly.no_interference",),
 ))

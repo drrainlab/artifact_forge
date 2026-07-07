@@ -363,3 +363,127 @@ register_probe("form.tongue_groove_profile_ok")(
     lambda form, ctx: check_tongue_groove_profile_ok(form))
 register_probe("form.profile_seat_dry_ok")(
     lambda form, ctx: check_profile_seat_dry_ok(form))
+
+
+# -- VF-3 fluid adapters (inlet cap / collector endcap) -----------------------
+
+#: Push-in tube grip: bore = tube OD + this band (looser slips, tighter
+#: won't insert on FDM).
+HOSE_GRIP_BAND = (0.2, 0.8)
+#: The catch tray drains at a gentler band than the growing rail — it only
+#: has to empty, not to feed substrate.
+TRAY_SLOPE_BAND = (0.8, 3.0)
+#: The drain bore must sit AT the tray floor (its underside within this).
+DRAIN_FLOOR_TOL = 1.0
+
+
+def check_hose_bore_ok(form: PartForm) -> Finding:
+    tube_od = form.frame.get("hose_tube_od")
+    if tube_od is None:
+        return _finding("form.hose_bore_ok", False,
+                        "no hose_tube_od frame key — the tube spec is unbound")
+    bores = [b for b in form.bores if "hose" in b.name]
+    if not bores:
+        return _finding("form.hose_bore_ok", False, "no hose bore on the part")
+    problems: list[str] = []
+    for bore in bores:
+        grip = bore.d - tube_od
+        if not (HOSE_GRIP_BAND[0] - 1e-6 <= grip <= HOSE_GRIP_BAND[1] + 1e-6):
+            problems.append(
+                f"{bore.name!r} grip {grip:.2f} outside "
+                f"{HOSE_GRIP_BAND[0]}..{HOSE_GRIP_BAND[1]} over the "
+                f"{tube_od:g} tube")
+        if bore.overshoot[0] <= 0.0 or bore.overshoot[1] <= 0.0:
+            problems.append(
+                f"{bore.name!r} is blind — a hose port must open through "
+                "(cleanable, no hidden wet pocket)")
+    return _finding(
+        "form.hose_bore_ok", not problems,
+        f"{len(bores)} hose bore(s) grip the {tube_od:g} tube and open through"
+        if not problems else "; ".join(problems),
+        measured=bores[0].d, limit=tube_od + HOSE_GRIP_BAND[1],
+    )
+
+
+def check_spout_drop_path_ok(form: PartForm) -> Finding:
+    f = form.frame
+    keys = ("spout_w", "rail_channel_w", "channel_floor_z_outlet", "saddle_floor_z")
+    missing = [k for k in keys if k not in f]
+    if missing:
+        return _finding("form.spout_drop_path_ok", False,
+                        f"no spout frame keys: {', '.join(missing)}")
+    problems: list[str] = []
+    spout = [r for r in form.ribs if "spout" in r.name]
+    if not spout:
+        problems.append("no spout rib on the part")
+    if f["channel_floor_z_outlet"] > -0.5:
+        problems.append(
+            f"spout exits at z={f['channel_floor_z_outlet']:g} — it must "
+            "descend below the body to reach into the rail corridor")
+    # The spout dips BELOW the rail seat floor into the channel itself
+    # (exit = inlet floor + FALL_ENTRY), so the budget is the channel
+    # width, not the wider corridor above it.
+    budget = f["rail_channel_w"] - 2.0
+    if f["spout_w"] > budget:
+        problems.append(
+            f"spout {f['spout_w']:g} wide does not fit inside the "
+            f"{f['rail_channel_w']:g} rail channel it dips into")
+    drops = [b for b in form.bores if "hose" in b.name and b.axis == "Z"]
+    if not drops:
+        problems.append("no vertical drop bore — the cap's water path must "
+                        "fall straight (no pockets by construction)")
+    else:
+        bore = drops[0]
+        lo = min(bore.span)
+        if lo > f["channel_floor_z_outlet"] + 0.1:
+            problems.append(
+                f"drop bore stops at z={lo:g} above the spout exit "
+                f"{f['channel_floor_z_outlet']:g} — the path is interrupted")
+    return _finding(
+        "form.spout_drop_path_ok", not problems,
+        f"spout descends to {f['channel_floor_z_outlet']:g} with a straight "
+        "vertical drop — gravity does the rest"
+        if not problems else "; ".join(problems),
+        measured=f["spout_w"], limit=budget,
+    )
+
+
+def check_collector_tray_drains(form: PartForm) -> Finding:
+    if not form.channels:
+        return _finding("form.collector_tray_drains", False,
+                        "no tray channel on the part")
+    ch = form.channels[0]
+    problems: list[str] = []
+    if ch.depth_end <= ch.depth_start + 1e-6:
+        problems.append("tray floor does not fall toward the drain")
+    if not (TRAY_SLOPE_BAND[0] <= ch.slope_deg <= TRAY_SLOPE_BAND[1]):
+        problems.append(
+            f"tray slope {ch.slope_deg:.2f} outside "
+            f"{TRAY_SLOPE_BAND[0]}..{TRAY_SLOPE_BAND[1]}")
+    drains = [b for b in form.bores if "drain" in b.name]
+    if not drains:
+        problems.append("no drain bore — the tray would be a reservoir")
+    else:
+        bore = drains[0]
+        floor_at_drain = ch.floor_z_at(ch.y1)
+        bottom = bore.center[2] - bore.d / 2.0
+        if abs(bottom - floor_at_drain) > DRAIN_FLOOR_TOL:
+            problems.append(
+                f"drain underside at z={bottom:.2f} vs tray floor "
+                f"{floor_at_drain:.2f} — water below the drain never leaves")
+        if bore.overshoot[0] <= 0.0 or bore.overshoot[1] <= 0.0:
+            problems.append(f"{bore.name!r} is blind — the drain must pierce the wall")
+    return _finding(
+        "form.collector_tray_drains", not problems,
+        f"tray falls {ch.slope_deg:.2f} deg into a through drain at the floor"
+        if not problems else "; ".join(problems),
+        measured=ch.slope_deg, limit=TRAY_SLOPE_BAND[1],
+    )
+
+
+register_probe("form.hose_bore_ok")(
+    lambda form, ctx: check_hose_bore_ok(form))
+register_probe("form.spout_drop_path_ok")(
+    lambda form, ctx: check_spout_drop_path_ok(form))
+register_probe("form.collector_tray_drains")(
+    lambda form, ctx: check_collector_tray_drains(form))

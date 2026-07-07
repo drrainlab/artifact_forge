@@ -169,6 +169,10 @@ INTERFACE_TYPES: dict[str, InterfaceTypeDecl] = dict([
     _decl("cable_pass",
           "cable/wire pass-through continuity point",
           (), genders=("neutral",)),
+    _decl("hose_port",
+          "push-in bore for external tubing (silicone hose) — mates "
+          "HARDWARE, never a printed part; the tube lands in the BOM",
+          (), genders=("neutral",)),
 ])
 
 

@@ -19,7 +19,13 @@ import math
 from typing import Any
 
 from ..product.archetype import RegionRole
-from .part import ChannelCutFeature, CutBoxFeature, FieldFeature, RibFeature
+from .part import (
+    BoreFeature,
+    ChannelCutFeature,
+    CutBoxFeature,
+    FieldFeature,
+    RibFeature,
+)
 from .profiles_plate import rounded_rect_loop
 from .recipe_ops import RECIPE_OPS, RecipeError, RecipeOpDecl, RecipeState, _register
 from .regions import Box3, Region
@@ -29,6 +35,10 @@ from .section import SectionProfile
 FLOOR_MARGIN_MIN = 2.0
 #: Corridor over the channel through the seat walls — brush-open by design.
 CORRIDOR_MARGIN = 2.0
+#: How far above the receiving channel floor the fluid INLET datum sits:
+#: mating outlet-on-inlet drops the downstream part this much below the
+#: upstream lip — the cascade step that makes gravity the pump.
+FALL_ENTRY = 2.5
 
 
 # -- water_rail_body (base) ---------------------------------------------------
@@ -111,6 +121,7 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         channel_floor_z_inlet=seat_floor - ch_d,
         channel_floor_z_outlet=seat_floor - depth_out,
         channel_slope_deg=slope, channel_floor_margin=floor_margin,
+        corridor_w=2.0 * corridor_half,
         seat_u0=-seat_l / 2.0, seat_v0=-seat_w / 2.0,
         seat_u1=seat_l / 2.0, seat_v1=seat_w / 2.0,
         seat_floor_z=seat_floor, seat_depth=seat_depth, seat_clearance=clearance,
@@ -120,8 +131,18 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     state.datums["module_origin"] = {"at": [0.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0]}
     state.datums["line_east"] = {"at": [u1, 0.0, h / 2.0], "rotate": [0.0, 0.0, 0.0]}
     state.datums["line_west"] = {"at": [u0, 0.0, h / 2.0], "rotate": [0.0, 0.0, 0.0]}
-    state.datums["inlet"] = {"at": [0.0, v1, seat_floor], "rotate": [0.0, 0.0, 0.0]}
-    state.datums["outlet"] = {"at": [0.0, v0, seat_floor], "rotate": [0.0, 0.0, 0.0]}
+    # Fluid datums ARE the water handover points (VF-3): mating them
+    # datum-on-datum builds the cascade by construction — the downstream
+    # part lands FALL_ENTRY below the upstream lip, so gravity pumps and
+    # the falling stream enters the receiving channel's face opening.
+    state.datums["inlet"] = {
+        "at": [0.0, v1, seat_floor - ch_d + FALL_ENTRY],
+        "rotate": [0.0, 0.0, 0.0],
+    }
+    state.datums["outlet"] = {
+        "at": [0.0, v0, seat_floor - depth_out],
+        "rotate": [0.0, 0.0, 0.0],
+    }
 
 
 _register(RecipeOpDecl(
@@ -586,4 +607,255 @@ _register(RecipeOpDecl(
     validators=("topology.ribs_present",),
     apply=_frame_snap_hooks,
     description="four light cantilever hooks (two per X side), lips outward",
+))
+
+
+# -- VF-3 fluid adapters --------------------------------------------------------
+#
+# Both adapters use a LOCAL FRAME ANCHORED AT THE RAIL FACE PLANE (local
+# y=0 = the rail face the adapter hangs on) and at the fluid handover
+# height (the fluid datum). Everything else — saddle, spout/tongue, tray —
+# is derived from that anchor, so datum-on-datum posing lands the saddle
+# on the wall by construction (verified, not hoped: assembly.saddle_hang_ir).
+
+
+def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """The Water Inlet Cap: a drip tower, not a mini-rail. A drip line
+    pushes into a vertical bore from the top; water falls straight through
+    a spout that dips into the rail's inlet corridor and exits at the
+    handover point. One straight vertical path — no pockets by
+    construction, brush- and eye-cleanable from above. Hangs on the rail
+    back wall via a downward saddle slot; the spout tongue in the corridor
+    captures X and Y. Local frame: y=0 = the rail back face (+Y side of
+    the wall is the cap's arm), z=0 = the cap body bottom."""
+    if state.section is not None:
+        raise RecipeError("inlet_cap_body must be the (single) base op")
+    cap_w, cap_h = p["cap_w"], p["cap_h"]
+    tube_od, grip = p["tube_od"], p["bore_clearance"]
+    wall_t, fit = p["rail_wall_t"], p["saddle_fit"]
+    saddle_depth = p["saddle_depth"]
+    hang_drop = p["hang_drop"]
+    spout_w = p["spout_w"]
+    rail_channel_w = p["rail_channel_w"]
+    bore_d = tube_od + grip
+    z_exit = saddle_depth - hang_drop
+    if z_exit > -1.0:
+        raise RecipeError(
+            f"spout exit z={z_exit:g} does not descend below the body — "
+            "hang_drop must exceed saddle_depth")
+    if spout_w > rail_channel_w - 2.0:
+        raise RecipeError(
+            f"spout {spout_w:g} cannot dip into the {rail_channel_w:g} rail channel")
+    if bore_d > spout_w - 3.0:
+        raise RecipeError(
+            f"hose bore {bore_d:g} leaves no spout wall in {spout_w:g}")
+
+    y_front = -(wall_t + fit) + 0.65  # stops short of the wall's inner sliver
+    y_back = 18.0
+    u0, v0, u1, v1 = -cap_w / 2.0, y_front, cap_w / 2.0, y_back
+    state.section = SectionProfile(
+        name="recipe", outer=rounded_rect_loop(u0, v0, u1, v1, p["corner_r"]),
+        plane="XY", width_axis="Z",
+    )
+    state.width = cap_h
+    name = op_id or "cap"
+
+    slot = Box3(u0 - 1.0, -(wall_t + fit), -1.0, u1 + 1.0, fit, saddle_depth)
+    state.cutboxes.append(CutBoxFeature(name=f"{name}_saddle_slot", box=slot))
+    spout = Box3(-spout_w / 2.0, -(wall_t + 0.25), z_exit - 1.0,
+                 spout_w / 2.0, 7.0, 0.6)
+    state.ribs.append(RibFeature(name=f"{name}_spout", box=spout))
+    state.bores.append(BoreFeature(
+        name=f"{name}_hose_drop", axis="Z", center=(0.0, 0.0, 0.0),
+        d=bore_d, span=(z_exit, cap_h), overshoot=(1.0, 1.0),
+    ))
+
+    state.regions.extend([
+        Region("spout_path", RegionRole.TRANSIENT_WATER_PATH,
+               Box3(-spout_w / 2.0, -bore_d / 2.0 - 2.0, z_exit - 1.0,
+                    spout_w / 2.0, bore_d / 2.0 + 2.0, cap_h + 0.5)),
+        Region("saddle", RegionRole.INTERFACE_KEEPOUT, slot),
+    ])
+
+    state.frame.update(
+        outline_u0=u0, outline_v0=v0, outline_u1=u1, outline_v1=v1,
+        outline_corner_r=p["corner_r"],
+        hose_tube_od=tube_od, hose_bore_d=bore_d,
+        spout_w=spout_w, rail_channel_w=rail_channel_w,
+        channel_center_x=0.0, channel_w=bore_d, channel_top_z=cap_h,
+        channel_floor_z_outlet=z_exit, channel_y_outlet=0.0,
+        saddle_slot_y0=-(wall_t + fit), saddle_slot_y1=fit,
+        saddle_floor_z=saddle_depth, saddle_fit=fit,
+        hang_drop=hang_drop,
+    )
+    state.datums["spout"] = {"at": [0.0, 0.0, z_exit], "rotate": [0.0, 0.0, 0.0]}
+    state.datums["tube_in"] = {"at": [0.0, 0.0, cap_h], "rotate": [0.0, 0.0, 0.0]}
+
+
+_register(RecipeOpDecl(
+    name="inlet_cap_body",
+    kind="base",
+    params={
+        "cap_w": ("length", 64.0), "cap_h": ("length", 22.0),
+        "tube_od": ("length", 9.0), "bore_clearance": ("length", 0.4),
+        "rail_wall_t": ("length", 13.25), "saddle_fit": ("length", 0.4),
+        "saddle_depth": ("length", 8.0), "hang_drop": ("length", 16.5),
+        "spout_w": ("length", 14.0), "rail_channel_w": ("length", 16.0),
+        "corner_r": ("length", 3.0),
+    },
+    validators=(
+        "form.hose_bore_ok", "form.spout_drop_path_ok",
+        "form.no_standing_water_ir",
+        "topology.fluid_path_open", "topology.single_connected_solid",
+        "topology.cutout_present", "topology.ribs_present",
+    ),
+    apply=_inlet_cap_body,
+    description="drip-tower inlet cap: vertical hose bore through a spout "
+                "dipping into the rail inlet corridor; saddle-hangs on the "
+                "back wall",
+))
+
+
+def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """The Collector/Drain Endcap: a catch tray tucked under the rail's
+    overflow lip. Droplets detach at the lip, fall into the tray mouth,
+    run down the sloped tray floor to a push-in drain bore at the low end.
+    Hangs on the rail FRONT wall: an arm over the wall top, a bib outside
+    the drip band, a dry tongue in the outlet corridor for X/Y capture
+    (riding ABOVE the exiting water). Local frame: y=0 = the rail front
+    face = the catch plane, +y toward the rail interior; z=0 = the catch
+    datum height (the fluid handover point)."""
+    if state.section is not None:
+        raise RecipeError("collector_endcap_body must be the (single) base op")
+    tray_w_inner = p["tray_w"]
+    tube_od, grip = p["tube_od"], p["bore_clearance"]
+    wall_t, fit = p["rail_wall_t"], p["saddle_fit"]
+    hang_drop = p["hang_drop"]
+    tongue_w = p["tongue_w"]
+    rail_channel_w = p["rail_channel_w"]
+    slope = p["tray_slope_deg"]
+    bore_d = tube_od + grip
+    wall = 2.4
+    tray_w_outer = tray_w_inner + 2.0 * (wall + 1.2)
+    if tongue_w > rail_channel_w - 2.0:
+        raise RecipeError(
+            f"tongue {tongue_w:g} cannot dip into the {rail_channel_w:g} rail channel")
+
+    rim_z = 3.0
+    # The catch floor sits catch_fall below the handover datum — deeper
+    # than the rail-to-rail FALL_ENTRY on purpose: the tray end must be
+    # deep enough to enclose the round drain bore below its rim.
+    catch_fall = p["catch_fall"]
+    floor_at_catch = -catch_fall
+    depth_start = rim_z + catch_fall
+    y_drain_wall = -11.0  # tray outer end
+    run = 1.6 - (y_drain_wall + 3.0)  # channel span catch->deep end
+    depth_end = depth_start + run * math.tan(math.radians(slope))
+    tray_bottom = floor_at_catch - (depth_end - depth_start) - 3.0  # ~3mm floor plate
+    if bore_d > depth_end - 1.5:
+        raise RecipeError(
+            f"drain bore {bore_d:g} does not fit enclosed below the tray rim "
+            f"(tray end depth {depth_end:g}) — raise catch_fall")
+
+    # base = the tray block; everything above is additive (arm/bib/tongue)
+    u0, v0, u1, v1 = -tray_w_outer / 2.0, y_drain_wall, tray_w_outer / 2.0, -0.4
+    state.section = SectionProfile(
+        name="recipe", outer=rounded_rect_loop(u0, v0, u1, v1, p["corner_r"]),
+        plane="XY", width_axis="Z",
+    )
+    state.width = rim_z - tray_bottom
+    # shift: extrusion runs 0..width but our tray spans tray_bottom..rim_z.
+    # Keep the native 0..width frame and express everything relative to it:
+    # local z here = z - tray_bottom for the BASE ONLY is messy — instead
+    # the base is extruded 0..width and we treat local z0 = tray_bottom by
+    # translating all features: the compile frame IS the part frame, so we
+    # place the channel/ribs in absolute coords by adding -tray_bottom.
+    dz = -tray_bottom  # translate design coords -> extrusion coords
+
+    state.channels.append(ChannelCutFeature(
+        name=f"{op_id or 'collector'}_tray", center_x=0.0,
+        y0=1.6, y1=y_drain_wall + 3.0, z_top=rim_z + dz,
+        width=tray_w_inner, depth_start=depth_start, depth_end=depth_end,
+        bottom_r=1.0,
+    ))
+    name = op_id or "collector"
+    state.bores.append(BoreFeature(
+        name=f"{name}_drain_hose", axis="Y",
+        center=(0.0, 0.0, rim_z - depth_end + bore_d / 2.0 + dz),
+        d=bore_d, span=(y_drain_wall, y_drain_wall + 3.0),
+        overshoot=(1.0, 1.0),
+    ))
+    # tuck strip: a low floor extension under the rail's relief recess so
+    # the whole drip band lands on sloping floor, not past the tray edge
+    state.ribs.append(RibFeature(
+        name=f"{name}_tuck",
+        box=Box3(-rail_channel_w / 2.0 - 1.5, -2.0, floor_at_catch - 1.2 + dz,
+                 rail_channel_w / 2.0 + 1.5, 1.6, floor_at_catch + 0.05 + dz),
+    ))
+    # Two side CHEEKS carry the tray up to the arm — never a cross-tray
+    # bib: the whole brush/drip volume over the tray (|x| <= ~6) stays
+    # open to the sky. Cheeks rise 0.6 into the arm's z-range (weld).
+    cheek_x0 = max(7.0, tray_w_inner / 2.0 + 1.0)
+    cheek_e = Box3(cheek_x0, -8.0, rim_z + dz - 0.6,
+                   u1, -1.5, hang_drop + 0.6 + dz)
+    cheek_w = Box3(u0, -8.0, rim_z + dz - 0.6,
+                   -cheek_x0, -1.5, hang_drop + 0.6 + dz)
+    arm = Box3(u0, -1.5, hang_drop + dz, u1, wall_t + fit, hang_drop + 8.0 + dz)
+    # the locator tongue rides the UPPER corridor only: its underside
+    # clears the tray's vertical brush probes (rim + 14) and sits far
+    # above the exiting water; X/Y capture is unchanged
+    tongue = Box3(-tongue_w / 2.0, 1.0, rim_z + 14.2 + dz,
+                  tongue_w / 2.0, wall_t + 0.25, hang_drop + 0.6 + dz)
+    state.ribs.append(RibFeature(name=f"{name}_cheek_e", box=cheek_e))
+    state.ribs.append(RibFeature(name=f"{name}_cheek_w", box=cheek_w))
+    state.ribs.append(RibFeature(name=f"{name}_arm", box=arm))
+    state.ribs.append(RibFeature(name=f"{name}_tongue", box=tongue))
+
+    state.regions.extend([
+        Region("catch_tray", RegionRole.TRANSIENT_WATER_PATH,
+               Box3(-tray_w_inner / 2.0, y_drain_wall - 0.5, tray_bottom + dz,
+                    tray_w_inner / 2.0, 1.6, rim_z + dz + 2.0)),
+        Region("saddle", RegionRole.INTERFACE_KEEPOUT, arm),
+    ])
+
+    state.frame.update(
+        outline_u0=u0, outline_v0=v0, outline_u1=u1, outline_v1=v1,
+        outline_corner_r=p["corner_r"],
+        hose_tube_od=tube_od, hose_bore_d=bore_d,
+        spout_w=tongue_w, rail_channel_w=rail_channel_w,
+        channel_center_x=0.0, channel_w=tray_w_inner,
+        channel_top_z=rim_z + dz,
+        channel_floor_z_inlet=floor_at_catch + dz, channel_y_inlet=0.0,
+        saddle_slot_y0=-1.5, saddle_slot_y1=wall_t + fit,
+        saddle_floor_z=hang_drop + dz, saddle_fit=fit,
+        hang_drop=hang_drop,
+    )
+    state.datums["catch"] = {"at": [0.0, 0.0, dz], "rotate": [0.0, 0.0, 0.0]}
+    state.datums["drain_out"] = {
+        "at": [0.0, y_drain_wall, rim_z - depth_end + bore_d / 2.0 + dz],
+        "rotate": [0.0, 0.0, 0.0],
+    }
+
+
+_register(RecipeOpDecl(
+    name="collector_endcap_body",
+    kind="base",
+    params={
+        "tray_w": ("length", 20.0), "tube_od": ("length", 9.0),
+        "bore_clearance": ("length", 0.4),
+        "rail_wall_t": ("length", 13.25), "saddle_fit": ("length", 0.4),
+        "hang_drop": ("length", 24.41), "tongue_w": ("length", 14.0),
+        "rail_channel_w": ("length", 16.0), "tray_slope_deg": ("number", 1.5),
+        "catch_fall": ("length", 8.5), "corner_r": ("length", 3.0),
+    },
+    validators=(
+        "form.hose_bore_ok", "form.collector_tray_drains",
+        "form.no_standing_water_ir",
+        "topology.fluid_path_open", "topology.single_connected_solid",
+        "topology.ribs_present",
+    ),
+    apply=_collector_endcap_body,
+    description="catch-tray collector endcap: sloped tray under the rail "
+                "overflow lip draining into a push-in hose bore; "
+                "saddle-hangs on the front wall over the drip band",
 ))

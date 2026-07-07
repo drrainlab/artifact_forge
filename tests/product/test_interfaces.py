@@ -13,6 +13,9 @@ USER_VOCABULARY = {
     "cylindrical_payload_socket", "dovetail_rail", "snap_joint",
     "tongue_groove", "removable_insert", "fluid_inlet", "fluid_outlet",
     "cable_pass",
+    # VF-3: external-hardware tube port (mates a silicone hose, not a
+    # printed part — the tube lands in BOM-lite)
+    "hose_port",
 }
 
 

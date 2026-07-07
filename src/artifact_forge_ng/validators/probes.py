@@ -119,6 +119,10 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.cassette_no_reservoir", Level.FORM, "the meshed floor covers the tray and nothing below it can hold water"),
         _decl("form.contact_window_geometry_ok", Level.FORM, "contact window drop 1-2mm, centered over the channel, meshed underside"),
         _decl("form.snap_pockets_cleanable", Level.FORM, "every snap window pierces the full wall — no blind wet pocket"),
+        # -- vertical farm fluid adapters (VF-3; impls in form/checks_water.py)
+        _decl("form.hose_bore_ok", Level.FORM, "the hose push-in bore matches the declared tube OD plus a real grip clearance and opens through both ends"),
+        _decl("form.spout_drop_path_ok", Level.FORM, "the inlet cap's spout descends below the saddle plane, fits the rail corridor, and carries a straight vertical water path"),
+        _decl("form.collector_tray_drains", Level.FORM, "the catch tray floor falls monotonically to a drain bore sitting at the floor's lowest point"),
         _decl("form.lift_access_ok", Level.FORM, "rim carries two finger notches wide enough for tool-free removal"),
         # -- interface level (wave A1, form-time) ------------------------------
         _decl("interface.frame_exists", Level.FORM, "every declared interface's datum is published on the form with its type's frame keys"),
@@ -160,6 +164,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.water_channel_floor_solid", Level.TOPOLOGY, "material is solid just below the channel floor — no leaks into the body"),
         _decl("topology.overflow_relief_open", Level.TOPOLOGY, "the air-gap relief under the overflow lip is a real void"),
         _decl("topology.contact_window_present", Level.TOPOLOGY, "the lowered contact slab exists under the floor AND the mesh pierces it — material in the band, never solid, never gone"),
+        _decl("topology.fluid_path_open", Level.TOPOLOGY, "the adapter's water path (tube bore, spout drop or tray-to-drain run) is void on the compiled solid"),
         # -- assembly level: cross-part checks in the assembled pose ----------
         _decl("assembly.screw_joint_ir", Level.ASSEMBLY, "bolt patterns coincide with compatible diameters in the pose"),
         _decl("assembly.joint_pose", Level.ASSEMBLY, "every part is posed by a joint against existing datums"),
@@ -186,6 +191,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         # -- vertical farm assembly checks (impls in assembly/joints.py) -------
         _decl("assembly.removable_insert_ir", Level.ASSEMBLY, "cassette drops into the seat with the clearance band, window over the channel, pulse-only water contact"),
         _decl("assembly.tongue_groove_ir", Level.ASSEMBLY, "adjacent modules align on tongue/groove with channel centerlines continuous at the pitch"),
+        _decl("assembly.saddle_hang_ir", Level.ASSEMBLY, "auxiliary verification: the adapter's saddle really straddles the rail wall in the pose the fluid joint set, and its spout/bib fits the corridor"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),

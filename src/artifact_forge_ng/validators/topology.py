@@ -912,3 +912,32 @@ def contact_window_present(geometry: Geometry, form: PartForm) -> Finding:
         measured=frac,
         limit=0.92,
     )
+
+
+@register_probe("topology.fluid_path_open")
+def fluid_path_open(geometry: Geometry, form: PartForm) -> Finding:
+    """The fluid adapter's whole water path, probed on the solid: every
+    hose bore is void end-to-end and (on the collector) the tray run is
+    void above its sloped floor. A blocked path is a plug, not a port."""
+    probes: list[tuple[str, object]] = []
+    for bore in form.bores:
+        if "hose" in bore.name or "drain" in bore.name:
+            probes.append((bore.name, channel_probe(bore.path(), d=bore.d * 0.7)))
+    for ch in form.channels:
+        d = min(ch.width * 0.4, 6.0)
+        probes.append((ch.name, channel_probe(ch.centerline(lift=d / 2.0 + 0.8), d=d)))
+    if not probes:
+        return _finding("topology.fluid_path_open", False,
+                        "no fluid path declared on this form")
+    blocked = []
+    for name, probe in probes:
+        frac = solid_fraction(geometry.workplane, probe)
+        if frac > 0.05:
+            blocked.append(f"{name} solid fraction {frac:.2f}")
+    return _finding(
+        "topology.fluid_path_open",
+        not blocked,
+        f"{len(probes)} fluid path leg(s) void on the solid"
+        if not blocked else "; ".join(blocked),
+        measured=None if not blocked else 0.05,
+    )

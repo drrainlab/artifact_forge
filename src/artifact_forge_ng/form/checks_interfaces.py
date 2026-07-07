@@ -281,7 +281,7 @@ def check_interface_normal_points_outward(form: PartForm, ctx=None) -> Finding:
                 "normal points INTO the part")
         # flow-through ports (fluid, cable) legitimately face void BOTH
         # ways — the connection continues into a channel by design.
-        flow_through = s.type in ("fluid_inlet", "fluid_outlet", "cable_pass")
+        flow_through = s.type in ("fluid_inlet", "fluid_outlet", "cable_pass", "hose_port")
         if not hit_in and not flow_through:
             warnings.append(
                 f"{s.id}: no material within the 2 mm cross behind the "
