@@ -51,7 +51,10 @@ def build_frame_report(
         })
     flush_ok = verdict("assembly.row_flush_aligned") == "pass"
     support_ok = verdict("assembly.profile_support_full_length") == "pass"
-    return {
+    magnet_count = sum(
+        int(s.form.frame.get("magnet_count", 0) or 0)
+        for s in states.values() if s.form is not None)
+    out = {
         "carrier": profile_entries,
         "rails": rail_entries,
         "slope_source": "physical_mount",
@@ -67,6 +70,14 @@ def build_frame_report(
         "drainage_verdict": verdict("assembly.row_drains_under_mount"),
         "scope": (
             "tilted flush row: straight profiles, full seating, slope by "
-            "mount; anti-slide retention under the mounted slope — VF-4.1"
+            "mount; anti-slide retention under the mounted slope — VF-4.2"
         ),
     }
+    if magnet_count:
+        out["magnet_installation"] = {
+            "method": "press_fit_dry_face",
+            "water_exposed": False,
+            "role": "alignment_only",
+            "count": magnet_count,
+        }
+    return out

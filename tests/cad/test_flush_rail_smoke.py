@@ -36,7 +36,7 @@ def build_rail_form(*, lightweight: bool, magnets: bool = True) -> PartForm:
         st, {"pocket_len": 6.0, "side_clearance": 0.4}, "lap_in")
     RECIPE_OPS["edge_magnet_pockets"].apply(
         st, {"enabled": magnets, "magnet_d": 6.0, "magnet_t": 2.0,
-             "fit_clearance": 0.4, "x_offset": 60.0, "z_center": 8.0}, "magnets")
+             "fit_clearance": 0.2, "x_offset": 60.0, "z_center": 8.0}, "magnets")
     RECIPE_OPS["profile_seat_slot"].apply(
         st, {"profile": "2020", "clearance": 0.2, "depth": 6.0, "inset": 24.0},
         "profile_slots")

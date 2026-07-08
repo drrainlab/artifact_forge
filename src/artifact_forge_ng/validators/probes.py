@@ -220,6 +220,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),
         # -- manufacturing level ----------------------------------------------
+        _decl("manufacturing.print_orientation_declared", Level.MANUFACTURING, "the instance-declared print orientation matches how the builder actually oriented the part"),
         _decl("manufacturing.supportless_lightweight_windows_ok", Level.MANUFACTURING, "bottom-entered pockets never hide a support-critical flat ceiling — through/vaulted/skeleton, probed on the solid"),
         _decl("manufacturing.horizontal_bore_supportless", Level.MANUFACTURING, "horizontal circular bores over the safe diameter carry a teardrop roof or run vertical"),
         _decl("manufacturing.min_wall", Level.MANUFACTURING, "measured minimum wall >= printer minimum"),

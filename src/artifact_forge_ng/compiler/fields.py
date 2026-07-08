@@ -141,18 +141,26 @@ def cut_field(body: cq.Workplane, field: FieldFeature) -> tuple[cq.Workplane, bo
     oriented = field.origin is not None
     z_start = -1.0 if oriented else field.plane_z + 1.0
     extrude_by = (depth + 1.0) if oriented else -(depth + 1.0)
-    cutter: cq.Workplane | None = None
+    # One COMPOUND of disjoint cell prisms, one boolean cut. The previous
+    # incremental union of hundreds of pieces was O(N) OCC booleans — slow,
+    # and once in a few hundred cells the union silently DROPPED a piece,
+    # leaving that cell solid (field-reported by a user's printed cassette;
+    # the all-cells probe in topology.hex_field_present now also catches it).
+    pieces: list[cq.Solid] = []
+
+    def _collect(wp: cq.Workplane) -> None:
+        pieces.extend(wp.solids().vals())
+
     if field.centers and field.pattern == "round":
         # Circular cells (phyllotaxis etc.): the circle of diameter `cell`
         # is exactly the hexagon's inscribed circle, so every hex-based
         # ligament measure stays conservative for round cutters.
         for cx, cy in field.centers:
-            piece = (
+            _collect(
                 cq.Workplane("XY", origin=(cx, cy, z_start))
                 .circle(field.cell / 2.0)
                 .extrude(extrude_by)
             )
-            cutter = piece if cutter is None else cutter.union(piece)
     elif field.centers:
         # Hexagons FLAT-TO-FLAT along the row axis (vertices at 30+60k
         # degrees): cadquery's polygon() is pointy-right, which faces
@@ -170,14 +178,13 @@ def cut_field(body: cq.Workplane, field: FieldFeature) -> tuple[cq.Workplane, bo
             )
             for vx, vy in vertices[1:]:
                 wp = wp.lineTo(cx + vx, cy + vy)
-            piece = wp.close().extrude(extrude_by)
-            cutter = piece if cutter is None else cutter.union(piece)
+            _collect(wp.close().extrude(extrude_by))
     for poly in field.polygons:
         wp = cq.Workplane("XY", origin=(0, 0, z_start)).moveTo(*poly[0])
         for pt in poly[1:]:
-            wp = wp.lineTo(*pt)
-        piece = wp.close().extrude(extrude_by)
-        cutter = piece if cutter is None else cutter.union(piece)
-    if cutter is None:
+            wp = wp.lineTo(pt[0], pt[1])
+        _collect(wp.close().extrude(extrude_by))
+    if not pieces:
         return body, False
+    cutter = cq.Workplane(obj=cq.Compound.makeCompound(pieces))
     return cut_keep_solid(body, _orient(cutter, field))

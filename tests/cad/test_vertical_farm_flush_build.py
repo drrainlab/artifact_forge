@@ -73,12 +73,38 @@ def test_smoke_flush_water_report(smoke_report):
     assert water["dead_pockets"] == "none found"
 
 
+def test_smoke_collector_is_end_receiver(smoke_report):
+    """VF-4.1: the receiver truths hold on the compiled, posed solids."""
+    report, _ = smoke_report
+    checks = {}
+    for j in report["joints"]:
+        checks.setdefault(j["check"], []).append(j["status"])
+    assert checks["assembly.collector_captures_drain_edge"] == ["pass"]
+    assert checks["assembly.collector_mouth_envelopes_outlet_lip"] == ["pass"]
+    assert checks["assembly.collector_removable_by_hand"] == ["pass"]
+
+
+def test_smoke_parts_print_supportless(smoke_report):
+    """VF-4.1 printability on real parts: the skeleton rail has no ceiling
+    bridges, the collector's teardrop drain passes the horizontal-bore
+    check, and the declared orientation matches the builder."""
+    report, out = smoke_report
+    base = out / "vertical_farm_flush_smoke"
+    for ref, expect in (("rail_1", "manufacturing.supportless_lightweight_windows_ok"),
+                        ("collector", "manufacturing.horizontal_bore_supportless")):
+        findings = yaml.safe_load((base / ref / "findings.yaml").read_text())
+        by_check = {f["check"]: f["status"] for f in findings["findings"]}
+        assert by_check.get(expect) == "pass", (ref, expect, by_check.get(expect))
+        assert by_check.get("manufacturing.print_orientation_declared") == "pass"
+
+
 def test_smoke_frame_report_and_bom(smoke_report):
     report, _ = smoke_report
     frame = yaml.safe_load(Path(report["exports"]["frame_report"]).read_text())
     assert frame["full_profile_seating"] is True
     assert frame["span_gap_mm"] == 0
     assert frame["modules_flush"] is True
+    assert "magnet_installation" not in frame  # smoke has no magnets
     bom = report["bom"]
     printed = {e["archetype"]: e["qty"] for e in bom["printed_parts"]}
     assert printed == {"inlet_cap_v1": 1, "water_rail_v1": 2,

@@ -401,3 +401,24 @@ def horizontal_bore_supportless(geometry: Geometry, form: PartForm) -> Finding:
         check, Status.PASS,
         f"{len(horizontal)} horizontal bore(s) over {H_BORE_OK_D:g} — all "
         "teardrop-roofed, self-supporting")
+
+
+@register_probe("manufacturing.print_orientation_declared")
+def print_orientation_declared(geometry: Geometry, form: PartForm) -> Finding:
+    """The instance may PIN its print orientation (VF-4.1 contract:
+    manufacturing.print_orientation on the instance). The builder's actual
+    orientation must match — a silent flip invalidates every supportless
+    guarantee. n/a when nothing is declared."""
+    check = "manufacturing.print_orientation_declared"
+    declared = form.frame.get("declared_print_orientation")
+    if declared is None:
+        return _finding(check, Status.PASS,
+                        "no declared print orientation — builder's choice")
+    ok = declared == form.print_orientation
+    return _finding(
+        check, Status.PASS if ok else Status.FAIL,
+        f"declared {declared!r} == built {form.print_orientation!r}" if ok else
+        f"instance declares {declared!r} but the part is built "
+        f"{form.print_orientation!r} — the supportless contract is void",
+        suggestion="" if ok else "align manufacturing.print_orientation with the builder",
+    )

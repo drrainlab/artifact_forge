@@ -35,7 +35,7 @@ def rail_form(name: str, magnets: bool = False) -> PartForm:
         st, {"pocket_len": 6.0, "side_clearance": 0.4}, "lap_in")
     RECIPE_OPS["edge_magnet_pockets"].apply(
         st, {"enabled": magnets, "magnet_d": 6.0, "magnet_t": 2.0,
-             "fit_clearance": 0.4, "x_offset": 60.0, "z_center": 8.0}, "magnets")
+             "fit_clearance": 0.2, "x_offset": 60.0, "z_center": 8.0}, "magnets")
     RECIPE_OPS["profile_seat_slot"].apply(
         st, {"profile": "2020", "clearance": 0.2, "depth": 6.0, "inset": 24.0},
         "profile_slots")
@@ -230,3 +230,83 @@ def test_no_row_joints_no_story():
     asm, states, poses = make_row(with_profiles=False)
     asm.joints = []
     assert carrier_findings(asm, states, poses) == []
+
+
+# -- VF-4.1: the collector is an END RECEIVER (pose truths) ---------------------
+
+
+def collector_form(name: str = "collector", **over) -> PartForm:
+    st = RecipeState()
+    p = dict(
+        tray_w=20.0, tube_od=9.0, bore_clearance=0.4,
+        rail_wall_t=13.25, saddle_fit=0.4, hang_drop=20.4,
+        tongue_w=14.0, rail_channel_w=16.0, tray_slope_deg=1.5,
+        catch_fall=8.5, lip_overhang=4.0, capture_depth=8.0, corner_r=3.0,
+    )
+    p.update(over)
+    RECIPE_OPS["collector_endcap_body"].apply(st, p, "collector")
+    return PartForm(
+        name=name, params={"catch_fall": p["catch_fall"]}, frame=st.frame,
+        section=st.section, width=st.width, style=MOLDED_UTILITY_PART,
+        channels=st.channels, cutboxes=st.cutboxes, bores=st.bores,
+        ribs=st.ribs, regions=st.regions, datums=st.datums,
+    )
+
+
+def make_row_with_collector(*, shift_x: float = 0.0, shift_y: float = 0.0):
+    asm, states, poses = make_row(with_profiles=False)
+    form = collector_form()
+    states["collector"] = _state(form, "water_collector")
+    asm.parts.append(SimpleNamespace(ref="collector"))
+    # mate catch onto rail_3.drain_edge (rail_3 at y = -2*pitch, z = 0)
+    rail_3 = states["rail_3"].form
+    drain = rail_3.datums["drain_edge"]["at"]
+    catch = form.datums["catch"]["at"]
+    poses["collector"] = Pose(rotate=(0, 0, 0), translate=(
+        drain[0] - catch[0] + shift_x,
+        drain[1] - catch[1] - 2 * FLUSH_PITCH + shift_y,
+        drain[2] - catch[2]))
+    return asm, states, poses
+
+
+def test_collector_captures_final_lip():
+    asm, states, poses = make_row_with_collector()
+    checks = by_check(carrier_findings(asm, states, poses))
+    cap = checks["assembly.collector_captures_drain_edge"]
+    assert cap.status is Status.PASS, cap.message
+    assert "end receiver" in cap.message
+    env = checks["assembly.collector_mouth_envelopes_outlet_lip"]
+    assert env.status is Status.PASS, env.message
+    rem = checks["assembly.collector_removable_by_hand"]
+    assert rem.status is Status.PASS, rem.message
+
+
+def test_shifted_collector_fails_capture():
+    """Pull the collector 4 outward: the lip tip leaves the mouth."""
+    asm, states, poses = make_row_with_collector(shift_y=-4.5)
+    checks = by_check(carrier_findings(asm, states, poses))
+    assert checks["assembly.collector_captures_drain_edge"].status is Status.FAIL
+
+
+def test_offset_collector_fails_envelope():
+    asm, states, poses = make_row_with_collector(shift_x=2.0)
+    checks = by_check(carrier_findings(asm, states, poses))
+    assert checks["assembly.collector_mouth_envelopes_outlet_lip"].status is Status.FAIL
+
+
+def test_roofed_lip_fails_removable():
+    from artifact_forge_ng.form.part import RibFeature
+    from artifact_forge_ng.form.regions import Box3
+    asm, states, poses = make_row_with_collector()
+    coll = states["collector"].form
+    dz = coll.frame["handover_dz"]
+    coll.ribs.append(RibFeature("cap_bar", Box3(-8.0, -3.5, dz + 6.0,
+                                                8.0, -0.5, dz + 9.0)))
+    checks = by_check(carrier_findings(asm, states, poses))
+    assert checks["assembly.collector_removable_by_hand"].status is Status.FAIL
+
+
+def test_no_collector_no_capture_findings():
+    asm, states, poses = make_row(with_profiles=False)
+    checks = by_check(carrier_findings(asm, states, poses))
+    assert "assembly.collector_captures_drain_edge" not in checks

@@ -13,9 +13,12 @@ from artifact_forge_ng.assembly.joints import (
 )
 from artifact_forge_ng.core.findings import Status
 from artifact_forge_ng.form.checks_water import (
+    check_collector_drain_bore_supportless,
+    check_collector_receiver_matches_final_lap,
     check_collector_tray_drains,
     check_hose_bore_ok,
     check_no_standing_water_ir,
+    check_receiver_open_top_cleanable,
     check_spout_drop_path_ok,
 )
 from artifact_forge_ng.form.part import PartForm
@@ -42,7 +45,7 @@ COLLECTOR_PARAMS = dict(
     tray_w=20.0, tube_od=9.0, bore_clearance=0.4,
     rail_wall_t=13.25, saddle_fit=0.4, hang_drop=20.4,
     tongue_w=14.0, rail_channel_w=16.0, tray_slope_deg=1.5,
-    catch_fall=8.5, lip_overhang=4.0, corner_r=3.0,
+    catch_fall=8.5, lip_overhang=4.0, capture_depth=8.0, corner_r=3.0,
 )
 
 
@@ -97,10 +100,71 @@ def test_cap_op_satisfies_checks():
 def test_collector_op_satisfies_checks():
     form = collector_form()
     for check in (check_hose_bore_ok, check_collector_tray_drains,
+                  check_collector_receiver_matches_final_lap,
+                  check_receiver_open_top_cleanable,
+                  check_collector_drain_bore_supportless,
                   check_no_standing_water_ir):
         finding = check(form)
         assert finding.status is Status.PASS, (finding.check, finding.message)
     assert "catch" in form.datums and "drain_out" in form.datums
+
+
+# -- VF-4.1: the collector is an end receiver ---------------------------------
+
+
+def test_narrow_mouth_rejected():
+    form = collector_form()
+    form.frame["receiver_mouth_w"] = form.frame["receiver_lip_w"] + 1.0
+    f = check_collector_receiver_matches_final_lap(form)
+    assert f.status is Status.FAIL and "envelope" in f.message
+
+
+def test_shallow_capture_rejected():
+    form = collector_form()
+    form.frame["receiver_capture_depth"] = 5.0
+    f = check_collector_receiver_matches_final_lap(form)
+    assert f.status is Status.FAIL
+
+
+def test_lip_tip_too_close_to_apron_rejected():
+    form = collector_form()
+    form.frame["receiver_lip_overhang"] = 7.0  # 1.0 to the apron < 2
+    f = check_collector_receiver_matches_final_lap(form)
+    assert f.status is Status.FAIL and "apron" in f.message
+
+
+def test_capture_depth_band_enforced_at_op():
+    from artifact_forge_ng.form.recipe_ops import RecipeError
+    with pytest.raises(RecipeError):
+        collector_form(capture_depth=5.0)
+    with pytest.raises(RecipeError):
+        collector_form(capture_depth=8.0, lip_overhang=6.5)  # tip margin < 2
+
+
+def test_ceiling_over_capture_zone_rejected():
+    from artifact_forge_ng.form.part import RibFeature
+    from artifact_forge_ng.form.regions import Box3
+    form = collector_form()
+    dz = form.frame["handover_dz"]
+    form.ribs.append(RibFeature("bridge", Box3(-8.0, -6.0, dz + 5.0,
+                                               8.0, -2.0, dz + 8.0)))
+    f = check_receiver_open_top_cleanable(form)
+    assert f.status is Status.FAIL and "roofs the capture zone" in f.message
+
+
+def test_wall_apron_rejected():
+    form = collector_form()
+    form.frame["receiver_apron_z"] = 6.0  # a wall, not a curb
+    f = check_receiver_open_top_cleanable(form)
+    assert f.status is Status.FAIL and "biofilm" in f.message
+
+
+def test_round_horizontal_drain_rejected():
+    from dataclasses import replace
+    form = collector_form()
+    form.bores[:] = [replace(b, roof="round") for b in form.bores]
+    f = check_collector_drain_bore_supportless(form)
+    assert f.status is Status.FAIL and "sags" in f.message
 
 
 def test_cap_refuses_wide_spout():

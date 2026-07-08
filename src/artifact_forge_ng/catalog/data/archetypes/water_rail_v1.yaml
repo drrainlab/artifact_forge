@@ -103,6 +103,10 @@ parameters:
   magnet_x_offset:
     {type: length, default: 60mm, min: 40mm, max: 80mm, role: assembly,
      description: magnet pocket centers at +-x_offset on both +-Y faces}
+  magnet_fit:
+    {type: length, default: 0.2mm, min: 0.1mm, max: 0.3mm, role: manufacturing,
+     description: "diametral press-fit of the d6x2 magnet in its dry
+       pocket — pushes in from the mating face, a drop of CA recommended"}
   profile:
     {type: choice, choices: ["2020", "3030"], default: "2020",
      role: assembly, exposed: true,
@@ -179,6 +183,7 @@ form:
       params:
         enabled: magnet_enabled
         x_offset: magnet_x_offset
+        fit_clearance: magnet_fit
     - op: profile_seat_slot
       id: profile_slots
       params:

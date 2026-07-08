@@ -29,6 +29,7 @@ parts:
       manufacturing:
         material: PETG
         support_policy: none
+        print_orientation: as_modeled
         bed: [250mm, 250mm, 250mm]
   - ref: rail_b
     product:
@@ -40,6 +41,7 @@ parts:
       manufacturing:
         material: PETG
         support_policy: none
+        print_orientation: as_modeled
         bed: [250mm, 250mm, 250mm]
 
 joints:

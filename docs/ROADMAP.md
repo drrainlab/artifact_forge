@@ -157,7 +157,21 @@ module_w + face_gap), **lap_flow_joint** (губа-продолжение пол
 drop, lap_seam_leak: controlled), frame (full seating, span_gap 0), BOM
 («mount the WHOLE row at 1.5 deg», магнитная строка).
 
-Впереди: **VF-4.1** anti-slide удержание ряда на смонтированном под
+**VF-4.1 Printability & Collector Hardening ✅ (2026-07-08)**: коллектор
+стал КОНЦЕВЫМ receiver'ом финальной lap-губы (capture 6–8, щёки вокруг
+мокрой зоны, низкий apron-бортик 2.4–3.5 — не стена: открытый верх +
+непрерывность с лотком = промываемость чеком `receiver_open_top_cleanable`;
+в позе — captures/envelopes/removable_by_hand); окна облегчения → СКВОЗНОЙ
+скелет (мостов нет by construction, −45%; `cassette_support_span_ok` —
+кассета накрывает всё, worst span ≤45); `BoreFeature.roof=teardrop`
+(45°-хорды, дренаж коллектора supportless); always-on
+`supportless_lightweight_windows_ok` (slab-проба на солиде — до этой волны
+мосты плоских потолков НЕ мерялись никем) + `horizontal_bore_supportless`;
+`manufacturing.print_orientation` в контракте инстанса; магниты press-fit
+0.1–0.3 из сухой стыковой ±Y грани (правило чеком) + magnet_installation
+в frame_report.
+
+Впереди: **VF-4.2** anti-slide удержание ряда на смонтированном под
 уклоном профиле (посадка полная, продольного замка нет);
 **lightweight_dry_shell_v1** generic-модификатор; **VF-5 Cassette Family**
 (sprout mesh / microgreen mat / rockwool cube / soil seedling / netpot

@@ -107,6 +107,14 @@ def carrier_findings(
     findings.append(_magnet_alignment(lap_joints, states, poses))
     if any(j.type == "removable_insert" for j in asm.joints):
         findings.append(_cassettes_removable(asm, joint_findings or []))
+    collector = next(
+        (p.ref for p in asm.parts
+         if states.get(p.ref) is not None and states[p.ref].form is not None
+         and getattr(states[p.ref].archetype, "object_class", "") == "water_collector"),
+        None)
+    if collector is not None and posed_rails:
+        findings.extend(_collector_capture(
+            collector, posed_rails[-1][0], states, poses))
     return findings
 
 
@@ -326,3 +334,116 @@ def _cassettes_removable(asm, joint_findings: list[Finding]) -> Finding:
         if not bad else
         f"{len(bad)} cassette insert(s) failed — not removable, mounted or not",
     )
+
+
+# -- VF-4.1: the collector is an END RECEIVER for the final lap lip --------------
+
+CAPTURE_TIP_MARGIN = 2.0   # lip tip to the apron wall, in the pose
+CAPTURE_MIN_DEPTH = 1.0    # the tip must really be inside the mouth
+MOUTH_SIDE_MARGIN = 1.4    # mouth over the posed lip, per side
+LIFT_WINDOW = 15.0         # clear vertical exit over the captured lip
+
+
+def _collector_capture(
+    coll_ref: str, final_rail: str, states: dict[str, Any],
+    poses: dict[str, Any],
+) -> list[Finding]:
+    """Three pose truths: the final lip tip sits INSIDE the receiver
+    volume, the mouth envelopes the lip across X, and nothing of the
+    collector roofs the captured lip — it lifts straight off."""
+    out: list[Finding] = []
+    coll_pose, rail_pose = poses.get(coll_ref), poses.get(final_rail)
+    coll, rail = states[coll_ref], states[final_rail]
+    if coll_pose is None or rail_pose is None:
+        return [_finding("assembly.collector_captures_drain_edge", False,
+                         "collector or final rail not posed")]
+    cf, rf = coll.form.frame, rail.form.frame
+    needed_c = ("receiver_capture_depth", "receiver_cheek_x0",
+                "receiver_apron_z", "handover_dz")
+    needed_r = ("lap_lip_tip_y", "lap_lip_w", "lap_lip_t",
+                "channel_floor_z_outlet")
+    missing = [k for k in needed_c if k not in cf]
+    missing += [f"rail:{k}" for k in needed_r if k not in rf]
+    if missing:
+        return [_finding("assembly.collector_captures_drain_edge", False,
+                         f"receiver/lap frame keys missing: {', '.join(missing)}")]
+
+    tip = rail_pose.apply((0.0, rf["lap_lip_tip_y"],
+                           rf["channel_floor_z_outlet"] - rf["lap_lip_t"]))
+    face_y = coll_pose.translate[1]              # collector local y=0 plane
+    handover_z = coll_pose.translate[2] + cf["handover_dz"]
+    floor_z = handover_z - coll.form.frame.get("hang_drop", 0.0) * 0.0 - (
+        cf.get("receiver_apron_z", 3.0) + 0.0)   # placeholder, refined below
+    # tray floor at the catch: design -catch_fall below the handover plane
+    catch_fall = coll.form.params.get("catch_fall", 8.5)
+    floor_z = handover_z - catch_fall
+    rim_z = handover_z + cf["receiver_apron_z"]
+
+    depth = face_y - tip[1]
+    problems: list[str] = []
+    if not (CAPTURE_MIN_DEPTH <= depth <= cf["receiver_capture_depth"]
+            - CAPTURE_TIP_MARGIN + 1e-6):
+        problems.append(
+            f"lip tip lands {depth:.2f} into the {cf['receiver_capture_depth']:g} "
+            f"mouth (needs {CAPTURE_MIN_DEPTH:g}..capture-{CAPTURE_TIP_MARGIN:g})")
+    if not (floor_z + 2.0 <= tip[2] <= rim_z + 0.1):
+        problems.append(
+            f"lip tip z {tip[2]:.2f} outside the receiver throat "
+            f"({floor_z + 2.0:.2f}..{rim_z:.2f})")
+    if abs(tip[0] - coll_pose.translate[0]) > 1.0:
+        problems.append(
+            f"lip tip {abs(tip[0] - coll_pose.translate[0]):.2f} off the "
+            "mouth centerline")
+    out.append(_finding(
+        "assembly.collector_captures_drain_edge", not problems,
+        f"the final lip tip sits {depth:.1f} inside the mouth, "
+        f"{tip[2] - floor_z:.1f} above the tray floor — an end receiver, "
+        "not a part standing nearby"
+        if not problems else "; ".join(problems),
+        measured=depth, limit=cf["receiver_capture_depth"],
+    ))
+
+    # mouth envelopes the lip across X
+    dx = abs(rail_pose.translate[0] - coll_pose.translate[0])
+    side = cf["receiver_cheek_x0"] - (dx + rf["lap_lip_w"] / 2.0)
+    out.append(_finding(
+        "assembly.collector_mouth_envelopes_outlet_lip",
+        side >= MOUTH_SIDE_MARGIN - 1e-6,
+        f"mouth envelopes the posed lip with {side:.2f} per side"
+        if side >= MOUTH_SIDE_MARGIN - 1e-6 else
+        f"mouth margin {side:.2f} < {MOUTH_SIDE_MARGIN:g} per side — the lip "
+        "can foul the cheeks",
+        measured=side, limit=MOUTH_SIDE_MARGIN,
+    ))
+
+    # removable by hand: nothing of the collector roofs the captured lip
+    # inside the lift window (the receiver has no ceiling)
+    lip_prism = (
+        rail_pose.translate[0] - rf["lap_lip_w"] / 2.0,   # x0
+        tip[1],                                           # y0 (tip)
+        rail_pose.translate[0] + rf["lap_lip_w"] / 2.0,   # x1
+        face_y,                                           # y1 (face plane)
+        handover_z + rf["lap_lip_t"],                     # z0 (lip top)
+        handover_z + LIFT_WINDOW,                         # z1
+    )
+    blockers: list[str] = []
+    for feat in coll.form.ribs:
+        b = feat.box
+        gx0, gy0, gz0 = (b.x0 + coll_pose.translate[0],
+                         b.y0 + coll_pose.translate[1],
+                         b.z0 + coll_pose.translate[2])
+        gx1, gy1, gz1 = (b.x1 + coll_pose.translate[0],
+                         b.y1 + coll_pose.translate[1],
+                         b.z1 + coll_pose.translate[2])
+        if (gx0 < lip_prism[2] and gx1 > lip_prism[0]
+                and gy0 < lip_prism[3] and gy1 > lip_prism[1]
+                and gz0 < lip_prism[5] and gz1 > lip_prism[4]):
+            blockers.append(feat.name)
+    out.append(_finding(
+        "assembly.collector_removable_by_hand", not blockers,
+        f"nothing roofs the captured lip within {LIFT_WINDOW:g} of lift — "
+        "the collector lifts straight off"
+        if not blockers else
+        "collector material over the captured lip: " + ", ".join(blockers),
+    ))
+    return out

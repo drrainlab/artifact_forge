@@ -395,33 +395,58 @@ def hex_field_present(geometry: Geometry, form: PartForm) -> Finding:
         if not field.centers and not field.polygons:
             empty.append(f"{field.pattern} (zero cells survived the keepouts)")
     fields = [f for f in form.fields if f.centers or f.polygons]
+    # EVERY cell is probed (VF-4.1): a user's printed cassette arrived with
+    # 1-3 random solid cells — a single-sample probe statistically never
+    # lands on them. All per-cell probe boxes fuse into ONE compound, so
+    # the whole-field verdict still costs a single boolean; the per-cell
+    # pass then names the exact uncut cells (only runs when the fast
+    # whole-field intersect says something is solid).
+    import cadquery as cq
+
     for field in fields:
+        cells: list[tuple[float, float, float]] = []  # (cu, cv, r)
         if field.centers:
             r = field.cell / math.sqrt(3.0) * 0.4
-            cu, cv = field.centers[len(field.centers) // 2]
+            cells = [(cu, cv, r) for cu, cv in field.centers]
         else:
-            poly = field.polygons[len(field.polygons) // 2]
-            cu = sum(p[0] for p in poly) / len(poly)
-            cv = sum(p[1] for p in poly) / len(poly)
-            # Probe must fit INSIDE the cell — bound by the narrow bbox
-            # dimension (a long slot is much narrower than its area hints).
-            bb_w = max(p[0] for p in poly) - min(p[0] for p in poly)
-            bb_h = max(p[1] for p in poly) - min(p[1] for p in poly)
-            r = 0.3 * max(0.5, min(bb_w, bb_h))
-        # World-space probe box at the cell's mid-depth — works for both
-        # horizontal and oriented (tilted-face) fields.
-        wx, wy, wz = field.local_to_world(cu, cv, field.depth * 0.45)
-        half = max(0.6, min(r, field.depth * 0.4))
-        probe = box_probe(
-            wx - r, wy - half, wz - half, wx + r, wy + half, wz + half
-        )
-        frac = solid_fraction(geometry.workplane, probe)
-        if frac > 0.3:
-            empty.append(f"{field.pattern} (fill {frac:.2f})")
+            for poly in field.polygons:
+                cu = sum(p[0] for p in poly) / len(poly)
+                cv = sum(p[1] for p in poly) / len(poly)
+                # Probe must fit INSIDE the cell — bound by the narrow bbox
+                # dimension (a long slot is narrower than its area hints).
+                bb_w = max(p[0] for p in poly) - min(p[0] for p in poly)
+                bb_h = max(p[1] for p in poly) - min(p[1] for p in poly)
+                cells.append((cu, cv, 0.3 * max(0.5, min(bb_w, bb_h))))
+
+        def _cell_probe(cu: float, cv: float, r: float):
+            # World-space probe box at the cell's mid-depth — works for
+            # both horizontal and oriented (tilted-face) fields.
+            wx, wy, wz = field.local_to_world(cu, cv, field.depth * 0.45)
+            half = max(0.6, min(r, field.depth * 0.4))
+            return box_probe(
+                wx - r, wy - half, wz - half, wx + r, wy + half, wz + half)
+
+        probes = [_cell_probe(cu, cv, r) for cu, cv, r in cells]
+        compound = cq.Workplane(obj=cq.Compound.makeCompound(
+            [s for p in probes for s in p.solids().vals()]))
+        frac = solid_fraction(geometry.workplane, compound)
+        # any single solid cell contributes ~1/N to the compound fraction
+        if frac > 0.3 / max(1, len(cells)):
+            uncut = []
+            for i, probe in enumerate(probes):
+                if solid_fraction(geometry.workplane, probe) > 0.3:
+                    uncut.append(i)
+            if uncut:
+                empty.append(
+                    f"{field.pattern}: {len(uncut)}/{len(cells)} cell(s) "
+                    f"SOLID (indices {uncut[:6]}{'…' if len(uncut) > 6 else ''})")
+            elif frac > 0.3:
+                empty.append(f"{field.pattern} (fill {frac:.2f})")
     return _finding(
         "topology.hex_field_present",
         not empty,
-        "all fields cut real material" if not empty else "uncut: " + ", ".join(empty),
+        f"all fields cut real material (every cell probed)"
+        if not empty else "uncut: " + ", ".join(empty),
     )
 
 

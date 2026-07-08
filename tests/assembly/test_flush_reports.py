@@ -88,6 +88,11 @@ def test_frame_report_flush(row_ctx):
     for rail in frame["rails"]:
         assert rail["contact"] == "full_length"
         assert len(rail["perched_on"]) == 2
+    magnets = frame["magnet_installation"]
+    assert magnets["method"] == "press_fit_dry_face"
+    assert magnets["water_exposed"] is False
+    assert magnets["role"] == "alignment_only"
+    assert magnets["count"] == 12
 
 
 def test_bom_profiles_magnets_and_mount_note(row_ctx):

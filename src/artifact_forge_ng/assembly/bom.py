@@ -106,9 +106,10 @@ def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
             "qty": magnet_qty,
             "note": (
                 "optional module alignment only — never a seal, never a "
-                "support; sealed dry pockets"
+                "support; press-fit from the dry mating face"
                 + (f" (pocket d {magnet_d:g})" if magnet_d else "")
-                + "; preferably coated/epoxy-protected against splash"
+                + "; a drop of CA glue recommended; preferably "
+                "coated/epoxy-protected against splash"
             ),
         })
 

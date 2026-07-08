@@ -73,6 +73,12 @@ def build_form(
     if state.section is None:
         raise RecipeError(f"{archetype.id}: recipe produced no base solid")
 
+    declared = instance.manufacturing.print_orientation
+    if declared is not None:
+        # the contract half of print orientation — checked against the
+        # builder's decision by manufacturing.print_orientation_declared
+        state.frame["declared_print_orientation"] = declared
+
     return PartForm(
         name=instance.id,
         params=dict(resolved.context),

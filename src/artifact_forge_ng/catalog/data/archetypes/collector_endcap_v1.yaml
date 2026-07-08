@@ -63,6 +63,10 @@ parameters:
     {type: length, default: 8.5mm, min: 6mm, max: 12mm, role: functional,
      description: drop from the lip to the tray floor — deep enough to
        enclose the drain bore below the rim}
+  capture_depth:
+    {type: length, default: 8mm, min: 6mm, max: 8mm, role: functional,
+     description: "receiver capture past the rail face — the lip tip must
+       keep >= 2 to the apron wall (VF-4.1 end receiver)"}
   saddle_fit:
     {type: length, default: 0.4mm, min: 0.2mm, max: 0.8mm, role: manufacturing}
   corner_r:
@@ -99,6 +103,7 @@ form:
         tray_slope_deg: tray_slope_deg
         catch_fall: catch_fall
         lip_overhang: lip_len
+        capture_depth: capture_depth
         corner_r: corner_r
 
 regions:
@@ -133,6 +138,9 @@ validators:
   - interface.keepouts_preserved
   - form.hose_bore_ok
   - form.collector_tray_drains
+  - form.collector_receiver_matches_final_lap
+  - form.receiver_open_top_cleanable
+  - form.collector_drain_bore_supportless
   - form.no_standing_water_ir
   - topology.fluid_path_open
   - topology.single_connected_solid

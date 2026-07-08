@@ -364,7 +364,9 @@ def _edge_magnet_pockets(state: RecipeState, p: dict[str, Any], op_id: str) -> N
     if not p.get("enabled", False):
         state.frame.update(magnet_count=0)
         return
-    d = p.get("magnet_d", 6.0) + p.get("fit_clearance", 0.4)
+    # press-fit (VF-4.1): the magnet pushes in from the DRY mating face
+    # and stays without a plug; a drop of CA glue is the BOM recommendation
+    d = p.get("magnet_d", 6.0) + p.get("fit_clearance", 0.2)
     depth = p.get("magnet_t", 2.0) + 0.4
     x_off, z_c = p.get("x_offset", 60.0), p.get("z_center", 8.0)
     name = op_id or "magnets"
@@ -386,6 +388,8 @@ def _edge_magnet_pockets(state: RecipeState, p: dict[str, Any], op_id: str) -> N
     state.frame.update(
         magnet_count=count, magnet_pocket_d=d, magnet_pocket_depth=depth,
         magnet_x_offset=x_off, magnet_z=z_c,
+        magnet_fit_clearance=d - p.get("magnet_d", 6.0),
+        magnet_d_nominal=p.get("magnet_d", 6.0),
     )
 
 
@@ -395,7 +399,7 @@ _register(RecipeOpDecl(
     params={
         "enabled": ("bool", False),
         "magnet_d": ("length", 6.0), "magnet_t": ("length", 2.0),
-        "fit_clearance": ("length", 0.4),
+        "fit_clearance": ("length", 0.2),
         "x_offset": ("length", 60.0), "z_center": ("length", 8.0),
     },
     validators=(
@@ -941,15 +945,26 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
     if tongue_w > rail_channel_w - 2.0:
         raise RecipeError(
             f"tongue {tongue_w:g} cannot dip into the {rail_channel_w:g} rail channel")
+    lip_overhang = p.get("lip_overhang", 4.0)
+    # Receiver capture (VF-4.1): how deep the mouth reaches past the rail
+    # face — the captured lip tip must keep >= 2 to the outer apron wall.
+    capture_depth = p.get("capture_depth", 8.0)
+    if not (6.0 - 1e-9 <= capture_depth <= 8.0 + 1e-9):
+        raise RecipeError(
+            f"capture_depth {capture_depth:g} outside the receiver band 6..8")
+    if capture_depth - lip_overhang < 2.0:
+        raise RecipeError(
+            f"lip tip lands {capture_depth - lip_overhang:g} from the apron "
+            "(needs >= 2) — deepen capture_depth or shorten the lip")
 
     rim_z = 3.0
     # The catch floor sits catch_fall below the handover datum — deeper
     # than the rail-to-rail FALL_ENTRY on purpose: the tray end must be
-    # deep enough to enclose the round drain bore below its rim.
+    # deep enough to enclose the drain bore below its rim.
     catch_fall = p["catch_fall"]
     floor_at_catch = -catch_fall
     depth_start = rim_z + catch_fall
-    y_drain_wall = -11.0  # tray outer end
+    y_drain_wall = -(capture_depth + 3.0)  # tray outer end (drain wall)
     run = 1.6 - (y_drain_wall + 3.0)  # channel span catch->deep end
     depth_end = depth_start + run * math.tan(math.radians(slope))
     tray_bottom = floor_at_catch - (depth_end - depth_start) - 3.0  # ~3mm floor plate
@@ -957,6 +972,12 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
         raise RecipeError(
             f"drain bore {bore_d:g} does not fit enclosed below the tray rim "
             f"(tray end depth {depth_end:g}) — raise catch_fall")
+    # the teardrop roof peaks r*sqrt(2) above center — it too must stay
+    # enclosed below the rim
+    if (bore_d / 2.0) * (1.0 + math.sqrt(2.0)) > depth_end - 0.3:
+        raise RecipeError(
+            f"teardrop drain peak does not fit below the rim "
+            f"(tray end depth {depth_end:g}) — raise catch_fall or shrink tube_od")
 
     # base = the tray block; everything above is additive (arm/bib/tongue)
     u0, v0, u1, v1 = -tray_w_outer / 2.0, y_drain_wall, tray_w_outer / 2.0, -0.4
@@ -980,23 +1001,28 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
         bottom_r=1.0,
     ))
     name = op_id or "collector"
+    # Teardrop drain (VF-4.1): a horizontal push-in bore prints a sagging
+    # round ceiling — the 45-degree chord roof is self-supporting.
     state.bores.append(BoreFeature(
         name=f"{name}_drain_hose", axis="Y",
         center=(0.0, 0.0, rim_z - depth_end + bore_d / 2.0 + dz),
         d=bore_d, span=(y_drain_wall, y_drain_wall + 3.0),
-        overshoot=(1.0, 1.0),
+        overshoot=(1.0, 1.0), roof="teardrop",
     ))
     # No tuck strip (VF correction): the cascade's relief recess is gone —
     # the wall face is solid, and the lap lip carries the drip band
     # lip_overhang outside the face, well inside the tray mouth. A strip
     # reaching INTO the wall would simply interfere with the rail body.
-    # Two side CHEEKS carry the tray up to the arm — never a cross-tray
-    # bib: the whole brush/drip volume over the tray (|x| <= ~6) stays
-    # open to the sky. Cheeks rise 0.6 into the arm's z-range (weld).
-    cheek_x0 = max(7.0, tray_w_inner / 2.0 + 1.0)
-    cheek_e = Box3(cheek_x0, -8.0, rim_z + dz - 0.6,
+    # Two side CHEEKS wrap the WET ZONE of the captured lip (VF-4.1:
+    # lip_w/2 + 1.5 per side — they hug, never touch) and carry the tray
+    # up to the arm — never a cross-tray bib: the whole brush/drip volume
+    # over the mouth stays open to the sky. Cheeks rise 0.6 into the
+    # arm's z-range (weld).
+    lip_w = rail_channel_w + 2.0
+    cheek_x0 = max(lip_w / 2.0 + 1.5, tray_w_inner / 2.0 + 0.5)
+    cheek_e = Box3(cheek_x0, -(capture_depth + 1.0), rim_z + dz - 0.6,
                    u1, -1.5, hang_drop + 0.6 + dz)
-    cheek_w = Box3(u0, -8.0, rim_z + dz - 0.6,
+    cheek_w = Box3(u0, -(capture_depth + 1.0), rim_z + dz - 0.6,
                    -cheek_x0, -1.5, hang_drop + 0.6 + dz)
     arm = Box3(u0, -1.5, hang_drop + dz, u1, wall_t + fit, hang_drop + 8.0 + dz)
     # the locator tongue rides the UPPER corridor only: its underside
@@ -1027,6 +1053,15 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
         saddle_slot_y0=-1.5, saddle_slot_y1=wall_t + fit,
         saddle_floor_z=hang_drop + dz, saddle_fit=fit,
         hang_drop=hang_drop,
+        # receiver keys (VF-4.1) — DESIGN coords: z relative to the
+        # handover plane (the lip tip underside), y relative to the face
+        receiver_mouth_w=2.0 * cheek_x0,
+        receiver_capture_depth=capture_depth,
+        receiver_apron_z=rim_z,
+        receiver_cheek_x0=cheek_x0,
+        receiver_lip_overhang=lip_overhang,
+        receiver_lip_w=lip_w,
+        handover_dz=dz,
     )
     # The catch datum sits AT THE LIP TIP: lip_overhang outside the wall
     # face, on the handover plane — mating it onto the rail's drain_edge
@@ -1049,10 +1084,14 @@ _register(RecipeOpDecl(
         "hang_drop": ("length", 20.4), "tongue_w": ("length", 14.0),
         "rail_channel_w": ("length", 16.0), "tray_slope_deg": ("number", 1.5),
         "catch_fall": ("length", 8.5), "lip_overhang": ("length", 4.0),
+        "capture_depth": ("length", 8.0),
         "corner_r": ("length", 3.0),
     },
     validators=(
         "form.hose_bore_ok", "form.collector_tray_drains",
+        "form.collector_receiver_matches_final_lap",
+        "form.receiver_open_top_cleanable",
+        "form.collector_drain_bore_supportless",
         "form.no_standing_water_ir",
         "topology.fluid_path_open", "topology.single_connected_solid",
         "topology.ribs_present",

@@ -44,6 +44,7 @@ parts:
       manufacturing:
         material: PETG
         support_policy: none
+        print_orientation: as_modeled
         bed: [250mm, 250mm, 250mm]
   - ref: rail_1
     product:
@@ -54,6 +55,7 @@ parts:
       manufacturing:
         material: PETG
         support_policy: none
+        print_orientation: as_modeled
         bed: [250mm, 250mm, 250mm]
   - ref: rail_2
     product:
@@ -64,6 +66,7 @@ parts:
       manufacturing:
         material: PETG
         support_policy: none
+        print_orientation: as_modeled
         bed: [250mm, 250mm, 250mm]
   - ref: cassette
     product:
@@ -74,6 +77,7 @@ parts:
       manufacturing:
         material: PETG
         support_policy: none
+        print_orientation: as_modeled
         bed: [250mm, 250mm, 250mm]
   - ref: collector
     product:
@@ -84,6 +88,7 @@ parts:
       manufacturing:
         material: PETG
         support_policy: none
+        print_orientation: as_modeled
         bed: [250mm, 250mm, 250mm]
   - ref: profile_e
     product:
