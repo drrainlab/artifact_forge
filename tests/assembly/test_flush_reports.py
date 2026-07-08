@@ -58,6 +58,11 @@ def test_water_report_row_rollup(row_ctx):
     assert row["lap_seam_leak"] == "controlled"
     assert set(row["drips_clear_of"]) == {"profiles", "magnets", "dry_zones"}
     assert row["orphan_fluid_ports"] == "none"
+    # VF-4.2 honesty: the skeleton rail does not contain top-water overflow
+    oc = row["overflow_containment"]
+    assert oc["status"] == "absent"
+    assert oc["path"] == "drains_through_skeleton"
+    assert "VF-5" in oc["planned_fix"]
 
 
 def test_water_report_channel_is_level(row_ctx):

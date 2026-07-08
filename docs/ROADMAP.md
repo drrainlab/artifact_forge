@@ -171,7 +171,16 @@ drop, lap_seam_leak: controlled), frame (full seating, span_gap 0), BOM
 0.1–0.3 из сухой стыковой ±Y грани (правило чеком) + magnet_installation
 в frame_report.
 
-Впереди: **VF-4.2** anti-slide удержание ряда на смонтированном под
+**VF-4.2 Collector Robustness + Overflow Honesty ✅ (2026-07-08)**:
+коллектор из «висящих столбиков» → жёсткая U-рама (две полные боковые
+стенки ≥3.5 от дна до arm несут консольный лоток; `collector_structure_
+sturdy` закрывает слепую зону min_wall) + слив стал ВЕРТИКАЛЬНЫМ вниз
+(трубка входит снизу, уходит под ряд; teardrop с коллектора снят,
+кернел-примитив жив для будущих гориз. боров); честная нота
+`overflow_containment` в water_report (сквозной скелет пропускает верхний
+перелив — до VF-5 корневой камеры).
+
+Впереди: **VF-4.3** anti-slide удержание ряда на смонтированном под
 уклоном профиле (посадка полная, продольного замка нет);
 **lightweight_dry_shell_v1** generic-модификатор; **VF-5 Cassette Family**
 (sprout mesh / microgreen mat / rockwool cube / soil seedling / netpot

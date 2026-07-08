@@ -4,9 +4,13 @@ version: 1
 object_class: water_collector
 maturity: sandbox_buildable
 description: >
-  Vertical Farm Pack (tilted flush row canon): the Collector/Drain Endcap
-  — a sloped catch tray under the LAST rail's lap lip: the lip continuing
-  the channel floor plane is the drip edge, its protrusion IS the air gap.
+  Vertical Farm Pack (tilted flush row canon, VF-4.2): the Collector/Drain
+  Endcap — a sloped catch tray under the LAST rail's lap lip on a STURDY
+  U-frame (two full side walls carry the cantilever, not thin columns).
+  The tray drains through a VERTICAL bore out the sump bottom: the push-in
+  tube enters from below and routes under the row (no sagging horizontal
+  ceiling). The lip continuing the channel floor plane is the drip edge,
+  its protrusion IS the air gap.
   Droplets detach at the lip tip, fall into the tray mouth, run down the
   tray floor to a push-in drain bore enclosed below the rim at the floor's
   lowest point — the tray empties completely, verified not postulated
@@ -67,6 +71,14 @@ parameters:
     {type: length, default: 8mm, min: 6mm, max: 8mm, role: functional,
      description: "receiver capture past the rail face — the lip tip must
        keep >= 2 to the apron wall (VF-4.1 end receiver)"}
+  drain_extension:
+    {type: length, default: 10mm, min: 8mm, max: 14mm, role: functional,
+     description: "sump length past the mouth so the VERTICAL drain has
+       solid body to grip the push-in tube (VF-4.2)"}
+  wall_extra:
+    {type: length, default: 3mm, min: 1.6mm, max: 4mm, role: structural,
+     description: "extra U-frame side wall thickness beyond a molded skin —
+       carries the cantilevered tray as a wall, not a column"}
   saddle_fit:
     {type: length, default: 0.4mm, min: 0.2mm, max: 0.8mm, role: manufacturing}
   corner_r:
@@ -81,7 +93,7 @@ derived:
 
 constraints:
   - tongue_w <= channel_w - 2
-  - tube_od + bore_clearance <= catch_fall + 3 - 1.5
+  - tube_od + bore_clearance <= tray_w - 3
 
 form:
   type: recipe
@@ -104,6 +116,8 @@ form:
         catch_fall: catch_fall
         lip_overhang: lip_len
         capture_depth: capture_depth
+        drain_extension: drain_extension
+        wall_extra: wall_extra
         corner_r: corner_r
 
 regions:
@@ -128,7 +142,9 @@ interfaces:
     type: hose_port
     gender: neutral
     datum: drain_out
-    frame: {normal: "-Y", up: "+Z", axis: "-Y"}
+    # VF-4.2: the drain exits the BOTTOM — the tube enters from below and
+    # routes under the row
+    frame: {normal: "-Z", up: "+Y", axis: "-Z"}
 
 validators:
   - interface.frame_exists
@@ -141,6 +157,7 @@ validators:
   - form.collector_receiver_matches_final_lap
   - form.receiver_open_top_cleanable
   - form.collector_drain_bore_supportless
+  - form.collector_structure_sturdy
   - form.no_standing_water_ir
   - topology.fluid_path_open
   - topology.single_connected_solid

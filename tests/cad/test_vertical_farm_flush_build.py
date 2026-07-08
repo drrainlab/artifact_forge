@@ -85,9 +85,9 @@ def test_smoke_collector_is_end_receiver(smoke_report):
 
 
 def test_smoke_parts_print_supportless(smoke_report):
-    """VF-4.1 printability on real parts: the skeleton rail has no ceiling
-    bridges, the collector's teardrop drain passes the horizontal-bore
-    check, and the declared orientation matches the builder."""
+    """Printability on real parts: the skeleton rail has no ceiling
+    bridges, the collector's VERTICAL drain has no horizontal bore to flag,
+    and the declared orientation matches the builder."""
     report, out = smoke_report
     base = out / "vertical_farm_flush_smoke"
     for ref, expect in (("rail_1", "manufacturing.supportless_lightweight_windows_ok"),
@@ -96,6 +96,35 @@ def test_smoke_parts_print_supportless(smoke_report):
         by_check = {f["check"]: f["status"] for f in findings["findings"]}
         assert by_check.get(expect) == "pass", (ref, expect, by_check.get(expect))
         assert by_check.get("manufacturing.print_orientation_declared") == "pass"
+
+
+def test_smoke_collector_sturdy_and_vertical_drain(smoke_report):
+    """VF-4.2 on the compiled collector: sturdy U-frame verdict, and the
+    drain really exits the BOTTOM (void column from the tray floor down
+    through the part underside, solid walls beside the mouth)."""
+    report, out = smoke_report
+    base = out / "vertical_farm_flush_smoke"
+    findings = yaml.safe_load((base / "collector" / "findings.yaml").read_text())
+    by_check = {f["check"]: f["status"] for f in findings["findings"]}
+    assert by_check.get("form.collector_structure_sturdy") == "pass"
+    assert by_check.get("form.collector_tray_drains") == "pass"
+
+    import cadquery as cq
+
+    from artifact_forge_ng.cad.geometry import Geometry
+    from artifact_forge_ng.validators.topology import box_probe, solid_fraction
+    geo = Geometry(cq.importers.importStep(
+        str(base / "collector" / "part.step")))
+    bb = geo.workplane.val().BoundingBox()
+    # a void column near the drain (x~0) from the very bottom up a few mm —
+    # the tube passage out the underside
+    drain = box_probe(-3.0, bb.ymin + 3.0, bb.zmin + 0.5,
+                      3.0, bb.ymin + 12.0, bb.zmin + 4.0)
+    assert solid_fraction(geo.workplane, drain) < 0.2
+    # a solid side wall beside the mouth (x near the outer edge, mid height)
+    wall = box_probe(bb.xmax - 3.5, -6.0, bb.zmin + 3.0,
+                     bb.xmax - 1.0, -3.0, bb.zmin + 8.0)
+    assert solid_fraction(geo.workplane, wall) > 0.85
 
 
 def test_smoke_frame_report_and_bom(smoke_report):

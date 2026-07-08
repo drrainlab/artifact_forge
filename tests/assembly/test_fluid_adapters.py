@@ -15,6 +15,7 @@ from artifact_forge_ng.core.findings import Status
 from artifact_forge_ng.form.checks_water import (
     check_collector_drain_bore_supportless,
     check_collector_receiver_matches_final_lap,
+    check_collector_structure_sturdy,
     check_collector_tray_drains,
     check_hose_bore_ok,
     check_no_standing_water_ir,
@@ -45,7 +46,8 @@ COLLECTOR_PARAMS = dict(
     tray_w=20.0, tube_od=9.0, bore_clearance=0.4,
     rail_wall_t=13.25, saddle_fit=0.4, hang_drop=20.4,
     tongue_w=14.0, rail_channel_w=16.0, tray_slope_deg=1.5,
-    catch_fall=8.5, lip_overhang=4.0, capture_depth=8.0, corner_r=3.0,
+    catch_fall=8.5, lip_overhang=4.0, capture_depth=8.0,
+    drain_extension=10.0, drain_grip=12.0, wall_extra=2.4, corner_r=3.0,
 )
 
 
@@ -103,6 +105,8 @@ def test_collector_op_satisfies_checks():
                   check_collector_receiver_matches_final_lap,
                   check_receiver_open_top_cleanable,
                   check_collector_drain_bore_supportless,
+                  check_collector_structure_sturdy,
+                  check_collector_tray_drains,
                   check_no_standing_water_ir):
         finding = check(form)
         assert finding.status is Status.PASS, (finding.check, finding.message)
@@ -159,12 +163,98 @@ def test_wall_apron_rejected():
     assert f.status is Status.FAIL and "biofilm" in f.message
 
 
-def test_round_horizontal_drain_rejected():
+def test_vertical_drain_prints_supportless():
+    """VF-4.2: the drain is a VERTICAL bore out the bottom — no ceiling,
+    supportless as-modeled."""
+    form = collector_form()
+    drain = next(b for b in form.bores if "drain" in b.name)
+    assert drain.axis == "Z"
+    f = check_collector_drain_bore_supportless(form)
+    assert f.status is Status.PASS
+
+
+def test_horizontal_round_drain_rejected():
     from dataclasses import replace
     form = collector_form()
-    form.bores[:] = [replace(b, roof="round") for b in form.bores]
+    form.bores[:] = [replace(b, axis="Y", roof="round") if "drain" in b.name
+                     else b for b in form.bores]
     f = check_collector_drain_bore_supportless(form)
     assert f.status is Status.FAIL and "sags" in f.message
+
+
+def test_drain_returns_to_tray_low_point():
+    """tray_drains: the vertical bore mouth reaches the sloped floor's low
+    point — water empties, nothing pools above it."""
+    form = collector_form()
+    assert check_collector_tray_drains(form).status is Status.PASS
+    # raise the sump low-point key above the bore top -> water above drain
+    form.frame["tray_floor_low_z"] = form.frame["tray_floor_low_z"] + 5.0
+    f = check_collector_tray_drains(form)
+    assert f.status is Status.FAIL
+
+
+# -- VF-4.2: sturdy U-frame (closes the min_wall blind spot) -------------------
+
+
+def test_thin_wall_rejected():
+    form = collector_form()
+    form.frame["wall_t"] = 3.0  # a column, not a wall
+    f = check_collector_structure_sturdy(form)
+    assert f.status is Status.FAIL and "thin column" in f.message
+
+
+def test_wall_off_the_bottom_rejected():
+    """A wall rooted on the tray rim (not the bottom) is the old column."""
+    from dataclasses import replace
+    form = collector_form()
+    for i, r in enumerate(form.ribs):
+        if "cheek" in r.name:
+            b = r.box
+            form.ribs[i] = replace(r, box=type(b)(
+                b.x0, b.y0, form.frame["tray_bottom_z"] + 6.0, b.x1, b.y1, b.z1))
+    f = check_collector_structure_sturdy(form)
+    assert f.status is Status.FAIL and "not rooted" in f.message
+
+
+def test_wall_not_welded_to_arm_rejected():
+    from dataclasses import replace
+    form = collector_form()
+    for i, r in enumerate(form.ribs):
+        if "cheek" in r.name:
+            b = r.box
+            form.ribs[i] = replace(r, box=type(b)(
+                b.x0, b.y0, b.z0, b.x1, b.y1, form.frame["arm_z0"] - 1.0))
+    f = check_collector_structure_sturdy(form)
+    assert f.status is Status.FAIL and "arm" in f.message
+
+
+def test_thin_arm_weld_rejected():
+    """The exact defect a user spotted in profile: walls merging into the
+    hanging arm over a 0.6 glue seam carry the whole cantilever on it."""
+    from dataclasses import replace
+    form = collector_form()
+    for i, r in enumerate(form.ribs):
+        if "cheek" in r.name:
+            b = r.box
+            form.ribs[i] = replace(r, box=type(b)(
+                b.x0, b.y0, b.z0, b.x1, b.y1, form.frame["arm_z0"] + 0.6))
+    f = check_collector_structure_sturdy(form)
+    assert f.status is Status.FAIL and "glue seam" in f.message
+
+
+def test_walls_merge_full_arm_height():
+    """Healthy: the walls run the full arm height (>= the weld minimum)."""
+    form = collector_form()
+    overlap = form.frame["wall_z1"] - form.frame["arm_z0"]
+    assert overlap >= 3.0
+    assert check_collector_structure_sturdy(form).status is Status.PASS
+
+
+def test_single_wall_rejected():
+    form = collector_form()
+    form.ribs[:] = [r for r in form.ribs if "cheek_w" not in r.name]
+    f = check_collector_structure_sturdy(form)
+    assert f.status is Status.FAIL
 
 
 def test_cap_refuses_wide_spout():

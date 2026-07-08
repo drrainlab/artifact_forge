@@ -136,18 +136,31 @@ def tray_channel(**over) -> ChannelCutFeature:
     return ChannelCutFeature(name="tray", **kw)
 
 
+#: tray floor low point (design z) at the deep end and its Y (VF-4.2).
+FLOOR_LOW = 8.0 - (3.0 + TRAY_DROP)
+DRAIN_Y = -9.0
+
+
 def drain_bore(**over) -> BoreFeature:
-    floor_at_drain = 8.0 - (3.0 + TRAY_DROP)
+    # VF-4.2: VERTICAL bore descending from the tray low floor out the
+    # bottom — the tube pushes in from below.
     kw: dict = dict(
-        name="drain_hose", axis="Y", center=(0.0, -10.0, floor_at_drain + BORE_D / 2.0),
-        d=BORE_D, span=(-14.0, -8.0), overshoot=(1.0, 1.0),
+        name="drain_hose", axis="Z", center=(0.0, DRAIN_Y, 0.0),
+        d=BORE_D, span=(-2.0, FLOOR_LOW + 0.5), overshoot=(1.0, 1.0),
     )
     kw.update(over)
     return BoreFeature(**kw)
 
 
+def collector_frame(**over) -> dict:
+    f = {"hose_tube_od": TUBE_OD, "tray_floor_low_z": FLOOR_LOW,
+         "drain_low_y": DRAIN_Y}
+    f.update(over)
+    return f
+
+
 def healthy_collector() -> PartForm:
-    return make_form("collector", frame={"hose_tube_od": TUBE_OD},
+    return make_form("collector", frame=collector_frame(),
                      channels=[tray_channel()], bores=[drain_bore()])
 
 
@@ -159,34 +172,56 @@ def test_healthy_collector_passes():
 
 
 def test_flat_tray_rejected():
-    form = make_form("collector", frame={"hose_tube_od": TUBE_OD},
+    form = make_form("collector", frame=collector_frame(),
                      channels=[tray_channel(depth_end=3.0001)],
                      bores=[drain_bore()])
     assert check_collector_tray_drains(form).status is Status.FAIL
 
 
 def test_missing_drain_rejected():
-    form = make_form("collector", frame={"hose_tube_od": TUBE_OD},
+    form = make_form("collector", frame=collector_frame(),
                      channels=[tray_channel()])
     finding = check_collector_tray_drains(form)
     assert finding.status is Status.FAIL
     assert "reservoir" in finding.message
 
 
-def test_high_drain_rejected():
-    """A drain sitting above the floor leaves standing water below it."""
-    form = make_form("collector", frame={"hose_tube_od": TUBE_OD},
+def test_horizontal_drain_rejected():
+    """A horizontal drain is the old sideways spit — VF-4.2 drains down."""
+    form = make_form("collector", frame=collector_frame(),
                      channels=[tray_channel()],
-                     bores=[drain_bore(center=(0.0, -10.0, 12.0))])
+                     bores=[drain_bore(axis="Y")])
     finding = check_collector_tray_drains(form)
     assert finding.status is Status.FAIL
-    assert "never leaves" in finding.message
+    assert "VERTICALLY" in finding.message
+
+
+def test_drain_short_of_floor_rejected():
+    """A vertical bore whose top stops below the tray low floor leaves
+    standing water above it."""
+    form = make_form("collector", frame=collector_frame(),
+                     channels=[tray_channel()],
+                     bores=[drain_bore(span=(-2.0, FLOOR_LOW - 3.0),
+                                       overshoot=(1.0, 0.0))])
+    finding = check_collector_tray_drains(form)
+    assert finding.status is Status.FAIL
+    assert "never reaches" in finding.message
+
+
+def test_drain_not_at_low_point_rejected():
+    form = make_form("collector", frame=collector_frame(),
+                     channels=[tray_channel()],
+                     bores=[drain_bore(center=(0.0, 5.0, 0.0))])
+    finding = check_collector_tray_drains(form)
+    assert finding.status is Status.FAIL
+    assert "low point" in finding.message
 
 
 def test_blind_drain_rejected():
-    form = make_form("collector", frame={"hose_tube_od": TUBE_OD},
+    """A bore that does not exit the bottom traps water."""
+    form = make_form("collector", frame=collector_frame(),
                      channels=[tray_channel()],
                      bores=[drain_bore(overshoot=(0.0, 1.0))])
     finding = check_collector_tray_drains(form)
     assert finding.status is Status.FAIL
-    assert "pierce" in finding.message
+    assert "exit the bottom" in finding.message

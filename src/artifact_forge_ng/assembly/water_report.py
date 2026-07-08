@@ -192,6 +192,22 @@ def _row_rollup(
     orphan = findings_for("assembly.no_orphan_ports")
     saddles = findings_for("assembly.saddle_hang_ir")
     meta = getattr(asm, "meta", {}) or {}
+    # Overflow containment honesty (VF-4.2): in nominal flow the water exits
+    # through the contact window into the channel; but with an open skeleton
+    # under the cassette, top-water OVERFLOW drips straight through the row.
+    # This is stated, not silent — the containing root chamber is VF-5.
+    skeleton = any(
+        state.form is not None and state.form.frame.get("lw_enabled")
+        for _, state in cells)
+    if skeleton:
+        overflow = {
+            "status": "absent",
+            "path": "drains_through_skeleton",
+            "user_action": "keep a tray under the row",
+            "planned_fix": "VF-5 root_chamber",
+        }
+    else:
+        overflow = {"status": "contained"}
     return {
         "kind": meta.get("row_kind", "tilted_flush_row"),
         "slope_source": ("mounted_profile" if mount is not None
@@ -210,6 +226,7 @@ def _row_rollup(
         "lap_seam_leak": ("controlled" if leak else
                           "UNCONTROLLED" if leak is False else "unchecked"),
         "drips_clear_of": ["profiles", "magnets", "dry_zones"],
+        "overflow_containment": overflow,
         "saddle_mounts": [
             {"status": s.status.value, "note": s.message} for s in saddles
         ],

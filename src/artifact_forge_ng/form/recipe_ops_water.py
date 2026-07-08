@@ -941,7 +941,10 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
     slope = p["tray_slope_deg"]
     bore_d = tube_od + grip
     wall = 2.4
-    tray_w_outer = tray_w_inner + 2.0 * (wall + 1.2)
+    # Sturdy U-frame walls (VF-4.2): wider than a molded skin so the side
+    # walls carry the cantilevered tray as real walls, not thin columns.
+    wall_extra = p.get("wall_extra", 2.4)
+    tray_w_outer = tray_w_inner + 2.0 * (wall + 1.2 + wall_extra)
     if tongue_w > rail_channel_w - 2.0:
         raise RecipeError(
             f"tongue {tongue_w:g} cannot dip into the {rail_channel_w:g} rail channel")
@@ -957,27 +960,33 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
             f"lip tip lands {capture_depth - lip_overhang:g} from the apron "
             "(needs >= 2) — deepen capture_depth or shorten the lip")
 
+    # Sump extension (VF-4.2): the tray reaches drain_extension further back
+    # so a VERTICAL drain bore can be drilled through solid body at the
+    # floor's low point — the tube pushes in FROM BELOW and routes under the
+    # row (no sagging horizontal ceiling, no teardrop trick needed).
+    drain_extension = p.get("drain_extension", 10.0)
+    if not (8.0 - 1e-9 <= drain_extension <= 14.0 + 1e-9):
+        raise RecipeError(
+            f"drain_extension {drain_extension:g} outside 8..14")
+    drain_grip = p.get("drain_grip", 12.0)  # solid depth for the push-in tube
+
     rim_z = 3.0
-    # The catch floor sits catch_fall below the handover datum — deeper
-    # than the rail-to-rail FALL_ENTRY on purpose: the tray end must be
-    # deep enough to enclose the drain bore below its rim.
+    # The catch floor sits catch_fall below the handover datum so the mouth
+    # captures the lip; the tray then slopes back to the sump's low point.
     catch_fall = p["catch_fall"]
     floor_at_catch = -catch_fall
     depth_start = rim_z + catch_fall
-    y_drain_wall = -(capture_depth + 3.0)  # tray outer end (drain wall)
+    y_drain_wall = -(capture_depth + 3.0 + drain_extension)  # sump outer end
     run = 1.6 - (y_drain_wall + 3.0)  # channel span catch->deep end
     depth_end = depth_start + run * math.tan(math.radians(slope))
-    tray_bottom = floor_at_catch - (depth_end - depth_start) - 3.0  # ~3mm floor plate
-    if bore_d > depth_end - 1.5:
+    floor_low = rim_z - depth_end  # deepest floor point (design z)
+    # base deep enough that the vertical drain grips >= drain_grip of solid
+    tray_bottom = min(floor_at_catch - (depth_end - depth_start) - 3.0,
+                      floor_low - drain_grip)
+    if bore_d > tray_w_inner - 3.0:
         raise RecipeError(
-            f"drain bore {bore_d:g} does not fit enclosed below the tray rim "
-            f"(tray end depth {depth_end:g}) — raise catch_fall")
-    # the teardrop roof peaks r*sqrt(2) above center — it too must stay
-    # enclosed below the rim
-    if (bore_d / 2.0) * (1.0 + math.sqrt(2.0)) > depth_end - 0.3:
-        raise RecipeError(
-            f"teardrop drain peak does not fit below the rim "
-            f"(tray end depth {depth_end:g}) — raise catch_fall or shrink tube_od")
+            f"drain bore {bore_d:g} does not fit across the {tray_w_inner:g} "
+            "tray with wall — widen tray_w or shrink tube_od")
 
     # base = the tray block; everything above is additive (arm/bib/tongue)
     u0, v0, u1, v1 = -tray_w_outer / 2.0, y_drain_wall, tray_w_outer / 2.0, -0.4
@@ -1001,30 +1010,40 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
         bottom_r=1.0,
     ))
     name = op_id or "collector"
-    # Teardrop drain (VF-4.1): a horizontal push-in bore prints a sagging
-    # round ceiling — the 45-degree chord roof is self-supporting.
+    # Vertical drain (VF-4.2): the bore descends from the sump's low floor
+    # point straight through the solid base and out the bottom — the push-in
+    # tube enters FROM BELOW and routes under the row. A vertical bore has
+    # no ceiling to bridge, so it prints supportless as-modeled.
+    y_drain = y_drain_wall + 3.0 + bore_d / 2.0 + 1.0  # inboard of the back wall
     state.bores.append(BoreFeature(
-        name=f"{name}_drain_hose", axis="Y",
-        center=(0.0, 0.0, rim_z - depth_end + bore_d / 2.0 + dz),
-        d=bore_d, span=(y_drain_wall, y_drain_wall + 3.0),
-        overshoot=(1.0, 1.0), roof="teardrop",
+        name=f"{name}_drain_hose", axis="Z",
+        center=(0.0, y_drain, 0.0),
+        d=bore_d, span=(0.0, floor_low + dz + 0.5),
+        overshoot=(1.0, 1.0),
     ))
     # No tuck strip (VF correction): the cascade's relief recess is gone —
     # the wall face is solid, and the lap lip carries the drip band
     # lip_overhang outside the face, well inside the tray mouth. A strip
     # reaching INTO the wall would simply interfere with the rail body.
-    # Two side CHEEKS wrap the WET ZONE of the captured lip (VF-4.1:
-    # lip_w/2 + 1.5 per side — they hug, never touch) and carry the tray
-    # up to the arm — never a cross-tray bib: the whole brush/drip volume
-    # over the mouth stays open to the sky. Cheeks rise 0.6 into the
-    # arm's z-range (weld).
+    # Two side WALLS (VF-4.2 U-frame): full side walls from the tray bottom
+    # up to the arm, running the FULL length of the body — the cantilevered
+    # tray, the mouth zone and the arm become one rigid U, not columns on
+    # the tray rim. Walls stay at |x| >= cheek_x0 (they hug the captured
+    # lip's wet zone, lip_w/2 + 1.5 per side, never touch) so the mouth's
+    # open top survives between them. Vertical walls print supportless.
     lip_w = rail_channel_w + 2.0
     cheek_x0 = max(lip_w / 2.0 + 1.5, tray_w_inner / 2.0 + 0.5)
-    cheek_e = Box3(cheek_x0, -(capture_depth + 1.0), rim_z + dz - 0.6,
-                   u1, -1.5, hang_drop + 0.6 + dz)
-    cheek_w = Box3(u0, -(capture_depth + 1.0), rim_z + dz - 0.6,
-                   -cheek_x0, -1.5, hang_drop + 0.6 + dz)
-    arm = Box3(u0, -1.5, hang_drop + dz, u1, wall_t + fit, hang_drop + 8.0 + dz)
+    wall_z0 = dz + tray_bottom + 1.0  # = 1.0: just above the base bottom
+    arm_z0 = hang_drop + dz
+    arm_z1 = hang_drop + 8.0 + dz
+    # Walls run the FULL arm height (VF-4.2): they ARE the arm's side walls,
+    # merging over the whole 8 mm — not a 0.6 mm glue line carrying the
+    # hanging arm. The neck between the tray and the arm is one continuous
+    # side wall, not a thin waist.
+    wall_z1 = arm_z1
+    cheek_e = Box3(cheek_x0, y_drain_wall, wall_z0, u1, -1.5, wall_z1)
+    cheek_w = Box3(u0, y_drain_wall, wall_z0, -cheek_x0, -1.5, wall_z1)
+    arm = Box3(u0, -1.5, arm_z0, u1, wall_t + fit, arm_z1)
     # the locator tongue rides the UPPER corridor only: its underside
     # clears the tray's vertical brush probes (rim + 14) and sits far
     # above the exiting water; X/Y capture is unchanged
@@ -1062,16 +1081,23 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
         receiver_lip_overhang=lip_overhang,
         receiver_lip_w=lip_w,
         handover_dz=dz,
+        # structure keys (VF-4.2) — the U-frame walls the sturdiness check
+        # reads, and the vertical-drain marker
+        wall_x0=cheek_x0, wall_t=u1 - cheek_x0,
+        wall_z0=wall_z0, wall_z1=wall_z1,
+        arm_z0=hang_drop + dz, tray_bottom_z=dz + tray_bottom,
+        drain_vertical=1.0, drain_low_y=y_drain, drain_grip=drain_grip,
+        tray_floor_low_z=floor_low + dz,
     )
     # The catch datum sits AT THE LIP TIP: lip_overhang outside the wall
     # face, on the handover plane — mating it onto the rail's drain_edge
     # lands the collector body exactly against the wall.
     state.datums["catch"] = {
         "at": [0.0, -p.get("lip_overhang", 4.0), dz], "rotate": [0.0, 0.0, 0.0]}
+    # The drain exits the BOTTOM of the sump — the tube pushes in from below
+    # and routes under the row (normal -Z).
     state.datums["drain_out"] = {
-        "at": [0.0, y_drain_wall, rim_z - depth_end + bore_d / 2.0 + dz],
-        "rotate": [0.0, 0.0, 0.0],
-    }
+        "at": [0.0, y_drain, 0.0], "rotate": [0.0, 0.0, 0.0]}
 
 
 _register(RecipeOpDecl(
@@ -1085,6 +1111,8 @@ _register(RecipeOpDecl(
         "rail_channel_w": ("length", 16.0), "tray_slope_deg": ("number", 1.5),
         "catch_fall": ("length", 8.5), "lip_overhang": ("length", 4.0),
         "capture_depth": ("length", 8.0),
+        "drain_extension": ("length", 10.0), "drain_grip": ("length", 12.0),
+        "wall_extra": ("length", 3.0),
         "corner_r": ("length", 3.0),
     },
     validators=(
@@ -1092,14 +1120,16 @@ _register(RecipeOpDecl(
         "form.collector_receiver_matches_final_lap",
         "form.receiver_open_top_cleanable",
         "form.collector_drain_bore_supportless",
+        "form.collector_structure_sturdy",
         "form.no_standing_water_ir",
         "topology.fluid_path_open", "topology.single_connected_solid",
         "topology.ribs_present",
     ),
     apply=_collector_endcap_body,
-    description="catch-tray collector endcap: sloped tray under the rail "
-                "overflow lip draining into a push-in hose bore; "
-                "saddle-hangs on the front wall over the drip band",
+    description="catch-tray collector endcap (VF-4.2): sloped tray under the "
+                "final lap lip, sturdy U-frame side walls carrying the "
+                "cantilever, draining through a VERTICAL push-in bore out "
+                "the sump bottom (tube enters from below, routes under the row)",
 ))
 
 

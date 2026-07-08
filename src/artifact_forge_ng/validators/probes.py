@@ -137,6 +137,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.collector_receiver_matches_final_lap", Level.FORM, "the collector mouth is a real end receiver for the final lap lip: wide enough, 6-8 capture depth, a low drip apron past the lip tip"),
         _decl("form.receiver_open_top_cleanable", Level.FORM, "the receiver capture zone is open to the sky, the apron is a low curb (never a wall), and the zone flows into the open tray — a brush goes wherever a drop goes"),
         _decl("form.collector_drain_bore_supportless", Level.FORM, "the drain bore prints without support: vertical, or a teardrop roof on a horizontal run"),
+        _decl("form.collector_structure_sturdy", Level.FORM, "the collector tray hangs on two full side walls (not thin columns): thick enough, rooted at the tray bottom, welded into the arm"),
         _decl("form.lift_access_ok", Level.FORM, "rim carries two finger notches wide enough for tool-free removal"),
         # -- interface level (wave A1, form-time) ------------------------------
         _decl("interface.frame_exists", Level.FORM, "every declared interface's datum is published on the form with its type's frame keys"),

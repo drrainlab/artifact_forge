@@ -703,6 +703,12 @@ HOSE_GRIP_BAND = (0.2, 0.8)
 TRAY_SLOPE_BAND = (0.8, 3.0)
 #: The drain bore must sit AT the tray floor (its underside within this).
 DRAIN_FLOOR_TOL = 1.0
+#: Collector U-frame side wall — thick enough to carry the cantilever, not
+#: a thin molded skin column (VF-4.2).
+COLLECTOR_WALL_MIN = 3.5
+#: The side walls must MERGE with the hanging arm over a real overlap, not
+#: a thin weld line that carries the whole cantilever on a glue seam.
+COLLECTOR_ARM_WELD_MIN = 3.0
 
 
 def check_hose_bore_ok(form: PartForm) -> Finding:
@@ -777,10 +783,15 @@ def check_spout_drop_path_ok(form: PartForm) -> Finding:
 
 
 def check_collector_tray_drains(form: PartForm) -> Finding:
+    """VF-4.2: the tray falls to its sump low point, and a VERTICAL drain
+    bore descends from that low point through the solid base and out the
+    bottom — the tube pushes in from below. (The old horizontal-drain
+    branch is gone; the collector was its only client.)"""
     if not form.channels:
         return _finding("form.collector_tray_drains", False,
                         "no tray channel on the part")
     ch = form.channels[0]
+    f = form.frame
     problems: list[str] = []
     if ch.depth_end <= ch.depth_start + 1e-6:
         problems.append("tray floor does not fall toward the drain")
@@ -793,19 +804,81 @@ def check_collector_tray_drains(form: PartForm) -> Finding:
         problems.append("no drain bore — the tray would be a reservoir")
     else:
         bore = drains[0]
-        floor_at_drain = ch.floor_z_at(ch.y1)
-        bottom = bore.center[2] - bore.d / 2.0
-        if abs(bottom - floor_at_drain) > DRAIN_FLOOR_TOL:
+        if bore.axis != "Z":
             problems.append(
-                f"drain underside at z={bottom:.2f} vs tray floor "
-                f"{floor_at_drain:.2f} — water below the drain never leaves")
-        if bore.overshoot[0] <= 0.0 or bore.overshoot[1] <= 0.0:
-            problems.append(f"{bore.name!r} is blind — the drain must pierce the wall")
+                f"drain axis {bore.axis} — the VF-4.2 collector drains "
+                "VERTICALLY out the bottom")
+        else:
+            # the bore MOUTH (its top) must reach the tray floor low point,
+            # and it must sit at that low point in Y (the deep end)
+            top = max(bore.span) + bore.overshoot[1]
+            low = f.get("tray_floor_low_z")
+            if low is not None and top < low - DRAIN_FLOOR_TOL:
+                problems.append(
+                    f"drain top z={top:.2f} below the tray low floor {low:.2f} "
+                    "— water above it never reaches the drain")
+            low_y = f.get("drain_low_y")
+            if low_y is not None and abs(bore.center[1] - low_y) > bore.d / 2.0 + 1.0:
+                problems.append(
+                    "drain is not at the tray low point — water pools before it")
+            if bore.overshoot[0] <= 0.0:
+                problems.append(
+                    f"{bore.name!r} is blind below — the drain must exit the bottom")
+        if bore.d < f.get("hose_tube_od", 0.0):
+            problems.append("drain narrower than the tube")
     return _finding(
         "form.collector_tray_drains", not problems,
-        f"tray falls {ch.slope_deg:.2f} deg into a through drain at the floor"
+        f"tray falls {ch.slope_deg:.2f} deg into a vertical drain at the "
+        "sump low point — empties out the bottom"
         if not problems else "; ".join(problems),
         measured=ch.slope_deg, limit=TRAY_SLOPE_BAND[1],
+    )
+
+
+def check_collector_structure_sturdy(form: PartForm) -> Finding:
+    """VF-4.2: the cantilevered tray hangs off the rail on TWO full side
+    walls, not thin columns — closes the min_wall blind spot (it measures
+    the `wall` param, never the actual rib sections). The walls are thick
+    enough, rooted at the tray bottom, run the full length and weld into
+    the arm."""
+    check = "form.collector_structure_sturdy"
+    f = form.frame
+    keys = ("wall_x0", "wall_t", "wall_z0", "wall_z1", "arm_z0", "tray_bottom_z")
+    missing = [k for k in keys if k not in f]
+    if missing:
+        return _finding(check, False, f"no structure frame keys: {', '.join(missing)}")
+    walls = [r for r in form.ribs if "cheek" in r.name]
+    problems: list[str] = []
+    if len(walls) != 2:
+        problems.append(f"{len(walls)} side wall(s) — the U-frame needs both flanks")
+    if f["wall_t"] < COLLECTOR_WALL_MIN:
+        problems.append(
+            f"side wall {f['wall_t']:.1f} thick < {COLLECTOR_WALL_MIN:g} — "
+            "a thin column, not a wall")
+    for w in walls:
+        if w.box.z0 > f["tray_bottom_z"] + 2.0 + 1e-6:
+            problems.append(
+                f"wall {w.name!r} starts at z={w.box.z0:.1f}, not rooted at the "
+                f"tray bottom {f['tray_bottom_z']:.1f} — a column on the rim")
+        if w.box.z1 < f["arm_z0"] + COLLECTOR_ARM_WELD_MIN - 1e-6:
+            problems.append(
+                f"wall {w.name!r} overlaps the arm only "
+                f"{max(0.0, w.box.z1 - f['arm_z0']):.1f} (needs >= "
+                f"{COLLECTOR_ARM_WELD_MIN:g}) — a glue seam, not a merged wall")
+        span = w.box.y1 - w.box.y0
+        if span < abs(f.get("drain_low_y", 0.0)) * 0.5:
+            problems.append(f"wall {w.name!r} does not run the tray length")
+    if len(walls) == 2:  # symmetry about the centerline
+        c0 = walls[0].box.x0 + walls[0].box.x1
+        c1 = walls[1].box.x0 + walls[1].box.x1
+        if abs(c0 + c1) > 0.4:
+            problems.append("side walls are not symmetric about the centerline")
+    return _finding(
+        check, not problems,
+        f"U-frame: two {f['wall_t']:.1f}-thick side walls from the tray "
+        "bottom into the arm — the tray hangs on walls, not columns"
+        if not problems else "; ".join(problems),
+        measured=f["wall_t"], limit=COLLECTOR_WALL_MIN,
     )
 
 
@@ -957,6 +1030,8 @@ register_probe("form.receiver_open_top_cleanable")(
     lambda form, ctx: check_receiver_open_top_cleanable(form))
 register_probe("form.collector_drain_bore_supportless")(
     lambda form, ctx: check_collector_drain_bore_supportless(form))
+register_probe("form.collector_structure_sturdy")(
+    lambda form, ctx: check_collector_structure_sturdy(form))
 register_probe("form.collector_tray_drains")(
     lambda form, ctx: check_collector_tray_drains(form))
 
