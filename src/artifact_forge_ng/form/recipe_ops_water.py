@@ -35,9 +35,10 @@ from .section import SectionProfile
 FLOOR_MARGIN_MIN = 2.0
 #: Corridor over the channel through the seat walls — brush-open by design.
 CORRIDOR_MARGIN = 2.0
-#: How far above the receiving channel floor the fluid INLET datum sits:
-#: mating outlet-on-inlet drops the downstream part this much below the
-#: upstream lip — the cascade step that makes gravity the pump.
+#: How far above the channel floor the FEED datum sits: the inlet cap's
+#: drip tower releases the stream this far above the first rail's floor.
+#: This is the ONLY place a fall survives after the VF correction — rails
+#: hand water to each other flush, over lap lips, with no step at all.
 FALL_ENTRY = 2.5
 
 
@@ -45,28 +46,41 @@ FALL_ENTRY = 2.5
 
 
 def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """The Base Water Rail: a level plan-view body carrying a recessed
-    cassette seat, and the sloped open U-channel cut from the SEAT FLOOR —
-    the body stays horizontal, the water falls. Flow axis Y: inlet at the
-    back (+Y), outlet at the front (-Y). Corridor notches open the channel
-    to the sky through both seat walls, so the whole run is brush-reachable
-    and the water exits by construction."""
+    """The Base Water Rail (tilted flush row canon): a level plan-view body
+    carrying a recessed cassette seat and a CONSTANT-DEPTH open U-channel
+    cut from the SEAT FLOOR. The rail itself is horizontal end to end — the
+    drainage slope comes from MOUNTING the whole row on a straight aluminum
+    profile at 1.0–2.0 deg (mount_context), never from the geometry. Flow
+    axis Y: inlet at the back (+Y), outlet at the front (-Y). Corridor
+    notches open the channel to the sky through both seat walls, so the
+    whole run is brush-reachable.
+
+    Lightweight dry shell (param-gated, reversible): the rail is a dry
+    frame around a protected water core, not a slab — large smooth
+    open-bottom windows are cut from the underside between the channel and
+    the profile-slot bands, leaving a >= lw_cover roof under the seat floor
+    and lw_rib cross ribs. The profile carries the row; plastic pays only
+    for water, cassette and positioning. Never honeycomb — big cleanable
+    openings only."""
     if state.section is not None:
         raise RecipeError("water_rail_body must be the (single) base op")
     l, w, h = p["module_l"], p["module_w"], p["body_h"]
-    ch_w, ch_d, slope = p["channel_w"], p["channel_d"], p["slope_deg"]
+    ch_w, ch_d = p["channel_w"], p["channel_d"]
     bottom_r = p["channel_bottom_r"]
     cassette_l, cassette_w = p["cassette_l"], p["cassette_w"]
     seat_depth, clearance = p["seat_depth"], p["seat_clearance"]
     pitch = p["module_pitch"]
+    face_gap = p.get("face_gap", 0.4)
 
     seat_floor = h - seat_depth
-    depth_out = ch_d + w * math.tan(math.radians(slope))
-    floor_margin = seat_floor - depth_out
+    floor_margin = seat_floor - ch_d
     if floor_margin < FLOOR_MARGIN_MIN:
         raise RecipeError(
-            f"channel floor would leave only {floor_margin:.1f} under the outlet "
-            f"(needs >= {FLOOR_MARGIN_MIN:g}) — raise body_h or shrink seat_depth/slope")
+            f"channel floor would leave only {floor_margin:.1f} beneath it "
+            f"(needs >= {FLOOR_MARGIN_MIN:g}) — raise body_h or shrink seat_depth/channel_d")
+    if not (0.3 - 1e-9 <= face_gap <= 0.6 + 1e-9):
+        raise RecipeError(
+            f"face_gap {face_gap:g} outside the controlled flush band 0.3..0.6")
     seat_l = cassette_l + 2.0 * clearance
     seat_w = cassette_w + 2.0 * clearance
     if seat_l + 16.0 > l or seat_w + 16.0 > w:
@@ -79,11 +93,12 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     )
     state.width = h
     name = op_id or "rail"
+    floor_z = seat_floor - ch_d
 
     state.channels.append(ChannelCutFeature(
         name=f"{name}_water", center_x=0.0,
         y0=v1, y1=v0, z_top=seat_floor,
-        width=ch_w, depth_start=ch_d, depth_end=depth_out, bottom_r=bottom_r,
+        width=ch_w, depth_start=ch_d, depth_end=ch_d, bottom_r=bottom_r,
     ))
     state.cutboxes.append(CutBoxFeature(
         name=f"{name}_seat",
@@ -102,7 +117,7 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
 
     state.regions.extend([
         Region("water_channel", RegionRole.TRANSIENT_WATER_PATH,
-               Box3(-ch_w / 2.0, v0, seat_floor - depth_out - 0.5,
+               Box3(-ch_w / 2.0, v0, floor_z - 0.5,
                     ch_w / 2.0, v1, seat_floor)),
         Region("cassette_seat_walls", RegionRole.INTERFACE_KEEPOUT,
                Box3(-seat_l / 2.0 - 4.0, -seat_w / 2.0 - 4.0, seat_floor,
@@ -111,6 +126,40 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
                Box3(corridor_half + 4.0, seat_w / 2.0 + 1.0, 0.0, u1 - 4.0, v1, h)),
     ])
 
+    # -- lightweight dry shell windows (reversible: lightweight=false → slab)
+    lw = bool(p.get("lightweight", True))
+    lw_cover = p.get("lw_cover", 2.4)
+    lw_rib = p.get("lw_rib", 2.0)
+    lw_windows = 0
+    lw_span_max = 0.0
+    if lw:
+        # forbidden bands, computed from the same params the later feature
+        # ops consume — the windows stay clear BY CONSTRUCTION and
+        # form.lightweight_windows_dry_ok re-proves it against the final frame
+        profile_size = 20.0 if p.get("profile", "2020") == "2020" else 30.0
+        slot_half = (profile_size + 2.0 * 0.5) / 2.0  # worst-case clearance
+        x_in = ch_w / 2.0 + 4.0                      # channel + 2 clear + 2 wall
+        x_out = u1 - p.get("profile_inset", 24.0) - slot_half - lw_cover
+        y_lim = w / 2.0 - 12.0                       # lap / magnet / face margin
+        z_roof = seat_floor - lw_cover
+        if x_out - x_in >= 24.0 and y_lim >= 40.0 and z_roof >= 6.0:
+            n_cols, n_rows = 2, 5
+            col_w = (x_out - x_in - (n_cols - 1) * lw_rib) / n_cols
+            row_l = (2.0 * y_lim - (n_rows - 1) * lw_rib) / n_rows
+            lw_span_max = max(col_w, row_l)
+            for side in (1.0, -1.0):
+                for ci in range(n_cols):
+                    cx0 = x_in + ci * (col_w + lw_rib)
+                    for ri in range(n_rows):
+                        ry0 = -y_lim + ri * (row_l + lw_rib)
+                        state.cutboxes.append(CutBoxFeature(
+                            name=f"{name}_lwin_{'e' if side > 0 else 'w'}{ci}{ri}",
+                            box=Box3(min(side * cx0, side * (cx0 + col_w)), ry0, -1.0,
+                                     max(side * cx0, side * (cx0 + col_w)), ry0 + row_l,
+                                     z_roof),
+                        ))
+                        lw_windows += 1
+
     state.frame.update(
         outline_u0=u0, outline_v0=v0, outline_u1=u1, outline_v1=v1,
         outline_corner_r=p["corner_r"],
@@ -118,29 +167,38 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         channel_center_x=0.0, channel_w=ch_w, channel_bottom_r=bottom_r,
         channel_top_z=seat_floor,
         channel_y_inlet=v1, channel_y_outlet=v0,
-        channel_floor_z_inlet=seat_floor - ch_d,
-        channel_floor_z_outlet=seat_floor - depth_out,
-        channel_slope_deg=slope, channel_floor_margin=floor_margin,
+        channel_floor_z_inlet=floor_z,
+        channel_floor_z_outlet=floor_z,
+        channel_slope_deg=0.0, channel_floor_margin=floor_margin,
         corridor_w=2.0 * corridor_half,
         seat_u0=-seat_l / 2.0, seat_v0=-seat_w / 2.0,
         seat_u1=seat_l / 2.0, seat_v1=seat_w / 2.0,
         seat_floor_z=seat_floor, seat_depth=seat_depth, seat_clearance=clearance,
         module_pitch=pitch,
+        face_gap=face_gap, flush_pitch=w + face_gap,
+        lw_enabled=lw, lw_window_count=lw_windows,
+        lw_cover=lw_cover, lw_rib=lw_rib, lw_span_max=lw_span_max,
     )
     state.datums["cassette_seat"] = {"at": [0.0, 0.0, seat_floor], "rotate": [0.0, 0.0, 0.0]}
     state.datums["module_origin"] = {"at": [0.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0]}
     state.datums["line_east"] = {"at": [u1, 0.0, h / 2.0], "rotate": [0.0, 0.0, 0.0]}
     state.datums["line_west"] = {"at": [u0, 0.0, h / 2.0], "rotate": [0.0, 0.0, 0.0]}
-    # Fluid datums ARE the water handover points (VF-3): mating them
-    # datum-on-datum builds the cascade by construction — the downstream
-    # part lands FALL_ENTRY below the upstream lip, so gravity pumps and
-    # the falling stream enters the receiving channel's face opening.
+    # Flush fluid datums: inlet/outlet sit ON the channel floor plane,
+    # face_gap/2 OUTSIDE each face — mating outlet-on-inlet lands the
+    # neighbour at dZ = 0 and dY = module_w + face_gap (the flush pitch).
+    # The water crosses over the lap lip; nothing falls between modules.
     state.datums["inlet"] = {
-        "at": [0.0, v1, seat_floor - ch_d + FALL_ENTRY],
+        "at": [0.0, v1 + face_gap / 2.0, floor_z],
         "rotate": [0.0, 0.0, 0.0],
     }
     state.datums["outlet"] = {
-        "at": [0.0, v0, seat_floor - depth_out],
+        "at": [0.0, v0 - face_gap / 2.0, floor_z],
+        "rotate": [0.0, 0.0, 0.0],
+    }
+    # The feed datum keeps the ONLY fall in the corrected row: the inlet
+    # cap's drip tower targets this point, FALL_ENTRY above the floor.
+    state.datums["feed"] = {
+        "at": [0.0, v1, floor_z + FALL_ENTRY],
         "rotate": [0.0, 0.0, 0.0],
     }
 
@@ -152,70 +210,193 @@ _register(RecipeOpDecl(
         "module_l": ("length", None), "module_w": ("length", None),
         "body_h": ("length", 30.0),
         "channel_w": ("length", 16.0), "channel_d": ("length", 5.0),
-        "slope_deg": ("number", 1.25), "channel_bottom_r": ("length", 1.2),
+        "channel_bottom_r": ("length", 1.2),
         "cassette_l": ("length", None), "cassette_w": ("length", None),
         "seat_depth": ("length", 14.0), "seat_clearance": ("length", 0.75),
         "module_pitch": ("length", 250.0), "corner_r": ("length", 4.0),
+        "face_gap": ("length", 0.4),
+        "lightweight": ("bool", True),
+        "lw_cover": ("length", 2.4), "lw_rib": ("length", 2.0),
+        "profile": ("choice", "2020"), "profile_inset": ("length", 24.0),
     },
     validators=(
-        "form.water_channel_slope_ok", "form.water_channel_dims_ok",
+        "form.water_channel_constant_depth_ok", "form.water_channel_dims_ok",
+        "form.drainage_requires_mount", "form.lightweight_windows_dry_ok",
         "form.no_standing_water_ir", "form.cassette_seat_fit_ok",
         "topology.water_channel_open", "topology.water_channel_floor_solid",
         "topology.single_connected_solid", "topology.cutout_present",
     ),
     apply=_water_rail_body,
-    description="level rail body + recessed cassette seat + sloped open "
-                "U-channel cut from the seat floor (flow -Y, corridors open both ends)",
+    description="level rail body + recessed cassette seat + CONSTANT-DEPTH open "
+                "U-channel (flow -Y; drainage slope comes from the mount, never "
+                "the rail) + optional lightweight dry-shell windows",
 ))
 
 
-# -- overflow_lip (feature) ---------------------------------------------------
+# -- lap_outlet_lip / lap_inlet_receiver (features) ----------------------------
+#
+# The flush handover pair. Physics at dZ = 0: any lip THICKNESS placed on
+# the water path either dams the flow (1.4 mm head at 1.5 deg backs up a
+# ~53 mm pool) or hides a wet cavity. The only geometry that obeys every
+# rule: the lip CONTINUES the channel floor plane (its top IS the floor
+# level) and the receiver is a THROUGH, open-bottom cutout in the first
+# millimetres of the downstream floor — the lip lands in the opening and
+# the floor plane resumes after a deliberate 0.5–2.5 slot. The stream
+# crosses on top of the lip; stray drops in the slot fall through OPEN AIR
+# (visible, cleanable, no sump possible). The seam is never the primary
+# water path, and modules separate by a straight vertical lift.
+
+#: Extra lip width past the channel — the receiver walls guide, water stays on.
+LAP_LIP_W_MARGIN = 2.0
+#: Vertical play above the lip inside the receiver side slots.
+LAP_TOP_CLEAR = 0.2
 
 
-def _overflow_lip(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """The droplet-detachment edge: the channel already exits through the
-    front face; this op UNDERCUTS the wall below the exiting floor by the
-    air gap, leaving a lip_h-thick floor tongue whose edge stays sharp by
-    never being blended (lip radius = the printed edge, assumed, checked).
-    The relief void doubles as the open drip receiver."""
-    state.require_base("overflow_lip")
+def _lap_outlet_lip(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """The floor-plane lip at the outlet (-Y) face. On the last module of a
+    row the same lip is the drip edge the collector catches — its 4 mm
+    protrusion IS the air gap from the wall, so droplets detach."""
+    state.require_base("lap_outlet_lip")
     f = state.frame
     if "channel_floor_z_outlet" not in f:
-        raise RecipeError("overflow_lip needs a water_rail_body base")
-    lip_h, air_gap, lip_r = p["lip_h"], p["air_gap"], p["lip_r"]
-    lip_z = f["channel_floor_z_outlet"]
-    if lip_z - lip_h < 0.5:
-        raise RecipeError(
-            f"no wall below the lip to relieve (floor exits at z={lip_z:g}, "
-            f"lip_h={lip_h:g})")
+        raise RecipeError("lap_outlet_lip needs a water_rail_body base")
+    lip_len, lip_t = p.get("lip_len", 4.0), p.get("lip_t", 1.4)
+    if not (3.0 <= lip_len <= 6.0):
+        raise RecipeError(f"lip_len {lip_len:g} outside the lap band 3..6")
+    floor = f["channel_floor_z_outlet"]
     face = f["rail_y0"]
-    half = f["channel_w"] / 2.0 + CORRIDOR_MARGIN
-    name = op_id or "lip"
-    relief = Box3(-half, face - 1.0, -1.0, half, face + air_gap, lip_z - lip_h)
-    state.cutboxes.append(CutBoxFeature(name=f"{name}_relief", box=relief))
-    state.regions.extend([
-        Region("overflow_lip", RegionRole.TRANSIENT_WATER_PATH,
-               Box3(-half, face - 1.0, lip_z - lip_h, half, face + 2.0,
-                    f["channel_top_z"])),
-        Region("drip_receiver", RegionRole.TRANSIENT_WATER_PATH, relief),
-    ])
-    state.frame.update(lip_z=lip_z, lip_h=lip_h, air_gap=air_gap, lip_r_assumed=lip_r)
+    lip_w = f["channel_w"] + LAP_LIP_W_MARGIN
+    name = op_id or "lap_out"
+    tip_y = face - lip_len
+    lip = Box3(-lip_w / 2.0, tip_y, floor - lip_t,
+               lip_w / 2.0, face + 0.6, floor)
+    state.ribs.append(RibFeature(name=f"{name}_lap_lip", box=lip))
+    state.regions.append(Region(
+        "lap_lip", RegionRole.TRANSIENT_WATER_PATH,
+        Box3(-lip_w / 2.0, tip_y - 0.5, floor - lip_t - 0.5,
+             lip_w / 2.0, face + 2.0, f["channel_top_z"])))
+    state.frame.update(
+        lap_lip_len=lip_len, lap_lip_w=lip_w, lap_lip_t=lip_t,
+        lap_lip_top_z=floor, lap_lip_tip_y=tip_y,
+    )
+    # Drip target for the collector: the UNDERSIDE of the lip tip.
+    state.datums["drain_edge"] = {
+        "at": [0.0, tip_y, floor - lip_t], "rotate": [0.0, 0.0, 0.0]}
 
 
 _register(RecipeOpDecl(
-    name="overflow_lip",
+    name="lap_outlet_lip",
+    kind="feature",
+    params={"lip_len": ("length", 4.0), "lip_t": ("length", 1.4)},
+    validators=(
+        "form.lap_joint_geometry_ok", "form.lap_slot_leak_path_controlled",
+        "form.no_secondary_water_channel", "topology.ribs_present",
+    ),
+    apply=_lap_outlet_lip,
+    description="floor-plane lap lip past the outlet face — the flush "
+                "handover giver, and the drip edge on the last module",
+))
+
+
+def _lap_inlet_receiver(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """The through, open-bottom lap opening at the inlet (+Y) face: the
+    neighbour's lip lands here, continuing the floor plane; the tip slot
+    stays deliberately open so nothing can dam and nothing hides."""
+    state.require_base("lap_inlet_receiver")
+    f = state.frame
+    if "channel_floor_z_inlet" not in f:
+        raise RecipeError("lap_inlet_receiver needs a water_rail_body base")
+    pocket_len = p.get("pocket_len", 6.0)
+    side_clear = p.get("side_clearance", 0.4)
+    if not (0.3 <= side_clear <= 0.5):
+        raise RecipeError(f"side_clearance {side_clear:g} outside 0.3..0.5")
+    floor = f["channel_floor_z_inlet"]
+    face = f["rail_y1"]
+    pocket_w = f["channel_w"] + LAP_LIP_W_MARGIN + 2.0 * side_clear
+    name = op_id or "lap_in"
+    pocket = Box3(-pocket_w / 2.0, face - pocket_len, -1.0,
+                  pocket_w / 2.0, face + 0.5, floor + LAP_TOP_CLEAR)
+    state.cutboxes.append(CutBoxFeature(name=f"{name}_lap_receiver", box=pocket))
+    state.regions.append(Region(
+        "lap_receiver", RegionRole.TRANSIENT_WATER_PATH,
+        Box3(-pocket_w / 2.0, face - pocket_len - 0.5, -1.0,
+             pocket_w / 2.0, face + 0.5, f["channel_top_z"])))
+    state.frame.update(lap_pocket_len=pocket_len, lap_pocket_w=pocket_w,
+                       lap_side_clearance=side_clear)
+
+
+_register(RecipeOpDecl(
+    name="lap_inlet_receiver",
+    kind="feature",
+    params={"pocket_len": ("length", 6.0), "side_clearance": ("length", 0.4)},
+    validators=(
+        "form.lap_joint_geometry_ok", "form.lap_slot_leak_path_controlled",
+        "form.no_standing_water_ir", "topology.cutout_present",
+    ),
+    apply=_lap_inlet_receiver,
+    description="through open-bottom lap opening in the inlet floor — the "
+                "flush handover receiver; the tip slot is a controlled, "
+                "visible, cleanable leak path",
+))
+
+
+# -- edge_magnet_pockets (feature) ---------------------------------------------
+
+
+def _edge_magnet_pockets(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Optional module-alignment magnets: SEALED dry pockets — blind bores
+    into both +-Y faces, in dry body far from every wet zone, leaving a
+    plastic floor to the face gap and >= 1.2 wall to any water. Magnets
+    align neighbouring modules and NOTHING else: never a seal, never a
+    support. No magnet face is ever exposed to water."""
+    state.require_base("edge_magnet_pockets")
+    f = state.frame
+    if "rail_y1" not in f:
+        raise RecipeError("edge_magnet_pockets needs a water_rail_body base")
+    if not p.get("enabled", False):
+        state.frame.update(magnet_count=0)
+        return
+    d = p.get("magnet_d", 6.0) + p.get("fit_clearance", 0.4)
+    depth = p.get("magnet_t", 2.0) + 0.4
+    x_off, z_c = p.get("x_offset", 60.0), p.get("z_center", 8.0)
+    name = op_id or "magnets"
+    count = 0
+    for face_label, face_y, sign in (("in", f["rail_y1"], 1.0), ("out", f["rail_y0"], -1.0)):
+        for x_label, x in (("e", x_off), ("w", -x_off)):
+            span = (face_y - depth, face_y) if sign > 0 else (face_y, face_y + depth)
+            overshoot = (0.0, 1.0) if sign > 0 else (1.0, 0.0)
+            state.bores.append(BoreFeature(
+                name=f"{name}_pocket_{face_label}_{x_label}", axis="Y",
+                center=(x, 0.0, z_c), d=d, span=span, overshoot=overshoot,
+            ))
+            state.regions.append(Region(
+                f"module_magnet_pocket_{face_label}_{x_label}",
+                RegionRole.INTERFACE_KEEPOUT,
+                Box3(x - d / 2.0 - 1.0, min(span) - 1.0, z_c - d / 2.0 - 1.0,
+                     x + d / 2.0 + 1.0, max(span) + 1.0, z_c + d / 2.0 + 1.0)))
+            count += 1
+    state.frame.update(
+        magnet_count=count, magnet_pocket_d=d, magnet_pocket_depth=depth,
+        magnet_x_offset=x_off, magnet_z=z_c,
+    )
+
+
+_register(RecipeOpDecl(
+    name="edge_magnet_pockets",
     kind="feature",
     params={
-        "lip_h": ("length", 2.0), "air_gap": ("length", 1.5),
-        "lip_r": ("length", 0.4),
+        "enabled": ("bool", False),
+        "magnet_d": ("length", 6.0), "magnet_t": ("length", 2.0),
+        "fit_clearance": ("length", 0.4),
+        "x_offset": ("length", 60.0), "z_center": ("length", 8.0),
     },
     validators=(
-        "form.overflow_lip_geometry_ok", "form.no_secondary_water_channel",
-        "topology.overflow_relief_open", "topology.cutout_present",
+        "form.magnet_pockets_outside_water_zone",
+        "form.magnet_pockets_do_not_break_wall",
     ),
-    apply=_overflow_lip,
-    description="sharp overflow edge: air-gap undercut below the exiting "
-                "channel floor; the relief void is the open drip receiver",
+    apply=_edge_magnet_pockets,
+    description="optional sealed dry magnet pockets in both +-Y faces — "
+                "module alignment only, never a seal, never a support",
 ))
 
 
@@ -727,14 +908,16 @@ _register(RecipeOpDecl(
 
 
 def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """The Collector/Drain Endcap: a catch tray tucked under the rail's
-    overflow lip. Droplets detach at the lip, fall into the tray mouth,
-    run down the sloped tray floor to a push-in drain bore at the low end.
-    Hangs on the rail FRONT wall: an arm over the wall top, a bib outside
-    the drip band, a dry tongue in the outlet corridor for X/Y capture
-    (riding ABOVE the exiting water). Local frame: y=0 = the rail front
-    face = the catch plane, +y toward the rail interior; z=0 = the catch
-    datum height (the fluid handover point)."""
+    """The Collector/Drain Endcap: a catch tray under the LAST rail's lap
+    lip (VF correction: the lip continuing the channel floor plane is the
+    drip edge — its protrusion IS the air gap). Droplets detach at the lip
+    tip, fall into the tray mouth, run down the sloped tray floor to a
+    push-in drain bore at the low end. Hangs on the rail FRONT wall: an arm
+    over the wall top, side cheeks outside the drip band, a dry tongue in
+    the outlet corridor for X/Y capture (riding ABOVE the exiting water).
+    Local frame: y=0 = the rail front face, +y toward the rail interior;
+    z=0 = the handover plane (the lip tip underside the catch datum mates —
+    lip_overhang outside the face)."""
     if state.section is not None:
         raise RecipeError("collector_endcap_body must be the (single) base op")
     tray_w_inner = p["tray_w"]
@@ -840,7 +1023,11 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
         saddle_floor_z=hang_drop + dz, saddle_fit=fit,
         hang_drop=hang_drop,
     )
-    state.datums["catch"] = {"at": [0.0, 0.0, dz], "rotate": [0.0, 0.0, 0.0]}
+    # The catch datum sits AT THE LIP TIP: lip_overhang outside the wall
+    # face, on the handover plane — mating it onto the rail's drain_edge
+    # lands the collector body exactly against the wall.
+    state.datums["catch"] = {
+        "at": [0.0, -p.get("lip_overhang", 4.0), dz], "rotate": [0.0, 0.0, 0.0]}
     state.datums["drain_out"] = {
         "at": [0.0, y_drain_wall, rim_z - depth_end + bore_d / 2.0 + dz],
         "rotate": [0.0, 0.0, 0.0],
@@ -854,9 +1041,10 @@ _register(RecipeOpDecl(
         "tray_w": ("length", 20.0), "tube_od": ("length", 9.0),
         "bore_clearance": ("length", 0.4),
         "rail_wall_t": ("length", 13.25), "saddle_fit": ("length", 0.4),
-        "hang_drop": ("length", 24.41), "tongue_w": ("length", 14.0),
+        "hang_drop": ("length", 20.4), "tongue_w": ("length", 14.0),
         "rail_channel_w": ("length", 16.0), "tray_slope_deg": ("number", 1.5),
-        "catch_fall": ("length", 8.5), "corner_r": ("length", 3.0),
+        "catch_fall": ("length", 8.5), "lip_overhang": ("length", 4.0),
+        "corner_r": ("length", 3.0),
     },
     validators=(
         "form.hose_bore_ok", "form.collector_tray_drains",

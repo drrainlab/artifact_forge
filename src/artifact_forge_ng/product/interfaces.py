@@ -161,11 +161,13 @@ INTERFACE_TYPES: dict[str, InterfaceTypeDecl] = dict([
           },
           clearance_band=(0.3, 1.5)),
     _decl("fluid_inlet",
-          "water/nutrient line entry (receives — female side)",
-          ("fluid_joint",), orientation_sensitive=True),
+          "water/nutrient line entry (receives — female side): a drip "
+          "target or a flush lap receiver",
+          ("fluid_joint", "lap_flow_joint"), orientation_sensitive=True),
     _decl("fluid_outlet",
-          "water/nutrient line exit / drip edge handover (hands out — male)",
-          ("fluid_joint",), orientation_sensitive=True),
+          "water/nutrient line exit (hands out — male): a drip edge or a "
+          "flush lap lip",
+          ("fluid_joint", "lap_flow_joint"), orientation_sensitive=True),
     _decl("cable_pass",
           "cable/wire pass-through continuity point",
           (), genders=("neutral",)),

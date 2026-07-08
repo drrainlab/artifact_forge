@@ -16,13 +16,18 @@ from artifact_forge_ng.form.checks_substrate_cassette import (
 )
 from artifact_forge_ng.form.checks_water import (
     check_cassette_seat_fit_ok,
+    check_drainage_requires_mount,
+    check_lap_joint_geometry_ok,
+    check_lap_slot_leak_path_controlled,
+    check_lightweight_windows_dry_ok,
+    check_magnet_pockets_do_not_break_wall,
+    check_magnet_pockets_outside_water_zone,
     check_no_secondary_water_channel,
     check_no_standing_water_ir,
-    check_overflow_lip_geometry_ok,
     check_profile_seat_dry_ok,
     check_tongue_groove_profile_ok,
+    check_water_channel_constant_depth_ok,
     check_water_channel_dims_ok,
-    check_water_channel_slope_ok,
 )
 from artifact_forge_ng.form.part import PartForm
 from artifact_forge_ng.form.recipe_ops import RECIPE_OPS, RecipeError, RecipeState
@@ -31,10 +36,12 @@ from artifact_forge_ng.validators.probes import KNOWN_CHECKS
 
 RAIL_PARAMS = dict(
     module_l=248.0, module_w=248.0, body_h=30.0,
-    channel_w=16.0, channel_d=5.0, slope_deg=1.25, channel_bottom_r=1.2,
+    channel_w=16.0, channel_d=5.0, channel_bottom_r=1.2,
     cassette_l=220.0, cassette_w=220.0,
     seat_depth=14.0, seat_clearance=0.75,
     module_pitch=250.0, corner_r=4.0,
+    face_gap=0.4, lightweight=True, lw_cover=2.4, lw_rib=2.0,
+    profile="2020", profile_inset=24.0,
 )
 
 
@@ -43,8 +50,13 @@ def build_rail(**over) -> RecipeState:
     p = dict(RAIL_PARAMS)
     p.update(over)
     RECIPE_OPS["water_rail_body"].apply(st, p, "body")
-    RECIPE_OPS["overflow_lip"].apply(
-        st, {"lip_h": 2.0, "air_gap": 1.5, "lip_r": 0.4}, "lip")
+    RECIPE_OPS["lap_outlet_lip"].apply(
+        st, {"lip_len": 4.0, "lip_t": 1.4}, "lap_out")
+    RECIPE_OPS["lap_inlet_receiver"].apply(
+        st, {"pocket_len": 6.0, "side_clearance": 0.4}, "lap_in")
+    RECIPE_OPS["edge_magnet_pockets"].apply(
+        st, {"enabled": True, "magnet_d": 6.0, "magnet_t": 2.0,
+             "fit_clearance": 0.4, "x_offset": 60.0, "z_center": 8.0}, "magnets")
     RECIPE_OPS["profile_seat_slot"].apply(
         st, {"profile": "2020", "clearance": 0.2, "depth": 6.0, "inset": 24.0},
         "profile")
@@ -92,7 +104,8 @@ def to_form(st: RecipeState, name: str, params: dict | None = None) -> PartForm:
 
 
 def test_all_declared_validators_exist():
-    for op in ("water_rail_body", "overflow_lip", "profile_seat_slot",
+    for op in ("water_rail_body", "lap_outlet_lip", "lap_inlet_receiver",
+               "edge_magnet_pockets", "profile_seat_slot",
                "tongue_groove_edges", "substrate_tray_body", "contact_window",
                "mesh_floor", "lift_tabs", "retainer_frame_body",
                "frame_snap_hooks"):
@@ -103,8 +116,13 @@ def test_all_declared_validators_exist():
 def test_rail_ops_satisfy_water_checks():
     form = to_form(build_rail(), "rail",
                    {"cassette_l": 220.0, "cassette_w": 220.0})
-    for check in (check_water_channel_slope_ok, check_water_channel_dims_ok,
-                  check_no_standing_water_ir, check_overflow_lip_geometry_ok,
+    for check in (check_water_channel_constant_depth_ok,
+                  check_water_channel_dims_ok, check_drainage_requires_mount,
+                  check_no_standing_water_ir, check_lap_joint_geometry_ok,
+                  check_lap_slot_leak_path_controlled,
+                  check_magnet_pockets_outside_water_zone,
+                  check_magnet_pockets_do_not_break_wall,
+                  check_lightweight_windows_dry_ok,
                   check_no_secondary_water_channel, check_cassette_seat_fit_ok,
                   check_tongue_groove_profile_ok, check_profile_seat_dry_ok):
         finding = check(form)
@@ -117,28 +135,61 @@ def test_rail_frame_contract_keys():
                 "channel_floor_z_inlet", "channel_floor_z_outlet",
                 "channel_slope_deg", "channel_floor_margin",
                 "seat_u0", "seat_v0", "seat_u1", "seat_v1", "seat_floor_z",
-                "seat_depth", "seat_clearance", "lip_z", "air_gap",
+                "seat_depth", "seat_clearance",
+                "face_gap", "flush_pitch",
+                "lap_lip_len", "lap_lip_w", "lap_lip_t", "lap_lip_top_z",
+                "lap_pocket_len", "lap_pocket_w",
+                "magnet_count", "magnet_x_offset",
+                "lw_enabled", "lw_window_count", "lw_cover",
                 "tongue_w", "groove_w", "module_pitch", "profile_size"):
         assert key in st.frame, key
     for datum in ("cassette_seat", "module_origin", "line_east", "line_west",
-                  "inlet", "outlet"):
+                  "inlet", "outlet", "feed", "drain_edge"):
         assert datum in st.datums, datum
     names = {r.name for r in st.regions}
-    assert {"water_channel", "overflow_lip", "drip_receiver",
+    assert {"water_channel", "lap_lip", "lap_receiver",
             "cassette_seat_walls"} <= names
 
 
-def test_rail_channel_deepens_toward_front():
+def test_rail_channel_is_level():
     st = build_rail()
     ch = st.channels[0]
     assert ch.y0 > ch.y1  # inlet back (+Y), outlet front (-Y)
-    assert ch.depth_end > ch.depth_start
-    assert ch.slope_deg == pytest.approx(1.25, abs=0.01)
+    assert ch.depth_end == pytest.approx(ch.depth_start)
+    assert st.frame["channel_slope_deg"] == 0.0
+    assert st.frame["channel_floor_z_inlet"] == st.frame["channel_floor_z_outlet"]
+
+
+def test_rail_flush_datums():
+    st = build_rail()
+    floor = st.frame["channel_floor_z_inlet"]
+    inlet, outlet = st.datums["inlet"]["at"], st.datums["outlet"]["at"]
+    assert inlet[2] == outlet[2] == floor  # dZ = 0 mate by construction
+    # mating outlet-on-inlet marches at module_w + face_gap
+    assert (inlet[1] - outlet[1]) == pytest.approx(248.0 + 0.4)
+    feed = st.datums["feed"]["at"]
+    assert feed[2] == pytest.approx(floor + 2.5)  # the only surviving fall
+    drain = st.datums["drain_edge"]["at"]
+    assert drain[1] == pytest.approx(-124.0 - 4.0)
+    assert drain[2] == pytest.approx(floor - 1.4)  # lip tip underside
+
+
+def test_rail_lightweight_reversible():
+    heavy = build_rail(lightweight=False)
+    light = build_rail()
+    def lwins(st):
+        return [c for c in st.cutboxes if "_lwin_" in c.name]
+    assert not lwins(heavy) and not heavy.frame["lw_enabled"]
+    assert len(lwins(light)) == light.frame["lw_window_count"] >= 10
 
 
 def test_rail_refuses_thin_floor():
     with pytest.raises(RecipeError):
-        build_rail(body_h=22.0)  # seat floor 8 < channel 10.4 deep
+        build_rail(body_h=22.0, seat_depth=15.0)  # floor margin < 2
+
+def test_rail_refuses_face_gap_out_of_band():
+    with pytest.raises(RecipeError):
+        build_rail(face_gap=1.0)
 
 
 def test_rail_refuses_oversized_cassette():

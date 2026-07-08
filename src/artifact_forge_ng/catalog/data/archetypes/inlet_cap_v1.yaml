@@ -63,8 +63,9 @@ parameters:
 derived:
   # the wall the cap straddles: (module depth - seat span) / 2
   rail_wall_t: (module_w - cassette_w - 2 * seat_clearance) / 2
-  # lip-to-wall-top drop: the rail inlet datum sits FALL_ENTRY (2.5) above
-  # the inlet floor; the saddle rests on the wall top (rail body top)
+  # feed-to-wall-top drop: the rail FEED datum (the only surviving fall in
+  # the flush row) sits FALL_ENTRY (2.5) above the channel floor; the
+  # saddle rests on the wall top (rail body top)
   hang_drop: seat_depth + channel_d - 2.5
 
 constraints:

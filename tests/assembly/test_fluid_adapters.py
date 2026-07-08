@@ -26,7 +26,7 @@ from artifact_forge_ng.product.interfaces import INTERFACE_TYPES
 
 RAIL_PARAMS = dict(
     module_l=248.0, module_w=248.0, body_h=30.0,
-    channel_w=16.0, channel_d=5.0, slope_deg=1.25, channel_bottom_r=1.2,
+    channel_w=16.0, channel_d=5.0, channel_bottom_r=1.2,
     cassette_l=220.0, cassette_w=220.0,
     seat_depth=14.0, seat_clearance=0.75,
     module_pitch=250.0, corner_r=4.0,
@@ -40,9 +40,9 @@ CAP_PARAMS = dict(
 
 COLLECTOR_PARAMS = dict(
     tray_w=20.0, tube_od=9.0, bore_clearance=0.4,
-    rail_wall_t=13.25, saddle_fit=0.4, hang_drop=24.41,
+    rail_wall_t=13.25, saddle_fit=0.4, hang_drop=20.4,
     tongue_w=14.0, rail_channel_w=16.0, tray_slope_deg=1.5,
-    catch_fall=8.5, corner_r=3.0,
+    catch_fall=8.5, lip_overhang=4.0, corner_r=3.0,
 )
 
 
@@ -60,8 +60,10 @@ def rail_form(name="rail", **over) -> PartForm:
     p = dict(RAIL_PARAMS)
     p.update(over)
     RECIPE_OPS["water_rail_body"].apply(st, p, "body")
-    RECIPE_OPS["overflow_lip"].apply(
-        st, {"lip_h": 2.0, "air_gap": 1.5, "lip_r": 0.4}, "lip")
+    RECIPE_OPS["lap_outlet_lip"].apply(
+        st, {"lip_len": 4.0, "lip_t": 1.4}, "lap_out")
+    RECIPE_OPS["lap_inlet_receiver"].apply(
+        st, {"pocket_len": 6.0, "side_clearance": 0.4}, "lap_in")
     return _to_form(st, name)
 
 
@@ -110,8 +112,10 @@ def test_cap_refuses_wide_spout():
 # -- the fluid chain ------------------------------------------------------------
 
 def test_cap_feeds_rail_downhill():
+    """The cap targets the FEED port — the only surviving fall in the
+    corrected row."""
     cap, rail = cap_form(), rail_form()
-    joint = JointUse(type="fluid_joint", a="cap.spout", b="rail.inlet",
+    joint = JointUse(type="fluid_joint", a="cap.spout", b="rail.feed",
                      rotate=[0, 0, 0])
     pose = compute_pose(joint, cap, rail)
     findings = _fluid_joint_ir(cap, rail, pose, joint)
@@ -121,15 +125,16 @@ def test_cap_feeds_rail_downhill():
 
 
 def test_rail_feeds_collector_downhill():
+    """The collector catches at the LAST rail's drain_edge — the lap lip
+    tip. Water leaves the lip TOP (the floor plane) and falls
+    catch_fall + lip_t to the tray floor."""
     rail, coll = rail_form(), collector_form()
-    joint = JointUse(type="fluid_joint", a="rail.outlet", b="collector.catch",
+    joint = JointUse(type="fluid_joint", a="rail.drain_edge", b="collector.catch",
                      rotate=[0, 0, 0])
     pose = compute_pose(joint, rail, coll)
     findings = _fluid_joint_ir(rail, coll, pose, joint)
     assert findings[0].status.value == "pass", findings[0].message
-    # the collector catches DEEPER than the rail-to-rail step — the tray
-    # end must enclose the round drain bore below its rim
-    assert findings[0].measured == pytest.approx(8.5, abs=0.01)
+    assert findings[0].measured == pytest.approx(8.5 + 1.4, abs=0.01)
 
 
 # -- saddle_hang ------------------------------------------------------------------
@@ -143,7 +148,7 @@ def test_saddle_hang_is_auxiliary():
 
 def test_cap_saddle_hangs_on_back_wall():
     rail, cap = rail_form(), cap_form()
-    joint = JointUse(type="saddle_hang", a="rail.inlet", b="cap.spout",
+    joint = JointUse(type="saddle_hang", a="rail.feed", b="cap.spout",
                      rotate=[0, 0, 0])
     pose = compute_pose(joint, rail, cap)
     findings = _saddle_hang_ir(rail, cap, pose, joint)
@@ -153,7 +158,7 @@ def test_cap_saddle_hangs_on_back_wall():
 
 def test_collector_saddle_hangs_on_front_wall():
     rail, coll = rail_form(), collector_form()
-    joint = JointUse(type="saddle_hang", a="rail.outlet", b="collector.catch",
+    joint = JointUse(type="saddle_hang", a="rail.drain_edge", b="collector.catch",
                      rotate=[0, 0, 0])
     pose = compute_pose(joint, rail, coll)
     findings = _saddle_hang_ir(rail, coll, pose, joint)
@@ -164,7 +169,7 @@ def test_wrong_wall_thickness_fails_saddle():
     """A cap built for a thinner wall no longer straddles this rail."""
     rail = rail_form()
     cap = cap_form(rail_wall_t=9.0)
-    joint = JointUse(type="saddle_hang", a="rail.inlet", b="cap.spout",
+    joint = JointUse(type="saddle_hang", a="rail.feed", b="cap.spout",
                      rotate=[0, 0, 0])
     pose = compute_pose(joint, rail, cap)
     findings = _saddle_hang_ir(rail, cap, pose, joint)
@@ -176,7 +181,7 @@ def test_floating_saddle_fails():
     """A cap with a mismatched hang_drop floats above the wall top."""
     rail = rail_form()
     cap = cap_form(hang_drop=12.0)
-    joint = JointUse(type="saddle_hang", a="rail.inlet", b="cap.spout",
+    joint = JointUse(type="saddle_hang", a="rail.feed", b="cap.spout",
                      rotate=[0, 0, 0])
     pose = compute_pose(joint, rail, cap)
     findings = _saddle_hang_ir(rail, cap, pose, joint)

@@ -170,7 +170,7 @@ def _row_rollup(
                if j.check == "assembly.saddle_hang_ir"]
     meta = getattr(asm, "meta", {}) or {}
     return {
-        "kind": meta.get("row_kind", "fluid_cascade"),
+        "kind": meta.get("row_kind", "tilted_flush_row"),
         "z_step_policy": "datum_handover",
         "rack_mounting": "deferred",
         "cells": len(cells),

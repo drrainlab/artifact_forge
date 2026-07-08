@@ -1,23 +1,29 @@
-"""Mutation tests for the water rail form checks: a healthy hand-built
-rail IR (matching the frame-key contract the water_rail ops publish) passes
-everything; each surgically broken variant fails exactly the check that
-owns the defect."""
+"""Mutation tests for the water rail form checks (tilted flush row canon):
+a healthy hand-built rail IR (matching the frame-key contract the
+water_rail ops publish) passes everything; each surgically broken variant
+fails exactly the check that owns the defect.
 
-import math
+The healthy rail is LEVEL: constant-depth channel, lap lip continuing the
+floor plane past the outlet face, a through open-bottom lap receiver in the
+inlet floor. Slope is the mount's job (assembly.row_drains_under_mount)."""
 
 from artifact_forge_ng.core.findings import Status
 from artifact_forge_ng.form.checks_water import (
     check_cassette_seat_fit_ok,
+    check_drainage_requires_mount,
+    check_lap_joint_geometry_ok,
+    check_lap_slot_leak_path_controlled,
+    check_lightweight_windows_dry_ok,
+    check_magnet_pockets_do_not_break_wall,
+    check_magnet_pockets_outside_water_zone,
     check_no_secondary_water_channel,
     check_no_standing_water_ir,
-    check_overflow_lip_geometry_ok,
     check_profile_seat_dry_ok,
     check_tongue_groove_profile_ok,
+    check_water_channel_constant_depth_ok,
     check_water_channel_dims_ok,
-    check_water_channel_slope_ok,
 )
 from artifact_forge_ng.form.part import (
-    BlendDirective,
     BoreFeature,
     ChannelCutFeature,
     CutBoxFeature,
@@ -30,31 +36,35 @@ from artifact_forge_ng.form.style import MOLDED_UTILITY_PART
 from artifact_forge_ng.product.archetype import RegionRole
 
 RAIL_CHECKS = (
-    check_water_channel_slope_ok,
+    check_water_channel_constant_depth_ok,
     check_water_channel_dims_ok,
+    check_drainage_requires_mount,
     check_no_standing_water_ir,
-    check_overflow_lip_geometry_ok,
+    check_lap_joint_geometry_ok,
+    check_lap_slot_leak_path_controlled,
+    check_magnet_pockets_outside_water_zone,
+    check_magnet_pockets_do_not_break_wall,
+    check_lightweight_windows_dry_ok,
     check_no_secondary_water_channel,
     check_cassette_seat_fit_ok,
     check_tongue_groove_profile_ok,
     check_profile_seat_dry_ok,
 )
 
-# -- the healthy rail: 248x248x30 body, seat floor at 16, channel 16 wide --
+# -- the healthy flush rail: 248x248x30 body, seat floor 16, channel 16x5 --
 HALF = 124.0
 SEAT_FLOOR = 16.0
-DEPTH_IN = 5.0
-DROP = 2.0 * HALF * math.tan(math.radians(1.25))
-DEPTH_OUT = DEPTH_IN + DROP
-LIP_Z = SEAT_FLOOR - DEPTH_OUT
-LIP_H = 2.0
-AIR_GAP = 1.5
+DEPTH = 5.0
+FLOOR = SEAT_FLOOR - DEPTH  # 11.0
+FACE_GAP = 0.4
+LIP_LEN, LIP_T, LIP_W = 4.0, 1.4, 18.0
+POCKET_LEN, POCKET_W = 6.0, 18.8
 
 
 def good_channel(**over) -> ChannelCutFeature:
     kw: dict = dict(
         center_x=0.0, y0=HALF, y1=-HALF, z_top=SEAT_FLOOR,
-        width=16.0, depth_start=DEPTH_IN, depth_end=DEPTH_OUT, bottom_r=1.2,
+        width=16.0, depth_start=DEPTH, depth_end=DEPTH, bottom_r=1.2,
     )
     kw.update(over)
     return ChannelCutFeature(name="water", **kw)
@@ -63,9 +73,14 @@ def good_channel(**over) -> ChannelCutFeature:
 def good_frame(**over) -> dict:
     f = dict(
         rail_y0=-HALF, rail_y1=HALF,
-        channel_top_z=SEAT_FLOOR, channel_slope_deg=1.25,
-        channel_floor_margin=SEAT_FLOOR - DEPTH_OUT,
-        lip_z=LIP_Z, lip_h=LIP_H, air_gap=AIR_GAP, lip_r_assumed=0.4,
+        channel_w=16.0, channel_top_z=SEAT_FLOOR, channel_slope_deg=0.0,
+        channel_floor_z_inlet=FLOOR, channel_floor_z_outlet=FLOOR,
+        channel_floor_margin=FLOOR,
+        face_gap=FACE_GAP, flush_pitch=248.0 + FACE_GAP,
+        lap_lip_len=LIP_LEN, lap_lip_w=LIP_W, lap_lip_t=LIP_T,
+        lap_lip_top_z=FLOOR, lap_lip_tip_y=-HALF - LIP_LEN,
+        lap_pocket_len=POCKET_LEN, lap_pocket_w=POCKET_W,
+        lap_side_clearance=0.4,
         seat_u0=-110.75, seat_v0=-110.75, seat_u1=110.75, seat_v1=110.75,
         seat_floor_z=SEAT_FLOOR, seat_depth=14.0, seat_clearance=0.75,
         tongue_w=6.0, tongue_h=4.0, tongue_len=3.6,
@@ -73,7 +88,10 @@ def good_frame(**over) -> dict:
         tongue_cy=0.0, groove_cy=0.0, tongue_z0=4.0, groove_z0=4.0,
         profile_size=20.0, profile_slot_w=20.4,
         profile_slot_clearance=0.2, profile_slot_depth=6.0,
+        profile_slot_x=100.0,
         module_pitch=250.0,
+        lw_enabled=False, lw_window_count=0, lw_cover=2.4, lw_rib=2.0,
+        lw_span_max=0.0,
     )
     f.update(over)
     return f
@@ -82,13 +100,17 @@ def good_frame(**over) -> dict:
 def good_regions() -> list[Region]:
     return [
         Region("water_channel", RegionRole.TRANSIENT_WATER_PATH,
-               Box3(-8.0, -HALF, LIP_Z - 0.5, 8.0, HALF, SEAT_FLOOR)),
-        Region("overflow_lip", RegionRole.TRANSIENT_WATER_PATH,
-               Box3(-8.0, -HALF - 1.0, LIP_Z - LIP_H, 8.0, -HALF + 2.0, SEAT_FLOOR)),
-        Region("drip_receiver", RegionRole.TRANSIENT_WATER_PATH,
-               Box3(-10.0, -HALF - 1.0, -1.0, 10.0, -HALF + AIR_GAP, LIP_Z - LIP_H)),
+               Box3(-8.0, -HALF, FLOOR - 0.5, 8.0, HALF, SEAT_FLOOR)),
+        Region("lap_lip", RegionRole.TRANSIENT_WATER_PATH,
+               Box3(-LIP_W / 2.0, -HALF - LIP_LEN - 0.5, FLOOR - LIP_T - 0.5,
+                    LIP_W / 2.0, -HALF + 2.0, SEAT_FLOOR)),
+        Region("lap_receiver", RegionRole.TRANSIENT_WATER_PATH,
+               Box3(-POCKET_W / 2.0, HALF - POCKET_LEN - 0.5, -1.0,
+                    POCKET_W / 2.0, HALF + 0.5, SEAT_FLOOR)),
         Region("cassette_seat_walls", RegionRole.INTERFACE_KEEPOUT,
                Box3(-113.0, -113.0, SEAT_FLOOR, 113.0, 113.0, 30.0)),
+        Region("dry_zone_back", RegionRole.MOUNTING_SURFACE,
+               Box3(14.0, 111.0, 0.0, 120.0, HALF, 30.0)),
     ]
 
 
@@ -97,10 +119,21 @@ def good_cutboxes() -> list[CutBoxFeature]:
         CutBoxFeature("body_seat", Box3(-110.75, -110.75, SEAT_FLOOR, 110.75, 110.75, 31.0)),
         CutBoxFeature("body_corridor_out", Box3(-10.0, -124.5, SEAT_FLOOR, 10.0, -110.0, 31.0)),
         CutBoxFeature("body_corridor_in", Box3(-10.0, 110.0, SEAT_FLOOR, 10.0, 124.5, 31.0)),
-        CutBoxFeature("lip_relief", Box3(-10.0, -HALF - 1.0, -1.0, 10.0, -HALF + AIR_GAP, LIP_Z - LIP_H)),
+        CutBoxFeature("lap_in_lap_receiver",
+                      Box3(-POCKET_W / 2.0, HALF - POCKET_LEN, -1.0,
+                           POCKET_W / 2.0, HALF + 0.5, FLOOR + 0.2)),
         CutBoxFeature("edges_groove", Box3(-124.0, -3.4, 4.0, -120.0, 3.4, 8.0)),
         CutBoxFeature("body_profile_slot_e", Box3(89.8, -HALF, 0.0, 110.2, HALF, 6.0)),
         CutBoxFeature("body_profile_slot_w", Box3(-110.2, -HALF, 0.0, -89.8, HALF, 6.0)),
+    ]
+
+
+def good_ribs() -> list[RibFeature]:
+    return [
+        RibFeature("edges_tongue", Box3(124.0, -3.0, 4.0, 127.6, 3.0, 8.0)),
+        RibFeature("lap_out_lap_lip",
+                   Box3(-LIP_W / 2.0, -HALF - LIP_LEN, FLOOR - LIP_T,
+                        LIP_W / 2.0, -HALF + 0.6, FLOOR)),
     ]
 
 
@@ -120,8 +153,7 @@ def make_rail(channels=None, frame=None, cutboxes=None, regions=None,
         channels=[good_channel()] if channels is None else channels,
         cutboxes=good_cutboxes() if cutboxes is None else cutboxes,
         regions=good_regions() if regions is None else regions,
-        ribs=[RibFeature("edges_tongue", Box3(124.0, -3.0, 4.0, 127.6, 3.0, 8.0))]
-        if ribs is None else ribs,
+        ribs=good_ribs() if ribs is None else ribs,
         blends=blends or [],
         bores=bores or [],
     )
@@ -138,23 +170,47 @@ def test_healthy_rail_passes_everything():
         assert finding.status is Status.PASS, (finding.check, finding.message)
 
 
-def test_zero_slope_rejected():
-    form = make_rail(channels=[good_channel(depth_end=DEPTH_IN + 0.001)],
-                     frame=good_frame(channel_slope_deg=0.0))
-    assert failing(form) == {"check_water_channel_slope_ok"}
+def test_drainage_note_is_info_not_warn():
+    """PASS-with-note, grade-neutral: the message says INFO and the finding
+    is not critical."""
+    finding = check_drainage_requires_mount(make_rail())
+    assert finding.status is Status.PASS
+    assert not finding.critical
+    assert "INFO" in finding.message
+    assert "mount" in finding.message
 
 
-def test_reversed_slope_rejected():
+# -- constant depth: any slope in the RAIL is now the defect -----------------
+
+
+def test_sloped_channel_rejected():
     form = make_rail(
-        channels=[good_channel(depth_start=DEPTH_OUT, depth_end=DEPTH_IN)],
-        frame=good_frame(channel_floor_margin=SEAT_FLOOR - DEPTH_OUT),
+        channels=[good_channel(depth_end=DEPTH + 5.41)],
+        frame=good_frame(channel_slope_deg=1.25,
+                         channel_floor_z_outlet=FLOOR - 5.41),
     )
-    assert "check_water_channel_slope_ok" in failing(form)
+    fails = failing(form)
+    assert "check_water_channel_constant_depth_ok" in fails
+    assert "check_drainage_requires_mount" in fails
+
+
+def test_reversed_depth_rejected():
+    form = make_rail(channels=[good_channel(depth_start=DEPTH + 2.0)])
+    assert "check_water_channel_constant_depth_ok" in failing(form)
+
+
+def test_nonzero_declared_slope_rejected():
+    form = make_rail(frame=good_frame(channel_slope_deg=1.25))
+    assert failing(form) == {"check_water_channel_constant_depth_ok"}
+
+
+def test_depth_out_of_band_rejected():
+    form = make_rail(channels=[good_channel(depth_start=10.0, depth_end=10.0)])
+    assert "check_water_channel_constant_depth_ok" in failing(form)
 
 
 def test_channel_without_exit_rejected():
-    form = make_rail(channels=[good_channel(y1=-100.0, depth_end=DEPTH_IN + 200.0 * math.tan(math.radians(1.25)))],
-                     frame=good_frame(channel_slope_deg=1.25))
+    form = make_rail(channels=[good_channel(y1=-100.0)])
     assert "check_water_channel_dims_ok" in failing(form)
 
 
@@ -175,37 +231,180 @@ def test_blind_bore_in_wet_path_rejected():
     assert failing(form) == {"check_no_standing_water_ir"}
 
 
-def test_small_air_gap_rejected():
-    form = make_rail(frame=good_frame(air_gap=0.8))
-    assert failing(form) == {"check_overflow_lip_geometry_ok"}
+# -- lap-flow handover geometry ------------------------------------------------
 
 
-def test_rounded_lip_rejected():
-    blend = BlendDirective(
-        zone=Box3(-8.0, -HALF - 1.0, LIP_Z - LIP_H, 8.0, -HALF + 2.0, SEAT_FLOOR),
-        radius=1.5,
-    )
-    form = make_rail(blends=[blend])
-    assert failing(form) == {"check_overflow_lip_geometry_ok"}
+def test_missing_lip_rejected():
+    ribs = [r for r in good_ribs() if "lap_lip" not in r.name]
+    form = make_rail(ribs=ribs)
+    assert "check_lap_joint_geometry_ok" in failing(form)
 
 
-def test_missing_relief_rejected():
-    cuts = [c for c in good_cutboxes() if c.name != "lip_relief"]
+def test_dam_lip_rejected():
+    """A lip whose top rides ABOVE the floor plane is a dam — at 1.5 deg a
+    1.4 head backs up a ~53 mm pool. The check kills it at the IR."""
+    ribs = [good_ribs()[0], RibFeature(
+        "lap_out_lap_lip",
+        Box3(-LIP_W / 2.0, -HALF - LIP_LEN, FLOOR, LIP_W / 2.0, -HALF + 0.6,
+             FLOOR + LIP_T))]
+    form = make_rail(ribs=ribs)
+    assert "check_lap_joint_geometry_ok" in failing(form)
+
+
+def test_blind_receiver_rejected():
+    """A receiver that does not cut THROUGH is a hidden sump: it fails the
+    lap geometry, the leak-path control AND the standing-water guard."""
+    cuts = [c for c in good_cutboxes() if "lap_receiver" not in c.name] + [
+        CutBoxFeature("lap_in_lap_receiver",
+                      Box3(-POCKET_W / 2.0, HALF - POCKET_LEN, 2.0,
+                           POCKET_W / 2.0, HALF + 0.5, FLOOR + 0.2)),
+    ]
     form = make_rail(cutboxes=cuts)
-    assert failing(form) == {"check_overflow_lip_geometry_ok"}
+    fails = failing(form)
+    assert "check_lap_joint_geometry_ok" in fails
+    assert "check_lap_slot_leak_path_controlled" in fails
+    assert "check_no_standing_water_ir" in fails
+
+
+def test_missing_receiver_rejected():
+    cuts = [c for c in good_cutboxes() if "lap_receiver" not in c.name]
+    form = make_rail(cutboxes=cuts)
+    fails = failing(form)
+    assert "check_lap_joint_geometry_ok" in fails
+    assert "check_lap_slot_leak_path_controlled" in fails
+
+
+def test_lip_protrusion_out_of_band_rejected():
+    form = make_rail(frame=good_frame(lap_lip_len=8.0))
+    assert "check_lap_joint_geometry_ok" in failing(form)
+
+
+def test_slot_out_of_band_rejected():
+    # pocket 12 with lip 4 leaves an 8.4 slot — far beyond the 0.5..2.5 seam
+    form = make_rail(frame=good_frame(lap_pocket_len=12.0))
+    assert "check_lap_joint_geometry_ok" in failing(form)
+
+
+def test_side_clearance_out_of_band_rejected():
+    form = make_rail(frame=good_frame(lap_pocket_w=LIP_W + 2.0))
+    assert "check_lap_joint_geometry_ok" in failing(form)
+
+
+def test_leak_path_near_profile_rejected():
+    """Profile slots creeping toward the centerline put aluminum under the
+    seam slot — the leak path is no longer controlled."""
+    form = make_rail(frame=good_frame(profile_slot_x=30.0))
+    assert "check_lap_slot_leak_path_controlled" in failing(form)
+
+
+# -- magnets: sealed dry pockets, alignment only -------------------------------
+
+
+def _magnet(name: str, x: float, *, through: bool = False) -> BoreFeature:
+    span = (HALF - 2.4, HALF)
+    return BoreFeature(name, axis="Y", center=(x, 0.0, 8.0), d=6.4,
+                       span=span, overshoot=(1.0, 1.0) if through else (0.0, 1.0))
+
+
+def test_magnets_absent_is_green():
+    form = make_rail()
+    assert check_magnet_pockets_outside_water_zone(form).status is Status.PASS
+    assert check_magnet_pockets_do_not_break_wall(form).status is Status.PASS
+
+
+def test_magnet_in_wet_zone_rejected():
+    form = make_rail(bores=[_magnet("magnets_pocket_in_c", 0.0)],
+                     frame=good_frame(magnet_count=1, magnet_x_offset=0.0,
+                                      magnet_pocket_d=6.4))
+    assert "check_magnet_pockets_outside_water_zone" in failing(form)
+
+
+def test_through_magnet_pocket_rejected():
+    form = make_rail(bores=[_magnet("magnets_pocket_in_e", 60.0, through=True)],
+                     frame=good_frame(magnet_count=1, magnet_x_offset=60.0,
+                                      magnet_pocket_d=6.4))
+    assert "check_magnet_pockets_do_not_break_wall" in failing(form)
+
+
+def test_healthy_magnets_pass():
+    form = make_rail(
+        bores=[_magnet("magnets_pocket_in_e", 60.0),
+               _magnet("magnets_pocket_in_w", -60.0)],
+        frame=good_frame(magnet_count=2, magnet_x_offset=60.0,
+                         magnet_pocket_d=6.4),
+    )
+    assert "check_magnet_pockets_outside_water_zone" not in failing(form)
+    assert "check_magnet_pockets_do_not_break_wall" not in failing(form)
+
+
+# -- lightweight dry shell ------------------------------------------------------
+
+
+def _window(name: str, box: Box3) -> CutBoxFeature:
+    return CutBoxFeature(name, box)
+
+
+def test_lightweight_off_is_green():
+    assert check_lightweight_windows_dry_ok(make_rail()).status is Status.PASS
+
+
+def test_healthy_windows_pass():
+    cuts = good_cutboxes() + [
+        _window("body_lwin_e00", Box3(13.0, -100.0, -1.0, 49.0, -60.0, 13.6)),
+        _window("body_lwin_w00", Box3(-49.0, -100.0, -1.0, -13.0, -60.0, 13.6)),
+    ]
+    form = make_rail(cutboxes=cuts,
+                     frame=good_frame(lw_enabled=True, lw_window_count=2,
+                                      lw_span_max=40.0))
+    assert "check_lightweight_windows_dry_ok" not in failing(form)
+
+
+def test_window_into_channel_band_rejected():
+    cuts = good_cutboxes() + [
+        _window("body_lwin_e00", Box3(6.0, -100.0, -1.0, 49.0, -60.0, 13.6)),
+    ]
+    form = make_rail(cutboxes=cuts,
+                     frame=good_frame(lw_enabled=True, lw_window_count=1,
+                                      lw_span_max=43.0))
+    assert "check_lightweight_windows_dry_ok" in failing(form)
+
+
+def test_blind_window_rejected():
+    cuts = good_cutboxes() + [
+        _window("body_lwin_e00", Box3(13.0, -100.0, 2.0, 49.0, -60.0, 13.6)),
+    ]
+    form = make_rail(cutboxes=cuts,
+                     frame=good_frame(lw_enabled=True, lw_window_count=1,
+                                      lw_span_max=40.0))
+    assert "check_lightweight_windows_dry_ok" in failing(form)
+
+
+def test_thin_window_roof_rejected():
+    cuts = good_cutboxes() + [
+        _window("body_lwin_e00", Box3(13.0, -100.0, -1.0, 49.0, -60.0, 15.0)),
+    ]
+    form = make_rail(cutboxes=cuts,
+                     frame=good_frame(lw_enabled=True, lw_window_count=1,
+                                      lw_span_max=40.0))
+    assert "check_lightweight_windows_dry_ok" in failing(form)
+
+
+def test_window_in_profile_band_rejected():
+    cuts = good_cutboxes() + [
+        _window("body_lwin_e00", Box3(60.0, -100.0, -1.0, 92.0, -60.0, 13.6)),
+    ]
+    form = make_rail(cutboxes=cuts,
+                     frame=good_frame(lw_enabled=True, lw_window_count=1,
+                                      lw_span_max=40.0))
+    assert "check_lightweight_windows_dry_ok" in failing(form)
+
+
+# -- the untouched neighbours ---------------------------------------------------
 
 
 def test_second_channel_rejected():
     form = make_rail(channels=[good_channel(), good_channel(center_x=40.0)])
     assert failing(form) == {"check_no_secondary_water_channel"}
-
-
-def test_trough_in_receiver_rejected():
-    cuts = good_cutboxes() + [
-        CutBoxFeature("second_trough", Box3(-8.0, -HALF - 0.5, 1.0, 8.0, -HALF + 1.0, 3.0)),
-    ]
-    form = make_rail(cutboxes=cuts)
-    assert "check_no_secondary_water_channel" in failing(form)
 
 
 def test_loose_seat_clearance_rejected():
@@ -238,4 +437,4 @@ def test_wet_profile_slot_rejected():
         CutBoxFeature("body_profile_slot_e", Box3(-10.2, -HALF, 0.0, 10.2, HALF, 6.0)),
     ]
     form = make_rail(cutboxes=cuts)
-    assert failing(form) == {"check_profile_seat_dry_ok"}
+    assert "check_profile_seat_dry_ok" in failing(form)

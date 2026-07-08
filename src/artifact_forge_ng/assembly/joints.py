@@ -999,6 +999,108 @@ _register(JointDecl(
 ))
 
 
+# -- lap_flow_joint (VF correction: flush module-to-module handover) -------------
+
+#: The lap handover bands, measured IN THE POSE (the form check proved the
+#: same numbers on each part alone; here the two parts prove them against
+#: each other).
+LAP_DZ_TOL = 0.05          # floors coplanar — flush means flush
+LAP_FACE_GAP_BAND = (0.3, 0.6)
+LAP_OVERLAP_BAND = (3.0, 6.0)   # lip length reaching INTO the receiver
+LAP_JOINT_SIDE_CLEAR = (0.3, 0.5)
+LAP_JOINT_SLOT_BAND = (0.5, 2.5)
+
+_LAP_A_KEYS = ("lap_lip_len", "lap_lip_w", "lap_lip_t", "lap_lip_top_z",
+               "channel_floor_z_outlet", "channel_w", "rail_y0", "face_gap")
+_LAP_B_KEYS = ("lap_pocket_len", "lap_pocket_w", "channel_floor_z_inlet",
+               "channel_w", "rail_y1")
+
+
+def _lap_flow_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """The flush handover: a's lap lip lands in b's through receiver with
+    the floors COPLANAR (dZ = 0 — nothing falls between modules), the
+    faces at the controlled gap, the lip overlapping 3-6 into the opening
+    and the deliberate 0.5-2.5 slot left at the tip. a: is the UPSTREAM
+    rail (outlet), b: the downstream (inlet)."""
+    check = "assembly.lap_flow_ir"
+    fa, fb = form_a.frame, form_b.frame
+    if "outlet" not in joint.a_datum or "inlet" not in joint.b_datum:
+        return [_finding(
+            check, False,
+            "lap_flow_joint mates a: the upstream OUTLET datum onto b: the "
+            f"downstream INLET datum — got a.{joint.a_datum} / b.{joint.b_datum}",
+        )]
+    missing = [k for k in _LAP_A_KEYS if k not in fa]
+    missing += [f"B:{k}" for k in _LAP_B_KEYS if k not in fb]
+    if missing:
+        return [_finding(
+            check, False,
+            f"lap frame keys missing: {', '.join(missing)} — both sides "
+            "must be corrected flush rails",
+        )]
+    problems: list[str] = []
+    # floors coplanar in the pose — THE flush contract
+    out_floor = fa["channel_floor_z_outlet"]
+    in_floor = pose.apply(
+        (0.0, fb["rail_y1"], fb["channel_floor_z_inlet"]))[2]
+    dz = in_floor - out_floor
+    if abs(dz) > LAP_DZ_TOL:
+        problems.append(
+            f"floors not coplanar: dZ = {dz:+.2f} (|dZ| <= {LAP_DZ_TOL:g}) — "
+            "a stair step is the old cascade, not a flush row")
+    # controlled face gap
+    b_face = pose.apply((0.0, fb["rail_y1"], 0.0))[1]
+    gap = fa["rail_y0"] - b_face
+    if not (LAP_FACE_GAP_BAND[0] - 1e-6 <= gap <= LAP_FACE_GAP_BAND[1] + 1e-6):
+        problems.append(
+            f"face gap {gap:.2f} outside {LAP_FACE_GAP_BAND[0]}..{LAP_FACE_GAP_BAND[1]} — "
+            "flush means one plane with a controlled gap, not contact")
+    elif abs(gap - fa["face_gap"]) > 0.05:
+        problems.append(
+            f"posed face gap {gap:.2f} != declared face_gap {fa['face_gap']:g}")
+    # lip really lands in the opening
+    overlap = fa["lap_lip_len"] - gap
+    if not (LAP_OVERLAP_BAND[0] - 1e-6 <= overlap <= LAP_OVERLAP_BAND[1] + 1e-6):
+        problems.append(
+            f"lip overlap {overlap:.2f} outside "
+            f"{LAP_OVERLAP_BAND[0]}..{LAP_OVERLAP_BAND[1]}")
+    side = (fb["lap_pocket_w"] - fa["lap_lip_w"]) / 2.0
+    if not (LAP_JOINT_SIDE_CLEAR[0] - 1e-6 <= side <= LAP_JOINT_SIDE_CLEAR[1] + 1e-6):
+        problems.append(
+            f"per-side lip clearance {side:.2f} outside "
+            f"{LAP_JOINT_SIDE_CLEAR[0]}..{LAP_JOINT_SIDE_CLEAR[1]}")
+    slot = fb["lap_pocket_len"] - overlap
+    if not (LAP_JOINT_SLOT_BAND[0] - 1e-6 <= slot <= LAP_JOINT_SLOT_BAND[1] + 1e-6):
+        problems.append(
+            f"tip slot {slot:.2f} outside "
+            f"{LAP_JOINT_SLOT_BAND[0]}..{LAP_JOINT_SLOT_BAND[1]} — the seam "
+            "must stay deliberately open, and only just")
+    if fb["channel_w"] < fa["channel_w"] - 0.5:
+        problems.append(
+            f"receiving channel {fb['channel_w']:g} narrower than the "
+            f"giving {fa['channel_w']:g}")
+    if problems:
+        return [_finding(check, False, "; ".join(problems))]
+    return [_finding(
+        check, True,
+        f"flush handover: floors coplanar (dZ {dz:+.2f}), face gap {gap:.2f}, "
+        f"lip {overlap:.1f} into the opening, {slot:.1f} slot at the tip",
+        measured=dz, limit=LAP_DZ_TOL,
+    )]
+
+
+_register(JointDecl(
+    name="lap_flow_joint",
+    description="flush module-to-module water handover: the upstream lap "
+                "lip continues the floor plane into the downstream through "
+                "receiver — dZ = 0, controlled face gap, deliberate tip slot",
+    ir_check=_lap_flow_ir,
+    cad_checks=("assembly.no_interference",),
+))
+
+
 # -- saddle_hang (vertical farm: adapter hangs on a rail wall) -------------------
 #
 # An AUXILIARY VERIFICATION JOINT: it never realizes a fluid port (it is

@@ -9,7 +9,7 @@ a comment.
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
@@ -93,6 +93,37 @@ class AssemblyContract(BaseModel):
     must_have: list[str] = []
 
 
+class MountContextSpec(BaseModel):
+    """How the WHOLE assembly meets the world (VF correction): a flush row
+    is modelled horizontal — quarter-turn poses only — and mounted at a
+    small physical slope. This spec is the machine-checked declaration of
+    that mount: assembly checks evaluate virtual heights
+    ``v = z + y * tan(slope)`` against it, CAD never rotates.
+
+    ``slope_deg`` is schema-legal in 0..3; the OPERATIONAL band (1.0-2.0)
+    is enforced by assembly.row_drains_under_mount, so an out-of-band
+    golden fails a check with a message, not a parse."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["tilted_flush_row"]
+    slope_deg: float
+    slope_axis: Literal["Y"] = "Y"
+    slope_direction: Literal["inlet_to_outlet"] = "inlet_to_outlet"
+    #: Who supplies the slope — free text for the report ("mounted straight
+    #: aluminum profile", "wall bracket at 1.5 deg").
+    slope_source: str = "mounted straight aluminum profile"
+
+    @field_validator("slope_deg")
+    @classmethod
+    def _check_slope(cls, v: float) -> float:
+        if not (0.0 <= v <= 3.0):
+            raise ValueError(
+                f"mount slope {v} deg outside the schema band 0..3 — the "
+                "operational band 1.0..2.0 is checked at assembly level")
+        return float(v)
+
+
 class AssemblyInstance(VersionedModel):
     SCHEMA_KIND: ClassVar[str] = "assembly"
 
@@ -108,9 +139,13 @@ class AssemblyInstance(VersionedModel):
     wiring: WiringSpec | None = None
     contract: AssemblyContract = AssemblyContract()
     #: Free-form annotations surfaced verbatim into the assembly report —
-    #: the assembly names what it IS (e.g. row_kind: fluid_cascade,
-    #: mounting_policy: not_final_rack). Never machine-interpreted.
+    #: the assembly names what it IS (e.g. row_kind: tilted_flush_row,
+    #: mounting_policy: tilted_flush_profile). Never machine-interpreted.
     meta: dict[str, str] = {}
+    #: The machine-checked mount declaration (VF correction): flush rows
+    #: drain ONLY under this slope — assembly.row_drains_under_mount FAILS
+    #: without it. None for assemblies that live flat.
+    mount_context: MountContextSpec | None = None
 
     @model_validator(mode="after")
     def _cross_checks(self) -> "AssemblyInstance":

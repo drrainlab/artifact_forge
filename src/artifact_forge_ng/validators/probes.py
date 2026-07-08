@@ -106,10 +106,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.dovetail_socket_profile_ok", Level.FORM, "the payload socket groove is a measured female dovetail at the declared widths and depth"),
         _decl("form.dovetail_foot_profile_ok", Level.FORM, "the adapter foot is a measured male dovetail whose free end is the wide end"),
         # -- vertical farm water checks (impls in form/checks_water.py) -------
-        _decl("form.water_channel_slope_ok", Level.FORM, "channel floor falls monotonically toward the outlet at 1.0-1.5 degrees"),
         _decl("form.water_channel_dims_ok", Level.FORM, "channel width/depth/bottom radius in band and the run spans both body faces"),
         _decl("form.no_standing_water_ir", Level.FORM, "no blind pocket or above-bottom floor can hold water in the wet path"),
-        _decl("form.overflow_lip_geometry_ok", Level.FORM, "overflow lip stays sharp (no blend zone) with the declared air gap relief below"),
         _decl("form.no_secondary_water_channel", Level.FORM, "exactly one water path; the drip receiver and cassette floor form no second trough"),
         _decl("form.cassette_seat_fit_ok", Level.FORM, "seat pocket matches the shared cassette envelope minus clearance, floor above the channel"),
         _decl("form.tongue_groove_profile_ok", Level.FORM, "groove = tongue + 2x clearance in the 0.3-0.5 band and the tongue never bottoms"),
@@ -125,6 +123,15 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.collector_tray_drains", Level.FORM, "the catch tray floor falls monotonically to a drain bore sitting at the floor's lowest point"),
         # -- VF-4 profile-carried row (impls in checks_water.py / carrier.py)
         _decl("form.profile_ref_geometry_ok", Level.FORM, "the profile reference proxy: sloped top monotonic, long enough for its stations, slope in band"),
+        # -- VF-correction: tilted flush row (impls in checks_water.py) --------
+        _decl("form.water_channel_constant_depth_ok", Level.FORM, "the channel floor is level end to end (constant depth) — the row slope comes from the mount, never the rail"),
+        _decl("form.lap_joint_geometry_ok", Level.FORM, "lap lip continues the channel floor plane into a through, open-bottom receiver with the declared overlap and clearances"),
+        _decl("form.lap_slot_leak_path_controlled", Level.FORM, "seam-slot drips fall through open air into the wet-safe zone — clear of profiles, magnets and dry zones"),
+        _decl("form.drainage_requires_mount", Level.FORM, "honesty note: a constant-depth channel drains only under the mounted row slope (1.0-2.0 deg) — buildable horizontal, operational mounted"),
+        _decl("form.magnet_pockets_outside_water_zone", Level.FORM, "every module magnet pocket sits in dry body — no magnet face sees water"),
+        _decl("form.magnet_pockets_do_not_break_wall", Level.FORM, "magnet pockets stay blind (never pierce the face) and keep >= 1.2 plastic to any wet zone"),
+        _decl("form.lightweight_windows_dry_ok", Level.FORM, "lightweight dry-shell windows: open-bottom, clear of every functional zone, >= 2.4 cover under the seat floor, ribs present between windows"),
+        _decl("form.substrate_retained_under_mount", Level.FORM, "honesty note: the substrate must not creep downstream under the mounted slope (static for coco; real retention checks arrive with mat cassettes)"),
         _decl("form.lift_access_ok", Level.FORM, "rim carries two finger notches wide enough for tool-free removal"),
         # -- interface level (wave A1, form-time) ------------------------------
         _decl("interface.frame_exists", Level.FORM, "every declared interface's datum is published on the form with its type's frame keys"),
@@ -164,7 +171,6 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         # -- vertical farm topology probes --------------------------------------
         _decl("topology.water_channel_open", Level.TOPOLOGY, "the water path is void along the sampled centerline just above the floor"),
         _decl("topology.water_channel_floor_solid", Level.TOPOLOGY, "material is solid just below the channel floor — no leaks into the body"),
-        _decl("topology.overflow_relief_open", Level.TOPOLOGY, "the air-gap relief under the overflow lip is a real void"),
         _decl("topology.contact_window_present", Level.TOPOLOGY, "the lowered contact slab exists under the floor AND the mesh pierces it — material in the band, never solid, never gone"),
         _decl("topology.fluid_path_open", Level.TOPOLOGY, "the adapter's water path (tube bore, spout drop or tray-to-drain run) is void on the compiled solid"),
         # -- assembly level: cross-part checks in the assembled pose ----------
@@ -198,6 +204,13 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.row_supported", Level.ASSEMBLY, "every rail in a carried row rests on the profile's sloped support line at its station — no cell hangs on a fluid joint"),
         _decl("assembly.row_pitch_aligned", Level.ASSEMBLY, "adjacent rails march at the module pitch and the profile stations land under their grooves"),
         _decl("assembly.profile_slope_feeds_downhill", Level.ASSEMBLY, "the carrier's global slope matches the fluid cascade — the profile preserves every downhill handover"),
+        # -- VF-correction: tilted flush row assembly checks --------------------
+        _decl("assembly.lap_flow_ir", Level.ASSEMBLY, "adjacent rails mate flush: lip in the receiver at the declared overlap, floors coplanar, controlled face gap"),
+        _decl("assembly.row_flush_aligned", Level.ASSEMBLY, "all rails share one row plane (dZ=0) and march at module_w + face_gap — stair steps are forbidden"),
+        _decl("assembly.row_drains_under_mount", Level.ASSEMBLY, "under the declared mount_context slope the whole water path descends monotonically — no context, out-of-band or reversed slope FAILS"),
+        _decl("assembly.profile_support_full_length", Level.ASSEMBLY, "every rail groove is coplanar with the straight profile top — full seating, zero span gap"),
+        _decl("assembly.magnet_alignment_ok", Level.ASSEMBLY, "adjacent modules' magnet pockets are coaxial in the pose (alignment only — never seal, never support)"),
+        _decl("assembly.cassettes_removable_under_mount", Level.ASSEMBLY, "every cassette stays hand-removable with the row mounted at its slope"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),

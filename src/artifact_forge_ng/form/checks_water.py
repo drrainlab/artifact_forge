@@ -22,16 +22,28 @@ from .part import PartForm
 from .regions import Box3
 
 #: The transient-pulse hydraulics bands (docs/VERTICAL_FARM_PACK.md).
-SLOPE_BAND = (1.0, 1.5)  # degrees
+#: MOUNT_SLOPE_BAND is the operational band the mounted row must sit at —
+#: the rail itself is level (constant depth); the mount supplies the fall.
+MOUNT_SLOPE_BAND = (1.0, 2.0)  # degrees, mount_context
+CONST_DEPTH_TOL = 0.05  # channel floor level end to end
+CHANNEL_D_BAND = (4.0, 8.0)
 CHANNEL_W_BAND = (12.0, 20.0)
 BOTTOM_R_BAND = (0.8, 2.0)
 FLOOR_MARGIN_MIN = 2.0  # material below the deepest floor point
-AIR_GAP_MIN = 1.2
-LIP_R_MAX = 0.5
-LIP_MIN_T = 0.4  # the relief must leave at least this much lip material
 SEAT_CLEARANCE_BAND = (0.5, 1.0)
 TG_SIDE_CLEARANCE_BAND = (0.3, 0.5)  # tongue/groove per-side
 TG_BOTTOM_MARGIN = 0.3  # tongue never bottoms in the groove
+# -- lap-flow handover bands (VF correction) ----------------------------------
+LAP_LIP_LEN_BAND = (3.0, 6.0)  # lip protrusion past the face
+LAP_LIP_T_BAND = (1.2, 1.6)
+LAP_SIDE_CLEAR_BAND = (0.3, 0.5)  # lip in the receiver, per side
+LAP_SLOT_BAND = (0.5, 2.5)  # deliberate open slot at the lip tip
+FACE_GAP_BAND = (0.3, 0.6)  # controlled flush face gap
+LAP_LATERAL_CLEAR_MIN = 40.0  # slot drips stay this far from dry hardware
+MAGNET_WET_WALL_MIN = 1.2  # plastic between a magnet pocket and any water
+LW_COVER_MIN = 2.4  # lightweight window roof under the seat floor
+LW_RIB_MIN = 1.8
+LW_SPAN_WARN = 45.0  # bridge span over a window ceiling worth flagging
 
 
 def _finding(check: str, ok: bool, message: str, *, measured: float | None = None,
@@ -55,32 +67,39 @@ def _wet_regions(form: PartForm):
     return [r for r in form.regions if r.role is RegionRole.TRANSIENT_WATER_PATH]
 
 
-def check_water_channel_slope_ok(form: PartForm) -> Finding:
+def check_water_channel_constant_depth_ok(form: PartForm) -> Finding:
+    """The corrected rail contract: the channel floor is LEVEL end to end.
+    The drainage slope belongs to the mount (mount_context), never to the
+    geometry — a sloped floor here would re-create the cascade steps."""
     if not form.channels:
-        return _finding("form.water_channel_slope_ok", False,
+        return _finding("form.water_channel_constant_depth_ok", False,
                         "no water channel declared on this part")
     ch = form.channels[0]
-    slope = ch.slope_deg
-    deepens = ch.depth_end > ch.depth_start + 1e-6
-    declared = form.frame.get("channel_slope_deg")
-    consistent = declared is None or abs(declared - slope) <= 0.02
-    # band edges are LEGAL: the tan/atan round-trip through the channel
-    # depths loses ~1e-15 — never fail a boundary value on float dust
-    in_band = SLOPE_BAND[0] - 1e-6 <= slope <= SLOPE_BAND[1] + 1e-6
-    ok = in_band and deepens and consistent
     problems: list[str] = []
-    if not deepens:
-        problems.append("floor does not fall toward the outlet")
-    if not in_band:
-        problems.append(f"slope {slope:.2f} deg outside {SLOPE_BAND[0]}..{SLOPE_BAND[1]}")
-    if not consistent:
-        problems.append(f"frame declares {declared:g} deg but the IR measures {slope:.2f}")
+    if abs(ch.depth_end - ch.depth_start) > CONST_DEPTH_TOL:
+        problems.append(
+            f"channel depth varies {ch.depth_start:g} -> {ch.depth_end:g} — "
+            "the rail must stay level; the mount supplies the slope")
+    if not (CHANNEL_D_BAND[0] <= ch.depth_start <= CHANNEL_D_BAND[1]):
+        problems.append(
+            f"depth {ch.depth_start:g} outside {CHANNEL_D_BAND[0]}..{CHANNEL_D_BAND[1]}")
+    declared = form.frame.get("channel_slope_deg")
+    if declared is not None and abs(declared) > 1e-6:
+        problems.append(
+            f"frame declares channel_slope_deg={declared:g} — must be 0 on a flush rail")
+    fi = form.frame.get("channel_floor_z_inlet")
+    fo = form.frame.get("channel_floor_z_outlet")
+    if fi is None or fo is None:
+        problems.append("no channel_floor_z_inlet/outlet frame keys")
+    elif abs(fi - fo) > CONST_DEPTH_TOL:
+        problems.append(f"frame floor keys differ ({fi:g} vs {fo:g})")
     return _finding(
-        "form.water_channel_slope_ok", ok,
-        f"channel falls {slope:.2f} deg toward the outlet, monotonic by construction"
-        if ok else "; ".join(problems),
-        measured=slope, limit=SLOPE_BAND[1],
-        suggestion="" if ok else "set slope_deg in 1.0..1.5 with the outlet the deep end",
+        "form.water_channel_constant_depth_ok", not problems,
+        f"level channel floor, {ch.depth_start:g} deep end to end — "
+        "slope is the mount's job"
+        if not problems else "; ".join(problems),
+        measured=abs(ch.depth_end - ch.depth_start), limit=CONST_DEPTH_TOL,
+        suggestion="" if not problems else "set depth_start == depth_end and slope 0",
     )
 
 
@@ -161,50 +180,266 @@ def check_no_standing_water_ir(form: PartForm) -> Finding:
     )
 
 
-def check_overflow_lip_geometry_ok(form: PartForm) -> Finding:
+def check_lap_joint_geometry_ok(form: PartForm) -> Finding:
+    """The flush handover pair on one rail: a lip that CONTINUES the
+    channel floor plane (top at floor level — anything higher is a dam,
+    anything lower a step) and a THROUGH open-bottom receiver the
+    neighbour's identical lip lands in, with a deliberate slot left open
+    at the tip."""
     f = form.frame
-    keys = ("lip_z", "lip_h", "air_gap", "lip_r_assumed")
+    keys = ("lap_lip_len", "lap_lip_w", "lap_lip_t", "lap_lip_top_z",
+            "lap_pocket_len", "lap_pocket_w", "face_gap",
+            "channel_floor_z_inlet", "channel_floor_z_outlet")
     missing = [k for k in keys if k not in f]
     if missing:
-        return _finding("form.overflow_lip_geometry_ok", False,
-                        f"no overflow lip frame keys: {', '.join(missing)}")
+        return _finding("form.lap_joint_geometry_ok", False,
+                        f"no lap frame keys: {', '.join(missing)}")
     problems: list[str] = []
-    if f["air_gap"] < AIR_GAP_MIN:
-        problems.append(f"air gap {f['air_gap']:g} < {AIR_GAP_MIN:g}")
-    if f["lip_r_assumed"] > LIP_R_MAX:
-        problems.append(f"lip radius {f['lip_r_assumed']:g} > {LIP_R_MAX:g}")
-    lip_region = form.region("overflow_lip")
-    receiver = form.region("drip_receiver")
-    relief = None
-    if receiver is not None:
-        for cut in form.cutboxes:
-            if _boxes_overlap(cut.box, receiver.box):
-                relief = cut
-                break
-    if receiver is None:
-        problems.append("no drip_receiver region")
-    if relief is None:
-        problems.append("no relief cut under the lip — water runs down the outer wall")
+    lip = next((r for r in form.ribs if "lap_lip" in r.name), None)
+    if lip is None:
+        problems.append("no lap lip rib on the part")
     else:
-        b = relief.box
-        if b.z0 > 0.0:
-            problems.append(f"relief {relief.name!r} has a blind floor at z={b.z0:g}")
-        if b.z1 > f["lip_z"] - LIP_MIN_T:
+        if abs(lip.box.z1 - f["channel_floor_z_outlet"]) > CONST_DEPTH_TOL:
             problems.append(
-                f"relief top {b.z1:g} eats the lip (must stay <= {f['lip_z'] - LIP_MIN_T:g})")
-        if (b.y1 - b.y0) < f["air_gap"] - 0.01:
+                f"lip top {lip.box.z1:g} is not the channel floor "
+                f"{f['channel_floor_z_outlet']:g} — a dam or a step, never flush")
+        if abs((lip.box.z1 - lip.box.z0) - f["lap_lip_t"]) > 0.05:
+            problems.append("lip rib thickness disagrees with lap_lip_t")
+    if not (LAP_LIP_LEN_BAND[0] <= f["lap_lip_len"] <= LAP_LIP_LEN_BAND[1]):
+        problems.append(
+            f"lip protrusion {f['lap_lip_len']:g} outside "
+            f"{LAP_LIP_LEN_BAND[0]}..{LAP_LIP_LEN_BAND[1]}")
+    if not (LAP_LIP_T_BAND[0] <= f["lap_lip_t"] <= LAP_LIP_T_BAND[1]):
+        problems.append(f"lip thickness {f['lap_lip_t']:g} outside "
+                        f"{LAP_LIP_T_BAND[0]}..{LAP_LIP_T_BAND[1]}")
+    pocket = next((c for c in form.cutboxes if "lap_receiver" in c.name), None)
+    if pocket is None:
+        problems.append("no lap receiver cut on the part")
+    else:
+        b = pocket.box
+        if b.z0 > -0.5:
             problems.append(
-                f"relief depth {b.y1 - b.y0:g} < declared air gap {f['air_gap']:g}")
-    if lip_region is not None:
-        for blend in form.blends:
-            if _boxes_overlap(blend.zone, lip_region.box):
-                problems.append(
-                    f"blend zone r={blend.radius:g} touches the lip — the drip edge must stay sharp")
+                f"receiver floors at z={b.z0:g} — it must cut THROUGH the body "
+                "(an open bottom is the whole no-sump guarantee)")
+        if b.z1 < f["channel_floor_z_inlet"] - CONST_DEPTH_TOL:
+            problems.append("receiver stops short of the floor plane — the lip cannot land")
+        side = (f["lap_pocket_w"] - f["lap_lip_w"]) / 2.0
+        if not (LAP_SIDE_CLEAR_BAND[0] <= side <= LAP_SIDE_CLEAR_BAND[1]):
+            problems.append(
+                f"per-side lip clearance {side:.2f} outside "
+                f"{LAP_SIDE_CLEAR_BAND[0]}..{LAP_SIDE_CLEAR_BAND[1]}")
+    overlap = f["lap_lip_len"] - f["face_gap"]
+    slot = f["lap_pocket_len"] - overlap
+    if not (LAP_SLOT_BAND[0] <= slot <= LAP_SLOT_BAND[1]):
+        problems.append(
+            f"tip slot {slot:.2f} outside {LAP_SLOT_BAND[0]}..{LAP_SLOT_BAND[1]} — "
+            "the seam must stay deliberately open, and only just")
+    if not (FACE_GAP_BAND[0] <= f["face_gap"] <= FACE_GAP_BAND[1]):
+        problems.append(f"face gap {f['face_gap']:g} outside "
+                        f"{FACE_GAP_BAND[0]}..{FACE_GAP_BAND[1]}")
     return _finding(
-        "form.overflow_lip_geometry_ok", not problems,
-        f"sharp lip over a {f['air_gap']:g} air gap — droplets detach"
+        "form.lap_joint_geometry_ok", not problems,
+        f"lip continues the floor plane {f['lap_lip_len']:g} past the face; "
+        f"the receiver is through with a {slot:.1f} open slot at the tip"
         if not problems else "; ".join(problems),
-        measured=f["air_gap"], limit=AIR_GAP_MIN,
+        measured=slot, limit=LAP_SLOT_BAND[1],
+    )
+
+
+def check_lap_slot_leak_path_controlled(form: PartForm) -> Finding:
+    """The deliberate seam slot must leak into KNOWN air: straight down
+    through the open-bottom receiver, laterally far from the profile slots,
+    magnet pockets and dry zones. The nominal stream crosses ON TOP of the
+    lip; this check pins down where the stray drops go."""
+    f = form.frame
+    if "lap_pocket_w" not in f:
+        return _finding("form.lap_slot_leak_path_controlled", False,
+                        "no lap receiver on the part — nothing to control")
+    problems: list[str] = []
+    pocket = next((c for c in form.cutboxes if "lap_receiver" in c.name), None)
+    if pocket is None:
+        problems.append("no lap receiver cut on the part")
+    else:
+        b = pocket.box
+        if b.z0 > -0.5:
+            problems.append("receiver is not open-bottom — drips would pool, not fall")
+        # nothing of the rail may sit under the slot footprint
+        for cut in form.cutboxes:
+            if cut is pocket:
+                continue
+            if cut.box.z1 <= 0.0 and _boxes_overlap(cut.box, b):
+                problems.append(f"feature {cut.name!r} sits under the slot footprint")
+        half = f["lap_pocket_w"] / 2.0
+        slot_x = half
+        px = f.get("profile_slot_x")
+        if px is not None:
+            clear = (px - f.get("profile_slot_w", 0.0) / 2.0) - slot_x
+            if clear < LAP_LATERAL_CLEAR_MIN:
+                problems.append(
+                    f"profile slot only {clear:.0f} from the leak slot "
+                    f"(needs >= {LAP_LATERAL_CLEAR_MIN:g}) — drips could reach aluminum")
+        mx = f.get("magnet_x_offset")
+        if mx is not None and f.get("magnet_count", 0):
+            clear = (mx - f.get("magnet_pocket_d", 0.0) / 2.0) - slot_x
+            if clear < LAP_LATERAL_CLEAR_MIN:
+                problems.append(
+                    f"magnet pockets only {clear:.0f} from the leak slot "
+                    f"(needs >= {LAP_LATERAL_CLEAR_MIN:g})")
+        dry = form.region("dry_zone_back")
+        if dry is not None and _boxes_overlap(
+                Box3(-half, b.y0, -5.0, half, b.y1, 0.0), dry.box):
+            problems.append("the dry back zone extends under the leak slot")
+    return _finding(
+        "form.lap_slot_leak_path_controlled", not problems,
+        "seam drips fall through open air between the profiles — clear of "
+        "aluminum, magnets and dry zones (leak: controlled, visible, cleanable)"
+        if not problems else "; ".join(problems),
+        limit=LAP_LATERAL_CLEAR_MIN,
+    )
+
+
+def check_drainage_requires_mount(form: PartForm) -> Finding:
+    """Honesty note, PASS-with-note (grade-neutral): a constant-depth
+    channel drains ONLY when the whole row is mounted at the operational
+    slope. Horizontal the part is buildable but not operational. The FAIL
+    for a missing/out-of-band mount lives at assembly level
+    (assembly.row_drains_under_mount), never here."""
+    if not form.channels:
+        return _finding("form.drainage_requires_mount", False,
+                        "no water channel declared on this part")
+    ch = form.channels[0]
+    level = abs(ch.depth_end - ch.depth_start) <= CONST_DEPTH_TOL
+    if not level:
+        return _finding(
+            "form.drainage_requires_mount", False,
+            "channel is not constant-depth — this note only applies to flush rails")
+    return Finding(
+        check="form.drainage_requires_mount", status=Status.PASS, level=Level.FORM,
+        message=(
+            f"INFO: level channel — drains only under the mounted row slope "
+            f"{MOUNT_SLOPE_BAND[0]:g}..{MOUNT_SLOPE_BAND[1]:g} deg "
+            "(buildable horizontal, operational mounted; see mount_context)"),
+        critical=False,
+    )
+
+
+def check_magnet_pockets_outside_water_zone(form: PartForm) -> Finding:
+    """Every magnet pocket lives in dry body: no pocket volume may touch a
+    wet region. Trivially green with magnets disabled."""
+    pockets = [b for b in form.bores if "magnet" in b.name]
+    if not pockets:
+        return _finding("form.magnet_pockets_outside_water_zone", True,
+                        "no magnet pockets — nothing near the water")
+    wet = _wet_regions(form)
+    problems: list[str] = []
+    for b in pockets:
+        x, y, z = b.center
+        r = b.d / 2.0
+        lo, hi = min(b.span), max(b.span)
+        bbox = Box3(x - r, lo, z - r, x + r, hi, z + r)  # axis Y pockets
+        for w in wet:
+            if _boxes_overlap(bbox, w.box):
+                problems.append(f"magnet pocket {b.name!r} touches wet region {w.name!r}")
+    return _finding(
+        "form.magnet_pockets_outside_water_zone", not problems,
+        f"{len(pockets)} magnet pocket(s) fully in dry body"
+        if not problems else "; ".join(problems),
+    )
+
+
+def check_magnet_pockets_do_not_break_wall(form: PartForm) -> Finding:
+    """Sealed pockets: blind (never pierce the face they enter from), and
+    >= MAGNET_WET_WALL_MIN plastic between the pocket and any wet zone —
+    no magnet face is ever exposed to water."""
+    pockets = [b for b in form.bores if "magnet" in b.name]
+    if not pockets:
+        return _finding("form.magnet_pockets_do_not_break_wall", True,
+                        "no magnet pockets — no wall to break")
+    f = form.frame
+    y0, y1 = f.get("rail_y0"), f.get("rail_y1")
+    problems: list[str] = []
+    wet = _wet_regions(form)
+    for b in pockets:
+        blind = b.overshoot[0] <= 0.0 or b.overshoot[1] <= 0.0
+        if not blind:
+            problems.append(f"magnet pocket {b.name!r} is a through bore")
+        if y0 is not None and y1 is not None:
+            lo, hi = min(b.span), max(b.span)
+            inside = min(hi - y0, y1 - lo)  # depth measured from the entry face
+            body = (y1 - y0) - inside
+            if body < MAGNET_WET_WALL_MIN:
+                problems.append(
+                    f"pocket {b.name!r} leaves only {body:g} body behind it")
+        x, y, z = b.center
+        r = b.d / 2.0
+        lo, hi = min(b.span), max(b.span)
+        grown = Box3(x - r - MAGNET_WET_WALL_MIN, lo - MAGNET_WET_WALL_MIN,
+                     z - r - MAGNET_WET_WALL_MIN,
+                     x + r + MAGNET_WET_WALL_MIN, hi + MAGNET_WET_WALL_MIN,
+                     z + r + MAGNET_WET_WALL_MIN)
+        for w in wet:
+            if _boxes_overlap(grown, w.box):
+                problems.append(
+                    f"pocket {b.name!r} leaves < {MAGNET_WET_WALL_MIN:g} plastic "
+                    f"to wet region {w.name!r}")
+    return _finding(
+        "form.magnet_pockets_do_not_break_wall", not problems,
+        f"{len(pockets)} sealed pocket(s): blind, >= {MAGNET_WET_WALL_MIN:g} "
+        "plastic to every wet zone"
+        if not problems else "; ".join(problems),
+        limit=MAGNET_WET_WALL_MIN,
+    )
+
+
+def check_lightweight_windows_dry_ok(form: PartForm) -> Finding:
+    """The dry-shell windows: open-bottom (cannot hold water), a solid roof
+    >= LW_COVER_MIN under the seat floor, ribs left between them, and clear
+    of every functional zone — channel, lap ends, profile-slot bands,
+    magnet pockets, wet regions. Trivially green with lightweight off."""
+    f = form.frame
+    wins = [c for c in form.cutboxes if "_lwin_" in c.name]
+    if not f.get("lw_enabled", False) or not wins:
+        return _finding("form.lightweight_windows_dry_ok", True,
+                        "lightweight shell off — solid slab, nothing to prove")
+    problems: list[str] = []
+    seat_floor = f.get("seat_floor_z")
+    ch_half = f.get("channel_w", 0.0) / 2.0
+    px = f.get("profile_slot_x")
+    pw = f.get("profile_slot_w", 0.0)
+    y1 = f.get("rail_y1", 0.0)
+    wet = _wet_regions(form)
+    for win in wins:
+        b = win.box
+        if b.z0 > -0.5:
+            problems.append(f"window {win.name!r} is not open-bottom")
+        if seat_floor is not None and b.z1 > seat_floor - LW_COVER_MIN + 0.01:
+            problems.append(
+                f"window {win.name!r} roof leaves < {LW_COVER_MIN:g} under the seat floor")
+        if min(abs(b.x0), abs(b.x1)) < ch_half + 2.0 and b.x0 * b.x1 < 0:
+            problems.append(f"window {win.name!r} crosses the channel band")
+        elif min(abs(b.x0), abs(b.x1)) < ch_half + 2.0:
+            problems.append(f"window {win.name!r} is closer than 2 to the channel wall")
+        if px is not None and max(abs(b.x0), abs(b.x1)) > px - pw / 2.0 - 2.0:
+            problems.append(f"window {win.name!r} enters the profile-slot band")
+        if max(abs(b.y0), abs(b.y1)) > y1 - 10.0:
+            problems.append(f"window {win.name!r} reaches into the lap/face end zone")
+        for w in wet:
+            if _boxes_overlap(b, w.box):
+                problems.append(f"window {win.name!r} touches wet region {w.name!r}")
+    # ribs: adjacent windows must not merge (their material gap >= LW_RIB_MIN)
+    rib = f.get("lw_rib", 0.0)
+    if rib < LW_RIB_MIN:
+        problems.append(f"declared rib {rib:g} < {LW_RIB_MIN:g}")
+    span = f.get("lw_span_max", 0.0)
+    note = ""
+    if span > LW_SPAN_WARN:
+        note = f" (note: {span:.0f} bridge over a window ceiling — expect sag on FDM)"
+    return _finding(
+        "form.lightweight_windows_dry_ok", not problems,
+        f"{len(wins)} open-bottom dry windows, roof >= {LW_COVER_MIN:g}, "
+        f"ribs {rib:g} — the profile carries, the plastic positions" + note
+        if not problems else "; ".join(problems),
+        measured=span,
     )
 
 
@@ -350,14 +585,24 @@ def check_profile_seat_dry_ok(form: PartForm) -> Finding:
     )
 
 
-register_probe("form.water_channel_slope_ok")(
-    lambda form, ctx: check_water_channel_slope_ok(form))
+register_probe("form.water_channel_constant_depth_ok")(
+    lambda form, ctx: check_water_channel_constant_depth_ok(form))
 register_probe("form.water_channel_dims_ok")(
     lambda form, ctx: check_water_channel_dims_ok(form))
 register_probe("form.no_standing_water_ir")(
     lambda form, ctx: check_no_standing_water_ir(form))
-register_probe("form.overflow_lip_geometry_ok")(
-    lambda form, ctx: check_overflow_lip_geometry_ok(form))
+register_probe("form.lap_joint_geometry_ok")(
+    lambda form, ctx: check_lap_joint_geometry_ok(form))
+register_probe("form.lap_slot_leak_path_controlled")(
+    lambda form, ctx: check_lap_slot_leak_path_controlled(form))
+register_probe("form.drainage_requires_mount")(
+    lambda form, ctx: check_drainage_requires_mount(form))
+register_probe("form.magnet_pockets_outside_water_zone")(
+    lambda form, ctx: check_magnet_pockets_outside_water_zone(form))
+register_probe("form.magnet_pockets_do_not_break_wall")(
+    lambda form, ctx: check_magnet_pockets_do_not_break_wall(form))
+register_probe("form.lightweight_windows_dry_ok")(
+    lambda form, ctx: check_lightweight_windows_dry_ok(form))
 register_probe("form.no_secondary_water_channel")(
     lambda form, ctx: check_no_secondary_water_channel(form))
 register_probe("form.cassette_seat_fit_ok")(

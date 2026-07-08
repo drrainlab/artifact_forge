@@ -501,32 +501,36 @@ features:
 
   # -- vertical farm pack v1 (docs/VERTICAL_FARM_PACK.md) --------------------
 
-  - id: sloped_water_channel
+  - id: constant_depth_water_channel
     description: >
-      open U-channel falling 1.0-1.5 deg toward the outlet inside a level
-      body — transient pulse transport, monotonic by construction, exits
-      through both faces
+      open U-channel of CONSTANT depth inside a level body — the drainage
+      slope comes from mounting the row (mount_context), never from the
+      rail; buildable horizontal, operational mounted
     verified_by:
-      - form.water_channel_slope_ok
+      - form.water_channel_constant_depth_ok
       - form.water_channel_dims_ok
+      - form.drainage_requires_mount
       - topology.water_channel_open
       - topology.water_channel_floor_solid
 
-  - id: overflow_drip_edge
+  - id: lap_flow_handover
     description: >
-      sharp overflow lip over an air-gap undercut — water detaches as
-      droplets instead of wicking down the outer wall
+      flush module-to-module water handover — a lip continuing the channel
+      floor plane lands in the neighbour's through open-bottom receiver;
+      the tip slot is a controlled, visible, cleanable leak path, and the
+      seam is never the primary water path
     verified_by:
-      - form.overflow_lip_geometry_ok
-      - topology.overflow_relief_open
-
-  - id: open_drip_receiver
-    description: >
-      the relief void under the lip stays an open, visually inspectable
-      drop zone — never a second trough, never standing water
-    verified_by:
-      - form.no_secondary_water_channel
+      - form.lap_joint_geometry_ok
+      - form.lap_slot_leak_path_controlled
       - form.no_standing_water_ir
+
+  - id: lightweight_dry_shell
+    description: >
+      the rail is a dry frame around a protected water core — large smooth
+      open-bottom windows between the channel and the profile bands, roofed
+      under the seat floor, ribbed, never honeycomb; the profile carries
+    verified_by:
+      - form.lightweight_windows_dry_ok
 
   - id: cassette_seat
     description: >
@@ -673,15 +677,30 @@ features:
       - form.collector_tray_drains
       - topology.fluid_path_open
 
-  # Assembly-level: the row's fluid story — every handover downhill, every
-  # required fluid port mated by a realizing fluid_joint.
-  - id: row_fluid_chain
+  # Assembly-level: the flush row's water story — drip in at the cap, lap
+  # handovers between modules, drip out at the collector, and the whole
+  # path drains ONLY under the declared mount slope.
+  - id: row_water_chain
     description: >
-      the water chain inlet -> cells -> collector verified in the pose:
-      gravity is the pump, no orphan required fluid ports
+      the water chain cap -> flush modules -> collector verified in the
+      pose: drip handovers at both ends, lap-flow handovers between
+      modules, no orphan required fluid ports, and the row drains under
+      its mount_context
     verified_by:
+      - assembly.lap_flow_ir
       - assembly.fluid_joint_ir
       - assembly.no_orphan_ports
+      - assembly.row_drains_under_mount
+
+  - id: row_flush_integrity
+    description: >
+      the modules form ONE plane: lap joints verified, dZ = 0 row
+      alignment at the flush pitch, and the seam slots leak only into
+      controlled open air
+    verified_by:
+      - assembly.lap_flow_ir
+      - assembly.row_flush_aligned
+      - form.lap_slot_leak_path_controlled
 
   - id: saddle_mount
     description: >

@@ -1,9 +1,11 @@
-# Vertical Farm Pack v1 golden artifact: one modular grow cell on the 250
-# nominal grid — Base Water Rail (transient sloped channel, overflow drip
-# edge, 2020 profile slots) + removable Coco Cassette (orthogonal mesh
-# floor, pulse contact window) + Snap Retainer Frame. The rail transports
-# and constrains water; the cassette decides substrate contact; the module
-# never stores water.
+# Vertical Farm Pack golden artifact (tilted flush row canon): one modular
+# grow cell on the 250 nominal grid — Base Water Rail (constant-depth
+# transient channel, lap-flow lip/receiver, 2020 profile slots, lightweight
+# dry shell) + removable Coco Cassette (orthogonal mesh floor, pulse
+# contact window) + Snap Retainer Frame. The rail transports and constrains
+# water; the cassette decides substrate contact; the module never stores
+# water. A single cell is buildable horizontal and operational only
+# mounted — drainage honesty lives in the row's mount_context.
 #
 # Honest scope: no inlet adapter, no collector, no magnets (MVP-1). The
 # tongue/groove edges exist on the rail but the line interface is proven
@@ -30,10 +32,9 @@ parts:
     product:
       schema: product/v1
       id: water_rail_2020
-      archetype: water_rail_v1@1
+      archetype: water_rail_v1@2
       params:
         profile: "2020"
-        slope_deg: 1.25
         channel_w: 16mm
       manufacturing:
         material: PETG

@@ -12,7 +12,7 @@ from artifact_forge_ng.validators.probes import FORBIDDEN_FORM_DETECTORS, KNOWN_
 PACK = ("water_rail_v1", "coco_cassette_v1", "substrate_retainer_frame_v1")
 
 PACK_FEATURES = (
-    "sloped_water_channel", "overflow_drip_edge", "open_drip_receiver",
+    "constant_depth_water_channel", "lap_flow_handover", "lightweight_dry_shell",
     "cassette_seat", "module_alignment_edges", "aluminum_profile_seat",
     "substrate_mesh_floor", "pulse_contact_window", "tool_free_removal",
     "cleanable_snap_interface", "vertical_farm_cassette_interface",
@@ -68,8 +68,8 @@ def test_loader_rejects_recipe_missing_op_validators(tmp_path):
     data = tmp_path / "data"
     shutil.copytree(loader.DATA_DIR, data)
     rail = data / "archetypes" / "water_rail_v1.yaml"
-    text = rail.read_text().replace("  - form.water_channel_slope_ok\n", "")
+    text = rail.read_text().replace("  - form.water_channel_constant_depth_ok\n", "")
     assert text != rail.read_text()
     rail.write_text(text)
-    with pytest.raises(CatalogError, match="water_channel_slope_ok"):
+    with pytest.raises(CatalogError, match="water_channel_constant_depth_ok"):
         load_catalog(data)

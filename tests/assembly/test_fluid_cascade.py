@@ -1,7 +1,8 @@
-"""VF-3.0 core: the fluid cascade physics on op-built rails (datum-on-datum
-handover drops the downstream part below the upstream lip), the actionable
-wrong-direction message, the receiver-width rule, the joint ordering guard
-and the assembly meta passthrough."""
+"""The drip fluid_joint physics after the VF correction: rails mate FLUSH
+(no step between modules — that is lap_flow_joint's contract now); the only
+surviving fall is the FEED datum the inlet cap's tower targets. Plus the
+actionable wrong-direction message, the receiver-width rule, the joint
+ordering guard and the assembly meta passthrough."""
 
 from pathlib import Path
 
@@ -25,10 +26,10 @@ CELL = EXAMPLES / "water_rail_cell_2020_petg.yaml"
 
 RAIL_PARAMS = dict(
     module_l=248.0, module_w=248.0, body_h=30.0,
-    channel_w=16.0, channel_d=5.0, slope_deg=1.25, channel_bottom_r=1.2,
+    channel_w=16.0, channel_d=5.0, channel_bottom_r=1.2,
     cassette_l=220.0, cassette_w=220.0,
     seat_depth=14.0, seat_clearance=0.75,
-    module_pitch=250.0, corner_r=4.0,
+    module_pitch=250.0, corner_r=4.0, face_gap=0.4,
 )
 
 
@@ -37,8 +38,10 @@ def rail_form(name="rail", **over) -> PartForm:
     p = dict(RAIL_PARAMS)
     p.update(over)
     RECIPE_OPS["water_rail_body"].apply(st, p, "body")
-    RECIPE_OPS["overflow_lip"].apply(
-        st, {"lip_h": 2.0, "air_gap": 1.5, "lip_r": 0.4}, "lip")
+    RECIPE_OPS["lap_outlet_lip"].apply(
+        st, {"lip_len": 4.0, "lip_t": 1.4}, "lap_out")
+    RECIPE_OPS["lap_inlet_receiver"].apply(
+        st, {"pocket_len": 6.0, "side_clearance": 0.4}, "lap_in")
     return PartForm(
         name=name, params={}, frame=st.frame, section=st.section,
         width=st.width, style=MOLDED_UTILITY_PART, channels=st.channels,
@@ -60,20 +63,33 @@ def fluid(a="rail_a.outlet", b="rail_b.inlet") -> JointUse:
     return JointUse(type="fluid_joint", a=a, b=b, rotate=[0, 0, 0])
 
 
-def test_cascade_datums_encode_the_step():
-    """outlet datum = the lip, inlet datum = receiving floor + FALL_ENTRY —
-    mating them puts the downstream rail one cascade step lower."""
+def test_flush_datums_encode_no_step():
+    """VF correction: rail-to-rail datums mate at dZ = 0 — the cascade
+    step is gone from the geometry. The drip joint still verifies (a zero
+    fall is not uphill), but rows hand over via lap_flow_joint."""
     a, b = rail_form("rail_a"), rail_form("rail_b")
     joint = fluid()
     pose = compute_pose(joint, a, b)
-    # drop = z(outlet datum) - z(inlet datum) = 5.59 - 13.5 = -7.91
-    expected = (a.datums["outlet"]["at"][2] - b.datums["inlet"]["at"][2])
-    assert pose.translate[2] == pytest.approx(expected)
-    assert pose.translate[2] < -5.0  # a real step DOWN
+    assert pose.translate[2] == pytest.approx(0.0)
+    assert pose.translate[1] == pytest.approx(-(248.0 + 0.4))
+    findings = _fluid_joint_ir(a, b, pose, joint)
+    assert findings[0].status.value == "pass", findings[0].message
+    assert findings[0].measured == pytest.approx(0.0)
+
+
+def test_feed_datum_keeps_the_only_fall():
+    """The inlet cap's drip tower targets rail.feed — FALL_ENTRY above the
+    receiving floor. Mating any outlet onto feed lands the receiver
+    exactly that far below: gravity pumps at the row entry, and ONLY
+    there."""
+    a, b = rail_form("rail_a"), rail_form("rail_b")
+    joint = JointUse(type="fluid_joint", a="rail_a.outlet", b="rail_b.feed",
+                     rotate=[0, 0, 0])
+    pose = compute_pose(joint, a, b)
+    assert pose.translate[2] == pytest.approx(-FALL_ENTRY)
     findings = _fluid_joint_ir(a, b, pose, joint)
     assert findings[0].status.value == "pass", findings[0].message
     assert "downhill" in findings[0].message
-    # the downhill margin is exactly FALL_ENTRY by construction
     assert findings[0].measured == pytest.approx(FALL_ENTRY)
 
 
@@ -153,8 +169,8 @@ def test_misordered_joints_fail_the_ordering_guard(tmp_path):
 
 def test_meta_passes_through_to_the_report(tmp_path):
     def patch(doc):
-        doc["meta"] = {"row_kind": "fluid_cascade",
-                       "mounting_policy": "not_final_rack"}
+        doc["meta"] = {"row_kind": "tilted_flush_row",
+                       "mounting_policy": "tilted_flush_profile"}
 
     report = run_assembly_validate(_mutate(tmp_path, patch), None)
-    assert report["meta"]["row_kind"] == "fluid_cascade"
+    assert report["meta"]["row_kind"] == "tilted_flush_row"

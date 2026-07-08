@@ -19,7 +19,7 @@ from artifact_forge_ng.product.assembly import JointUse
 
 RAIL_PARAMS = dict(
     module_l=248.0, module_w=248.0, body_h=30.0,
-    channel_w=16.0, channel_d=5.0, slope_deg=1.25, channel_bottom_r=1.2,
+    channel_w=16.0, channel_d=5.0, channel_bottom_r=1.2,
     cassette_l=220.0, cassette_w=220.0,
     seat_depth=14.0, seat_clearance=0.75,
     module_pitch=250.0, corner_r=4.0,
@@ -31,8 +31,10 @@ def rail_form(name="rail", **over) -> PartForm:
     p = dict(RAIL_PARAMS)
     p.update(over)
     RECIPE_OPS["water_rail_body"].apply(st, p, "body")
-    RECIPE_OPS["overflow_lip"].apply(
-        st, {"lip_h": 2.0, "air_gap": 1.5, "lip_r": 0.4}, "lip")
+    RECIPE_OPS["lap_outlet_lip"].apply(
+        st, {"lip_len": 4.0, "lip_t": 1.4}, "lap_out")
+    RECIPE_OPS["lap_inlet_receiver"].apply(
+        st, {"pocket_len": 6.0, "side_clearance": 0.4}, "lap_in")
     RECIPE_OPS["tongue_groove_edges"].apply(
         st, {"tongue_w": 6.0, "tongue_h": 4.0, "tongue_len": 3.6,
              "clearance": 0.4, "z0": 4.0, "bottom_margin": 0.4}, "edges")

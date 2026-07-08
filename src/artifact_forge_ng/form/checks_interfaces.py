@@ -10,6 +10,7 @@ geometry.
 from __future__ import annotations
 
 from ..core.findings import Finding, Level, Status
+from ..product.archetype import RegionRole
 from ..validators.probes import register_probe
 from .part import PartForm
 from .regions import Box3
@@ -84,6 +85,22 @@ def check_interface_keepouts_preserved(form: PartForm, ctx=None) -> Finding:
     if not guarded:
         return _finding(check, True, "no interface keepouts declared")
     regions = {r.name: r for r in form.regions}
+    # A cut that IS water path (fully inside a builder-declared
+    # transient_water_path region — e.g. the lap receiver opening in the
+    # channel floor) does not violate a water keepout: the keepout guards
+    # the port against DRY features and modifiers, not against the water
+    # system's own voids.
+    wet = [r.box for r in form.regions
+           if r.role is RegionRole.TRANSIENT_WATER_PATH]
+
+    def _is_water_void(b: Box3) -> bool:
+        return any(
+            b.x0 >= w.x0 - 0.05 and b.x1 <= w.x1 + 0.05
+            and b.y0 >= w.y0 - 0.05 and b.y1 <= w.y1 + 0.05
+            and b.z0 >= w.z0 - 0.05 and b.z1 <= w.z1 + 0.05
+            for w in wet
+        )
+
     problems: list[str] = []
     for spec, keep in guarded:
         region = regions.get(keep)
@@ -92,7 +109,7 @@ def check_interface_keepouts_preserved(form: PartForm, ctx=None) -> Finding:
                 f"{spec.id}: keepout region {keep!r} not on the form")
             continue
         for cut in form.cutboxes:
-            if _boxes_intersect(cut.box, region.box):
+            if _boxes_intersect(cut.box, region.box) and not _is_water_void(cut.box):
                 problems.append(
                     f"{spec.id}: cut {cut.name!r} enters keepout {keep!r}")
         for bore in form.bores:

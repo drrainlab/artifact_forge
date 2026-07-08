@@ -15,7 +15,6 @@ root: rail_a
 shared:
   module_pitch: 250mm
   channel_w: 16mm
-  slope_deg: 1.25
   cassette_l: 220mm
   cassette_w: 220mm
 
@@ -24,7 +23,7 @@ parts:
     product:
       schema: product/v1
       id: rail_a
-      archetype: water_rail_v1@1
+      archetype: water_rail_v1@2
       params:
         profile: "2020"
       manufacturing:
@@ -35,7 +34,7 @@ parts:
     product:
       schema: product/v1
       id: rail_b
-      archetype: water_rail_v1@1
+      archetype: water_rail_v1@2
       params:
         profile: "2020"
       manufacturing:
