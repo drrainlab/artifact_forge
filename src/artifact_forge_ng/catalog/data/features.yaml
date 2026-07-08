@@ -524,6 +524,17 @@ features:
       - form.lap_slot_leak_path_controlled
       - form.no_standing_water_ir
 
+  - id: root_chamber
+    description: >
+      the under-cassette volume is a passive root chamber: a solid blind
+      bottom that contains overflow, with open-top level troughs the mount
+      drains forward (passive_root_drainage_return, never a second pulse
+      channel); roots grow in, brush-open after the cassette lifts
+    verified_by:
+      - form.root_chamber_ok
+      - form.cassette_support_span_ok
+      - form.no_secondary_water_channel
+
   - id: lightweight_dry_shell
     description: >
       the rail is a dry OPEN SKELETON around a protected water core —

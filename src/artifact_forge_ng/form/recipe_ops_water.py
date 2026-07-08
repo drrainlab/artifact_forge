@@ -266,7 +266,7 @@ _register(RecipeOpDecl(
     validators=(
         "form.water_channel_constant_depth_ok", "form.water_channel_dims_ok",
         "form.drainage_requires_mount", "form.lightweight_windows_dry_ok",
-        "form.cassette_support_span_ok",
+        "form.cassette_support_span_ok", "form.root_chamber_ok",
         "form.no_standing_water_ir", "form.cassette_seat_fit_ok",
         "topology.water_channel_open", "topology.water_channel_floor_solid",
         "topology.single_connected_solid", "topology.cutout_present",

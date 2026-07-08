@@ -133,6 +133,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.lightweight_windows_dry_ok", Level.FORM, "lightweight dry-shell windows: open-bottom, clear of every functional zone, >= 2.4 cover under the seat floor, ribs present between windows"),
         _decl("form.substrate_retained_under_mount", Level.FORM, "honesty note: the substrate must not creep downstream under the mounted slope (static for coco; real retention checks arrive with mat cassettes)"),
         # -- VF-4.1 printability & collector hardening -------------------------
+        _decl("form.root_chamber_ok", Level.FORM, "the root chamber troughs are level, full-length (mount-drained), open-top, over a solid blind containment bottom, clear of the pulse channel"),
         _decl("form.cassette_support_span_ok", Level.FORM, "every skeleton window hides fully under the cassette with a support grid around it — worst unsupported span under the cassette floor stays in band"),
         _decl("form.collector_receiver_matches_final_lap", Level.FORM, "the collector mouth is a real end receiver for the final lap lip: wide enough, 6-8 capture depth, a low drip apron past the lip tip"),
         _decl("form.receiver_open_top_cleanable", Level.FORM, "the receiver capture zone is open to the sky, the apron is a low curb (never a wall), and the zone flows into the open tray — a brush goes wherever a drop goes"),

@@ -466,6 +466,24 @@ def check_cassette_support_span_ok(form: PartForm) -> Finding:
     Trivially green with lightweight off."""
     f = form.frame
     wins = [c for c in form.cutboxes if "_lwin_" in c.name]
+    troughs = [c for c in form.channels if "root_trough" in c.name]
+    if troughs:
+        # root chamber: the cassette spans the open-top troughs; each must
+        # be no wider than the support span, with a rib between them
+        problems: list[str] = []
+        tw = f.get("root_trough_w", 0.0)
+        if tw > CASSETTE_SPAN_MAX:
+            problems.append(
+                f"root trough {tw:g} wide > {CASSETTE_SPAN_MAX:g} — the cassette "
+                "sags between the ribs")
+        if f.get("root_trough_rib", 0.0) < LW_RIB_MIN:
+            problems.append("root trough ribs too thin to carry the cassette")
+        return _finding(
+            "form.cassette_support_span_ok", not problems,
+            f"{len(troughs)} root troughs, {tw:g} wide on {f.get('root_trough_rib',0):g} "
+            "ribs — the cassette spans them stiffly"
+            if not problems else "; ".join(problems),
+            measured=tw, limit=CASSETTE_SPAN_MAX)
     if not f.get("lw_enabled", False) or not wins:
         return _finding("form.cassette_support_span_ok", True,
                         "solid slab under the cassette — full support")
@@ -686,6 +704,56 @@ register_probe("form.magnet_pockets_do_not_break_wall")(
     lambda form, ctx: check_magnet_pockets_do_not_break_wall(form))
 register_probe("form.lightweight_windows_dry_ok")(
     lambda form, ctx: check_lightweight_windows_dry_ok(form))
+def check_root_chamber_ok(form: PartForm) -> Finding:
+    """VF-5 root chamber: the open-top troughs form a valid, cleanable,
+    self-draining root zone. Level const-depth (the MOUNT drains them, no
+    geometry slope), running the FULL length so they exit both faces (a
+    guaranteed forward exit under the mount, and they chain module-to-
+    module to the collector), a solid blind bottom below for containment,
+    and clear of the pulse channel spine. n/a-PASS when not a root
+    chamber."""
+    check = "form.root_chamber_ok"
+    troughs = [c for c in form.channels if "root_trough" in c.name]
+    if not troughs:
+        return _finding(check, True, "no root chamber on this part — n/a")
+    f = form.frame
+    problems: list[str] = []
+    y0, y1 = f.get("rail_y0"), f.get("rail_y1")
+    ch_half = f.get("channel_w", 0.0) / 2.0
+    floor_z = f.get("root_trough_floor_z")
+    for c in troughs:
+        if abs(c.depth_end - c.depth_start) > CONST_DEPTH_TOL:
+            problems.append(
+                f"{c.name!r} is not level — the mount drains the troughs, "
+                "geometry slope is the old cascade")
+        # full length: spans both faces so it drains forward under the mount
+        lo, hi = min(c.y0, c.y1), max(c.y0, c.y1)
+        if y0 is not None and (lo > y0 + 0.01 or hi < y1 - 0.01):
+            problems.append(
+                f"{c.name!r} does not span both faces — no guaranteed forward "
+                "exit / module-to-module chaining")
+        # clear of the pulse channel spine
+        if abs(c.center_x) - c.width / 2.0 < ch_half + 2.0:
+            problems.append(f"{c.name!r} eats into the channel spine")
+    # blind containment bottom below the troughs
+    if floor_z is None:
+        problems.append("no root_trough_floor_z — blind bottom unproven")
+    elif floor_z < FLOOR_MARGIN_MIN:
+        problems.append(
+            f"only {floor_z:g} solid below the troughs (needs >= "
+            f"{FLOOR_MARGIN_MIN:g}) — the containment bottom is too thin")
+    return _finding(
+        check, not problems,
+        f"{len(troughs)} level open-top root troughs over a {floor_z:g} blind "
+        "bottom — roots grow in, the mount drains them forward, brush-open "
+        "after the cassette lifts"
+        if not problems else "; ".join(problems),
+        measured=floor_z, limit=FLOOR_MARGIN_MIN,
+    )
+
+
+register_probe("form.root_chamber_ok")(
+    lambda form, ctx: check_root_chamber_ok(form))
 register_probe("form.cassette_support_span_ok")(
     lambda form, ctx: check_cassette_support_span_ok(form))
 register_probe("form.no_secondary_water_channel")(

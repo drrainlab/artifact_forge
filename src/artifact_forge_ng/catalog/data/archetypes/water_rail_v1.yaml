@@ -337,6 +337,7 @@ validators:
   - form.lap_slot_leak_path_controlled
   - form.lightweight_windows_dry_ok
   - form.cassette_support_span_ok
+  - form.root_chamber_ok
   - form.magnet_pockets_outside_water_zone
   - form.magnet_pockets_do_not_break_wall
   - form.no_standing_water_ir

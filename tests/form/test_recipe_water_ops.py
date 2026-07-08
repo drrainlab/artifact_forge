@@ -324,3 +324,24 @@ def test_root_chamber_magnets_avoid_troughs():
         with_magnets(60.0)).status is Status.FAIL   # in a trough
     assert check_magnet_pockets_outside_water_zone(
         with_magnets(84.0)).status is Status.PASS   # dry perimeter
+
+
+def test_root_chamber_ok_and_mutations():
+    from dataclasses import replace
+    from artifact_forge_ng.form.checks_water import check_root_chamber_ok
+    st = build_root_chamber()
+    form = to_form(st, "rc")
+    assert check_root_chamber_ok(form).status is Status.PASS
+    # skeleton rail: n/a-PASS (no troughs)
+    assert check_root_chamber_ok(to_form(build_rail(), "sk")).status is Status.PASS
+    # a sloped trough (geometry slope) -> FAIL
+    bad = to_form(st, "rc")
+    bad.channels[:] = [replace(c, depth_end=c.depth_start + 3.0)
+                       if "root_trough" in c.name else c for c in bad.channels]
+    f = check_root_chamber_ok(bad)
+    assert f.status is Status.FAIL and "not level" in f.message
+    # a trough not spanning both faces -> FAIL (no guaranteed drain)
+    bad2 = to_form(st, "rc")
+    bad2.channels[:] = [replace(c, y1=0.0) if "root_trough" in c.name else c
+                        for c in bad2.channels]
+    assert check_root_chamber_ok(bad2).status is Status.FAIL
