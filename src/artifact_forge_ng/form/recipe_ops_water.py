@@ -127,45 +127,79 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
                Box3(corridor_half + 4.0, seat_w / 2.0 + 1.0, 0.0, u1 - 4.0, v1, h)),
     ])
 
-    # -- lightweight OPEN SKELETON (VF-4.1; reversible: lightweight=false →
-    # slab). Windows cut THROUGH the slab into the seat pocket — no flat
-    # ceilings, no bridges by construction. What remains is a frame: the
-    # perimeter ring, the channel spine, the profile bands and the rib
-    # grid. The cassette (its footprint minus >= 4 margin) covers every
-    # opening and rests on the ring + ribs.
-    lw = bool(p.get("lightweight", True))
+    # -- under-cassette volume: skeleton (VF-4.1) | root_chamber (VF-5) -----
+    # skeleton = open through-windows, -45% plastic, but overflow drips
+    #   straight through (uncontained; see overflow_containment report).
+    # root_chamber = SOLID blind bottom (contains overflow) with open-top
+    #   root troughs cut into it. The troughs are LEVEL const-depth grooves
+    #   running front-back — the MOUNT drains them forward, exactly like the
+    #   main channel — so roots grow in and water leaves without any
+    #   geometry slope. A separate, legalized subsystem
+    #   (passive_root_drainage_return), never the pulse path.
+    under = p.get("under_cassette", "skeleton")
+    lw = bool(p.get("lightweight", True)) and under == "skeleton"
     lw_rib = p.get("lw_rib", 2.0)
     lw_windows = 0
     lw_span_max = 0.0
-    if lw:
-        # forbidden bands, computed from the same params the later feature
-        # ops consume — the windows stay clear BY CONSTRUCTION and the
-        # lightweight/support checks re-prove it against the final frame
-        profile_size = 20.0 if p.get("profile", "2020") == "2020" else 30.0
-        slot_half = (profile_size + 2.0 * 0.5) / 2.0  # worst-case clearance
-        x_in = ch_w / 2.0 + 4.0                      # channel + 2 clear + 2 wall
-        x_out = u1 - p.get("profile_inset", 24.0) - slot_half - 2.4
+    root_troughs = 0
+    profile_size = 20.0 if p.get("profile", "2020") == "2020" else 30.0
+    slot_half = (profile_size + 2.0 * 0.5) / 2.0  # worst-case clearance
+    x_in = ch_w / 2.0 + 4.0                        # channel + 2 clear + 2 wall
+    x_out = u1 - p.get("profile_inset", 24.0) - slot_half - 2.4
+    y_lim = min(w / 2.0 - 12.0, seat_w / 2.0 - 4.0)
+    if lw and x_out - x_in >= 24.0 and y_lim >= 40.0:
         # windows must hide fully UNDER the cassette seat (>= 4 inside its
         # footprint): a through cut past the seat edge would gnaw the seat
         # wall base — and would poke out from under the cassette
-        y_lim = min(w / 2.0 - 12.0, seat_w / 2.0 - 4.0)
-        if x_out - x_in >= 24.0 and y_lim >= 40.0:
-            n_cols, n_rows = 2, 5
-            col_w = (x_out - x_in - (n_cols - 1) * lw_rib) / n_cols
-            row_l = (2.0 * y_lim - (n_rows - 1) * lw_rib) / n_rows
-            lw_span_max = max(col_w, row_l)
-            for side in (1.0, -1.0):
-                for ci in range(n_cols):
-                    cx0 = x_in + ci * (col_w + lw_rib)
-                    for ri in range(n_rows):
-                        ry0 = -y_lim + ri * (row_l + lw_rib)
-                        state.cutboxes.append(CutBoxFeature(
-                            name=f"{name}_lwin_{'e' if side > 0 else 'w'}{ci}{ri}",
-                            box=Box3(min(side * cx0, side * (cx0 + col_w)), ry0, -1.0,
-                                     max(side * cx0, side * (cx0 + col_w)), ry0 + row_l,
-                                     seat_floor + 0.5),
-                        ))
-                        lw_windows += 1
+        n_cols, n_rows = 2, 5
+        col_w = (x_out - x_in - (n_cols - 1) * lw_rib) / n_cols
+        row_l = (2.0 * y_lim - (n_rows - 1) * lw_rib) / n_rows
+        lw_span_max = max(col_w, row_l)
+        for side in (1.0, -1.0):
+            for ci in range(n_cols):
+                cx0 = x_in + ci * (col_w + lw_rib)
+                for ri in range(n_rows):
+                    ry0 = -y_lim + ri * (row_l + lw_rib)
+                    state.cutboxes.append(CutBoxFeature(
+                        name=f"{name}_lwin_{'e' if side > 0 else 'w'}{ci}{ri}",
+                        box=Box3(min(side * cx0, side * (cx0 + col_w)), ry0, -1.0,
+                                 max(side * cx0, side * (cx0 + col_w)), ry0 + row_l,
+                                 seat_floor + 0.5),
+                    ))
+                    lw_windows += 1
+    elif under == "root_chamber" and x_out - x_in >= 24.0:
+        # open-top root troughs: LEVEL const-depth grooves cut from the seat
+        # floor down, running the full length (exit both faces so the mount
+        # drains them forward and they chain module->module to the
+        # collector). The solid below (z0..trough_floor) is the blind
+        # containment bottom.
+        trough_w = p.get("trough_w", 26.0)
+        trough_rib = p.get("trough_rib", 6.0)
+        trough_d = p.get("trough_depth", 12.0)
+        trough_floor = seat_floor - trough_d
+        n_t = max(1, int((x_out - x_in + trough_rib) // (trough_w + trough_rib)))
+        used = n_t * trough_w + (n_t - 1) * trough_rib
+        x0 = x_in + (x_out - x_in - used) / 2.0  # centre the troughs in the band
+        for side in (1.0, -1.0):
+            for ti in range(n_t):
+                cx = side * (x0 + ti * (trough_w + trough_rib) + trough_w / 2.0)
+                state.channels.append(ChannelCutFeature(
+                    name=f"{name}_root_trough_{'e' if side > 0 else 'w'}{ti}",
+                    center_x=cx, y0=v1, y1=v0, z_top=seat_floor,
+                    width=trough_w, depth_start=trough_d, depth_end=trough_d,
+                    bottom_r=1.5,
+                ))
+                state.regions.append(Region(
+                    f"root_trough_{'e' if side > 0 else 'w'}{ti}",
+                    RegionRole.TRANSIENT_WATER_PATH,
+                    Box3(cx - trough_w / 2.0, v0, trough_floor - 0.5,
+                         cx + trough_w / 2.0, v1, seat_floor)))
+                root_troughs += 1
+        state.frame.update(
+            root_trough_count=root_troughs, root_trough_w=trough_w,
+            root_trough_floor_z=trough_floor, root_blind_bottom_z=trough_floor,
+            root_trough_rib=trough_rib,
+        )
 
     state.frame.update(
         outline_u0=u0, outline_v0=v0, outline_u1=u1, outline_v1=v1,
@@ -224,6 +258,9 @@ _register(RecipeOpDecl(
         "face_gap": ("length", 0.4),
         "lightweight": ("bool", True),
         "lw_rib": ("length", 2.0),
+        "under_cassette": ("choice", "skeleton"),
+        "trough_w": ("length", 26.0), "trough_rib": ("length", 6.0),
+        "trough_depth": ("length", 12.0),
         "profile": ("choice", "2020"), "profile_inset": ("length", 24.0),
     },
     validators=(

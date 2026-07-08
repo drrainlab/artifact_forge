@@ -253,3 +253,74 @@ def test_frame_refuses_no_opening():
         RECIPE_OPS["retainer_frame_body"].apply(
             st, {"l": 60.0, "w": 60.0, "t": 3.0, "band_w": 25.0,
                  "corner_r": 3.0}, "frame")
+
+
+# -- VF-5 root chamber under the cassette -------------------------------------
+
+
+def build_root_chamber(**over):
+    st = RecipeState()
+    p = dict(RAIL_PARAMS, under_cassette="root_chamber",
+             trough_w=26.0, trough_rib=6.0, trough_depth=12.0)
+    p.update(over)
+    RECIPE_OPS["water_rail_body"].apply(st, p, "body")
+    return st
+
+
+def test_root_chamber_troughs_and_blind_bottom():
+    st = build_root_chamber()
+    troughs = [c for c in st.channels if "root_trough" in c.name]
+    assert len(troughs) == st.frame["root_trough_count"] >= 2
+    # troughs are LEVEL const-depth (mount drains them, no geometry slope)
+    for c in troughs:
+        assert c.depth_start == c.depth_end
+    # the blind containment bottom sits below the troughs
+    assert st.frame["root_blind_bottom_z"] == pytest.approx(
+        st.frame["seat_floor_z"] - 12.0)
+    # the main pulse channel is still channels[0], level
+    assert st.channels[0].name.endswith("_water")
+    assert "root_trough" not in st.channels[0].name
+
+
+def test_root_chamber_passes_water_checks():
+    from artifact_forge_ng.form.checks_water import (
+        check_no_secondary_water_channel, check_no_standing_water_ir,
+        check_water_channel_constant_depth_ok, check_cassette_seat_fit_ok)
+    form = to_form(build_root_chamber(), "rc",
+                   {"cassette_l": 220.0, "cassette_w": 220.0})
+    for check in (check_water_channel_constant_depth_ok,
+                  check_no_secondary_water_channel,   # root troughs exempt
+                  check_no_standing_water_ir, check_cassette_seat_fit_ok):
+        finding = check(form)
+        assert finding.status is Status.PASS, (finding.check, finding.message)
+
+
+def test_skeleton_and_root_chamber_are_exclusive():
+    """The param gate: root_chamber cuts NO skeleton windows (solid blind
+    bottom), skeleton cuts NO root troughs."""
+    sk = build_rail()  # default skeleton
+    assert any("_lwin_" in c.name for c in sk.cutboxes)
+    assert not any("root_trough" in c.name for c in sk.channels)
+    rc = build_root_chamber()
+    assert not any("_lwin_" in c.name for c in rc.cutboxes)
+    assert any("root_trough" in c.name for c in rc.channels)
+
+
+def test_root_chamber_magnets_avoid_troughs():
+    """Magnets at the default x60 land in a root trough (wet) — the checks
+    catch it; at the perimeter (x84) they sit in dry body."""
+    from artifact_forge_ng.form.checks_water import (
+        check_magnet_pockets_outside_water_zone)
+
+    def with_magnets(x_off):
+        st = build_root_chamber()
+        RECIPE_OPS["edge_magnet_pockets"].apply(
+            st, {"enabled": True, "magnet_d": 6.0, "magnet_t": 2.0,
+                 "fit_clearance": 0.2, "x_offset": x_off, "z_center": 8.0},
+            "magnets")
+        return to_form(st, "rc")
+
+    assert check_magnet_pockets_outside_water_zone(
+        with_magnets(60.0)).status is Status.FAIL   # in a trough
+    assert check_magnet_pockets_outside_water_zone(
+        with_magnets(84.0)).status is Status.PASS   # dry perimeter

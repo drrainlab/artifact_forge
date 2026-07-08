@@ -96,13 +96,30 @@ parameters:
   lw_rib:
     {type: length, default: 2mm, min: 1.8mm, max: 3mm, role: structural,
      description: cross-rib width between windows}
+  under_cassette:
+    {type: choice, choices: ["skeleton", "root_chamber"], default: "skeleton",
+     role: structural, exposed: true,
+     description: "under-cassette volume: skeleton (-45% plastic, overflow
+       drips through) | root_chamber (blind bottom contains overflow +
+       open-top root troughs drained forward by the mount) — VF-5"}
+  trough_w:
+    {type: length, default: 26mm, min: 18mm, max: 40mm, role: functional,
+     description: root trough width (root_chamber) — cassette spans it}
+  trough_rib:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: structural,
+     description: rib between root troughs (cassette support)}
+  trough_depth:
+    {type: length, default: 12mm, min: 8mm, max: 13mm, role: functional,
+     description: root trough depth — the root zone; blind bottom below it}
   magnet_enabled:
     {type: bool, default: false, role: assembly, exposed: true,
      description: "optional d6x2 alignment magnets in sealed dry pockets —
        alignment only, never a seal, never a support"}
   magnet_x_offset:
-    {type: length, default: 60mm, min: 40mm, max: 80mm, role: assembly,
-     description: magnet pocket centers at +-x_offset on both +-Y faces}
+    {type: length, default: 60mm, min: 40mm, max: 90mm, role: assembly,
+     description: "magnet pocket centers at +-x_offset on both +-Y faces
+       (root_chamber: use ~84 to sit in the solid perimeter, clear of the
+       root troughs — the magnet checks enforce it)"}
   magnet_fit:
     {type: length, default: 0.2mm, min: 0.1mm, max: 0.3mm, role: manufacturing,
      description: "diametral press-fit of the d6x2 magnet in its dry
@@ -166,6 +183,10 @@ form:
         face_gap: face_gap
         lightweight: lightweight
         lw_rib: lw_rib
+        under_cassette: under_cassette
+        trough_w: trough_w
+        trough_rib: trough_rib
+        trough_depth: trough_depth
         profile: profile
         profile_inset: profile_inset
     - op: lap_outlet_lip

@@ -524,8 +524,13 @@ def check_cassette_support_span_ok(form: PartForm) -> Finding:
 def check_no_secondary_water_channel(form: PartForm) -> Finding:
     if form.channels:
         problems: list[str] = []
-        if len(form.channels) != 1:
-            problems.append(f"{len(form.channels)} water channels declared — the rail owns exactly one")
+        # The rail owns exactly ONE transient pulse channel. Root-drainage
+        # troughs (VF-5 root chamber) are a DIFFERENT, legalized subsystem
+        # (passive_root_drainage_return) — level, mount-drained, named
+        # *_root_trough_* — and do not count as a second pulse channel.
+        pulse = [c for c in form.channels if "root_trough" not in c.name]
+        if len(pulse) != 1:
+            problems.append(f"{len(pulse)} pulse water channels declared — the rail owns exactly one")
         receiver = form.region("drip_receiver")
         if receiver is not None:
             for cut in form.cutboxes:

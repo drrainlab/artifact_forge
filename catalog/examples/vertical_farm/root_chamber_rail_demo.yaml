@@ -1,0 +1,18 @@
+# VF-5 preview: a single water rail with the ROOT CHAMBER under the
+# cassette instead of the lightweight skeleton. Blind containment bottom
+# (z0..4) + open-top root troughs running front-back; roots grow into the
+# troughs, water drains forward under the mounted row slope (like the main
+# channel). Standalone rail — just to eyeball the chamber geometry.
+schema: product/v1
+id: root_chamber_rail_demo
+archetype: water_rail_v1@2
+params:
+  profile: "2020"
+  under_cassette: root_chamber
+  magnet_enabled: true
+  magnet_x_offset: 84mm
+manufacturing:
+  material: PETG
+  support_policy: none
+  bed: [250mm, 250mm, 250mm]
+  print_orientation: as_modeled
