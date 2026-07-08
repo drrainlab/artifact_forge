@@ -41,9 +41,9 @@ LAP_SLOT_BAND = (0.5, 2.5)  # deliberate open slot at the lip tip
 FACE_GAP_BAND = (0.3, 0.6)  # controlled flush face gap
 LAP_LATERAL_CLEAR_MIN = 40.0  # slot drips stay this far from dry hardware
 MAGNET_WET_WALL_MIN = 1.2  # plastic between a magnet pocket and any water
-LW_COVER_MIN = 2.4  # lightweight window roof under the seat floor
 LW_RIB_MIN = 1.8
-LW_SPAN_WARN = 45.0  # bridge span over a window ceiling worth flagging
+CASSETTE_COVER = 4.0  # every skeleton opening hides this far under the seat
+CASSETTE_SPAN_MAX = 45.0  # worst unsupported span under the cassette floor
 
 
 def _finding(check: str, ok: bool, message: str, *, measured: float | None = None,
@@ -392,10 +392,11 @@ def check_magnet_pockets_do_not_break_wall(form: PartForm) -> Finding:
 
 
 def check_lightweight_windows_dry_ok(form: PartForm) -> Finding:
-    """The dry-shell windows: open-bottom (cannot hold water), a solid roof
-    >= LW_COVER_MIN under the seat floor, ribs left between them, and clear
-    of every functional zone — channel, lap ends, profile-slot bands,
-    magnet pockets, wet regions. Trivially green with lightweight off."""
+    """The open-skeleton windows (VF-4.1): THROUGH the under-seat slab —
+    open bottom (cannot hold water) AND open top (no flat ceiling, no
+    bridges by construction) — and clear of every functional zone:
+    channel, lap ends, profile-slot bands, wet regions. Trivially green
+    with lightweight off."""
     f = form.frame
     wins = [c for c in form.cutboxes if "_lwin_" in c.name]
     if not f.get("lw_enabled", False) or not wins:
@@ -412,9 +413,11 @@ def check_lightweight_windows_dry_ok(form: PartForm) -> Finding:
         b = win.box
         if b.z0 > -0.5:
             problems.append(f"window {win.name!r} is not open-bottom")
-        if seat_floor is not None and b.z1 > seat_floor - LW_COVER_MIN + 0.01:
+        if seat_floor is not None and b.z1 < seat_floor - 0.05:
             problems.append(
-                f"window {win.name!r} roof leaves < {LW_COVER_MIN:g} under the seat floor")
+                f"window {win.name!r} stops at z={b.z1:g} under the seat floor "
+                f"{seat_floor:g} — a blind pocket with a bridged flat ceiling, "
+                "not a through skeleton opening")
         if min(abs(b.x0), abs(b.x1)) < ch_half + 2.0 and b.x0 * b.x1 < 0:
             problems.append(f"window {win.name!r} crosses the channel band")
         elif min(abs(b.x0), abs(b.x1)) < ch_half + 2.0:
@@ -430,16 +433,72 @@ def check_lightweight_windows_dry_ok(form: PartForm) -> Finding:
     rib = f.get("lw_rib", 0.0)
     if rib < LW_RIB_MIN:
         problems.append(f"declared rib {rib:g} < {LW_RIB_MIN:g}")
-    span = f.get("lw_span_max", 0.0)
-    note = ""
-    if span > LW_SPAN_WARN:
-        note = f" (note: {span:.0f} bridge over a window ceiling — expect sag on FDM)"
     return _finding(
         "form.lightweight_windows_dry_ok", not problems,
-        f"{len(wins)} open-bottom dry windows, roof >= {LW_COVER_MIN:g}, "
-        f"ribs {rib:g} — the profile carries, the plastic positions" + note
+        f"{len(wins)} through skeleton openings, ribs {rib:g} — no bridges "
+        "by construction; the cassette covers, the profile carries"
         if not problems else "; ".join(problems),
-        measured=span,
+        measured=f.get("lw_span_max", 0.0),
+    )
+
+
+def check_cassette_support_span_ok(form: PartForm) -> Finding:
+    """The cassette must not sag over the open skeleton (VF-4.1): every
+    window hides FULLY under the cassette seat footprint (>= CASSETTE_COVER
+    margin inside — the cassette covers each opening), the support grid
+    survives around them (perimeter ring + channel spine + ribs), and the
+    worst unsupported span under the cassette floor stays in band.
+    Trivially green with lightweight off."""
+    f = form.frame
+    wins = [c for c in form.cutboxes if "_lwin_" in c.name]
+    if not f.get("lw_enabled", False) or not wins:
+        return _finding("form.cassette_support_span_ok", True,
+                        "solid slab under the cassette — full support")
+    keys = ("seat_u0", "seat_v0", "seat_u1", "seat_v1", "channel_w", "lw_rib")
+    missing = [k for k in keys if k not in f]
+    if missing:
+        return _finding("form.cassette_support_span_ok", False,
+                        f"no frame keys: {', '.join(missing)}")
+    problems: list[str] = []
+    worst = 0.0
+    for win in wins:
+        b = win.box
+        if (b.x0 < f["seat_u0"] + CASSETTE_COVER or b.x1 > f["seat_u1"] - CASSETTE_COVER
+                or b.y0 < f["seat_v0"] + CASSETTE_COVER
+                or b.y1 > f["seat_v1"] - CASSETTE_COVER):
+            problems.append(
+                f"window {win.name!r} pokes out from under the cassette seat "
+                f"(needs >= {CASSETTE_COVER:g} inside the footprint)")
+        span = min(b.x1 - b.x0, b.y1 - b.y0)
+        worst = max(worst, span)
+        if span > CASSETTE_SPAN_MAX:
+            problems.append(
+                f"window {win.name!r} leaves a {span:.1f} unsupported span "
+                f"under the cassette (max {CASSETTE_SPAN_MAX:g})")
+    # the support grid: no two windows may merge (rib survives between them)
+    for i in range(len(wins)):
+        for j in range(i + 1, len(wins)):
+            a, b = wins[i].box, wins[j].box
+            gap_x = max(a.x0, b.x0) - min(a.x1, b.x1)
+            gap_y = max(a.y0, b.y0) - min(a.y1, b.y1)
+            if max(gap_x, gap_y) < f["lw_rib"] - 0.2:
+                problems.append(
+                    f"windows {wins[i].name!r}/{wins[j].name!r} merge — the "
+                    "support rib between them is gone")
+    # the channel spine: openings never cross the channel band (the spine
+    # under the cassette's contact window is always solid)
+    ch_half = f["channel_w"] / 2.0
+    for win in wins:
+        if win.box.x0 < ch_half and win.box.x1 > -ch_half:
+            problems.append(f"window {win.name!r} eats the channel spine")
+    return _finding(
+        "form.cassette_support_span_ok", not problems,
+        f"{len(wins)} openings fully under the cassette; worst unsupported "
+        f"span {worst:.1f} <= {CASSETTE_SPAN_MAX:g} on the ring + spine + rib "
+        "grid (the 2 mm cassette floor with its mesh spans this stiffly; "
+        "channel-zone reinforcement arrives with VF-5 cassettes)"
+        if not problems else "; ".join(problems),
+        measured=worst, limit=CASSETTE_SPAN_MAX,
     )
 
 
@@ -603,6 +662,8 @@ register_probe("form.magnet_pockets_do_not_break_wall")(
     lambda form, ctx: check_magnet_pockets_do_not_break_wall(form))
 register_probe("form.lightweight_windows_dry_ok")(
     lambda form, ctx: check_lightweight_windows_dry_ok(form))
+register_probe("form.cassette_support_span_ok")(
+    lambda form, ctx: check_cassette_support_span_ok(form))
 register_probe("form.no_secondary_water_channel")(
     lambda form, ctx: check_no_secondary_water_channel(form))
 register_probe("form.cassette_seat_fit_ok")(

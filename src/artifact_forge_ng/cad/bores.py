@@ -28,11 +28,24 @@ def cut_bore(body: cq.Workplane, bore: BoreFeature) -> tuple[cq.Workplane, bool]
     hi = bore.span[1] + bore.overshoot[1]
     origin[idx] = lo
     length = hi - lo
-    cutter = (
-        cq.Workplane(_AXIS_PLANES[bore.axis], origin=tuple(origin))
-        .circle(bore.d / 2.0)
-        .extrude(_AXIS_SIGN[bore.axis] * length)
-    )
+    wp = cq.Workplane(_AXIS_PLANES[bore.axis], origin=tuple(origin))
+    if bore.roof == "teardrop" and bore.axis in ("X", "Y"):
+        # Self-supporting horizontal bore: keep the lower 3/4 of the circle,
+        # replace the ceiling with two 45-degree tangent chords meeting at a
+        # peak r*sqrt(2) above center. On both named planes here ("YZ" for
+        # axis X, "XZ" for axis Y) local +v is world +Z, so "up" is +v.
+        r = bore.d / 2.0
+        k = r / math.sqrt(2.0)
+        profile = (
+            wp.moveTo(k, k)
+            .threePointArc((0.0, -r), (-k, k))  # the major arc via the floor
+            .lineTo(0.0, r * math.sqrt(2.0))    # left 45-degree chord to the peak
+            .lineTo(k, k)                        # right chord back down
+            .close()
+        )
+    else:
+        profile = wp.circle(bore.d / 2.0)
+    cutter = profile.extrude(_AXIS_SIGN[bore.axis] * length)
     return cut_keep_solid(body, cutter)
 
 

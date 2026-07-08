@@ -10,6 +10,7 @@ inlet floor. Slope is the mount's job (assembly.row_drains_under_mount)."""
 from artifact_forge_ng.core.findings import Status
 from artifact_forge_ng.form.checks_water import (
     check_cassette_seat_fit_ok,
+    check_cassette_support_span_ok,
     check_drainage_requires_mount,
     check_lap_joint_geometry_ok,
     check_lap_slot_leak_path_controlled,
@@ -45,6 +46,7 @@ RAIL_CHECKS = (
     check_magnet_pockets_outside_water_zone,
     check_magnet_pockets_do_not_break_wall,
     check_lightweight_windows_dry_ok,
+    check_cassette_support_span_ok,
     check_no_secondary_water_channel,
     check_cassette_seat_fit_ok,
     check_tongue_groove_profile_ok,
@@ -90,7 +92,7 @@ def good_frame(**over) -> dict:
         profile_slot_clearance=0.2, profile_slot_depth=6.0,
         profile_slot_x=100.0,
         module_pitch=250.0,
-        lw_enabled=False, lw_window_count=0, lw_cover=2.4, lw_rib=2.0,
+        lw_enabled=False, lw_window_count=0, lw_rib=2.0,
         lw_span_max=0.0,
     )
     f.update(over)
@@ -350,18 +352,20 @@ def test_lightweight_off_is_green():
 
 def test_healthy_windows_pass():
     cuts = good_cutboxes() + [
-        _window("body_lwin_e00", Box3(13.0, -100.0, -1.0, 49.0, -60.0, 13.6)),
-        _window("body_lwin_w00", Box3(-49.0, -100.0, -1.0, -13.0, -60.0, 13.6)),
+        _window("body_lwin_e00", Box3(13.0, -100.0, -1.0, 49.0, -60.0, 16.5)),
+        _window("body_lwin_w00", Box3(-49.0, -100.0, -1.0, -13.0, -60.0, 16.5)),
     ]
     form = make_rail(cutboxes=cuts,
                      frame=good_frame(lw_enabled=True, lw_window_count=2,
                                       lw_span_max=40.0))
-    assert "check_lightweight_windows_dry_ok" not in failing(form)
+    fails = failing(form)
+    assert "check_lightweight_windows_dry_ok" not in fails
+    assert "check_cassette_support_span_ok" not in fails
 
 
 def test_window_into_channel_band_rejected():
     cuts = good_cutboxes() + [
-        _window("body_lwin_e00", Box3(6.0, -100.0, -1.0, 49.0, -60.0, 13.6)),
+        _window("body_lwin_e00", Box3(6.0, -100.0, -1.0, 49.0, -60.0, 16.5)),
     ]
     form = make_rail(cutboxes=cuts,
                      frame=good_frame(lw_enabled=True, lw_window_count=1,
@@ -371,7 +375,7 @@ def test_window_into_channel_band_rejected():
 
 def test_blind_window_rejected():
     cuts = good_cutboxes() + [
-        _window("body_lwin_e00", Box3(13.0, -100.0, 2.0, 49.0, -60.0, 13.6)),
+        _window("body_lwin_e00", Box3(13.0, -100.0, 2.0, 49.0, -60.0, 16.5)),
     ]
     form = make_rail(cutboxes=cuts,
                      frame=good_frame(lw_enabled=True, lw_window_count=1,
@@ -379,24 +383,65 @@ def test_blind_window_rejected():
     assert "check_lightweight_windows_dry_ok" in failing(form)
 
 
-def test_thin_window_roof_rejected():
+def test_flat_ceiling_pocket_rejected():
+    """The pre-4.1 geometry: a blind pocket roofed 2.4 under the seat floor
+    — a 36mm bridge on FDM. The through rule kills it at the IR."""
     cuts = good_cutboxes() + [
-        _window("body_lwin_e00", Box3(13.0, -100.0, -1.0, 49.0, -60.0, 15.0)),
+        _window("body_lwin_e00", Box3(13.0, -100.0, -1.0, 49.0, -60.0, 13.6)),
     ]
     form = make_rail(cutboxes=cuts,
                      frame=good_frame(lw_enabled=True, lw_window_count=1,
                                       lw_span_max=40.0))
-    assert "check_lightweight_windows_dry_ok" in failing(form)
+    fails = failing(form)
+    assert "check_lightweight_windows_dry_ok" in fails
 
 
 def test_window_in_profile_band_rejected():
     cuts = good_cutboxes() + [
-        _window("body_lwin_e00", Box3(60.0, -100.0, -1.0, 92.0, -60.0, 13.6)),
+        _window("body_lwin_e00", Box3(60.0, -100.0, -1.0, 92.0, -60.0, 16.5)),
     ]
     form = make_rail(cutboxes=cuts,
                      frame=good_frame(lw_enabled=True, lw_window_count=1,
                                       lw_span_max=40.0))
     assert "check_lightweight_windows_dry_ok" in failing(form)
+
+
+def test_window_poking_from_under_cassette_rejected():
+    """A through opening reaching past the seat footprint minus margin
+    would peek out from under the cassette AND gnaw the seat wall base."""
+    cuts = good_cutboxes() + [
+        _window("body_lwin_e00", Box3(13.0, -100.0, -1.0, 49.0, -108.0 + 216.0, 16.5)),
+    ]
+    form = make_rail(cutboxes=cuts,
+                     frame=good_frame(lw_enabled=True, lw_window_count=1,
+                                      lw_span_max=40.0))
+    assert "check_cassette_support_span_ok" in failing(form)
+
+
+def test_oversized_span_rejected():
+    cuts = good_cutboxes() + [
+        _window("body_lwin_e00", Box3(13.0, -100.0, -1.0, 73.0, -40.0, 16.5)),
+    ]
+    form = make_rail(cutboxes=cuts,
+                     frame=good_frame(lw_enabled=True, lw_window_count=1,
+                                      lw_span_max=60.0))
+    assert "check_cassette_support_span_ok" in failing(form)
+
+
+def test_merged_windows_rejected():
+    """Two openings with no rib between them — the support grid is gone."""
+    cuts = good_cutboxes() + [
+        _window("body_lwin_e00", Box3(13.0, -100.0, -1.0, 49.0, -60.0, 16.5)),
+        _window("body_lwin_e01", Box3(13.0, -60.5, -1.0, 49.0, -20.0, 16.5)),
+    ]
+    form = make_rail(cutboxes=cuts,
+                     frame=good_frame(lw_enabled=True, lw_window_count=2,
+                                      lw_span_max=40.0))
+    assert "check_cassette_support_span_ok" in failing(form)
+
+
+def test_lightweight_off_support_is_na():
+    assert check_cassette_support_span_ok(make_rail()).status is Status.PASS
 
 
 # -- the untouched neighbours ---------------------------------------------------

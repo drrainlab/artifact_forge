@@ -125,7 +125,14 @@ class BoreFeature:
     bore, a blind pocket). ``span`` is the axis-coordinate range of the
     cut; ``overshoot`` extends the cutter past each span end — (1, 0) makes
     a blind pocket entered from the low end. Verification reuses the
-    swept-cylinder channel probe along the same span."""
+    swept-cylinder channel probe along the same span.
+
+    ``roof`` (VF-4.1): a HORIZONTAL bore (axis X/Y) printed as-modeled has
+    a bridged circular ceiling; ``"teardrop"`` replaces the top quarter
+    with two 45-degree tangent chords meeting at a peak d/2*sqrt(2) above
+    center — self-supporting on FDM. The teardrop volume is a superset of
+    the cylinder, so every swept-cylinder probe stays valid. Ignored for
+    axis Z (a vertical bore has no ceiling)."""
 
     name: str
     axis: str  # "X" | "Y" | "Z"
@@ -133,6 +140,7 @@ class BoreFeature:
     d: float
     span: tuple[float, float]
     overshoot: tuple[float, float] = (1.0, 1.0)
+    roof: str = "round"  # "round" | "teardrop" (horizontal axes only)
 
     def path(self, probe_overshoot: float = 1.0) -> list[tuple[float, float, float]]:
         """The probe polyline along the bore. A blind end (overshoot 0) is

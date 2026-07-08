@@ -308,3 +308,96 @@ def no_unwashable_snap_pockets(geometry: Geometry, form: PartForm) -> Finding:
         f"{len(windows)} snap window(s) verified void through the wall"
         if ok else "; ".join(blocked),
     )
+
+
+# -- VF-4.1 printability: bottom pockets and horizontal bores -------------------
+
+#: FDM bridging bands for a flat ceiling over a bottom-entered pocket,
+#: printing as-modeled (bottom down): short bridges print clean, medium
+#: ones sag cosmetically, long ones need support.
+CEILING_BRIDGE_OK = 25.0
+CEILING_BRIDGE_FAIL = 35.0
+#: A horizontal circular bore prints acceptably up to this diameter; above
+#: it the round ceiling sags — use a teardrop roof or a vertical bore.
+H_BORE_OK_D = 8.0
+
+
+@register_probe("manufacturing.supportless_lightweight_windows_ok")
+def supportless_lightweight_windows_ok(geometry: Geometry, form: PartForm) -> Finding:
+    """No blind bottom pocket may hide a support-critical flat ceiling
+    (VF-4.1). Every cutbox entered from BELOW whose footprint could bridge
+    is probed ON THE SOLID just above its ceiling: void above (a through
+    opening into another cavity — the open-skeleton case) passes; material
+    above is a real bridge, graded by span. n/a fast-path: parts without
+    bottom-entered pockets never touch the geometry."""
+    check = "manufacturing.supportless_lightweight_windows_ok"
+    if form.print_orientation != "as_modeled":
+        return _finding(check, Status.PASS,
+                        "n/a — sideprint part; ceilings print vertical")
+    top = form.width or 0.0
+    candidates = [
+        c for c in form.cutboxes
+        if c.box.z0 <= 0.05 and c.box.z1 < top - 0.05
+        and min(c.box.x1 - c.box.x0, c.box.y1 - c.box.y0) > CEILING_BRIDGE_OK
+    ]
+    if not candidates:
+        return _finding(check, Status.PASS,
+                        "no bottom-entered pockets that could bridge — n/a")
+    from ..cad.probes import box_probe, solid_fraction
+
+    problems: list[str] = []
+    worst = 0.0
+    for cut in candidates:
+        b = cut.box
+        probe = box_probe(b.x0 + 0.3, b.y0 + 0.3, b.z1 + 0.2,
+                          b.x1 - 0.3, b.y1 - 0.3, b.z1 + 1.2)
+        if solid_fraction(geometry.workplane, probe) <= 0.5:
+            continue  # through into another cavity — no ceiling, no bridge
+        span = min(b.x1 - b.x0, b.y1 - b.y0)
+        worst = max(worst, span)
+        if span > CEILING_BRIDGE_FAIL:
+            problems.append(
+                f"pocket {cut.name!r} bridges a {span:.0f} flat ceiling "
+                f"(> {CEILING_BRIDGE_FAIL:g}) — make it through, vaulted or a "
+                "rib skeleton")
+    if problems:
+        return _finding(check, Status.FAIL, "; ".join(problems),
+                        measured=worst, limit=CEILING_BRIDGE_FAIL,
+                        suggestion="through-open the pocket or vault its roof")
+    if worst > 0.0:
+        return _finding(
+            check, Status.WARN,
+            f"flat ceiling bridges up to {worst:.0f} over bottom pockets — "
+            "prints, expect sag", measured=worst, limit=CEILING_BRIDGE_FAIL)
+    return _finding(check, Status.PASS,
+                    "every wide bottom pocket is through-open — no ceiling "
+                    "bridges, supportless by construction")
+
+
+@register_probe("manufacturing.horizontal_bore_supportless")
+def horizontal_bore_supportless(geometry: Geometry, form: PartForm) -> Finding:
+    """A HORIZONTAL circular bore wider than H_BORE_OK_D prints a sagging
+    round ceiling as-modeled; a teardrop roof (or a vertical bore) is
+    self-supporting. Purely IR — the roof is a declared feature."""
+    check = "manufacturing.horizontal_bore_supportless"
+    if form.print_orientation != "as_modeled":
+        return _finding(check, Status.PASS,
+                        "n/a — sideprint part; bore axes rotate with it")
+    horizontal = [b for b in form.bores
+                  if b.axis in ("X", "Y") and b.d > H_BORE_OK_D]
+    if not horizontal:
+        return _finding(check, Status.PASS,
+                        f"no horizontal bores over {H_BORE_OK_D:g} — n/a")
+    sagging = [b for b in horizontal if b.roof != "teardrop"]
+    if sagging:
+        names = ", ".join(f"{b.name!r} d{b.d:g}" for b in sagging[:4])
+        return _finding(
+            check, Status.WARN,
+            f"horizontal circular bore(s) {names} sag without support — "
+            "give them roof: teardrop, or run them vertical",
+            measured=max(b.d for b in sagging), limit=H_BORE_OK_D,
+            suggestion="BoreFeature(roof=\"teardrop\")")
+    return _finding(
+        check, Status.PASS,
+        f"{len(horizontal)} horizontal bore(s) over {H_BORE_OK_D:g} — all "
+        "teardrop-roofed, self-supporting")

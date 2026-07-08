@@ -24,7 +24,7 @@ RAIL_PARAMS = dict(
     cassette_l=220.0, cassette_w=220.0,
     seat_depth=14.0, seat_clearance=0.75,
     module_pitch=250.0, corner_r=4.0,
-    face_gap=0.4, lightweight=True, lw_cover=2.4, lw_rib=2.0,
+    face_gap=0.4, lightweight=True, lw_rib=2.0,
     profile="2020", profile_inset=24.0,
 )
 

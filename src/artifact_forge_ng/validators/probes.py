@@ -132,6 +132,11 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.magnet_pockets_do_not_break_wall", Level.FORM, "magnet pockets stay blind (never pierce the face) and keep >= 1.2 plastic to any wet zone"),
         _decl("form.lightweight_windows_dry_ok", Level.FORM, "lightweight dry-shell windows: open-bottom, clear of every functional zone, >= 2.4 cover under the seat floor, ribs present between windows"),
         _decl("form.substrate_retained_under_mount", Level.FORM, "honesty note: the substrate must not creep downstream under the mounted slope (static for coco; real retention checks arrive with mat cassettes)"),
+        # -- VF-4.1 printability & collector hardening -------------------------
+        _decl("form.cassette_support_span_ok", Level.FORM, "every skeleton window hides fully under the cassette with a support grid around it — worst unsupported span under the cassette floor stays in band"),
+        _decl("form.collector_receiver_matches_final_lap", Level.FORM, "the collector mouth is a real end receiver for the final lap lip: wide enough, 6-8 capture depth, a low drip apron past the lip tip"),
+        _decl("form.receiver_open_top_cleanable", Level.FORM, "the receiver capture zone is open to the sky, the apron is a low curb (never a wall), and the zone flows into the open tray — a brush goes wherever a drop goes"),
+        _decl("form.collector_drain_bore_supportless", Level.FORM, "the drain bore prints without support: vertical, or a teardrop roof on a horizontal run"),
         _decl("form.lift_access_ok", Level.FORM, "rim carries two finger notches wide enough for tool-free removal"),
         # -- interface level (wave A1, form-time) ------------------------------
         _decl("interface.frame_exists", Level.FORM, "every declared interface's datum is published on the form with its type's frame keys"),
@@ -208,10 +213,15 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.profile_support_full_length", Level.ASSEMBLY, "every rail groove is coplanar with the straight profile top — full seating, zero span gap"),
         _decl("assembly.magnet_alignment_ok", Level.ASSEMBLY, "adjacent modules' magnet pockets are coaxial in the pose (alignment only — never seal, never support)"),
         _decl("assembly.cassettes_removable_under_mount", Level.ASSEMBLY, "every cassette stays hand-removable with the row mounted at its slope"),
+        _decl("assembly.collector_captures_drain_edge", Level.ASSEMBLY, "in the pose the final lap lip tip sits INSIDE the collector receiver volume — an end receiver, not a part standing nearby"),
+        _decl("assembly.collector_mouth_envelopes_outlet_lip", Level.ASSEMBLY, "the receiver mouth envelopes the posed lip across X with real side margin"),
+        _decl("assembly.collector_removable_by_hand", Level.ASSEMBLY, "no collector material above the captured lip — the receiver has no ceiling, so the collector lifts straight off"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),
         # -- manufacturing level ----------------------------------------------
+        _decl("manufacturing.supportless_lightweight_windows_ok", Level.MANUFACTURING, "bottom-entered pockets never hide a support-critical flat ceiling — through/vaulted/skeleton, probed on the solid"),
+        _decl("manufacturing.horizontal_bore_supportless", Level.MANUFACTURING, "horizontal circular bores over the safe diameter carry a teardrop roof or run vertical"),
         _decl("manufacturing.min_wall", Level.MANUFACTURING, "measured minimum wall >= printer minimum"),
         _decl("manufacturing.bed_fit", Level.MANUFACTURING, "bounding box fits the print bed"),
         _decl("manufacturing.overhang", Level.MANUFACTURING, "overhang fraction acceptable for the support policy"),

@@ -55,13 +55,14 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     notches open the channel to the sky through both seat walls, so the
     whole run is brush-reachable.
 
-    Lightweight dry shell (param-gated, reversible): the rail is a dry
-    frame around a protected water core, not a slab — large smooth
-    open-bottom windows are cut from the underside between the channel and
-    the profile-slot bands, leaving a >= lw_cover roof under the seat floor
-    and lw_rib cross ribs. The profile carries the row; plastic pays only
-    for water, cassette and positioning. Never honeycomb — big cleanable
-    openings only."""
+    Lightweight open skeleton (param-gated, reversible): the rail is a dry
+    frame around a protected water core, not a slab — large smooth windows
+    cut THROUGH the under-seat slab (open bottom AND top: no bridges by
+    construction), leaving the perimeter ring, the channel spine, the
+    profile bands and the lw_rib grid. The cassette covers every opening
+    and rests on the ring + ribs. The profile carries the row; plastic
+    pays only for water, cassette and positioning. Never honeycomb — big
+    cleanable openings only."""
     if state.section is not None:
         raise RecipeError("water_rail_body must be the (single) base op")
     l, w, h = p["module_l"], p["module_w"], p["body_h"]
@@ -126,23 +127,29 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
                Box3(corridor_half + 4.0, seat_w / 2.0 + 1.0, 0.0, u1 - 4.0, v1, h)),
     ])
 
-    # -- lightweight dry shell windows (reversible: lightweight=false → slab)
+    # -- lightweight OPEN SKELETON (VF-4.1; reversible: lightweight=false →
+    # slab). Windows cut THROUGH the slab into the seat pocket — no flat
+    # ceilings, no bridges by construction. What remains is a frame: the
+    # perimeter ring, the channel spine, the profile bands and the rib
+    # grid. The cassette (its footprint minus >= 4 margin) covers every
+    # opening and rests on the ring + ribs.
     lw = bool(p.get("lightweight", True))
-    lw_cover = p.get("lw_cover", 2.4)
     lw_rib = p.get("lw_rib", 2.0)
     lw_windows = 0
     lw_span_max = 0.0
     if lw:
         # forbidden bands, computed from the same params the later feature
-        # ops consume — the windows stay clear BY CONSTRUCTION and
-        # form.lightweight_windows_dry_ok re-proves it against the final frame
+        # ops consume — the windows stay clear BY CONSTRUCTION and the
+        # lightweight/support checks re-prove it against the final frame
         profile_size = 20.0 if p.get("profile", "2020") == "2020" else 30.0
         slot_half = (profile_size + 2.0 * 0.5) / 2.0  # worst-case clearance
         x_in = ch_w / 2.0 + 4.0                      # channel + 2 clear + 2 wall
-        x_out = u1 - p.get("profile_inset", 24.0) - slot_half - lw_cover
-        y_lim = w / 2.0 - 12.0                       # lap / magnet / face margin
-        z_roof = seat_floor - lw_cover
-        if x_out - x_in >= 24.0 and y_lim >= 40.0 and z_roof >= 6.0:
+        x_out = u1 - p.get("profile_inset", 24.0) - slot_half - 2.4
+        # windows must hide fully UNDER the cassette seat (>= 4 inside its
+        # footprint): a through cut past the seat edge would gnaw the seat
+        # wall base — and would poke out from under the cassette
+        y_lim = min(w / 2.0 - 12.0, seat_w / 2.0 - 4.0)
+        if x_out - x_in >= 24.0 and y_lim >= 40.0:
             n_cols, n_rows = 2, 5
             col_w = (x_out - x_in - (n_cols - 1) * lw_rib) / n_cols
             row_l = (2.0 * y_lim - (n_rows - 1) * lw_rib) / n_rows
@@ -156,7 +163,7 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
                             name=f"{name}_lwin_{'e' if side > 0 else 'w'}{ci}{ri}",
                             box=Box3(min(side * cx0, side * (cx0 + col_w)), ry0, -1.0,
                                      max(side * cx0, side * (cx0 + col_w)), ry0 + row_l,
-                                     z_roof),
+                                     seat_floor + 0.5),
                         ))
                         lw_windows += 1
 
@@ -177,7 +184,7 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         module_pitch=pitch,
         face_gap=face_gap, flush_pitch=w + face_gap,
         lw_enabled=lw, lw_window_count=lw_windows,
-        lw_cover=lw_cover, lw_rib=lw_rib, lw_span_max=lw_span_max,
+        lw_rib=lw_rib, lw_span_max=lw_span_max,
     )
     state.datums["cassette_seat"] = {"at": [0.0, 0.0, seat_floor], "rotate": [0.0, 0.0, 0.0]}
     state.datums["module_origin"] = {"at": [0.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0]}
@@ -216,12 +223,13 @@ _register(RecipeOpDecl(
         "module_pitch": ("length", 250.0), "corner_r": ("length", 4.0),
         "face_gap": ("length", 0.4),
         "lightweight": ("bool", True),
-        "lw_cover": ("length", 2.4), "lw_rib": ("length", 2.0),
+        "lw_rib": ("length", 2.0),
         "profile": ("choice", "2020"), "profile_inset": ("length", 24.0),
     },
     validators=(
         "form.water_channel_constant_depth_ok", "form.water_channel_dims_ok",
         "form.drainage_requires_mount", "form.lightweight_windows_dry_ok",
+        "form.cassette_support_span_ok",
         "form.no_standing_water_ir", "form.cassette_seat_fit_ok",
         "topology.water_channel_open", "topology.water_channel_floor_solid",
         "topology.single_connected_solid", "topology.cutout_present",

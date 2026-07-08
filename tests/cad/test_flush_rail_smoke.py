@@ -1,7 +1,8 @@
-"""VF-correction early CAD smoke: ONE corrected rail really compiles —
+"""VF-correction/4.1 early CAD smoke: ONE corrected rail really compiles —
 constant-depth channel, lap lip welded past the outlet face, THROUGH
-open-bottom lap receiver, sealed magnet pockets, lightweight dry-shell
-windows. The lightweight gate is reversible and pays its 25-45% mass
+open-bottom lap receiver, sealed magnet pockets, and the OPEN SKELETON
+lightweight windows (through the under-seat slab — no bridges by
+construction). The lightweight gate is reversible and pays its mass
 saving; the lap geometry is real on the solid, not just in the IR."""
 
 import pytest
@@ -21,7 +22,7 @@ RAIL_PARAMS = dict(
     cassette_l=220.0, cassette_w=220.0,
     seat_depth=14.0, seat_clearance=0.75,
     module_pitch=250.0, corner_r=4.0,
-    face_gap=0.4, lw_cover=2.4, lw_rib=2.0,
+    face_gap=0.4, lw_rib=2.0,
     profile="2020", profile_inset=24.0,
 )
 
@@ -74,9 +75,9 @@ def test_lightweight_pays_its_mass_saving(solids):
     v_light = light.workplane.val().Volume()
     v_heavy = heavy.workplane.val().Volume()
     saving = 1.0 - v_light / v_heavy
-    # the practical dry-shell target: 25-40% of the part, with slack for
-    # geometry drift — but never token (<15%) and never structural (>50%)
-    assert 0.15 <= saving <= 0.50, f"saving {saving:.1%}"
+    # the open skeleton removes the window roofs too: target ~45%, with
+    # slack for drift — never token (<25%) and never structural (>55%)
+    assert 0.25 <= saving <= 0.55, f"saving {saving:.1%}"
 
 
 def test_lap_lip_is_real_on_the_solid(solids):
@@ -121,9 +122,12 @@ def test_magnet_pockets_blind_on_the_solid(solids):
     assert solid_fraction(light.workplane, behind) > 0.9
 
 
-def test_windows_open_from_below(solids):
+def test_windows_are_through_skeleton(solids):
     _, light, _, _, heavy, _ = solids
-    # a window column void under the seat slab on the light rail only
-    probe = box_probe(20.0, -60.0, 1.0, 40.0, -30.0, 12.0)
+    # a window void runs THROUGH the slab — including the former roof band
+    probe = box_probe(20.0, -60.0, 1.0, 40.0, -30.0, 15.5)
     assert solid_fraction(light.workplane, probe) < 0.05
     assert solid_fraction(heavy.workplane, probe) > 0.9
+    # the rib grid survives between openings (support for the cassette)
+    rib = box_probe(20.0, -65.4, 1.0, 40.0, -63.9, 14.0)
+    assert solid_fraction(light.workplane, rib) > 0.85

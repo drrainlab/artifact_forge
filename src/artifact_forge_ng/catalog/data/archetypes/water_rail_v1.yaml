@@ -90,11 +90,9 @@ parameters:
     {type: length, default: 4mm, min: 2mm, max: 8mm, role: aesthetic}
   lightweight:
     {type: bool, default: true, role: structural, exposed: true,
-     description: "dry-shell windows on (reversible: false = solid slab);
-       the aluminum profile is the structural member"}
-  lw_cover:
-    {type: length, default: 2.4mm, min: 2.4mm, max: 4mm, role: structural,
-     description: solid roof left under the seat floor over every window}
+     description: "open-skeleton windows on (reversible: false = solid
+       slab); through cuts — no bridges by construction; the aluminum
+       profile is the structural member"}
   lw_rib:
     {type: length, default: 2mm, min: 1.8mm, max: 3mm, role: structural,
      description: cross-rib width between windows}
@@ -163,7 +161,6 @@ form:
         corner_r: corner_r
         face_gap: face_gap
         lightweight: lightweight
-        lw_cover: lw_cover
         lw_rib: lw_rib
         profile: profile
         profile_inset: profile_inset
@@ -313,6 +310,7 @@ validators:
   - form.lap_joint_geometry_ok
   - form.lap_slot_leak_path_controlled
   - form.lightweight_windows_dry_ok
+  - form.cassette_support_span_ok
   - form.magnet_pockets_outside_water_zone
   - form.magnet_pockets_do_not_break_wall
   - form.no_standing_water_ir

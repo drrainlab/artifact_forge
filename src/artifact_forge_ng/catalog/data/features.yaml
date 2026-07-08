@@ -526,11 +526,13 @@ features:
 
   - id: lightweight_dry_shell
     description: >
-      the rail is a dry frame around a protected water core — large smooth
-      open-bottom windows between the channel and the profile bands, roofed
-      under the seat floor, ribbed, never honeycomb; the profile carries
+      the rail is a dry OPEN SKELETON around a protected water core —
+      large smooth THROUGH windows between the channel and the profile
+      bands (no bridges by construction), ribbed, never honeycomb; the
+      cassette covers every opening, the profile carries
     verified_by:
       - form.lightweight_windows_dry_ok
+      - form.cassette_support_span_ok
 
   - id: cassette_seat
     description: >

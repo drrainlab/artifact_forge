@@ -40,7 +40,7 @@ RAIL_PARAMS = dict(
     cassette_l=220.0, cassette_w=220.0,
     seat_depth=14.0, seat_clearance=0.75,
     module_pitch=250.0, corner_r=4.0,
-    face_gap=0.4, lightweight=True, lw_cover=2.4, lw_rib=2.0,
+    face_gap=0.4, lightweight=True, lw_rib=2.0,
     profile="2020", profile_inset=24.0,
 )
 
@@ -140,7 +140,7 @@ def test_rail_frame_contract_keys():
                 "lap_lip_len", "lap_lip_w", "lap_lip_t", "lap_lip_top_z",
                 "lap_pocket_len", "lap_pocket_w",
                 "magnet_count", "magnet_x_offset",
-                "lw_enabled", "lw_window_count", "lw_cover",
+                "lw_enabled", "lw_window_count", "lw_rib",
                 "tongue_w", "groove_w", "module_pitch", "profile_size"):
         assert key in st.frame, key
     for datum in ("cassette_seat", "module_origin", "line_east", "line_west",
