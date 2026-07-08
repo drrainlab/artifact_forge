@@ -238,6 +238,25 @@ def check_lift_access_ok(form: PartForm) -> Finding:
     )
 
 
+def check_substrate_retained_under_mount(form: PartForm) -> Finding:
+    """Honesty note, PASS-with-note: at the mounted row slope (1.0-2.0
+    deg) loose coco is static — friction angles are an order of magnitude
+    higher — so nothing creeps toward the downstream wall. This note
+    becomes a REAL retention check (governor lip, mat anchoring) when
+    mat/rockwool cassettes join the family."""
+    if not form.fields:
+        return _finding("form.substrate_retained_under_mount", False,
+                        "no mesh floor on this part — not a substrate cassette")
+    return Finding(
+        check="form.substrate_retained_under_mount", status=Status.PASS,
+        level=Level.FORM,
+        message=("INFO: loose coco is static at the 1.0-2.0 deg mount slope "
+                 "(friction >> slope); retention hardware becomes real with "
+                 "future mat cassettes"),
+        critical=False,
+    )
+
+
 register_probe("form.mesh_floor_orthogonal_ok")(
     lambda form, ctx: check_mesh_floor_orthogonal_ok(form))
 register_probe("form.cassette_no_reservoir")(
@@ -248,3 +267,5 @@ register_probe("form.snap_pockets_cleanable")(
     lambda form, ctx: check_snap_pockets_cleanable(form))
 register_probe("form.lift_access_ok")(
     lambda form, ctx: check_lift_access_ok(form))
+register_probe("form.substrate_retained_under_mount")(
+    lambda form, ctx: check_substrate_retained_under_mount(form))

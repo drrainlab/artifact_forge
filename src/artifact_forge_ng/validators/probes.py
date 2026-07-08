@@ -201,9 +201,6 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.tongue_groove_ir", Level.ASSEMBLY, "adjacent modules align on tongue/groove with channel centerlines continuous at the pitch"),
         _decl("assembly.saddle_hang_ir", Level.ASSEMBLY, "auxiliary verification: the adapter's saddle really straddles the rail wall in the pose the fluid joint set, and its spout/bib fits the corridor"),
         _decl("assembly.profile_perch_ir", Level.ASSEMBLY, "the rail's bottom groove seats on the aluminum profile: width fit in band, axes aligned"),
-        _decl("assembly.row_supported", Level.ASSEMBLY, "every rail in a carried row rests on the profile's sloped support line at its station — no cell hangs on a fluid joint"),
-        _decl("assembly.row_pitch_aligned", Level.ASSEMBLY, "adjacent rails march at the module pitch and the profile stations land under their grooves"),
-        _decl("assembly.profile_slope_feeds_downhill", Level.ASSEMBLY, "the carrier's global slope matches the fluid cascade — the profile preserves every downhill handover"),
         # -- VF-correction: tilted flush row assembly checks --------------------
         _decl("assembly.lap_flow_ir", Level.ASSEMBLY, "adjacent rails mate flush: lip in the receiver at the declared overlap, floors coplanar, controlled face gap"),
         _decl("assembly.row_flush_aligned", Level.ASSEMBLY, "all rails share one row plane (dZ=0) and march at module_w + face_gap — stair steps are forbidden"),

@@ -37,7 +37,9 @@ parameters:
      role: functional, exposed: true,
      description: tray height — the substrate depth budget}
   wall:
-    {type: length, default: 2.4mm, min: 2mm, max: 3.2mm, role: structural}
+    {type: length, default: 2.2mm, min: 2mm, max: 3.2mm, role: structural,
+     description: "shell wall — lightweight default (VF correction): the
+       mesh floor already dominates stiffness"}
   floor_t:
     {type: length, default: 2mm, min: 1.6mm, max: 3mm, role: structural}
   corner_r:
@@ -176,6 +178,7 @@ validators:
   - form.contact_window_geometry_ok
   - form.snap_pockets_cleanable
   - form.lift_access_ok
+  - form.substrate_retained_under_mount
   - form.cuts_respect_keepouts
   - topology.cutout_present
   - topology.single_connected_solid

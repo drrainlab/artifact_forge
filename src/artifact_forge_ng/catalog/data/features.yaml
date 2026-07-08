@@ -715,12 +715,12 @@ features:
   # the cascade. Required only in carried-row assemblies' contracts.
   - id: row_carried_by_profile
     description: >
-      every rail in the row rests on the sloped aluminum profile carrier
-      at its own station (no cell hangs on a fluid joint), rails march at
-      the module pitch, and the carrier's slope preserves every downhill
-      handover
+      every rail in the row rests FULL LENGTH on standard straight
+      aluminum profiles (span gap zero — no cell hangs on a water joint),
+      rails march flush at module_w + face_gap, and the whole row drains
+      under its declared mount slope
     verified_by:
       - assembly.profile_perch_ir
-      - assembly.row_supported
-      - assembly.row_pitch_aligned
-      - assembly.profile_slope_feeds_downhill
+      - assembly.profile_support_full_length
+      - assembly.row_flush_aligned
+      - assembly.row_drains_under_mount

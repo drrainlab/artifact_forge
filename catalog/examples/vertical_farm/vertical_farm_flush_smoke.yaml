@@ -1,0 +1,137 @@
+# VF-correction CAD smoke: cap + TWO flush rails (one real lap seam!) +
+# one cassette + collector + ONE straight profile — proves the lap lip
+# really lands in the through receiver on compiled solids (topology +
+# no_interference), the flush row checks and the reports, at a fraction
+# of the full 3x1 build cost. Single-side support is a smoke-only
+# simplification; the golden row rides two profiles.
+schema: assembly/v1
+id: vertical_farm_flush_smoke
+strict: true
+root: cap
+
+meta:
+  row_kind: tilted_flush_row
+  mounting_policy: tilted_flush_profile
+
+mount_context:
+  type: tilted_flush_row
+  slope_deg: 1.5
+  slope_source: "whole row mounted on a straight 2020 profile at 1.5 deg"
+
+shared:
+  module_w: 248mm
+  seat_depth: 14mm
+  channel_d: 5mm
+  channel_w: 16mm
+  face_gap: 0.4mm
+  lip_len: 4mm
+  lip_t: 1.4mm
+  cassette_l: 220mm
+  cassette_w: 220mm
+  cassette_h: 26mm
+  seat_clearance: 0.75mm
+  wall: 2.2mm
+  module_pitch: 250mm
+  tube_od: 9mm
+
+parts:
+  - ref: cap
+    product:
+      schema: product/v1
+      id: fsmoke_inlet_cap
+      archetype: inlet_cap_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: rail_1
+    product:
+      schema: product/v1
+      id: fsmoke_rail_1
+      archetype: water_rail_v1@2
+      params: {profile: "2020"}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: rail_2
+    product:
+      schema: product/v1
+      id: fsmoke_rail_2
+      archetype: water_rail_v1@2
+      params: {profile: "2020"}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: cassette
+    product:
+      schema: product/v1
+      id: fsmoke_cassette
+      archetype: coco_cassette_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: collector
+    product:
+      schema: product/v1
+      id: fsmoke_collector
+      archetype: collector_endcap_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        bed: [250mm, 250mm, 250mm]
+  - ref: profile_e
+    product:
+      schema: product/v1
+      id: fsmoke_profile_e
+      archetype: aluminum_profile_ref_v1@2
+      params: {size: "2020", length: 540mm, stations: 2}
+      manufacturing:
+        process: reference
+        material: aluminum
+
+joints:
+  - type: fluid_joint
+    a: cap.rail_out
+    b: rail_1.feed
+    rotate: [0, 0, 0]
+  - type: saddle_hang
+    a: rail_1.feed
+    b: cap.rail_out
+    rotate: [0, 0, 0]
+  - type: removable_insert
+    a: rail_1.cassette_seat
+    b: cassette.seat
+    rotate: [0, 0, 0]
+    params: {lift_margin: 3mm}
+  - type: lap_flow_joint
+    a: rail_1.outlet
+    b: rail_2.inlet
+    rotate: [0, 0, 0]
+  - type: fluid_joint
+    a: rail_2.drain_edge
+    b: collector.rail_in
+    rotate: [0, 0, 0]
+  - type: saddle_hang
+    a: rail_2.drain_edge
+    b: collector.rail_in
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_1.seat_e
+    b: profile_e.ridge_1
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_2.seat_e
+    b: profile_e.ridge_2
+    rotate: [0, 0, 0]
+
+contract:
+  must_have:
+    - row_water_chain
+    - row_flush_integrity
+    - vertical_farm_cassette_interface

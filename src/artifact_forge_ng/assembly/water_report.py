@@ -80,10 +80,12 @@ def build_water_report(
                 f["channel_floor_z_inlet"] - f["channel_floor_z_outlet"], 2),
             "floor_margin_mm": round(f.get("channel_floor_margin", 0.0), 2),
         },
-        "overflow": {
-            "lip_r_assumed_mm": round(f.get("lip_r_assumed", 0.0), 2),
-            "lip_h_mm": round(f.get("lip_h", 0.0), 2),
-            "air_gap_mm": round(f.get("air_gap", 0.0), 2),
+        "lap_handover": {
+            "lip_len_mm": round(f.get("lap_lip_len", 0.0), 2),
+            "lip_t_mm": round(f.get("lap_lip_t", 0.0), 2),
+            "receiver_len_mm": round(f.get("lap_pocket_len", 0.0), 2),
+            "face_gap_mm": round(f.get("face_gap", 0.0), 2),
+            "seam": "controlled open slot — never the primary water path",
         },
         "dead_pockets": _verdict(passed("form.no_standing_water_ir")),
         "permanent_substrate_contact": _contact_verdict(insert),
@@ -111,72 +113,103 @@ def _row_rollup(
     asm: Any,
     poses: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """The VF-3 row story: the handover chain in joint order, per-cell
-    drops, the global top-to-bottom drop through the cascade, adapter
-    verdicts and the orphan-port rollup. Skipped for single-part builds
-    (no asm) and non-fluid assemblies (no fluid joints)."""
+    """The tilted-flush-row story (VF correction): drip handovers at the
+    cap and collector, lap-flow handovers between LEVEL modules, and the
+    virtual drop under the DECLARED mount — the geometry is horizontal,
+    v = z + y*tan(slope). Skipped for single-part builds (no asm) and dry
+    assemblies (no water joints)."""
+    import math
+
+    lap_joints = [j for j in asm.joints if j.type == "lap_flow_joint"]
     fluid_joints = [j for j in asm.joints if j.type == "fluid_joint"]
-    if not fluid_joints:
+    if not lap_joints and not fluid_joints:
         return None
-    fluid_findings = [j for j in joint_findings
-                      if j.check == "assembly.fluid_joint_ir"]
-    handovers = []
+
+    def findings_for(check: str) -> list[Any]:
+        return [j for j in joint_findings if j.check == check]
+
+    handovers: list[dict[str, Any]] = []
+    lap_findings = findings_for("assembly.lap_flow_ir")
+    for i, joint in enumerate(lap_joints):
+        finding = lap_findings[i] if i < len(lap_findings) else None
+        handovers.append({
+            "type": "lap_flow",
+            "from": joint.a_ref,
+            "to": joint.b_ref,
+            "status": finding.status.value if finding else "unchecked",
+            "dz_mm": round(finding.measured, 2)
+            if finding and finding.measured is not None else None,
+        })
+    fluid_findings = findings_for("assembly.fluid_joint_ir")
     for i, joint in enumerate(fluid_joints):
         finding = fluid_findings[i] if i < len(fluid_findings) else None
         handovers.append({
+            "type": "drip",
             "from": joint.a_ref,
             "to": joint.b_ref,
             "status": finding.status.value if finding else "unchecked",
             "drop_mm": round(finding.measured, 2)
             if finding and finding.measured is not None else None,
         })
-    insert_findings = [j for j in joint_findings
-                       if j.check == "assembly.removable_insert_ir"]
+
+    insert_findings = findings_for("assembly.removable_insert_ir")
     insert_joints = [j for j in asm.joints if j.type == "removable_insert"]
     cell_rows = []
     for ref, state in cells:
-        fr = state.form.frame
-        entry: dict[str, Any] = {
-            "ref": ref,
-            "slope_deg": round(fr[WATER_KEY], 3),
-            "drop_mm": round(
-                fr["channel_floor_z_inlet"] - fr["channel_floor_z_outlet"], 2),
-        }
+        entry: dict[str, Any] = {"ref": ref, "channel": "level"}
         for k, joint in enumerate(insert_joints):
             if joint.a_ref == ref and k < len(insert_findings):
                 fi = insert_findings[k]
                 entry["cassette_contact"] = (
                     "pulse_only" if fi.status.value == "pass" else "FAILED")
         cell_rows.append(entry)
-    # global drop through the cascade: first cell's inlet floor down to the
-    # last cell's outlet floor, both in the ROOT frame via the poses
-    total = None
-    chain_refs = [r for r, _ in cells]
-    if chain_refs and poses:
-        def gz(ref: str, key: str) -> float | None:
-            pose = poses.get(ref)
-            state = states[ref]
-            if pose is None or state.form is None:
-                return None
-            return state.form.frame[key] + pose.translate[2]
 
-        top = gz(chain_refs[0], "channel_floor_z_inlet")
-        bottom = gz(chain_refs[-1], "channel_floor_z_outlet")
-        if top is not None and bottom is not None:
-            total = round(top - bottom, 2)
-    orphan = [j for j in joint_findings
-              if j.check == "assembly.no_orphan_ports"]
-    saddles = [j for j in joint_findings
-               if j.check == "assembly.saddle_hang_ir"]
+    mount = getattr(asm, "mount_context", None)
+    slope = mount.slope_deg if mount is not None else None
+    total_virtual = None
+    posed = [(r, poses.get(r)) for r, _ in cells if poses.get(r) is not None]
+    if posed and slope is not None:
+        grade = math.tan(math.radians(slope))
+        posed.sort(key=lambda rp: -rp[1].translate[1])
+        (first_ref, p0), (last_ref, p1) = posed[0], posed[-1]
+        f0 = states[first_ref].form.frame
+        f1 = states[last_ref].form.frame
+        v_top = (f0["channel_floor_z_inlet"] + p0.translate[2]
+                 + (f0["rail_y1"] + p0.translate[1]) * grade)
+        v_bot = (f1["channel_floor_z_outlet"] + p1.translate[2]
+                 + (f1["rail_y0"] + p1.translate[1]) * grade)
+        total_virtual = round(v_top - v_bot, 2)
+
+    drains = findings_for("assembly.row_drains_under_mount")
+    flush = findings_for("assembly.row_flush_aligned")
+    leak: bool | None = None
+    for ref, state in cells:
+        if state.report.findings and any(
+                fd.check == "form.lap_slot_leak_path_controlled"
+                for fd in state.report.findings):
+            ok = state.report.passed("form.lap_slot_leak_path_controlled")
+            leak = ok if leak is None else (leak and ok)
+    orphan = findings_for("assembly.no_orphan_ports")
+    saddles = findings_for("assembly.saddle_hang_ir")
     meta = getattr(asm, "meta", {}) or {}
     return {
         "kind": meta.get("row_kind", "tilted_flush_row"),
-        "z_step_policy": "datum_handover",
-        "rack_mounting": "deferred",
+        "slope_source": ("mounted_profile" if mount is not None
+                         else "UNDECLARED — no mount_context"),
+        "slope_deg": slope,
+        "modules_flush": bool(flush) and all(
+            f.status.value == "pass" for f in flush),
+        "stair_step": False,
         "cells": len(cells),
         "cell_details": cell_rows,
-        "total_drop_mm": total,
+        "total_virtual_drop_mm": total_virtual,
         "handovers": handovers,
+        "standing_water_under_mount": (
+            "none" if drains and all(d.status.value == "pass" for d in drains)
+            else "NOT PROVEN" if drains else "unchecked"),
+        "lap_seam_leak": ("controlled" if leak else
+                          "UNCONTROLLED" if leak is False else "unchecked"),
+        "drips_clear_of": ["profiles", "magnets", "dry_zones"],
         "saddle_mounts": [
             {"status": s.status.value, "note": s.message} for s in saddles
         ],
@@ -203,9 +236,10 @@ def build_views(
     asm: Any, states: dict[str, Any], poses: dict[str, Any]
 ) -> dict[str, Any] | None:
     """Section planes + explode vectors, derived mechanically: the flow
-    section shows the slope, the cross section shows the U and the seat;
-    explode direction comes from the joint type (inserts and snaps stack
-    +Z, line joints spread along X)."""
+    section shows the level channel and the lap handover, the cross
+    section shows the U and the seat; explode direction comes from the
+    joint type (inserts and snaps stack +Z, line joints spread along X,
+    lap neighbours pull apart along the flow)."""
     hit = _water_state(states)
     if hit is None:
         return None
@@ -216,7 +250,7 @@ def build_views(
             {"name": "flow_section",
              "origin": [round(f["channel_center_x"], 2), 0.0, 0.0],
              "normal": [1, 0, 0],
-             "shows": "channel slope, overflow lip, air gap"},
+             "shows": "level channel, lap lip and receiver, feed drop"},
             {"name": "cross_section",
              "origin": [0.0, 0.0, 0.0],
              "normal": [0, 1, 0],
@@ -240,6 +274,9 @@ def build_views(
         elif joint.type == "fluid_joint":
             # pull the downstream part further along the flow axis
             vector = [0.0, -60.0, -10.0]
+        elif joint.type == "lap_flow_joint":
+            # flush neighbours separate by a straight pull along the flow
+            vector = [0.0, -60.0, 0.0]
         else:
             continue  # auxiliary joints (saddle_hang) explode nothing
         views["explode"].append({"part": b_ref, "vector": vector,

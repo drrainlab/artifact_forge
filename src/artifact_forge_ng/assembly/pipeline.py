@@ -168,7 +168,7 @@ def _joint_findings(
     findings.extend(interface_findings(asm, states))
     from .carrier import carrier_findings
 
-    findings.extend(carrier_findings(asm, states, poses))
+    findings.extend(carrier_findings(asm, states, poses, findings))
     return findings, poses, pose_report
 
 
@@ -286,18 +286,20 @@ def run_assembly_build(
             allowed += _math.pi * pin.d * (interference / 2.0) * pin.length * 1.5
     refs = list(placed)
     worst_overlap = 0.0
+    worst_pair = ""
     for i in range(len(refs)):
         for j in range(i + 1, len(refs)):
-            worst_overlap = max(
-                worst_overlap,
-                interference_volume(placed[refs[i]], placed[refs[j]]),
-            )
+            vol = interference_volume(placed[refs[i]], placed[refs[j]])
+            if vol > worst_overlap:
+                worst_overlap = vol
+                worst_pair = f"{refs[i]}<->{refs[j]}"
     joint_findings.append(afind(
         "assembly.no_interference",
         worst_overlap <= allowed,
-        f"worst pairwise overlap volume {worst_overlap:.2f} mm3 (allowed "
-        f"{allowed:.2f}: weld-level contact plus declared press-fit "
-        "interference)",
+        f"worst pairwise overlap volume {worst_overlap:.2f} mm3"
+        + (f" ({worst_pair})" if worst_pair else "")
+        + f" (allowed {allowed:.2f}: weld-level contact plus declared "
+        "press-fit interference)",
         measured=worst_overlap, limit=allowed,
     ))
 
@@ -421,6 +423,15 @@ def run_assembly_build(
     # -- contract: joint features built iff their checks passed -----------
     passed = {f.check for f in joint_findings if f.status is Status.PASS}
     failed = {f.check for f in joint_findings if f.status is Status.FAIL}
+    # Part-level checks count toward assembly features too: a feature may
+    # be verified by form/topology checks measured on each part (e.g. the
+    # lap seam leak path). Built iff EVERY part measuring the check passes.
+    for state in states.values():
+        for f in state.report.findings:
+            if f.status is Status.PASS:
+                passed.add(f.check)
+            elif f.status is Status.FAIL:
+                failed.add(f.check)
     built_features = []
     for feature in asm.contract.must_have:
         verified_by = catalog.features[feature].verified_by

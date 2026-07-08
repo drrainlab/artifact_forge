@@ -18,6 +18,7 @@ from ..core.fasteners import screw_spec
 
 
 def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
+    mount = getattr(asm, "mount_context", None)
     printed: dict[str, dict[str, Any]] = {}
     reference_parts: list[tuple[str, Any]] = []
     for part in asm.parts:
@@ -44,9 +45,13 @@ def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
     hardware: list[dict[str, Any]] = []
 
     # reference geometry -> hardware lines (STANDARD parts, cut to length;
-    # the sloped model face is a reference PROXY of a straight profile
-    # mounted at the global row slope, never a wedge-cut part)
+    # modeled straight — the physical row slope is the MOUNT's, declared
+    # in the assembly's mount_context)
     ref_lines: dict[str, dict[str, Any]] = {}
+    mount_note = (
+        f"mount the WHOLE row at {mount.slope_deg:g} deg "
+        f"({mount.slope_source})" if mount is not None
+        else "row mount slope undeclared — see mount_context")
     for ref, state in reference_parts:
         fr = state.form.frame if state.form is not None else {}
         size = fr.get("profile_size")
@@ -57,11 +62,8 @@ def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
                 "qty": 0,
                 "length_mm": round(fr.get("profile_len", 0.0), 1),
                 "note": (
-                    f"mounted at global row slope "
-                    f"{fr.get('profile_slope_deg', 0.0):g} deg (frame's "
-                    "responsibility); the sloped model face is a reference "
-                    "proxy, NOT a wedge-cut part; anti-slide clips/stops — "
-                    "VF-4.1"
+                    f"{mount_note}; nothing is milled or wedge-cut; "
+                    "anti-slide retention under the mounted slope — VF-4.1"
                 ),
             })
             line["qty"] += 1
@@ -87,6 +89,27 @@ def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
             "item": f"{screw} screw",
             "qty": qty,
             "note": f"head d {spec['head']:g} mm; length per joint stack",
+        })
+
+    # alignment magnets: derived from the rails' actual magnet pockets
+    magnet_qty = 0
+    magnet_d = None
+    for state in states.values():
+        fr = state.form.frame if state.form is not None else {}
+        n = int(fr.get("magnet_count", 0) or 0)
+        if n:
+            magnet_qty += n
+            magnet_d = fr.get("magnet_pocket_d")
+    if magnet_qty:
+        hardware.append({
+            "item": "magnet d6x2, neodymium",
+            "qty": magnet_qty,
+            "note": (
+                "optional module alignment only — never a seal, never a "
+                "support; sealed dry pockets"
+                + (f" (pocket d {magnet_d:g})" if magnet_d else "")
+                + "; preferably coated/epoxy-protected against splash"
+            ),
         })
 
     # silicone tubing: derived from declared hose ports
@@ -128,8 +151,8 @@ def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
                 "item": f"aluminum profile {key}",
                 "qty": slots,
                 "note": "profile seats per module (2 rails under each); "
-                        "lengths and rack layout external — the row is a fluid "
-                        "cascade proof, not the final rack (VF-4/VF-5)",
+                        "lengths and rack layout external — the flush row "
+                        "mounts whole at the mount_context slope",
             })
 
     fdm_states = [s for s in states.values()

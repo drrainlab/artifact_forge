@@ -978,13 +978,10 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
         d=bore_d, span=(y_drain_wall, y_drain_wall + 3.0),
         overshoot=(1.0, 1.0),
     ))
-    # tuck strip: a low floor extension under the rail's relief recess so
-    # the whole drip band lands on sloping floor, not past the tray edge
-    state.ribs.append(RibFeature(
-        name=f"{name}_tuck",
-        box=Box3(-rail_channel_w / 2.0 - 1.5, -2.0, floor_at_catch - 1.2 + dz,
-                 rail_channel_w / 2.0 + 1.5, 1.6, floor_at_catch + 0.05 + dz),
-    ))
+    # No tuck strip (VF correction): the cascade's relief recess is gone —
+    # the wall face is solid, and the lap lip carries the drip band
+    # lip_overhang outside the face, well inside the tray mouth. A strip
+    # reaching INTO the wall would simply interfere with the rail body.
     # Two side CHEEKS carry the tray up to the arm — never a cross-tray
     # bib: the whole brush/drip volume over the tray (|x| <= ~6) stays
     # open to the sky. Cheeks rise 0.6 into the arm's z-range (weld).
@@ -1063,19 +1060,14 @@ _register(RecipeOpDecl(
 
 
 def _profile_ref_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """Aluminum profile REFERENCE GEOMETRY — an honesty-critical surrogate.
+    """Aluminum profile REFERENCE GEOMETRY — after the VF correction the
+    model is LITERALLY TRUE: a standard straight 2020/3030 extrusion, cut
+    to length, modeled straight and horizontal. The physical row slope
+    lives ONLY in the assembly's mount_context — never in this geometry
+    and never in a pose. (The VF-4 sloped-top surrogate is superseded:
+    slope_deg stays accepted for the IR but the canon is 0.)
 
-    This does NOT represent a physically milled/sloped aluminum extrusion:
-    the sloped top face is a reference proxy for a STANDARD STRAIGHT
-    2020/3030 profile mounted with a global row slope. AF poses support
-    only 90-degree rotations, so the slope lives in the body's geometry
-    (the same trick as the rail's sloped channel), never in the pose. The
-    BOM must describe this part as a standard rectangular profile CUT TO
-    LENGTH — never as a wedge-cut part.
-
-    Body: an axis-aligned box beheaded by a wide sloped ChannelCutFeature
-    (wider than the body — the U-cutter's floor becomes the top face).
-    Stations along the top line mark where each rail's groove ceiling
+    Stations along the flat top mark where each rail's groove ceiling
     lands; their datums drive the profile_perch joints."""
     if state.section is not None:
         raise RecipeError("profile_ref_body must be the (single) base op")
@@ -1095,7 +1087,8 @@ def _profile_ref_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None
             f"({span_needed:g}) — cut it longer")
 
     y0, y1 = -length / 2.0, length / 2.0
-    height = size + 2.0 + drop_total
+    straight = abs(drop_total) < 1e-9
+    height = size if straight else size + 2.0 + drop_total
     state.section = SectionProfile(
         name="recipe",
         outer=rounded_rect_loop(-size / 2.0, y0, size / 2.0, y1, 1.0),
@@ -1104,13 +1097,15 @@ def _profile_ref_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None
     state.width = height
     name = op_id or "profile"
 
-    # behead: wide sloped U-cutter — its floor IS the sloped top face
-    state.channels.append(ChannelCutFeature(
-        name=f"{name}_slope_cut", center_x=0.0,
-        y0=y1, y1=y0, z_top=height,
-        width=size + 10.0, depth_start=2.0, depth_end=2.0 + drop_total,
-        bottom_r=1.0,
-    ))
+    if not straight:
+        # legacy sloped surrogate: wide U-cutter beheads the box — its
+        # floor becomes the sloped top face (superseded by mount_context)
+        state.channels.append(ChannelCutFeature(
+            name=f"{name}_slope_cut", center_x=0.0,
+            y0=y1, y1=y0, z_top=height,
+            width=size + 10.0, depth_start=2.0, depth_end=2.0 + drop_total,
+            bottom_r=1.0,
+        ))
 
     def top_z_at(y: float) -> float:
         return size + (y - y0) * math.tan(math.radians(slope))
@@ -1142,14 +1137,14 @@ _register(RecipeOpDecl(
     kind="base",
     params={
         "size": ("choice", "2020"), "length": ("length", 780.0),
-        "slope_deg": ("number", 1.827), "station_pitch": ("length", 248.0),
+        "slope_deg": ("number", 0.0), "station_pitch": ("length", 248.4),
         "stations": ("count", 3), "station_edge": ("length", 20.0),
     },
     validators=(
         "form.profile_ref_geometry_ok", "topology.single_connected_solid",
     ),
     apply=_profile_ref_body,
-    description="aluminum profile reference proxy: standard straight "
-                "2020/3030 mounted at the global row slope, modeled with a "
-                "sloped-top surrogate (poses are quarter-turn only)",
+    description="aluminum profile reference geometry: standard straight "
+                "2020/3030 cut to length, modeled straight — the row slope "
+                "belongs to mount_context, never to the model",
 ))

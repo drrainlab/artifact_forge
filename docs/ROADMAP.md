@@ -137,11 +137,34 @@ row_carried_by_profile в must_have carried-сборки. Контакт по
 upstream-кромке (span gap 7.91 репортится честно) — verification proof,
 не финальная опора.
 
-Впереди: **VF-4.1** anti-slide clips / point pads / end stops
-(полноценная посадка на наклонном профиле); **VF-5 Cassette Family**
+**VF-Correction: Tilted Flush Water Rail ✅ (2026-07-08)**: каскад признан
+design mistake и заменён каноном **tilted_flush_row** —
+`water_rail_v1` переписан IN PLACE (v2): желоб ПОСТОЯННОЙ глубины (уклон
+целиком у монтажа: `mount_context` 1.0–2.0°, чек
+`assembly.row_drains_under_mount` по виртуальным высотам, порядок цепи из
+lap-joints — реверс ловится), flush-модули (ΔZ=0, face_gap 0.3–0.6, шаг =
+module_w + face_gap), **lap_flow_joint** (губа-продолжение пола в сквозной
+открытый снизу проём; слот 0.5–2.5 = осознанная негерметичность с
+контролируемым leak-path — `form.lap_slot_leak_path_controlled`),
+запечатанные магнитные карманы (alignment only), **lightweight dry shell**
+в опе (−40% пластика, param-gated, обратимо; generic-модификатор
+`lightweight_dry_shell_v1` — следующая волна), профиль-референс стал
+БУКВАЛЬНО прямым (slope 0, полная посадка, span gap 0 — чек), адаптеры
+перемейчены (cap→`feed` — единственное падение ряда; collector→`drain_edge`
+— кончик губы, hang_drop derived без каскадного члена). Каскадные goldens
+удалены (история в git); новые: `vertical_farm_row_3x1` (магниты on) +
+`vertical_farm_flush_smoke`. Отчёты: water (tilted_flush_row, virtual
+drop, lap_seam_leak: controlled), frame (full seating, span_gap 0), BOM
+(«mount the WHOLE row at 1.5 deg», магнитная строка).
+
+Впереди: **VF-4.1** anti-slide удержание ряда на смонтированном под
+уклоном профиле (посадка полная, продольного замка нет);
+**lightweight_dry_shell_v1** generic-модификатор; **VF-5 Cassette Family**
 (sprout mesh / microgreen mat / rockwool cube / soil seedling / netpot
-кассеты на Cassette Interface Standard); **VF-6** production readiness
-(PP food-grade, draft angles, no-undercut report); `dry_endcap_v1`.
+кассеты на Cassette Interface Standard; mat-кассеты сделают
+`form.substrate_retained_under_mount` реальным чеком); **VF-6** production
+readiness (PP food-grade, draft angles, no-undercut report);
+`dry_endcap_v1`.
 
 ---
 

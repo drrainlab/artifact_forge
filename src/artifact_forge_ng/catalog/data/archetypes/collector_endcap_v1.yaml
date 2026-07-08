@@ -46,10 +46,11 @@ parameters:
     {type: length, default: 1.4mm, min: 1.2mm, max: 1.6mm, role: assembly,
      description: shared rail lap-lip thickness — the handover plane is the
        lip tip underside}
-  lip_overhang:
+  lip_len:
     {type: length, default: 4mm, min: 3mm, max: 6mm, role: assembly,
-     description: shared rail lap-lip protrusion — how far outside the wall
-       face the drip edge (and the catch datum) sits}
+     description: "shared rail lap-lip protrusion (same name as the rail's
+       parameter — shared: injects both) — how far outside the wall face
+       the drip edge and the catch datum sit"}
   channel_w:
     {type: length, default: 16mm, min: 12mm, max: 20mm, role: assembly}
   tongue_w:
@@ -97,7 +98,7 @@ form:
         rail_channel_w: channel_w
         tray_slope_deg: tray_slope_deg
         catch_fall: catch_fall
-        lip_overhang: lip_overhang
+        lip_overhang: lip_len
         corner_r: corner_r
 
 regions:

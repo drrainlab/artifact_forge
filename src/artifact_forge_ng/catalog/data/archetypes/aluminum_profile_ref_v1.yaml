@@ -1,22 +1,22 @@
 schema: archetype/v1
 id: aluminum_profile_ref_v1
-version: 1
+version: 2
 object_class: hardware_reference
 maturity: sandbox_buildable
 description: >
-  Vertical Farm Pack VF-4: aluminum profile carrier REFERENCE GEOMETRY.
-  IMPORTANT HONESTY NOTE — this does NOT represent a physically milled or
-  sloped aluminum extrusion: the sloped top face is a reference-geometry
-  SURROGATE for a STANDARD STRAIGHT 2020/3030 profile mounted with a
-  global row slope, a workaround for AF poses supporting only 90-degree
-  rotations. The BOM always describes this part as standard rectangular
-  profile CUT TO LENGTH, mounted at the global slope by the frame — never
-  as a custom wedge-cut part. Instances use manufacturing.process:
-  reference (external hardware: no FDM checks, exported STL/STEP are
-  visual references only). Stations along the sloped support line mark
-  where each rail's bottom groove ceiling lands; profile_perch joints
-  verify the local seat fit, assembly.row_supported verifies the row-level
-  support truth in global poses.
+  Vertical Farm Pack (tilted flush row canon): aluminum profile carrier
+  REFERENCE GEOMETRY — and after the VF correction the model is LITERALLY
+  TRUE: a standard straight 2020/3030 extrusion, cut to length, modeled
+  straight and horizontal. The physical row slope (1.0-2.0 deg) lives
+  ONLY in the assembly's mount_context — the whole row, profiles
+  included, is mounted tilted by the frame; nothing is milled, nothing is
+  wedge-cut, no surrogate geometry remains. Instances use
+  manufacturing.process: reference (external hardware: no FDM checks,
+  exported STL/STEP are visual references only). Stations along the flat
+  top mark where each rail's bottom groove ceiling lands (flush pitch =
+  module_w + face_gap); profile_perch joints verify the local seat fit,
+  assembly.profile_support_full_length verifies FULL seating — span gap
+  zero — in global poses.
 
 provides_features: []
 
@@ -29,14 +29,13 @@ parameters:
     {type: length, default: 780mm, min: 200mm, max: 2000mm,
      role: assembly, exposed: true,
      description: cut-to-length of the standard straight profile}
-  slope_deg:
-    {type: number, default: 1.25, min: 1.0, max: 1.5, role: assembly,
-     description: "shared RAIL CHANNEL slope; the carrier's own mounting
-       slope is DERIVED from it (row_slope_deg) so the frame can never
-       fight the water"}
   module_w:
     {type: length, default: 248mm, min: 200mm, max: 250mm, role: assembly,
-     description: shared rail module depth — the station pitch}
+     description: shared rail module depth}
+  face_gap:
+    {type: length, default: 0.4mm, min: 0.3mm, max: 0.6mm, role: assembly,
+     description: "shared controlled face gap — stations march at the
+       flush pitch (module_w + face_gap)"}
   stations:
     {type: count, default: 3, min: 1, max: 8, role: assembly,
      description: how many rail cells this carrier serves}
@@ -45,14 +44,12 @@ parameters:
      description: first station inset from the profile's high end}
 
 derived:
-  # The carrier's mounting slope IS the cascade grade: per-module drop =
-  # in-channel drop (module_w * tan(channel slope)) + the FALL_ENTRY
-  # handover step (2.5, the fluid datum convention). Derived, not
-  # declared — a carrier that fights the water is unrepresentable.
-  row_slope_deg: deg(atan2(module_w * tan(rad(slope_deg)) + 2.5, module_w))
+  # Stations march at the FLUSH pitch — the same module_w + face_gap the
+  # lap joints enforce; a carrier that fights the row is unrepresentable.
+  station_pitch: module_w + face_gap
 
 constraints:
-  - length >= station_edge + (stations - 1) * module_w + 8
+  - length >= station_edge + (stations - 1) * (module_w + face_gap) + 8
 
 form:
   type: recipe
@@ -65,8 +62,8 @@ form:
       params:
         size: size
         length: length
-        slope_deg: row_slope_deg
-        station_pitch: module_w
+        slope_deg: 0.0
+        station_pitch: station_pitch
         stations: stations
         station_edge: station_edge
 
@@ -114,4 +111,4 @@ contract:
   must_have: []
   must_not_have: []
   invariants:
-    - row_slope_deg >= 0.0 and row_slope_deg <= 3.0
+    - face_gap >= 0.3 and face_gap <= 0.6

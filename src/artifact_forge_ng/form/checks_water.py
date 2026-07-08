@@ -739,7 +739,6 @@ register_probe("form.collector_tray_drains")(
 
 # -- VF-4 profile reference proxy ---------------------------------------------
 
-PROFILE_SLOPE_BAND = (0.0, 3.0)
 
 
 def check_profile_ref_geometry_ok(form: PartForm) -> Finding:
@@ -752,28 +751,31 @@ def check_profile_ref_geometry_ok(form: PartForm) -> Finding:
         return _finding("form.profile_ref_geometry_ok", False,
                         f"no profile frame keys: {', '.join(missing)}")
     problems: list[str] = []
-    if not form.channels:
-        problems.append("no slope cut — the reference proxy top is flat, "
-                        "the cascade would sit on nothing")
-    else:
-        ch = form.channels[0]
-        if ch.depth_end < ch.depth_start:
-            problems.append("slope cut rises toward the collector end — "
-                            "the support line must fall with the cascade")
-    if not (PROFILE_SLOPE_BAND[0] <= f["profile_slope_deg"] <= PROFILE_SLOPE_BAND[1]):
+    # VF correction: the reference geometry must be LITERALLY a standard
+    # straight profile — a sloped or beheaded model is the old surrogate
+    if abs(f["profile_slope_deg"]) > 1e-6:
         problems.append(
-            f"slope {f['profile_slope_deg']:g} outside "
-            f"{PROFILE_SLOPE_BAND[0]}..{PROFILE_SLOPE_BAND[1]}")
+            f"model slope {f['profile_slope_deg']:g} deg — the corrected "
+            "carrier is a STANDARD STRAIGHT profile; the row slope belongs "
+            "to mount_context")
+    if form.channels:
+        problems.append("slope cut on the profile body — a straight "
+                        "extrusion has nothing to behead")
     n = int(f["station_count"])
+    zs = []
     for k in range(1, n + 1):
         if f"station_{k}_z" not in f:
             problems.append(f"station_{k} not published")
+        else:
+            zs.append(f[f"station_{k}_z"])
+    if zs and (max(zs) - min(zs)) > 0.05:
+        problems.append("stations sit at different heights on a straight top")
     return _finding(
         "form.profile_ref_geometry_ok", not problems,
-        f"reference proxy: {f['profile_len']:g} long, "
-        f"{f['profile_slope_deg']:g} deg support line, {n} stations"
+        f"standard straight profile, {f['profile_len']:g} cut to length, "
+        f"{n} level stations — the mount supplies the slope"
         if not problems else "; ".join(problems),
-        measured=f["profile_slope_deg"], limit=PROFILE_SLOPE_BAND[1],
+        measured=f["profile_slope_deg"], limit=0.0,
     )
 
 

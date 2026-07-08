@@ -63,12 +63,12 @@ Recipe-op без реализации в движке = честный engine-ga
 | `loft_between_sections` | 🔶 | rect→rect есть (LoftFeature/tapered_beam); rect→circle при первом клиенте |
 | `tapered_beam` | ✅ | LoftFeature (конус по построению) + topology.arm_reaches_tip (shelf_bracket_v1) |
 | `truss_beam` | ✅ | truss_web_cutouts op: warren-треугольники, лигамент = strut by construction (truss_beam_180) |
-| `water_rail_body` | ✅ | vertical farm (docs/VERTICAL_FARM_PACK.md): корпус + seat + наклонный ChannelCutFeature + коридоры (water_rail_v1) |
+| `water_rail_body` | ✅ | vertical farm (docs/VERTICAL_FARM_PACK.md): корпус + seat + желоб ПОСТОЯННОЙ глубины + коридоры + flush-датумы + lightweight dry shell (water_rail_v1@2; уклон — у mount_context) |
 | `substrate_tray_body` | ✅ | vertical farm: shell кассеты + frame-ключи Cassette Interface Standard (coco_cassette_v1) |
 | `retainer_frame_body` | ✅ | vertical farm: кольцевая рамка-прижим (substrate_retainer_frame_v1) |
 | `inlet_cap_body` | ✅ | VF-3: drip tower — вертикальный hose-бор сквозь спаут в inlet-коридор; saddle-hang на заднюю стенку (inlet_cap_v1) |
-| `collector_endcap_body` | ✅ | VF-3: Γ catch tray под overflow-кромкой, наклонный пол в закрытый дренажный бор; saddle-hang на переднюю стенку (collector_endcap_v1) |
-| `profile_ref_body` | ✅ | VF-4: reference-суррогат стандартного 2020/3030 под глобальным уклоном ряда (скос = широкий ChannelCutFeature; process: reference — без FDM-чеков) |
+| `collector_endcap_body` | ✅ | VF-3/VFC: Γ catch tray под lap-губой последнего модуля (catch-датум на кончике губы), наклонный пол в закрытый дренажный бор; saddle-hang на переднюю стенку (collector_endcap_v1) |
+| `profile_ref_body` | ✅ | VF-4/VFC: стандартный ПРЯМОЙ 2020/3030 cut-to-length (модель буквально правдива; уклон — у mount_context; process: reference — без FDM-чеков) |
 
 ### feature — крепёж, карманы, вырезы
 
@@ -85,7 +85,8 @@ Recipe-op без реализации в движке = честный engine-ga
 | `boss_pattern` | ✅ | recipe-op: 4 бобышки + глухие pilot-боры, keepout в слое пола |
 | `standoff_pattern` | ✅ | recipe-op: PCB-стойки на плите + глухие pilot'ы |
 | `lid_seat` | ✅ | inset_plug op + lid_seat joint: размерная цепочка + pose-проба (esp32_box_with_lid) |
-| `overflow_lip` | ✅ | vertical farm: relief-подрез = air gap под кромкой перелива + drip receiver |
+| `lap_outlet_lip` / `lap_inlet_receiver` | ✅ | VF-correction: flush lap-стык — губа-продолжение пола + сквозной открытый снизу проём (слот = контролируемая негерметичность) |
+| `edge_magnet_pockets` | ✅ | VF-correction: запечатанные сухие карманы d6x2 в ±Y гранях — alignment only, default off |
 | `profile_seat_slot` | ✅ | vertical farm: пазы под 2020/3030, сухая зона верифицирована |
 | `tongue_groove_edges` | ✅ | vertical farm: tongue/groove кромки линии модулей |
 | `contact_window` | ✅ | vertical farm: слэб контактного окна под дном кассеты (topology.contact_window_present: есть И прошит сеткой) |

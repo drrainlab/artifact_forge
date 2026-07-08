@@ -1190,9 +1190,9 @@ def _profile_perch_ir(
 ) -> list[Finding]:
     """The rail's bottom groove seats on the aluminum profile carrier:
     width fit in the push-on band, groove deep enough to swallow the
-    contact, flow axes aligned. A = the rail (groove), B = the profile
-    reference proxy. Row-level support truth (every rail actually rests
-    on the sloped line) lives in assembly.row_supported — this joint
+    contact, flow axes aligned. A = the rail (groove), B = the straight
+    profile reference. Row-level support truth (full seating, span gap
+    zero) lives in assembly.profile_support_full_length — this joint
     verifies the LOCAL seat fit."""
     check = "assembly.profile_perch_ir"
     fa, fb = form_a.frame, form_b.frame
@@ -1229,8 +1229,8 @@ def _profile_perch_ir(
 _register(JointDecl(
     name="profile_perch",
     description="rail bottom groove seated on the aluminum profile carrier "
-                "(reference proxy): width fit and capture verified locally; "
-                "row-level support truth in assembly.row_supported",
+                "(straight reference): width fit and capture verified locally; "
+                "row-level truth in assembly.profile_support_full_length",
     ir_check=_profile_perch_ir,
     cad_checks=("assembly.no_interference",),
 ))

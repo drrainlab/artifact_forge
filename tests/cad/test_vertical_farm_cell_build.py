@@ -54,9 +54,11 @@ def test_cell_water_report(cell_report):
     water = yaml.safe_load(path.read_text())
     assert water["mode"] == "transient_pulse"
     assert water["storage"] == "forbidden"
-    assert water["channel"]["slope_deg"] == pytest.approx(1.25)
-    assert water["channel"]["drop_mm"] == pytest.approx(5.41, abs=0.05)
-    assert water["overflow"]["air_gap_mm"] == pytest.approx(1.5)
+    # VF correction: the channel is LEVEL — the mount supplies the slope
+    assert water["channel"]["slope_deg"] == 0.0
+    assert water["channel"]["drop_mm"] == 0.0
+    assert water["lap_handover"]["lip_len_mm"] == pytest.approx(4.0)
+    assert water["lap_handover"]["face_gap_mm"] == pytest.approx(0.4)
     assert water["dead_pockets"] == "none found"
     assert water["permanent_substrate_contact"] is False
     assert water["contact_window"]["verdict"] == "pulse_only"

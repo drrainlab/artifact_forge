@@ -1,12 +1,8 @@
-"""The frame/carrier report (VF-4) — the mechanical-support story of a
-carried row, symmetric to the water report: which profiles carry which
-rails, at what slope, with what contact quality. Derived from frame keys,
-poses and the carrier findings — never re-measured here.
-
-Scope honesty (printed into every report): VF-4 validates the support
-REFERENCE — the profile part is a reference proxy of a standard straight
-2020/3030 extrusion mounted at the global row slope. Anti-slide locking,
-vibration and full-surface seating are deferred to VF-4.1.
+"""The frame/carrier report (VF correction) — the mechanical-support story
+of a tilted flush row, symmetric to the water report: standard straight
+profiles carry flush modules FULL LENGTH (span gap zero), and the physical
+slope comes from the MOUNT (mount_context), never from any part. Derived
+from frame keys, poses and the carrier findings — never re-measured here.
 """
 
 from __future__ import annotations
@@ -26,6 +22,7 @@ def build_frame_report(
         return None
     profiles = _profile_refs(asm, states)
     rails = _rail_refs(asm, states)
+    mount = getattr(asm, "mount_context", None)
 
     def verdict(check: str) -> str:
         hits = [j for j in joint_findings if j.check == check]
@@ -33,18 +30,16 @@ def build_frame_report(
             return "unchecked"
         return "pass" if all(h.status.value == "pass" for h in hits) else "FAIL"
 
-    supported = next((j for j in joint_findings
-                      if j.check == "assembly.row_supported"), None)
     profile_entries = []
     for prof in profiles:
         f = states[prof].form.frame
         profile_entries.append({
             "ref": prof,
             "size": f"{int(f['profile_size'])}{int(f['profile_size'])}",
-            "slope_deg": round(f["profile_slope_deg"], 3),
+            "slope_deg": round(f.get("profile_slope_deg", 0.0), 3),
             "length_mm": round(f["profile_len"], 1),
-            "geometry": ("reference proxy — standard straight profile "
-                         "mounted at the global row slope"),
+            "geometry": ("standard straight profile, cut to length — "
+                         "modeled straight; the row slope is the mount's"),
         })
     rail_entries = []
     for rail in rails:
@@ -52,20 +47,26 @@ def build_frame_report(
         rail_entries.append({
             "ref": rail,
             "perched_on": perched_on,
-            "contact": "upstream_edge",
+            "contact": "full_length",
         })
+    flush_ok = verdict("assembly.row_flush_aligned") == "pass"
+    support_ok = verdict("assembly.profile_support_full_length") == "pass"
     return {
         "carrier": profile_entries,
         "rails": rail_entries,
-        "support_verdict": verdict("assembly.row_supported"),
-        "pitch_verdict": verdict("assembly.row_pitch_aligned"),
-        "slope_verdict": verdict("assembly.profile_slope_feeds_downhill"),
-        "span_gap_mm": (round(supported.measured, 2)
-                        if supported is not None and supported.measured is not None
-                        else None),
+        "slope_source": "physical_mount",
+        "slope_deg": (round(mount.slope_deg, 3) if mount is not None else None),
+        "mount": (mount.slope_source if mount is not None
+                  else "UNDECLARED — no mount_context"),
+        "full_profile_seating": support_ok,
+        "span_gap_mm": 0 if support_ok else None,
+        "stair_step": not flush_ok,
+        "modules_flush": flush_ok,
+        "support_verdict": verdict("assembly.profile_support_full_length"),
+        "flush_verdict": verdict("assembly.row_flush_aligned"),
+        "drainage_verdict": verdict("assembly.row_drains_under_mount"),
         "scope": (
-            "VF-4 validates the profile-carried support REFERENCE; "
-            "anti-slide locking / vibration / full-surface seating "
-            "deferred to VF-4.1"
+            "tilted flush row: straight profiles, full seating, slope by "
+            "mount; anti-slide retention under the mounted slope — VF-4.1"
         ),
     }
