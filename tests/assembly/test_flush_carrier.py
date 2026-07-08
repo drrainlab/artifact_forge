@@ -310,3 +310,64 @@ def test_no_collector_no_capture_findings():
     asm, states, poses = make_row(with_profiles=False)
     checks = by_check(carrier_findings(asm, states, poses))
     assert "assembly.collector_captures_drain_edge" not in checks
+
+
+# -- VF-5: the collector catches the root-chamber drainage ---------------------
+
+
+def root_chamber_rail(name: str) -> PartForm:
+    st = RecipeState()
+    p = dict(
+        module_l=248.0, module_w=248.0, body_h=30.0,
+        channel_w=16.0, channel_d=5.0, channel_bottom_r=1.2,
+        cassette_l=220.0, cassette_w=220.0, seat_depth=14.0, seat_clearance=0.75,
+        module_pitch=250.0, corner_r=4.0, face_gap=0.4,
+        under_cassette="root_chamber", trough_w=26.0, trough_rib=6.0, trough_depth=12.0,
+    )
+    RECIPE_OPS["water_rail_body"].apply(st, p, "body")
+    RECIPE_OPS["lap_outlet_lip"].apply(st, {"lip_len": 4.0, "lip_t": 1.4}, "lap_out")
+    RECIPE_OPS["lap_inlet_receiver"].apply(
+        st, {"pocket_len": 6.0, "side_clearance": 0.4}, "lap_in")
+    return PartForm(
+        name=name, params={}, frame=st.frame, section=st.section, width=st.width,
+        style=MOLDED_UTILITY_PART, channels=st.channels, cutboxes=st.cutboxes,
+        bores=st.bores, ribs=st.ribs, regions=st.regions, datums=st.datums)
+
+
+def _row_with_collector(collector: PartForm):
+    rail = root_chamber_rail("rail_1")
+    states = {"rail_1": _state(rail, "water_rail"),
+              "collector": _state(collector, "water_collector")}
+    poses = {"rail_1": Pose(rotate=(0, 0, 0), translate=(0.0, 0.0, 0.0))}
+    drain = rail.datums["drain_edge"]["at"]
+    catch = collector.datums["catch"]["at"]
+    poses["collector"] = Pose(rotate=(0, 0, 0), translate=(
+        drain[0] - catch[0], drain[1] - catch[1], drain[2] - catch[2]))
+    asm = SimpleNamespace(
+        parts=[SimpleNamespace(ref="rail_1"), SimpleNamespace(ref="collector")],
+        joints=[JointUse(type="lap_flow_joint", a="rail_1.outlet", b="rail_1.inlet",
+                         rotate=[0, 0, 0])],  # a dummy lap so carrier engages
+        mount_context=MountContextSpec(type="tilted_flush_row", slope_deg=1.5),
+        meta={})
+    return asm, states, poses
+
+
+def test_wide_collector_catches_root_drainage():
+    asm, states, poses = _row_with_collector(collector_form(tray_w=170.0))
+    checks = by_check(carrier_findings(asm, states, poses))
+    f = checks["assembly.collector_catches_root_drainage"]
+    assert f.status is Status.PASS, f.message
+    assert "lands in the tray" in f.message
+
+
+def test_narrow_collector_spills_root_drainage():
+    asm, states, poses = _row_with_collector(collector_form(tray_w=20.0))
+    checks = by_check(carrier_findings(asm, states, poses))
+    f = checks["assembly.collector_catches_root_drainage"]
+    assert f.status is Status.FAIL and "spills" in f.message
+
+
+def test_skeleton_rail_no_root_drainage_check():
+    asm, states, poses = make_row_with_collector()  # skeleton rails
+    checks = by_check(carrier_findings(asm, states, poses))
+    assert "assembly.collector_catches_root_drainage" not in checks

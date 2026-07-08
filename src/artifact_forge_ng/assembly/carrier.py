@@ -446,4 +446,23 @@ def _collector_capture(
         if not blockers else
         "collector material over the captured lip: " + ", ".join(blockers),
     ))
+
+    # root drainage (VF-5): if the final rail has a root chamber, its root
+    # troughs exit the front face across the module width — the collector's
+    # tray mouth must span them so the passive root-drainage return lands
+    # in the tray (a narrow receiver would spill the outer troughs).
+    if rf.get("root_trough_count"):
+        trough_x = rf["root_trough_x_max"]  # outermost trough outer edge in x
+        dxc = abs(rail_pose.translate[0] - coll_pose.translate[0])
+        mouth_reach = cf["receiver_cheek_x0"] - dxc
+        out.append(_finding(
+            "assembly.collector_catches_root_drainage",
+            mouth_reach >= trough_x - 1e-6,
+            f"the tray mouth spans the root troughs (reach {mouth_reach:.0f} >= "
+            f"outer trough {trough_x:.0f}) — passive root drainage lands in the tray"
+            if mouth_reach >= trough_x - 1e-6 else
+            f"tray mouth reaches {mouth_reach:.0f} but the outer root trough is at "
+            f"{trough_x:.0f} — widen the collector or the drainage spills",
+            measured=mouth_reach, limit=trough_x,
+        ))
     return out

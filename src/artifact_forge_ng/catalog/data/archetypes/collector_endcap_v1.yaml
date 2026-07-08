@@ -27,7 +27,7 @@ provides_features:
 
 parameters:
   tray_w:
-    {type: length, default: 20mm, min: 16mm, max: 32mm,
+    {type: length, default: 20mm, min: 16mm, max: 180mm,
      role: functional, exposed: true,
      description: tray inner width — wider than the rail channel's drip band}
   tube_od:

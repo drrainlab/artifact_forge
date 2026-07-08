@@ -218,6 +218,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.collector_captures_drain_edge", Level.ASSEMBLY, "in the pose the final lap lip tip sits INSIDE the collector receiver volume — an end receiver, not a part standing nearby"),
         _decl("assembly.collector_mouth_envelopes_outlet_lip", Level.ASSEMBLY, "the receiver mouth envelopes the posed lip across X with real side margin"),
         _decl("assembly.collector_removable_by_hand", Level.ASSEMBLY, "no collector material above the captured lip — the receiver has no ceiling, so the collector lifts straight off"),
+        _decl("assembly.collector_catches_root_drainage", Level.ASSEMBLY, "the collector tray mouth spans the final rail's root troughs so the passive root drainage lands in the tray"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),

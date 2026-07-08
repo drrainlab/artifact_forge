@@ -199,6 +199,7 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
             root_trough_count=root_troughs, root_trough_w=trough_w,
             root_trough_floor_z=trough_floor, root_blind_bottom_z=trough_floor,
             root_trough_rib=trough_rib,
+            root_trough_x_max=x0 + used,  # outermost trough edge
         )
 
     state.frame.update(
