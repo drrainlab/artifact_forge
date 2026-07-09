@@ -192,22 +192,39 @@ def _row_rollup(
     orphan = findings_for("assembly.no_orphan_ports")
     saddles = findings_for("assembly.saddle_hang_ir")
     meta = getattr(asm, "meta", {}) or {}
-    # Overflow containment honesty (VF-4.2): in nominal flow the water exits
-    # through the contact window into the channel; but with an open skeleton
-    # under the cassette, top-water OVERFLOW drips straight through the row.
-    # This is stated, not silent — the containing root chamber is VF-5.
+    # Overflow containment honesty (VF-4.2/VF-5): in nominal flow the water
+    # exits through the contact window into the channel; the question is
+    # where top-water OVERFLOW goes. An open skeleton drips it straight
+    # through (uncontained); a root chamber has a blind bottom that
+    # contains it and drains it forward to the collector.
     skeleton = any(
         state.form is not None and state.form.frame.get("lw_enabled")
         for _, state in cells)
-    if skeleton:
+    root_chamber = any(
+        state.form is not None and state.form.frame.get("root_trough_count")
+        for _, state in cells)
+    if root_chamber:
+        overflow = {
+            "status": "contained",
+            "path": "blind_bottom_root_chamber_drains_forward_to_collector",
+            "return": "passive_root_drainage_return",
+        }
+        removal = {
+            "before_rooting": "hand-removable (no roots in the chamber yet)",
+            "mid_cycle": "NOT clean once roots enter the troughs",
+            "end_cycle": "removable with the harvest (roots torn/cut)",
+        }
+    elif skeleton:
         overflow = {
             "status": "absent",
             "path": "drains_through_skeleton",
             "user_action": "keep a tray under the row",
             "planned_fix": "VF-5 root_chamber",
         }
+        removal = None
     else:
         overflow = {"status": "contained"}
+        removal = None
     return {
         "kind": meta.get("row_kind", "tilted_flush_row"),
         "slope_source": ("mounted_profile" if mount is not None
@@ -227,6 +244,7 @@ def _row_rollup(
                           "UNCONTROLLED" if leak is False else "unchecked"),
         "drips_clear_of": ["profiles", "magnets", "dry_zones"],
         "overflow_containment": overflow,
+        **({"cassette_removal": removal} if removal is not None else {}),
         "saddle_mounts": [
             {"status": s.status.value, "note": s.message} for s in saddles
         ],

@@ -131,3 +131,31 @@ def test_single_cell_report_shape_unchanged():
     assert "row" not in water  # no water joints — no row story
     frame = build_frame_report(asm, states, findings)
     assert frame is None  # no carrier — no frame story
+
+
+# -- VF-5A: the root chamber row -----------------------------------------------
+
+ROW_RC = EXAMPLES / "vertical_farm_row_3x1_root_chamber.yaml"
+
+
+def test_root_chamber_row_contains_overflow_and_drains():
+    catalog = load_catalog()
+    asm = load_assembly(ROW_RC)
+    states = {ref: pre_cad_from_instance(inst, catalog, True)
+              for ref, inst in _inject_shared(asm, catalog).items()}
+    findings, poses, _ = _joint_findings(asm, states)
+    checks = {}
+    for f in findings:
+        checks.setdefault(f.check, []).append(f.status.value)
+    assert checks["assembly.collector_catches_root_drainage"] == ["pass"]
+    water = build_water_report(states, findings, asm=asm, poses=poses)
+    row = water["row"]
+    oc = row["overflow_containment"]
+    assert oc["status"] == "contained"
+    assert oc["return"] == "passive_root_drainage_return"
+    rm = row["cassette_removal"]
+    assert "roots" in rm["mid_cycle"]
+    # the rails really are root chambers
+    r1 = states["rail_1"].report
+    assert r1.passed("form.root_chamber_ok")
+    assert r1.passed("form.no_secondary_water_channel")  # troughs exempt

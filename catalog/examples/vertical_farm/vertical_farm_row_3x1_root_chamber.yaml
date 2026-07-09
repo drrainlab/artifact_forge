@@ -1,0 +1,235 @@
+# Vertical Farm Pack — the tilted flush row with the ROOT CHAMBER under
+# the cassette (VF-5A): solid blind bottom contains overflow, open-top
+# root troughs the mount drains forward to a full-width collector.
+# (Base flush row golden — the TILTED FLUSH ROW (the VF
+# correction canon): three flush water modules on two STANDARD STRAIGHT
+# 2020 profiles, the whole row mounted at 1.5 deg (mount_context — the
+# mount IS the slope; every rail and both profiles are modeled level).
+#
+# Water story: the inlet cap drips onto rail_1's FEED point (the row's
+# ONLY fall), then the water rides constant-depth channels and crosses
+# module seams ON TOP of lap lips landing in through open-bottom
+# receivers (dZ = 0, controlled 0.4 face gap, deliberate seam slot
+# leaking into open air between the profiles). The last rail's lip is the
+# drip edge the collector catches. Alignment magnets (d6x2, sealed dry
+# pockets) face each other across both seams — alignment only, never a
+# seal, never a support.
+schema: assembly/v1
+id: vertical_farm_row_3x1_root_chamber
+strict: true
+root: cap
+
+meta:
+  row_kind: tilted_flush_row
+  mounting_policy: tilted_flush_profile
+  under_cassette: root_chamber
+
+mount_context:
+  type: tilted_flush_row
+  slope_deg: 1.5
+  slope_source: "whole row mounted on straight 2020 profiles at 1.5 deg"
+
+shared:
+  module_w: 248mm
+  seat_depth: 14mm
+  channel_d: 5mm
+  channel_w: 16mm
+  face_gap: 0.4mm
+  lip_len: 4mm
+  lip_t: 1.4mm
+  cassette_l: 220mm
+  cassette_w: 220mm
+  cassette_h: 26mm
+  seat_clearance: 0.75mm
+  wall: 2.2mm
+  module_pitch: 250mm
+  tube_od: 9mm
+
+parts:
+  - ref: cap
+    product:
+      schema: product/v1
+      id: flush_inlet_cap
+      archetype: inlet_cap_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        print_orientation: as_modeled
+        bed: [250mm, 250mm, 250mm]
+  - ref: rail_1
+    product:
+      schema: product/v1
+      id: flush_rail_1
+      archetype: water_rail_v1@2
+      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 84mm, under_cassette: root_chamber}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        print_orientation: as_modeled
+        bed: [250mm, 250mm, 250mm]
+  - ref: rail_2
+    product:
+      schema: product/v1
+      id: flush_rail_2
+      archetype: water_rail_v1@2
+      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 84mm, under_cassette: root_chamber}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        print_orientation: as_modeled
+        bed: [250mm, 250mm, 250mm]
+  - ref: rail_3
+    product:
+      schema: product/v1
+      id: flush_rail_3
+      archetype: water_rail_v1@2
+      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 84mm, under_cassette: root_chamber}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        print_orientation: as_modeled
+        bed: [250mm, 250mm, 250mm]
+  - ref: cassette_1
+    product:
+      schema: product/v1
+      id: flush_cassette_1
+      archetype: coco_cassette_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        print_orientation: as_modeled
+        bed: [250mm, 250mm, 250mm]
+  - ref: cassette_2
+    product:
+      schema: product/v1
+      id: flush_cassette_2
+      archetype: coco_cassette_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        print_orientation: as_modeled
+        bed: [250mm, 250mm, 250mm]
+  - ref: cassette_3
+    product:
+      schema: product/v1
+      id: flush_cassette_3
+      archetype: coco_cassette_v1@1
+      params: {}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        print_orientation: as_modeled
+        bed: [250mm, 250mm, 250mm]
+  - ref: collector
+    product:
+      schema: product/v1
+      id: flush_collector
+      archetype: collector_endcap_v1@1
+      params: {tray_w: 160mm}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        print_orientation: as_modeled
+        bed: [250mm, 250mm, 250mm]
+  # STANDARD straight 2020 profiles, cut to length — modeled straight and
+  # horizontal, mounted at the row slope by the frame (see mount_context).
+  # process: reference => no FDM checks; exports are visual references.
+  - ref: profile_e
+    product:
+      schema: product/v1
+      id: flush_profile_e
+      archetype: aluminum_profile_ref_v1@2
+      params: {size: "2020", length: 780mm, stations: 3}
+      manufacturing:
+        process: reference
+        material: aluminum
+  - ref: profile_w
+    product:
+      schema: product/v1
+      id: flush_profile_w
+      archetype: aluminum_profile_ref_v1@2
+      params: {size: "2020", length: 780mm, stations: 3}
+      manufacturing:
+        process: reference
+        material: aluminum
+
+# Chain order: the water chain poses everything printed (drip in, two lap
+# seams, drip out); each profile is then posed by ONE perch joint off
+# rail_1; the remaining perch joints verify rails 2/3 against the
+# already-posed profiles.
+joints:
+  - type: fluid_joint
+    a: cap.rail_out
+    b: rail_1.feed
+    rotate: [0, 0, 0]
+  - type: saddle_hang
+    a: rail_1.feed
+    b: cap.rail_out
+    rotate: [0, 0, 0]
+  - type: removable_insert
+    a: rail_1.cassette_seat
+    b: cassette_1.seat
+    rotate: [0, 0, 0]
+    params: {lift_margin: 3mm}
+  - type: lap_flow_joint
+    a: rail_1.outlet
+    b: rail_2.inlet
+    rotate: [0, 0, 0]
+  - type: removable_insert
+    a: rail_2.cassette_seat
+    b: cassette_2.seat
+    rotate: [0, 0, 0]
+    params: {lift_margin: 3mm}
+  - type: lap_flow_joint
+    a: rail_2.outlet
+    b: rail_3.inlet
+    rotate: [0, 0, 0]
+  - type: removable_insert
+    a: rail_3.cassette_seat
+    b: cassette_3.seat
+    rotate: [0, 0, 0]
+    params: {lift_margin: 3mm}
+  - type: fluid_joint
+    a: rail_3.drain_edge
+    b: collector.rail_in
+    rotate: [0, 0, 0]
+  - type: saddle_hang
+    a: rail_3.drain_edge
+    b: collector.rail_in
+    rotate: [0, 0, 0]
+  # carrier: pose each profile off rail_1, verify the rest
+  - type: profile_perch
+    a: rail_1.seat_e
+    b: profile_e.ridge_1
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_1.seat_w
+    b: profile_w.ridge_1
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_2.seat_e
+    b: profile_e.ridge_2
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_2.seat_w
+    b: profile_w.ridge_2
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_3.seat_e
+    b: profile_e.ridge_3
+    rotate: [0, 0, 0]
+  - type: profile_perch
+    a: rail_3.seat_w
+    b: profile_w.ridge_3
+    rotate: [0, 0, 0]
+
+contract:
+  must_have:
+    - row_water_chain
+    - row_flush_integrity
+    - saddle_mount
+    - vertical_farm_cassette_interface
+    - row_carried_by_profile
