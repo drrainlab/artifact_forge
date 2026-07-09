@@ -568,6 +568,16 @@ features:
       - form.profile_seat_dry_ok
       - topology.cutout_present
 
+  - id: endcap_dock
+    description: >
+      VF-6 magnetic docking of the row endcaps: UP pockets in the terminal
+      module's END wall top take the collector (front) or inlet cap (back)
+      arm's DOWN pockets — magnet to magnet, dry perimeter wall, alignment
+      only. The seating check proves the pockets actually mate in the pose
+    verified_by:
+      - form.dock_pockets_dry
+      - assembly.endcap_docks_to_rail
+
   - id: substrate_mesh_floor
     description: >
       flat orthogonal through-mesh across the cassette floor — holds coco,

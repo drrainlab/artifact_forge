@@ -450,6 +450,81 @@ _register(RecipeOpDecl(
 ))
 
 
+# -- endcap_dock_pockets (feature) --------------------------------------------
+
+
+def _endcap_dock_pockets(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Endcap docking magnets (VF-6): the terminal module's END faces have no
+    neighbour, so their module magnets go to waste. Instead the row END wall
+    TOP carries a pair of UP-facing Z pockets that the collector (front) or
+    inlet cap (back) arm docks onto — arm underside sits flat on the wall top
+    at the module height, magnet to magnet, alignment-only. The pockets live
+    in the dry perimeter END wall (x = +-dock_x, inboard of the seat, far
+    from channel and root troughs); they open UP and print supportless."""
+    state.require_base("endcap_dock_pockets")
+    f = state.frame
+    if "rail_y1" not in f:
+        raise RecipeError("endcap_dock_pockets needs a water_rail_body base")
+    end = p.get("dock_end", "none")
+    if end == "none":
+        state.frame.update(dock_pocket_count=0)
+        return
+    if end not in ("front", "back", "both"):
+        raise RecipeError(f"dock_end {end!r} not in none|front|back|both")
+    d = p.get("magnet_d", 6.0) + p.get("fit_clearance", 0.2)
+    depth = p.get("magnet_t", 2.0) + 0.4
+    dock_x = p.get("dock_x", 22.0)
+    inset = p.get("dock_inset", 7.0)
+    z_top = f["body_h"]
+    # front = outlet face (rail_y0, -Y, collector); back = inlet (rail_y1, cap)
+    ends = {
+        "front": [("f", f["rail_y0"], 1.0)],
+        "back": [("b", f["rail_y1"], -1.0)],
+        "both": [("f", f["rail_y0"], 1.0), ("b", f["rail_y1"], -1.0)],
+    }[end]
+    name = op_id or "dock"
+    count = 0
+    for tag, face_y, inward in ends:
+        dock_y = face_y + inward * inset  # step inboard off the end face
+        for x_label, x in (("e", dock_x), ("w", -dock_x)):
+            state.bores.append(BoreFeature(
+                name=f"{name}_{tag}_{x_label}", axis="Z",
+                center=(x, dock_y, 0.0), d=d,
+                span=(z_top - depth, z_top), overshoot=(0.0, 1.0),
+            ))
+            state.regions.append(Region(
+                f"endcap_dock_{tag}_{x_label}", RegionRole.INTERFACE_KEEPOUT,
+                Box3(x - d / 2.0 - 1.0, dock_y - d / 2.0 - 1.0, z_top - depth - 1.0,
+                     x + d / 2.0 + 1.0, dock_y + d / 2.0 + 1.0, z_top + 1.0)))
+            count += 1
+    state.frame.update(
+        dock_pocket_count=count, dock_pocket_d=d, dock_pocket_depth=depth,
+        dock_x=dock_x, dock_inset=inset, dock_z_plane=z_top,
+        dock_front=1.0 if end in ("front", "both") else 0.0,
+        dock_back=1.0 if end in ("back", "both") else 0.0,
+        dock_fit_clearance=d - p.get("magnet_d", 6.0),
+    )
+
+
+_register(RecipeOpDecl(
+    name="endcap_dock_pockets",
+    kind="feature",
+    params={
+        "dock_end": ("choice", "none"),
+        "magnet_d": ("length", 6.0), "magnet_t": ("length", 2.0),
+        "fit_clearance": ("length", 0.2),
+        "dock_x": ("length", 22.0), "dock_inset": ("length", 7.0),
+    },
+    validators=(
+        "form.dock_pockets_dry",
+    ),
+    apply=_endcap_dock_pockets,
+    description="optional UP-facing dock magnets in the END wall tops — the "
+                "collector/cap arm docks onto the terminal module, alignment "
+                "only, dry perimeter wall, printed supportless",
+))
+
+
 # -- profile_seat_slot (feature) ----------------------------------------------
 
 
@@ -918,6 +993,13 @@ def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         Region("saddle", RegionRole.INTERFACE_KEEPOUT, slot),
     ])
 
+    # Endcap dock magnets (VF-6): the saddle-slot ceiling rests on the FIRST
+    # rail's back wall top (z = saddle_depth). DOWN pockets there dock onto
+    # that rail's back-end wall-top pockets — magnet to magnet, dry, inboard
+    # of the channel. The cap is narrow, so the dock sits at a modest x.
+    _collect_dock(state, p, name, dock_y=-p.get("dock_inset", 7.0),
+                  z_plane=saddle_depth, side_front=False)
+
     state.frame.update(
         outline_u0=u0, outline_v0=v0, outline_u1=u1, outline_v1=v1,
         outline_corner_r=p["corner_r"],
@@ -943,9 +1025,14 @@ _register(RecipeOpDecl(
         "saddle_depth": ("length", 8.0), "hang_drop": ("length", 16.5),
         "spout_w": ("length", 14.0), "rail_channel_w": ("length", 16.0),
         "corner_r": ("length", 3.0),
+        "dock_magnets": ("bool", False),
+        "magnet_d": ("length", 6.0), "magnet_t": ("length", 2.0),
+        "dock_fit_clearance": ("length", 0.2),
+        "dock_x": ("length", 22.0), "dock_inset": ("length", 7.0),
     },
     validators=(
         "form.hose_bore_ok", "form.spout_drop_path_ok",
+        "form.dock_pockets_dry",
         "form.no_standing_water_ir",
         "topology.fluid_path_open", "topology.single_connected_solid",
         "topology.cutout_present", "topology.ribs_present",
@@ -955,6 +1042,37 @@ _register(RecipeOpDecl(
                 "dipping into the rail inlet corridor; saddle-hangs on the "
                 "back wall",
 ))
+
+
+def _collect_dock(state: RecipeState, p: dict[str, Any], name: str, *,
+                  dock_y: float, z_plane: float, side_front: bool) -> None:
+    """Shared endcap docking magnets (VF-6): a pair of DOWN-facing Z pockets
+    in an endcap arm underside (the plane that contacts the rail END wall
+    top). Gated by ``dock_magnets``; they bore UP into the solid arm (a
+    plastic floor above) at x = +-dock_x, aligned to the rail's UP dock
+    pockets across the contact. Alignment-only, press-fit, n/a when off."""
+    if not p.get("dock_magnets", False):
+        state.frame.update(dock_pocket_count=0)
+        return
+    d = p.get("magnet_d", 6.0) + p.get("dock_fit_clearance", 0.2)
+    depth = p.get("magnet_t", 2.0) + 0.4
+    dock_x = p.get("dock_x", 22.0)
+    for x_label, x in (("e", dock_x), ("w", -dock_x)):
+        state.bores.append(BoreFeature(
+            name=f"{name}_dock_{x_label}", axis="Z",
+            center=(x, dock_y, 0.0), d=d,
+            span=(z_plane, z_plane + depth), overshoot=(1.0, 0.0),
+        ))
+        state.regions.append(Region(
+            f"endcap_dock_{x_label}", RegionRole.INTERFACE_KEEPOUT,
+            Box3(x - d / 2.0 - 1.0, dock_y - d / 2.0 - 1.0, z_plane - 1.0,
+                 x + d / 2.0 + 1.0, dock_y + d / 2.0 + 1.0, z_plane + depth + 1.0)))
+    state.frame.update(
+        dock_pocket_count=2, dock_pocket_d=d, dock_pocket_depth=depth,
+        dock_x=dock_x, dock_inset=p.get("dock_inset", 7.0), dock_y=dock_y,
+        dock_z_plane=z_plane, dock_side_front=1.0 if side_front else 0.0,
+        dock_fit_clearance=d - p.get("magnet_d", 6.0),
+    )
 
 
 def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
@@ -1092,6 +1210,15 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
     state.ribs.append(RibFeature(name=f"{name}_arm", box=arm))
     state.ribs.append(RibFeature(name=f"{name}_tongue", box=tongue))
 
+    # Endcap dock magnets (VF-6): the arm underside sits flat on the LAST
+    # rail's front wall top (z = arm_z0, the module height). A pair of
+    # DOWN-facing Z pockets there docks onto matching UP pockets in that
+    # rail's front-end wall top — magnet to magnet, alignment-only. The
+    # pockets bore UP into the solid arm (a plastic floor above), far from
+    # the tray, and print with a short bridged roof.
+    _collect_dock(state, p, name, dock_y=p.get("dock_inset", 7.0),
+                  z_plane=arm_z0, side_front=True)
+
     state.regions.extend([
         Region("catch_tray", RegionRole.TRANSIENT_WATER_PATH,
                Box3(-tray_w_inner / 2.0, y_drain_wall - 0.5, tray_bottom + dz,
@@ -1152,6 +1279,10 @@ _register(RecipeOpDecl(
         "drain_extension": ("length", 10.0), "drain_grip": ("length", 12.0),
         "wall_extra": ("length", 3.0),
         "corner_r": ("length", 3.0),
+        "dock_magnets": ("bool", False),
+        "magnet_d": ("length", 6.0), "magnet_t": ("length", 2.0),
+        "dock_fit_clearance": ("length", 0.2),
+        "dock_x": ("length", 22.0), "dock_inset": ("length", 7.0),
     },
     validators=(
         "form.hose_bore_ok", "form.collector_tray_drains",
@@ -1159,6 +1290,7 @@ _register(RecipeOpDecl(
         "form.receiver_open_top_cleanable",
         "form.collector_drain_bore_supportless",
         "form.collector_structure_sturdy",
+        "form.dock_pockets_dry",
         "form.no_standing_water_ir",
         "topology.fluid_path_open", "topology.single_connected_solid",
         "topology.ribs_present",

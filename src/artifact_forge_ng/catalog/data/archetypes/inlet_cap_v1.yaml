@@ -18,6 +18,7 @@ description: >
 provides_features:
   - hose_takeoff
   - drip_spout
+  - endcap_dock
 
 parameters:
   cap_w:
@@ -59,6 +60,20 @@ parameters:
     {type: length, default: 0.4mm, min: 0.2mm, max: 0.8mm, role: manufacturing}
   corner_r:
     {type: length, default: 3mm, min: 2mm, max: 6mm, role: aesthetic}
+  dock_magnets:
+    {type: bool, default: false, role: assembly, exposed: true,
+     description: "VF-6: dock the cap arm onto the FIRST rail's back wall-top
+       magnets (rail needs endcap_dock: back) — alignment only. Keep cap_w
+       wide enough that +-dock_x stays inside the arm (64 fits dock_x 22)"}
+  dock_x:
+    {type: length, default: 22mm, min: 14mm, max: 40mm, role: assembly,
+     description: "dock magnet centers at +-dock_x — must match the rail"}
+  dock_inset:
+    {type: length, default: 7mm, min: 4mm, max: 12mm, role: assembly,
+     description: "dock pocket step inboard from the rail face — match the rail"}
+  dock_fit:
+    {type: length, default: 0.2mm, min: 0.1mm, max: 0.3mm, role: manufacturing,
+     description: "diametral press-fit of the d6x2 dock magnet"}
 
 derived:
   # the wall the cap straddles: (module depth - seat span) / 2
@@ -93,6 +108,10 @@ form:
         spout_w: spout_w
         rail_channel_w: channel_w
         corner_r: corner_r
+        dock_magnets: dock_magnets
+        dock_x: dock_x
+        dock_inset: dock_inset
+        dock_fit_clearance: dock_fit
 
 regions:
   - {id: spout_path, role: transient_water_path, editable: false,
@@ -126,6 +145,7 @@ validators:
   - interface.keepouts_preserved
   - form.hose_bore_ok
   - form.spout_drop_path_ok
+  - form.dock_pockets_dry
   - form.no_standing_water_ir
   - topology.fluid_path_open
   - topology.single_connected_solid

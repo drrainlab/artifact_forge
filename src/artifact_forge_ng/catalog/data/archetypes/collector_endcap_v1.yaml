@@ -24,6 +24,7 @@ description: >
 provides_features:
   - hose_takeoff
   - catch_tray
+  - endcap_dock
 
 parameters:
   tray_w:
@@ -83,6 +84,19 @@ parameters:
     {type: length, default: 0.4mm, min: 0.2mm, max: 0.8mm, role: manufacturing}
   corner_r:
     {type: length, default: 3mm, min: 2mm, max: 6mm, role: aesthetic}
+  dock_magnets:
+    {type: bool, default: false, role: assembly, exposed: true,
+     description: "VF-6: dock the collector arm onto the LAST rail's front
+       wall-top magnets (rail needs endcap_dock: front) — alignment only"}
+  dock_x:
+    {type: length, default: 22mm, min: 14mm, max: 40mm, role: assembly,
+     description: "dock magnet centers at +-dock_x — must match the rail"}
+  dock_inset:
+    {type: length, default: 7mm, min: 4mm, max: 12mm, role: assembly,
+     description: "dock pocket step inboard from the rail face — match the rail"}
+  dock_fit:
+    {type: length, default: 0.2mm, min: 0.1mm, max: 0.3mm, role: manufacturing,
+     description: "diametral press-fit of the d6x2 dock magnet"}
 
 derived:
   rail_wall_t: (module_w - cassette_w - 2 * seat_clearance) / 2
@@ -119,6 +133,10 @@ form:
         drain_extension: drain_extension
         wall_extra: wall_extra
         corner_r: corner_r
+        dock_magnets: dock_magnets
+        dock_x: dock_x
+        dock_inset: dock_inset
+        dock_fit_clearance: dock_fit
 
 regions:
   - {id: catch_tray, role: transient_water_path, editable: false,
@@ -158,6 +176,7 @@ validators:
   - form.receiver_open_top_cleanable
   - form.collector_drain_bore_supportless
   - form.collector_structure_sturdy
+  - form.dock_pockets_dry
   - form.no_standing_water_ir
   - topology.fluid_path_open
   - topology.single_connected_solid

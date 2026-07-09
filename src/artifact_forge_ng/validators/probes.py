@@ -130,6 +130,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.drainage_requires_mount", Level.FORM, "honesty note: a constant-depth channel drains only under the mounted row slope (1.0-2.0 deg) — buildable horizontal, operational mounted"),
         _decl("form.magnet_pockets_outside_water_zone", Level.FORM, "every module magnet pocket sits in dry body — no magnet face sees water"),
         _decl("form.magnet_pockets_do_not_break_wall", Level.FORM, "magnet pockets stay blind (never pierce the face) and keep >= 1.2 plastic to any wet zone"),
+        _decl("form.dock_pockets_dry", Level.FORM, "endcap dock magnets are blind vertical (Z) pockets, press-fit, >= 1.2 plastic to every wet zone — the collector/cap arm docks onto the rail wall top"),
         _decl("form.lightweight_windows_dry_ok", Level.FORM, "lightweight dry-shell windows: open-bottom, clear of every functional zone, >= 2.4 cover under the seat floor, ribs present between windows"),
         _decl("form.substrate_retained_under_mount", Level.FORM, "honesty note: the substrate must not creep downstream under the mounted slope (static for coco; real retention checks arrive with mat cassettes)"),
         # -- VF-4.1 printability & collector hardening -------------------------
@@ -219,6 +220,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.collector_mouth_envelopes_outlet_lip", Level.ASSEMBLY, "the receiver mouth envelopes the posed lip across X with real side margin"),
         _decl("assembly.collector_removable_by_hand", Level.ASSEMBLY, "no collector material above the captured lip — the receiver has no ceiling, so the collector lifts straight off"),
         _decl("assembly.collector_catches_root_drainage", Level.ASSEMBLY, "the collector tray mouth spans the final rail's root troughs so the passive root drainage lands in the tray"),
+        _decl("assembly.endcap_docks_to_rail", Level.ASSEMBLY, "the endcap's dock magnets land on a matching rail dock pocket across the arm/wall-top contact — the magnetic dock actually mates in the pose"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),

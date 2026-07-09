@@ -371,3 +371,76 @@ def test_skeleton_rail_no_root_drainage_check():
     asm, states, poses = make_row_with_collector()  # skeleton rails
     checks = by_check(carrier_findings(asm, states, poses))
     assert "assembly.collector_catches_root_drainage" not in checks
+
+
+# -- VF-6: endcap magnetic docking (pose truth) --------------------------------
+
+
+def dock_rail(name: str, dock_end: str) -> PartForm:
+    st = RecipeState()
+    p = dict(
+        module_l=248.0, module_w=248.0, body_h=30.0,
+        channel_w=16.0, channel_d=5.0, channel_bottom_r=1.2,
+        cassette_l=220.0, cassette_w=220.0, seat_depth=14.0, seat_clearance=0.75,
+        module_pitch=250.0, corner_r=4.0, face_gap=0.4,
+        under_cassette="root_chamber", trough_w=26.0, trough_rib=6.0, trough_depth=12.0,
+    )
+    RECIPE_OPS["water_rail_body"].apply(st, p, "body")
+    RECIPE_OPS["lap_outlet_lip"].apply(st, {"lip_len": 4.0, "lip_t": 1.4}, "lap_out")
+    RECIPE_OPS["lap_inlet_receiver"].apply(
+        st, {"pocket_len": 6.0, "side_clearance": 0.4}, "lap_in")
+    RECIPE_OPS["endcap_dock_pockets"].apply(
+        st, {"dock_end": dock_end, "dock_x": 22.0, "dock_inset": 7.0,
+             "fit_clearance": 0.2}, "dock")
+    return PartForm(
+        name=name, params={}, frame=st.frame, section=st.section, width=st.width,
+        style=MOLDED_UTILITY_PART, channels=st.channels, cutboxes=st.cutboxes,
+        bores=st.bores, ribs=st.ribs, regions=st.regions, datums=st.datums)
+
+
+def _row_dock(collector: PartForm, dock_end: str = "front", shift_x: float = 0.0):
+    rail = dock_rail("rail_1", dock_end)
+    states = {"rail_1": _state(rail, "water_rail"),
+              "collector": _state(collector, "water_collector")}
+    poses = {"rail_1": Pose(rotate=(0, 0, 0), translate=(0.0, 0.0, 0.0))}
+    drain = rail.datums["drain_edge"]["at"]
+    catch = collector.datums["catch"]["at"]
+    poses["collector"] = Pose(rotate=(0, 0, 0), translate=(
+        drain[0] - catch[0] + shift_x, drain[1] - catch[1], drain[2] - catch[2]))
+    asm = SimpleNamespace(
+        parts=[SimpleNamespace(ref="rail_1"), SimpleNamespace(ref="collector")],
+        joints=[JointUse(type="lap_flow_joint", a="rail_1.outlet",
+                         b="rail_1.inlet", rotate=[0, 0, 0])],
+        mount_context=MountContextSpec(type="tilted_flush_row", slope_deg=1.5),
+        meta={})
+    return asm, states, poses
+
+
+def test_collector_docks_to_rail():
+    asm, states, poses = _row_dock(collector_form(tray_w=160.0, dock_magnets=True))
+    f = by_check(carrier_findings(asm, states, poses))["assembly.endcap_docks_to_rail"]
+    assert f.status is Status.PASS, f.message
+    assert f.measured < 1.0
+
+
+def test_dock_missing_rail_pocket_fails():
+    # collector carries dock magnets but the rail's front end has none
+    asm, states, poses = _row_dock(
+        collector_form(tray_w=160.0, dock_magnets=True), dock_end="none")
+    f = by_check(carrier_findings(asm, states, poses))["assembly.endcap_docks_to_rail"]
+    assert f.status is Status.FAIL
+    assert "no dock pocket" in f.message
+
+
+def test_shifted_collector_dock_misses():
+    asm, states, poses = _row_dock(
+        collector_form(tray_w=160.0, dock_magnets=True), shift_x=3.0)
+    f = by_check(carrier_findings(asm, states, poses))["assembly.endcap_docks_to_rail"]
+    assert f.status is Status.FAIL
+    assert "does not mate" in f.message
+
+
+def test_undocked_collector_no_dock_finding():
+    asm, states, poses = _row_dock(collector_form(tray_w=160.0))  # no dock magnets
+    assert "assembly.endcap_docks_to_rail" not in by_check(
+        carrier_findings(asm, states, poses))

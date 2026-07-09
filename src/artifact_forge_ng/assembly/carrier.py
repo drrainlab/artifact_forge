@@ -115,6 +115,18 @@ def carrier_findings(
     if collector is not None and posed_rails:
         findings.extend(_collector_capture(
             collector, posed_rails[-1][0], states, poses))
+        findings.extend(_endcap_dock(
+            collector, posed_rails[-1][0], "front", states, poses))
+    # inlet cap docks onto the FIRST rail's back wall top (VF-6)
+    cap = next(
+        (p.ref for p in asm.parts
+         if states.get(p.ref) is not None and states[p.ref].form is not None
+         and getattr(states[p.ref].archetype, "object_class", "")
+         == "water_inlet_cap"),
+        None)
+    if cap is not None and posed_rails:
+        findings.extend(_endcap_dock(
+            cap, posed_rails[0][0], "back", states, poses))
     return findings
 
 
@@ -466,3 +478,53 @@ def _collector_capture(
             measured=mouth_reach, limit=trough_x,
         ))
     return out
+
+
+DOCK_ALIGN_TOL = 1.0  # magnet-to-magnet lateral/plane slack across the dock
+
+
+def _endcap_dock(
+    endcap_ref: str, rail_ref: str, side: str,
+    states: dict[str, Any], poses: dict[str, Any],
+) -> list[Finding]:
+    """VF-6: when an endcap carries dock magnets, each must land on a
+    matching rail dock pocket across the arm/wall-top contact. We transform
+    both pocket mouths to world and require they coincide within
+    DOCK_ALIGN_TOL — a magnet with nothing to grab is a hallucinated dock.
+    Emitted only when the endcap declares dock pockets."""
+    check = "assembly.endcap_docks_to_rail"
+    ec, rl = states.get(endcap_ref), states.get(rail_ref)
+    ec_pose, rl_pose = poses.get(endcap_ref), poses.get(rail_ref)
+    if ec is None or ec.form is None or ec_pose is None:
+        return []
+    ef = ec.form.frame
+    if not ef.get("dock_pocket_count"):
+        return []  # endcap has no dock magnets — nothing to seat
+    if rl is None or rl.form is None or rl_pose is None:
+        return [_finding(check, False, f"endcap {endcap_ref} docks but its "
+                         f"rail {rail_ref} is not posed")]
+    rf = rl.form.frame
+    has_rail = rf.get("dock_front" if side == "front" else "dock_back", 0.0)
+    if not has_rail:
+        return [_finding(
+            check, False,
+            f"{endcap_ref} carries dock magnets but the {side} end of "
+            f"{rail_ref} has no dock pocket to grab — add dock_end: {side}")]
+    rail_y = (rf["rail_y0"] + rf["dock_inset"] if side == "front"
+              else rf["rail_y1"] - rf["dock_inset"])
+    worst = 0.0
+    for xs in (1.0, -1.0):
+        pe = ec_pose.apply((xs * ef["dock_x"], ef["dock_y"], ef["dock_z_plane"]))
+        pr = rl_pose.apply((xs * rf["dock_x"], rail_y, rf["dock_z_plane"]))
+        d = math.dist(pe, pr)
+        worst = max(worst, d)
+    ok = worst <= DOCK_ALIGN_TOL + 1e-6
+    return [_finding(
+        check, ok,
+        f"{int(ef['dock_pocket_count'])} dock magnet(s) seat on {rail_ref}'s "
+        f"{side} wall top (worst offset {worst:.2f})"
+        if ok else
+        f"{endcap_ref} dock magnets miss {rail_ref}'s pockets by {worst:.2f} "
+        f"> {DOCK_ALIGN_TOL:g} — the magnetic dock does not mate in the pose",
+        measured=worst, limit=DOCK_ALIGN_TOL,
+    )]

@@ -159,3 +159,24 @@ def test_root_chamber_row_contains_overflow_and_drains():
     r1 = states["rail_1"].report
     assert r1.passed("form.root_chamber_ok")
     assert r1.passed("form.no_secondary_water_channel")  # troughs exempt
+
+
+def test_root_chamber_row_endcaps_dock_magnetically():
+    """VF-6: the collector and inlet cap magnetically dock onto the terminal
+    modules' end wall tops — the seating check proves both mates."""
+    catalog = load_catalog()
+    asm = load_assembly(ROW_RC)
+    states = {ref: pre_cad_from_instance(inst, catalog, True)
+              for ref, inst in _inject_shared(asm, catalog).items()}
+    findings, poses, _ = _joint_findings(asm, states)
+    docks = [f for f in findings if f.check == "assembly.endcap_docks_to_rail"]
+    assert len(docks) == 2  # collector (front) + cap (back)
+    for f in docks:
+        assert f.status.value == "pass", f.message
+        assert f.measured < 1.0
+    # only the terminal rails carry dock pockets; the middle one does not
+    assert states["rail_1"].form.frame["dock_pocket_count"] == 2
+    assert states["rail_2"].form.frame["dock_pocket_count"] == 0
+    assert states["rail_3"].form.frame["dock_pocket_count"] == 2
+    assert states["collector"].report.passed("form.dock_pockets_dry")
+    assert states["cap"].report.passed("form.dock_pockets_dry")

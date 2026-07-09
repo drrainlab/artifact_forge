@@ -30,6 +30,7 @@ provides_features:
   - cassette_seat
   - module_alignment_edges
   - aluminum_profile_seat
+  - endcap_dock
 
 parameters:
   module_l:
@@ -124,6 +125,20 @@ parameters:
     {type: length, default: 0.2mm, min: 0.1mm, max: 0.3mm, role: manufacturing,
      description: "diametral press-fit of the d6x2 magnet in its dry
        pocket — pushes in from the mating face, a drop of CA recommended"}
+  endcap_dock:
+    {type: choice, choices: ["none", "front", "back", "both"], default: "none",
+     role: assembly, exposed: true,
+     description: "VF-6 endcap docking magnets in the END wall top(s): front
+       (outlet, collector) / back (inlet, cap) / both. Only the terminal
+       modules of a row need it — the collector/cap arm docks onto it"}
+  dock_x:
+    {type: length, default: 22mm, min: 14mm, max: 40mm, role: assembly,
+     description: "dock magnet centers at +-dock_x in the dry perimeter wall
+       (clear of channel and root troughs); the endcap uses the same value"}
+  dock_inset:
+    {type: length, default: 7mm, min: 4mm, max: 12mm, role: assembly,
+     description: "dock pocket step inboard from the end face — under the
+       endcap arm footprint, ahead of the seat wall"}
   profile:
     {type: choice, choices: ["2020", "3030"], default: "2020",
      role: assembly, exposed: true,
@@ -204,6 +219,13 @@ form:
       params:
         enabled: magnet_enabled
         x_offset: magnet_x_offset
+        fit_clearance: magnet_fit
+    - op: endcap_dock_pockets
+      id: dock
+      params:
+        dock_end: endcap_dock
+        dock_x: dock_x
+        dock_inset: dock_inset
         fit_clearance: magnet_fit
     - op: profile_seat_slot
       id: profile_slots
@@ -340,6 +362,7 @@ validators:
   - form.root_chamber_ok
   - form.magnet_pockets_outside_water_zone
   - form.magnet_pockets_do_not_break_wall
+  - form.dock_pockets_dry
   - form.no_standing_water_ir
   - form.no_secondary_water_channel
   - form.cassette_seat_fit_ok

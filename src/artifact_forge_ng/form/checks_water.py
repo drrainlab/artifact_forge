@@ -406,6 +406,55 @@ def check_magnet_pockets_do_not_break_wall(form: PartForm) -> Finding:
     )
 
 
+def check_dock_pockets_dry(form: PartForm) -> Finding:
+    """VF-6 endcap dock magnets: vertical (Z) pockets that dock the collector
+    or the inlet cap onto a rail END wall top — magnet to magnet across the
+    arm/wall-top contact. Each must be blind (a plastic floor to the far
+    face), enter along Z (the dock axis; anything else aligns nothing), sit
+    >= MAGNET_WET_WALL_MIN from every wet region, and press-fit. Same part
+    on both sides of the joint runs this check; n/a-PASS with no dock
+    pockets."""
+    check = "form.dock_pockets_dry"
+    pockets = [b for b in form.bores if "dock" in b.name]
+    if not pockets:
+        return _finding(check, True, "no dock pockets — nothing to seat")
+    wet = _wet_regions(form)
+    problems: list[str] = []
+    fit = form.frame.get("dock_fit_clearance")
+    if fit is not None and not (MAGNET_FIT_BAND[0] - 1e-9 <= fit
+                                <= MAGNET_FIT_BAND[1] + 1e-9):
+        problems.append(
+            f"dock fit {fit:g} outside the press band "
+            f"{MAGNET_FIT_BAND[0]}..{MAGNET_FIT_BAND[1]}")
+    for b in pockets:
+        if b.overshoot[0] > 0.0 and b.overshoot[1] > 0.0:
+            problems.append(f"dock pocket {b.name!r} is a through bore")
+        if b.axis != "Z":
+            problems.append(
+                f"dock pocket {b.name!r} enters a non-dock face (axis "
+                f"{b.axis}) — dock magnets seat vertically into the wall top "
+                "and the arm underside")
+        x, y, z = b.center
+        r = b.d / 2.0
+        lo, hi = min(b.span), max(b.span)  # axis Z: the span is the z range
+        grown = Box3(x - r - MAGNET_WET_WALL_MIN, y - r - MAGNET_WET_WALL_MIN,
+                     lo - MAGNET_WET_WALL_MIN,
+                     x + r + MAGNET_WET_WALL_MIN, y + r + MAGNET_WET_WALL_MIN,
+                     hi + MAGNET_WET_WALL_MIN)
+        for w in wet:
+            if _boxes_overlap(grown, w.box):
+                problems.append(
+                    f"dock pocket {b.name!r} leaves < {MAGNET_WET_WALL_MIN:g} "
+                    f"plastic to wet region {w.name!r}")
+    return _finding(
+        check, not problems,
+        f"{len(pockets)} dock pocket(s): blind, vertical, >= "
+        f"{MAGNET_WET_WALL_MIN:g} plastic to every wet zone"
+        if not problems else "; ".join(problems),
+        limit=MAGNET_WET_WALL_MIN,
+    )
+
+
 def check_lightweight_windows_dry_ok(form: PartForm) -> Finding:
     """The open-skeleton windows (VF-4.1): THROUGH the under-seat slab —
     open bottom (cannot hold water) AND open top (no flat ceiling, no
@@ -702,6 +751,8 @@ register_probe("form.magnet_pockets_outside_water_zone")(
     lambda form, ctx: check_magnet_pockets_outside_water_zone(form))
 register_probe("form.magnet_pockets_do_not_break_wall")(
     lambda form, ctx: check_magnet_pockets_do_not_break_wall(form))
+register_probe("form.dock_pockets_dry")(
+    lambda form, ctx: check_dock_pockets_dry(form))
 register_probe("form.lightweight_windows_dry_ok")(
     lambda form, ctx: check_lightweight_windows_dry_ok(form))
 def check_root_chamber_ok(form: PartForm) -> Finding:

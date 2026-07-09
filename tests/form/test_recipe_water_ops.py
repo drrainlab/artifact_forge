@@ -345,3 +345,91 @@ def test_root_chamber_ok_and_mutations():
     bad2.channels[:] = [replace(c, y1=0.0) if "root_trough" in c.name else c
                         for c in bad2.channels]
     assert check_root_chamber_ok(bad2).status is Status.FAIL
+
+
+# -- VF-6: endcap dock magnets -------------------------------------------------
+
+
+def build_dock_rail(dock_end="both", **over):
+    st = build_root_chamber(**over)
+    RECIPE_OPS["endcap_dock_pockets"].apply(
+        st, {"dock_end": dock_end, "dock_x": 22.0, "dock_inset": 7.0,
+             "fit_clearance": 0.2}, "dock")
+    return st
+
+
+def test_endcap_dock_op_declares_known_check():
+    for check in RECIPE_OPS["endcap_dock_pockets"].validators:
+        assert check in KNOWN_CHECKS, check
+
+
+def test_rail_dock_pockets_up_and_dry():
+    from artifact_forge_ng.form.checks_water import check_dock_pockets_dry
+    st = build_dock_rail("both")
+    docks = [b for b in st.bores if "dock" in b.name]
+    assert len(docks) == st.frame["dock_pocket_count"] == 4
+    for b in docks:  # vertical, blind, opening UP through the wall top
+        assert b.axis == "Z"
+        assert b.overshoot[0] == 0.0  # a plastic floor below the magnet
+        assert max(b.span) == pytest.approx(st.frame["body_h"])
+    assert check_dock_pockets_dry(to_form(st, "rc")).status is Status.PASS
+    # a bare rail (no dock) is n/a-PASS
+    assert check_dock_pockets_dry(
+        to_form(build_rail(), "sk")).status is Status.PASS
+
+
+def test_dock_end_gate():
+    assert build_dock_rail("none").frame["dock_pocket_count"] == 0
+    assert build_dock_rail("front").frame["dock_pocket_count"] == 2
+    assert build_dock_rail("back").frame["dock_pocket_count"] == 2
+    assert {b.name.split("_")[1] for b in build_dock_rail("front").bores
+            if "dock" in b.name} == {"f"}
+    assert {b.name.split("_")[1] for b in build_dock_rail("back").bores
+            if "dock" in b.name} == {"b"}
+
+
+def test_dock_pockets_dry_mutations():
+    from dataclasses import replace
+    from artifact_forge_ng.form.checks_water import check_dock_pockets_dry
+    st = build_dock_rail("front")
+    # a through bore (no floor) -> FAIL
+    bad = to_form(st, "rc")
+    bad.bores[:] = [replace(b, overshoot=(1.0, 1.0)) if "dock" in b.name else b
+                    for b in bad.bores]
+    assert check_dock_pockets_dry(bad).status is Status.FAIL
+    # a horizontal (non-dock) axis -> FAIL
+    bad2 = to_form(st, "rc")
+    bad2.bores[:] = [replace(b, axis="Y") if "dock" in b.name else b
+                     for b in bad2.bores]
+    assert check_dock_pockets_dry(bad2).status is Status.FAIL
+
+
+def test_collector_and_cap_dock_pockets_down_and_dry():
+    from artifact_forge_ng.form.checks_water import check_dock_pockets_dry
+    stc = RecipeState()
+    RECIPE_OPS["collector_endcap_body"].apply(stc, dict(
+        tray_w=160.0, tube_od=9.0, bore_clearance=0.4, rail_wall_t=13.25,
+        saddle_fit=0.4, hang_drop=20.4, tongue_w=14.0, rail_channel_w=16.0,
+        tray_slope_deg=1.5, catch_fall=8.5, lip_overhang=4.0, capture_depth=8.0,
+        drain_extension=10.0, drain_grip=12.0, wall_extra=3.0, corner_r=3.0,
+        dock_magnets=True), "collector")
+    assert stc.frame["dock_pocket_count"] == 2
+    for b in [b for b in stc.bores if "dock" in b.name]:
+        assert b.axis == "Z" and b.overshoot[1] == 0.0  # opens DOWN, floor above
+        assert min(b.span) == pytest.approx(stc.frame["arm_z0"])
+    assert check_dock_pockets_dry(to_form(stc, "c")).status is Status.PASS
+
+    stk = RecipeState()
+    RECIPE_OPS["inlet_cap_body"].apply(stk, dict(
+        cap_w=64.0, cap_h=22.0, tube_od=9.0, bore_clearance=0.4, rail_wall_t=13.25,
+        saddle_fit=0.4, saddle_depth=8.0, hang_drop=16.5, spout_w=14.0,
+        rail_channel_w=16.0, corner_r=3.0, dock_magnets=True), "cap")
+    assert stk.frame["dock_pocket_count"] == 2
+    assert check_dock_pockets_dry(to_form(stk, "k")).status is Status.PASS
+    # off by default
+    stk0 = RecipeState()
+    RECIPE_OPS["inlet_cap_body"].apply(stk0, dict(
+        cap_w=64.0, cap_h=22.0, tube_od=9.0, bore_clearance=0.4, rail_wall_t=13.25,
+        saddle_fit=0.4, saddle_depth=8.0, hang_drop=16.5, spout_w=14.0,
+        rail_channel_w=16.0, corner_r=3.0), "cap")
+    assert stk0.frame["dock_pocket_count"] == 0

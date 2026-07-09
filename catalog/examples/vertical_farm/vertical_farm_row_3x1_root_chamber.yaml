@@ -51,7 +51,7 @@ parts:
       schema: product/v1
       id: flush_inlet_cap
       archetype: inlet_cap_v1@1
-      params: {}
+      params: {dock_magnets: true}
       manufacturing:
         material: PETG
         support_policy: none
@@ -62,7 +62,7 @@ parts:
       schema: product/v1
       id: flush_rail_1
       archetype: water_rail_v1@2
-      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 84mm, under_cassette: root_chamber}
+      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 84mm, under_cassette: root_chamber, endcap_dock: back}
       manufacturing:
         material: PETG
         support_policy: none
@@ -84,7 +84,7 @@ parts:
       schema: product/v1
       id: flush_rail_3
       archetype: water_rail_v1@2
-      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 84mm, under_cassette: root_chamber}
+      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 84mm, under_cassette: root_chamber, endcap_dock: front}
       manufacturing:
         material: PETG
         support_policy: none
@@ -128,7 +128,7 @@ parts:
       schema: product/v1
       id: flush_collector
       archetype: collector_endcap_v1@1
-      params: {tray_w: 160mm}
+      params: {tray_w: 160mm, dock_magnets: true}
       manufacturing:
         material: PETG
         support_policy: none
