@@ -453,6 +453,44 @@ def horizontal_bore_supportless(geometry: Geometry, form: PartForm) -> Finding:
         "teardrop-roofed, self-supporting")
 
 
+CAP_ROOF_OVERHANG_MAX = 5.0  # mm — a printable one-sided ledge, not a cantilever
+
+
+@register_probe("manufacturing.cap_supportless_verified")
+def cap_supportless_verified(geometry: Geometry, form: PartForm) -> Finding:
+    """VF-9 Part B: closes the VF-7c blind spot (manufacturing.overhang never
+    modelled the inlet cap's saddle-slot roof, so the old flat cantilever passed
+    only because it flipped for print). The cap must print support-free
+    AS-MODELED: the rest-ledge roof over the open saddle slot must be a SHORT
+    one-sided overhang (<= CAP_ROOF_OVERHANG_MAX), not a deep floating
+    cantilever, and a nose column must reach the bed to anchor the roof over the
+    channel. n/a on parts without a cap saddle slot + hose bore."""
+    check = "manufacturing.cap_supportless_verified"
+    slots = [c for c in form.cutboxes if "saddle_slot" in c.name]
+    has_hose = any("hose" in b.name for b in form.bores)
+    if not slots or not has_hose:
+        return _finding(check, Status.PASS, "not an inlet cap — n/a")
+    slot = slots[0].box
+    overhang = slot.y1 - slot.y0  # inboard reach of the rest ledge over open air
+    nose = [r for r in form.ribs if "nose" in r.name and r.box.z0 <= 0.05]
+    problems: list[str] = []
+    if overhang > CAP_ROOF_OVERHANG_MAX + 1e-6:
+        problems.append(
+            f"saddle-slot roof overhangs {overhang:.1f} inboard over open air "
+            f"(> {CAP_ROOF_OVERHANG_MAX:g}) — a floating cantilever; shorten "
+            "hook_reach or anchor the inboard side")
+    if not nose:
+        problems.append(
+            "no nose column reaches the bed to anchor the roof over the channel")
+    ok = not problems
+    return _finding(
+        check, Status.PASS if ok else Status.FAIL,
+        f"support-free Г-hook: {overhang:.1f}mm rest ledge, the nose column "
+        "anchors the roof — nothing floats as-modeled"
+        if ok else "; ".join(problems),
+        measured=overhang, limit=CAP_ROOF_OVERHANG_MAX)
+
+
 @register_probe("manufacturing.print_orientation_declared")
 def print_orientation_declared(geometry: Geometry, form: PartForm) -> Finding:
     """The instance may PIN its print orientation (VF-4.1 contract:

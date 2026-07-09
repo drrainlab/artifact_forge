@@ -94,7 +94,7 @@ def test_missing_spout_rejected():
     form = make_form("cap", frame=cap_frame(), bores=[cap_bore()])
     finding = check_spout_drop_path_ok(form)
     assert finding.status is Status.FAIL
-    assert "no spout rib" in finding.message
+    assert "no spout/nose rib" in finding.message
 
 
 def test_spout_above_body_rejected():

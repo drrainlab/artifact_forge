@@ -237,7 +237,17 @@ no_standing_before / drain_inside_footprint / removable).
 `lap_receiver_has_floor` / `lap_receiver_residual_volume_ok` /
 `rail_universal_inlet_accepts_cap_and_lap` + assembly
 `lap_joint_no_external_downward_leak` / `cap_drip_lands_in_channel_safe_floor`.
-**VF-9 Part B** supportless Г-cap adapter — отложено.
+**VF-9 Part B Support-free Г-hook cap ✅ (2026-07-10)**: cap печатается
+AS-MODELED без `saddle_up` flip. Открытие: двусторонний straddle через ~13мм
+стенку support-free не печатается (внутренняя губа плеча висит) → **compact
+one-sided Г-hook**: короткая полка (~3.5мм overhang) на внешний край верха
+стенки + внешняя нога/foot до стола + nose column над каналом (прямой слив,
+анкер крыши). Убрана выпирающая пластина. **Магнитный док перенесён на
+вертикальную +Y-грань** (VF-6 амендмент `endcap_dock_style: top|face`) — док на
+верху стенки требовал un-printable overhang. `saddle_hang_ir` +hook-ветка
+(collector straddle нетронут). Новый `manufacturing.cap_supportless_verified`
+закрывает VF-7c слепую зону (плоский cantilever → FAIL). CAD-acceptance:
+smoke+root_chamber strict PASS.
 
 Впереди: **VF-4.3** anti-slide удержание ряда на смонтированном под
 уклоном профиле (посадка полная, продольного замка нет);

@@ -488,8 +488,48 @@ floored-карман ловит и каплю cap (не проваливаетс
 Архитектура ряда: `универсальный рейл (floored-приёмник + губа-выход, без мокрых
 сквозных дыр) → lap-переток без внешней протечки вниз → collector = единственный
 намеренный слив вниз`. CAD-проба (rail_2): под колонкой feed теперь solid (было
-0.00 сквозное); мелкий seat-паз выше, сплошное дно ниже. Cap как деталь пока не
-меняется (supportless Г-адаптер = VF-9 Part B, отложено).
+0.00 сквозное); мелкий seat-паз выше, сплошное дно ниже.
+
+## Support-free Г-hook cap (VF-9 Part B)
+
+Старый cap печатался только через `saddle_up` flip: as-modeled потолок седла —
+плоский мост над ~14мм с висящей внешней губой («floating cantilever», Bambu
+флагает; движковый `manufacturing.overhang` это НЕ ловил — слепая зона VF-7c).
+Задача Part B — печать AS-MODELED без flip.
+
+Геометрическое открытие: **двусторонний straddle через ~13мм стенку нельзя
+напечатать support-free** — над проёмом стенки (в печати самой детали стенки
+нет) внутренняя губа плеча всегда висит; gable над плоскостью z=8 не помогает
+(потолок на z=8 всё равно над воздухом). Единственные support-free варианты —
+односторонний hook или reorient/flip. Решение (утв. пользователем): **compact
+one-sided Г-hook + face dock**:
+- Короткая полка-опора (**hook_reach ~3.5мм**, `HOOK_LEDGE_BAND`) ложится на
+  ВНЕШНИЙ край верха стенки; внешняя нога/foot держит +Y-грань и достаёт до
+  стола. Полка = 4.4мм one-sided overhang (печатается), НЕ 14мм cantilever.
+- **Nose column** над каналом (`|x|<nose/2`) достаёт до стола, несёт вертикальный
+  бор (прямой слив, чистится сверху) и служит внутренним анкером крыши над
+  каналом (bridge, не cantilever); тянется вглубь на ~10мм — сплошные стенки по
+  бокам бора (иначе полый столбик не «ребро» для `topology.ribs_present`).
+- Убрана выпирающая spout-пластина; `print_orientation: as_modeled`, flip удалён.
+- **Магнитный док перенесён с верха стенки на вертикальную +Y-грань**
+  (Y-оси карманы): док на верху стенки требует ~7мм inboard-полку (un-printable
+  overhang), а вертикальная грань печатается чисто. Rail-амендмент VF-6:
+  `endcap_dock_style: top|face` (top=Z-карманы верха, collector; face=Y-карманы
+  торца, cap). `dock_drop` — общая просадка от верха стенки, чтобы cap и rail
+  сошлись по мировому z. `_endcap_dock` (carrier) и `check_dock_pockets_dry`
+  умеют обе оси.
+- `saddle_hang_ir` получил hook-ветку (гейт `hang_mode`): проверяет ledge reach
+  (`HOOK_LEDGE_BAND`, ≤ толщины стенки), leg gap у грани, посадку на верх стенки;
+  collector остаётся straddle (без изменений). Hook **не зависит от толщины
+  стенки** (цепляет внешний край) — mismatch толщины больше не failure mode.
+- Новый always-on **`manufacturing.cap_supportless_verified`** (закрывает
+  VF-7c): полка-overhang ≤ `CAP_ROOF_OVERHANG_MAX=5` И nose достаёт до стола;
+  старый плоский 14мм cantilever → FAIL.
+
+CAD-acceptance: flush_smoke (cap без дока) И root_chamber (cap с face-доком) —
+оба strict PASS, no_interference/ribs_present/single_solid/overhang/
+cap_supportless_verified зелёные. Corbelled L-hook (двусторонний capture+nose)
+и gabled roof остаются возможной эволюцией после физической печати.
 
 ## Overflow honesty (VF-4.2, до VF-5 Root Chamber)
 

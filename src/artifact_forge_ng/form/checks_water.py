@@ -493,17 +493,19 @@ def check_magnet_pockets_do_not_break_wall(form: PartForm) -> Finding:
 
 
 def check_dock_pockets_dry(form: PartForm) -> Finding:
-    """VF-6 endcap dock magnets: vertical (Z) pockets that dock the collector
-    or the inlet cap onto a rail END wall top — magnet to magnet across the
-    arm/wall-top contact. Each must be blind (a plastic floor to the far
-    face), enter along Z (the dock axis; anything else aligns nothing), sit
-    >= MAGNET_WET_WALL_MIN from every wet region, and press-fit. Same part
-    on both sides of the joint runs this check; n/a-PASS with no dock
-    pockets."""
+    """Endcap dock magnets: blind pockets that dock the collector or the inlet
+    cap onto a rail END. Two styles — TOP (Z pockets into the wall top, VF-6
+    collector) and FACE (Y pockets into the +/-Y end face, VF-9 support-free
+    cap hook). Each must be blind (a plastic floor to the far face), enter along
+    the dock axis (Z for top, Y for face), sit >= MAGNET_WET_WALL_MIN from every
+    wet region, and press-fit. Same part on both sides runs this check; n/a-PASS
+    with no dock pockets."""
     check = "form.dock_pockets_dry"
     pockets = [b for b in form.bores if "dock" in b.name]
     if not pockets:
         return _finding(check, True, "no dock pockets — nothing to seat")
+    face_style = form.frame.get("dock_style_face", 0.0) >= 0.5
+    dock_axis = "Y" if face_style else "Z"
     wet = _wet_regions(form)
     problems: list[str] = []
     fit = form.frame.get("dock_fit_clearance")
@@ -515,18 +517,20 @@ def check_dock_pockets_dry(form: PartForm) -> Finding:
     for b in pockets:
         if b.overshoot[0] > 0.0 and b.overshoot[1] > 0.0:
             problems.append(f"dock pocket {b.name!r} is a through bore")
-        if b.axis != "Z":
+        if b.axis != dock_axis:
             problems.append(
-                f"dock pocket {b.name!r} enters a non-dock face (axis "
-                f"{b.axis}) — dock magnets seat vertically into the wall top "
-                "and the arm underside")
+                f"dock pocket {b.name!r} enters along {b.axis} — a "
+                f"{'face' if face_style else 'top'} dock seats along {dock_axis}")
         x, y, z = b.center
         r = b.d / 2.0
-        lo, hi = min(b.span), max(b.span)  # axis Z: the span is the z range
-        grown = Box3(x - r - MAGNET_WET_WALL_MIN, y - r - MAGNET_WET_WALL_MIN,
-                     lo - MAGNET_WET_WALL_MIN,
-                     x + r + MAGNET_WET_WALL_MIN, y + r + MAGNET_WET_WALL_MIN,
-                     hi + MAGNET_WET_WALL_MIN)
+        lo, hi = min(b.span), max(b.span)
+        m = MAGNET_WET_WALL_MIN
+        if b.axis == "Z":
+            grown = Box3(x - r - m, y - r - m, lo - m, x + r + m, y + r + m, hi + m)
+        elif b.axis == "Y":
+            grown = Box3(x - r - m, lo - m, z - r - m, x + r + m, hi + m, z + r + m)
+        else:  # X
+            grown = Box3(lo - m, y - r - m, z - r - m, hi + m, y + r + m, z + r + m)
         for w in wet:
             if _boxes_overlap(grown, w.box):
                 problems.append(
@@ -534,7 +538,7 @@ def check_dock_pockets_dry(form: PartForm) -> Finding:
                     f"plastic to wet region {w.name!r}")
     return _finding(
         check, not problems,
-        f"{len(pockets)} dock pocket(s): blind, vertical, >= "
+        f"{len(pockets)} dock pocket(s): blind, along {dock_axis}, >= "
         f"{MAGNET_WET_WALL_MIN:g} plastic to every wet zone"
         if not problems else "; ".join(problems),
         limit=MAGNET_WET_WALL_MIN,
@@ -1120,9 +1124,9 @@ def check_spout_drop_path_ok(form: PartForm) -> Finding:
         return _finding("form.spout_drop_path_ok", False,
                         f"no spout frame keys: {', '.join(missing)}")
     problems: list[str] = []
-    spout = [r for r in form.ribs if "spout" in r.name]
+    spout = [r for r in form.ribs if "spout" in r.name or "nose" in r.name]
     if not spout:
-        problems.append("no spout rib on the part")
+        problems.append("no spout/nose rib on the part")
     if f["channel_floor_z_outlet"] > -0.5:
         problems.append(
             f"spout exits at z={f['channel_floor_z_outlet']:g} — it must "

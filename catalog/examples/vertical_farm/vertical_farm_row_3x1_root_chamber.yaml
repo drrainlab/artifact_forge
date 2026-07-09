@@ -55,14 +55,14 @@ parts:
       manufacturing:
         material: PETG
         support_policy: none
-        print_orientation: saddle_up
+        print_orientation: as_modeled
         bed: [250mm, 250mm, 250mm]
   - ref: rail_1
     product:
       schema: product/v1
       id: flush_rail_1
       archetype: water_rail_v1@2
-      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 95mm, under_cassette: root_chamber, endcap_dock: back}
+      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 95mm, under_cassette: root_chamber, endcap_dock: back, endcap_dock_style: face}
       manufacturing:
         material: PETG
         support_policy: none

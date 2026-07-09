@@ -243,6 +243,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("manufacturing.print_orientation_declared", Level.MANUFACTURING, "the instance-declared print orientation matches how the builder actually oriented the part"),
         _decl("manufacturing.supportless_lightweight_windows_ok", Level.MANUFACTURING, "bottom-entered pockets never hide a support-critical flat ceiling — through/vaulted/skeleton, probed on the solid"),
         _decl("manufacturing.horizontal_bore_supportless", Level.MANUFACTURING, "horizontal circular bores over the safe diameter carry a teardrop roof or run vertical"),
+        _decl("manufacturing.cap_supportless_verified", Level.MANUFACTURING, "VF-9 Part B: the inlet cap prints support-free as-modeled — the saddle-slot rest ledge is a short one-sided overhang (not a floating cantilever) and a nose column reaches the bed to anchor the roof; closes the VF-7c saddle-bridge blind spot"),
         _decl("manufacturing.min_wall", Level.MANUFACTURING, "measured minimum wall >= printer minimum"),
         _decl("manufacturing.bed_fit", Level.MANUFACTURING, "bounding box fits the print bed"),
         _decl("manufacturing.overhang", Level.MANUFACTURING, "overhang fraction acceptable for the support policy"),

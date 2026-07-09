@@ -510,19 +510,36 @@ def _endcap_dock(
             check, False,
             f"{endcap_ref} carries dock magnets but the {side} end of "
             f"{rail_ref} has no dock pocket to grab — add dock_end: {side}")]
-    rail_y = (rf["rail_y0"] + rf["dock_inset"] if side == "front"
-              else rf["rail_y1"] - rf["dock_inset"])
+    # VF-9 Part B: top (Z pockets on the wall top) vs face (Y pockets in the
+    # end face). Both endcap and rail must use the same style, and we compare
+    # their pocket-mouth positions in the pose.
+    ec_face = ef.get("dock_style_face", 0.0) >= 0.5
+    rl_face = rf.get("dock_style_face", 0.0) >= 0.5
+    if ec_face != rl_face:
+        return [_finding(
+            check, False,
+            f"{endcap_ref} docks {'face' if ec_face else 'top'} but {rail_ref}'s "
+            f"{side} dock is {'face' if rl_face else 'top'} — styles must match")]
+    if ec_face:
+        rail_y = rf["rail_y0"] if side == "front" else rf["rail_y1"]
+        z_ec, z_rl = ef["dock_z_plane"], rf.get("dock_face_z", ef["dock_z_plane"])
+        where = f"{side} end face"
+    else:
+        rail_y = (rf["rail_y0"] + rf["dock_inset"] if side == "front"
+                  else rf["rail_y1"] - rf["dock_inset"])
+        z_ec, z_rl = ef["dock_z_plane"], rf["dock_z_plane"]
+        where = f"{side} wall top"
     worst = 0.0
     for xs in (1.0, -1.0):
-        pe = ec_pose.apply((xs * ef["dock_x"], ef["dock_y"], ef["dock_z_plane"]))
-        pr = rl_pose.apply((xs * rf["dock_x"], rail_y, rf["dock_z_plane"]))
+        pe = ec_pose.apply((xs * ef["dock_x"], ef["dock_y"], z_ec))
+        pr = rl_pose.apply((xs * rf["dock_x"], rail_y, z_rl))
         d = math.dist(pe, pr)
         worst = max(worst, d)
     ok = worst <= DOCK_ALIGN_TOL + 1e-6
     return [_finding(
         check, ok,
         f"{int(ef['dock_pocket_count'])} dock magnet(s) seat on {rail_ref}'s "
-        f"{side} wall top (worst offset {worst:.2f})"
+        f"{where} (worst offset {worst:.2f})"
         if ok else
         f"{endcap_ref} dock magnets miss {rail_ref}'s pockets by {worst:.2f} "
         f"> {DOCK_ALIGN_TOL:g} — the magnetic dock does not mate in the pose",

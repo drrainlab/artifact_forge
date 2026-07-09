@@ -1257,6 +1257,7 @@ _register(JointDecl(
 # corridor it dips through.
 
 SADDLE_PLAY_BAND = (0.2, 2.0)
+HOOK_LEDGE_BAND = (2.5, 6.0)   # VF-9 Part B: short rest ledge onto the wall top
 SADDLE_REST_TOL = 0.3
 
 _SADDLE_A_KEYS = ("rail_y0", "rail_y1", "seat_v0", "seat_v1", "body_h", "channel_w")
@@ -1306,20 +1307,46 @@ def _saddle_hang_ir(
     lo = pose.apply((0.0, fb["saddle_slot_y0"], 0.0))[1]
     hi = pose.apply((0.0, fb["saddle_slot_y1"], 0.0))[1]
     slot_y0, slot_y1 = sorted((lo, hi))
+    back = (slot_y0 + slot_y1) / 2.0 > 0.0
     # which wall the adapter hangs on: the one whose span the slot covers
-    if (slot_y0 + slot_y1) / 2.0 > 0.0:
+    if back:
         wall_lo, wall_hi = fa["seat_v1"], fa["rail_y1"]
     else:
         wall_lo, wall_hi = fa["rail_y0"], fa["seat_v0"]
     problems: list[str] = []
-    play_lo = wall_lo - slot_y0
-    play_hi = slot_y1 - wall_hi
-    for label, play in (("inner", play_lo), ("outer", play_hi)):
-        if not (SADDLE_PLAY_BAND[0] - 1e-6 <= play <= SADDLE_PLAY_BAND[1] + 1e-6):
+    hook = fb.get("hang_mode", 0.0) >= 0.5
+    if hook:
+        # VF-9 Part B one-sided Г-hook: the leg grips the wall's OUTBOARD face
+        # and a SHORT ledge rests on the outboard part of the wall top — it does
+        # NOT straddle to the inboard face (that would need an un-printable leg
+        # in the seat). Capture: leg gap at the face + ledge reach onto the top.
+        face = wall_hi if back else wall_lo
+        reach = (face - slot_y0) if back else (slot_y1 - face)  # inboard onto top
+        leg_gap = (slot_y1 - face) if back else (face - slot_y0)  # off the face
+        wall_t = fa["rail_y1"] - fa["seat_v1"]
+        if not (HOOK_LEDGE_BAND[0] - 1e-6 <= reach <= HOOK_LEDGE_BAND[1] + 1e-6):
             problems.append(
-                f"{label} saddle play {play:.2f} outside "
-                f"{SADDLE_PLAY_BAND[0]}..{SADDLE_PLAY_BAND[1]} — the saddle "
-                "does not straddle the wall in this pose")
+                f"hook ledge reach {reach:.2f} onto the wall top outside "
+                f"{HOOK_LEDGE_BAND[0]}..{HOOK_LEDGE_BAND[1]} — a short rest, not a "
+                "deep cantilever")
+        elif reach > wall_t - 1.0:
+            problems.append(
+                f"hook ledge reach {reach:.2f} exceeds the wall top {wall_t:.1f} "
+                "— it would overhang past the inboard edge")
+        if not (SADDLE_PLAY_BAND[0] - 1e-6 <= leg_gap <= SADDLE_PLAY_BAND[1] + 1e-6):
+            problems.append(
+                f"leg gap {leg_gap:.2f} off the wall face outside "
+                f"{SADDLE_PLAY_BAND[0]}..{SADDLE_PLAY_BAND[1]} — the hook does not "
+                "grip the outboard face")
+    else:
+        play_lo = wall_lo - slot_y0
+        play_hi = slot_y1 - wall_hi
+        for label, play in (("inner", play_lo), ("outer", play_hi)):
+            if not (SADDLE_PLAY_BAND[0] - 1e-6 <= play <= SADDLE_PLAY_BAND[1] + 1e-6):
+                problems.append(
+                    f"{label} saddle play {play:.2f} outside "
+                    f"{SADDLE_PLAY_BAND[0]}..{SADDLE_PLAY_BAND[1]} — the saddle "
+                    "does not straddle the wall in this pose")
     rest_z = pose.apply((0.0, 0.0, fb["saddle_floor_z"]))[2]
     if abs(rest_z - fa["body_h"]) > SADDLE_REST_TOL:
         problems.append(
@@ -1329,13 +1356,13 @@ def _saddle_hang_ir(
         problems.append(
             f"spout/tongue {fb['spout_w']:g} does not fit the "
             f"{fa['channel_w']:g} channel it dips into")
+    kind = "Г-hook grips the wall" if hook else "saddle straddles the wall"
     if problems:
         findings = [_finding(check, False, "; ".join(problems))]
     else:
         findings = [_finding(
             check, True,
-            f"saddle straddles the wall (play {play_lo:.2f}/{play_hi:.2f}), "
-            f"rests on its top at z={rest_z:.1f}, spout fits the channel",
+            f"{kind}, rests on its top at z={rest_z:.1f}, spout fits the channel",
             measured=rest_z, limit=fa["body_h"],
         )]
     # VF-9: emit cap_drip_lands_in_channel_safe_floor ONLY for the inlet-cap ->

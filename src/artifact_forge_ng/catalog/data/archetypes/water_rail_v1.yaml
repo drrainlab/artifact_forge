@@ -137,9 +137,15 @@ parameters:
   endcap_dock:
     {type: choice, choices: ["none", "front", "back", "both"], default: "none",
      role: assembly, exposed: true,
-     description: "VF-6 endcap docking magnets in the END wall top(s): front
+     description: "VF-6 endcap docking magnets on the END(s): front
        (outlet, collector) / back (inlet, cap) / both. Only the terminal
        modules of a row need it — the collector/cap arm docks onto it"}
+  endcap_dock_style:
+    {type: choice, choices: ["top", "face"], default: "top",
+     role: assembly, exposed: true,
+     description: "dock pocket placement: top (UP Z pockets on the wall top,
+       collector) or face (Y pockets in the end FACE, VF-9 support-free cap
+       hook). Match the docking endcap's style"}
   dock_x:
     {type: length, default: 22mm, min: 14mm, max: 40mm, role: assembly,
      description: "dock magnet centers at +-dock_x in the dry perimeter wall
@@ -234,6 +240,7 @@ form:
       id: dock
       params:
         dock_end: endcap_dock
+        dock_style: endcap_dock_style
         dock_x: dock_x
         dock_inset: dock_inset
         fit_clearance: magnet_fit

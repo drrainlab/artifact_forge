@@ -484,11 +484,17 @@ def _endcap_dock_pockets(state: RecipeState, p: dict[str, Any], op_id: str) -> N
         return
     if end not in ("front", "back", "both"):
         raise RecipeError(f"dock_end {end!r} not in none|front|back|both")
+    style = p.get("dock_style", "top")
+    if style not in ("top", "face"):
+        raise RecipeError(f"dock_style {style!r} not in top|face")
     d = p.get("magnet_d", 6.0) + p.get("fit_clearance", 0.2)
     depth = p.get("magnet_t", 2.0) + 0.4
     dock_x = p.get("dock_x", 22.0)
     inset = p.get("dock_inset", 7.0)
     z_top = f["body_h"]
+    # face dock height: a common DROP below the wall top so the cap (which
+    # measures from its own frame) and the rail land at the same world z.
+    face_z = z_top - p.get("dock_drop", 4.0)
     # front = outlet face (rail_y0, -Y, collector); back = inlet (rail_y1, cap)
     ends = {
         "front": [("f", f["rail_y0"], 1.0)],
@@ -498,21 +504,39 @@ def _endcap_dock_pockets(state: RecipeState, p: dict[str, Any], op_id: str) -> N
     name = op_id or "dock"
     count = 0
     for tag, face_y, inward in ends:
-        dock_y = face_y + inward * inset  # step inboard off the end face
         for x_label, x in (("e", dock_x), ("w", -dock_x)):
-            state.bores.append(BoreFeature(
-                name=f"{name}_{tag}_{x_label}", axis="Z",
-                center=(x, dock_y, 0.0), d=d,
-                span=(z_top - depth, z_top), overshoot=(0.0, 1.0),
-            ))
-            state.regions.append(Region(
-                f"endcap_dock_{tag}_{x_label}", RegionRole.INTERFACE_KEEPOUT,
-                Box3(x - d / 2.0 - 1.0, dock_y - d / 2.0 - 1.0, z_top - depth - 1.0,
-                     x + d / 2.0 + 1.0, dock_y + d / 2.0 + 1.0, z_top + 1.0)))
+            if style == "face":
+                # VF-9 Part B: Y-axis pocket in the END FACE, bored inward from
+                # the face (mouth opens outward) — the cap's +Y-face hook magnet
+                # docks here. Vertical face → prints support-free; blind (dry).
+                if inward < 0:   # back (+Y) face
+                    lo, hi, ov = face_y - depth, face_y, (0.0, 1.0)
+                else:            # front (-Y) face
+                    lo, hi, ov = face_y, face_y + depth, (1.0, 0.0)
+                state.bores.append(BoreFeature(
+                    name=f"{name}_{tag}_{x_label}", axis="Y",
+                    center=(x, 0.0, face_z), d=d, span=(lo, hi), overshoot=ov,
+                ))
+                state.regions.append(Region(
+                    f"endcap_dock_{tag}_{x_label}", RegionRole.INTERFACE_KEEPOUT,
+                    Box3(x - d / 2.0 - 1.0, lo - 1.0, face_z - d / 2.0 - 1.0,
+                         x + d / 2.0 + 1.0, hi + 1.0, face_z + d / 2.0 + 1.0)))
+            else:
+                dock_y = face_y + inward * inset  # step inboard off the end face
+                state.bores.append(BoreFeature(
+                    name=f"{name}_{tag}_{x_label}", axis="Z",
+                    center=(x, dock_y, 0.0), d=d,
+                    span=(z_top - depth, z_top), overshoot=(0.0, 1.0),
+                ))
+                state.regions.append(Region(
+                    f"endcap_dock_{tag}_{x_label}", RegionRole.INTERFACE_KEEPOUT,
+                    Box3(x - d / 2.0 - 1.0, dock_y - d / 2.0 - 1.0, z_top - depth - 1.0,
+                         x + d / 2.0 + 1.0, dock_y + d / 2.0 + 1.0, z_top + 1.0)))
             count += 1
     state.frame.update(
         dock_pocket_count=count, dock_pocket_d=d, dock_pocket_depth=depth,
         dock_x=dock_x, dock_inset=inset, dock_z_plane=z_top,
+        dock_style_face=1.0 if style == "face" else 0.0, dock_face_z=face_z,
         dock_front=1.0 if end in ("front", "both") else 0.0,
         dock_back=1.0 if end in ("back", "both") else 0.0,
         dock_fit_clearance=d - p.get("magnet_d", 6.0),
@@ -523,18 +547,20 @@ _register(RecipeOpDecl(
     name="endcap_dock_pockets",
     kind="feature",
     params={
-        "dock_end": ("choice", "none"),
+        "dock_end": ("choice", "none"), "dock_style": ("choice", "top"),
         "magnet_d": ("length", 6.0), "magnet_t": ("length", 2.0),
         "fit_clearance": ("length", 0.2),
         "dock_x": ("length", 22.0), "dock_inset": ("length", 7.0),
+        "dock_drop": ("length", 4.0),
     },
     validators=(
         "form.dock_pockets_dry",
     ),
     apply=_endcap_dock_pockets,
-    description="optional UP-facing dock magnets in the END wall tops — the "
-                "collector/cap arm docks onto the terminal module, alignment "
-                "only, dry perimeter wall, printed supportless",
+    description="optional dock magnets on a terminal module END — style: top "
+                "(UP Z pockets on the wall top, collector) or face (Y pockets "
+                "in the +/-Y end face, VF-9 cap); alignment-only, dry, "
+                "supportless",
 ))
 
 
@@ -1065,51 +1091,77 @@ _register(RecipeOpDecl(
 
 
 def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """The Water Inlet Cap: a drip tower, not a mini-rail. A drip line
-    pushes into a vertical bore from the top; water falls straight through
-    a spout that dips into the rail's inlet corridor and exits at the
-    handover point. One straight vertical path — no pockets by
-    construction, brush- and eye-cleanable from above. Hangs on the rail
-    back wall via a downward saddle slot; the spout tongue in the corridor
-    captures X and Y. Local frame: y=0 = the rail back face (+Y side of
-    the wall is the cap's arm), z=0 = the cap body bottom."""
+    """The Water Inlet Cap (VF-9 Part B): a compact, support-free Г-hook — no
+    saddle_up flip. A drip line pushes into a vertical bore from the top; water
+    falls straight through a nose column that dips into the rail's inlet channel
+    and drips onto the floored lip-seat (Part A) — one straight vertical path,
+    brush- and eye-cleanable from above. The cap HOOKS the outboard edge of the
+    rail back wall: a short rest ledge (~4mm) lands on the wall top, an outboard
+    leg/foot grips the +Y face down to the bed, and the nose column over the
+    channel anchors the roof (a both-supported bridge, not a floating
+    cantilever). Because the ledge is short and the nose reaches the bed,
+    NOTHING floats as-modeled (manufacturing.cap_supportless_verified). Magnets
+    dock on the VERTICAL +Y face (Y-axis pockets), not the wall top, so no deep
+    overhang is needed. Local frame: y=0 = the rail back (+Y) face, -Y = inboard
+    toward the channel, +Y = outboard off the rail end; z=0 = the cap body
+    bottom, wall top at z = saddle_depth."""
     if state.section is not None:
         raise RecipeError("inlet_cap_body must be the (single) base op")
     cap_w, cap_h = p["cap_w"], p["cap_h"]
     tube_od, grip = p["tube_od"], p["bore_clearance"]
-    wall_t, fit = p["rail_wall_t"], p["saddle_fit"]
+    fit = p["saddle_fit"]
     saddle_depth = p["saddle_depth"]
     hang_drop = p["hang_drop"]
-    spout_w = p["spout_w"]
+    nose_w = p["spout_w"]
     rail_channel_w = p["rail_channel_w"]
+    hook_reach = p.get("hook_reach", 3.5)  # rest-ledge reach onto the wall top
     bore_d = tube_od + grip
     z_exit = saddle_depth - hang_drop
     if z_exit > -1.0:
         raise RecipeError(
-            f"spout exit z={z_exit:g} does not descend below the body — "
+            f"nose exit z={z_exit:g} does not descend below the body — "
             "hang_drop must exceed saddle_depth")
-    if spout_w > rail_channel_w - 2.0:
+    if nose_w > rail_channel_w - 2.0:
         raise RecipeError(
-            f"spout {spout_w:g} cannot dip into the {rail_channel_w:g} rail channel")
-    if bore_d > spout_w - 3.0:
+            f"nose {nose_w:g} cannot dip into the {rail_channel_w:g} rail channel")
+    if bore_d > nose_w - 3.0:
         raise RecipeError(
-            f"hose bore {bore_d:g} leaves no spout wall in {spout_w:g}")
+            f"hose bore {bore_d:g} leaves no nose wall in {nose_w:g}")
+    if not (2.5 <= hook_reach <= 5.0):
+        raise RecipeError(
+            f"hook_reach {hook_reach:g} outside 2.5..5.0 — the rest ledge must "
+            "be a short printable overhang on the wall top, not a deep cantilever")
 
-    y_front = -(wall_t + fit) + 0.65  # stops short of the wall's inner sliver
-    y_back = 18.0
-    u0, v0, u1, v1 = -cap_w / 2.0, y_front, cap_w / 2.0, y_back
+    y_leg = fit                    # outboard leg inboard face (fit off the wall)
+    y_ledge_in = -hook_reach       # rest-ledge inboard edge (short reach)
+    y_out = 12.0                   # outboard leg/tower back
+    u0, u1 = -cap_w / 2.0, cap_w / 2.0
     state.section = SectionProfile(
-        name="recipe", outer=rounded_rect_loop(u0, v0, u1, v1, p["corner_r"]),
+        name="recipe",
+        outer=rounded_rect_loop(u0, y_ledge_in, u1, y_out, p["corner_r"]),
         plane="XY", width_axis="Z",
     )
     state.width = cap_h
     name = op_id or "cap"
 
-    slot = Box3(u0 - 1.0, -(wall_t + fit), -1.0, u1 + 1.0, fit, saddle_depth)
+    # HOOK SLOT: clear the wall's outboard strip under the rest ledge so the
+    # ledge lands on the wall top and the leg grips the +Y face (open bottom).
+    slot = Box3(u0 - 1.0, y_ledge_in - 0.5, -1.0, u1 + 1.0, y_leg, saddle_depth)
     state.cutboxes.append(CutBoxFeature(name=f"{name}_saddle_slot", box=slot))
-    spout = Box3(-spout_w / 2.0, -(wall_t + 0.25), z_exit - 1.0,
-                 spout_w / 2.0, 7.0, 0.6)
-    state.ribs.append(RibFeature(name=f"{name}_spout", box=spout))
+    # NOSE COLUMN over the channel: refills the slot at |x|<nose/2 and descends
+    # into the channel — the straight vertical drip path AND the inboard anchor
+    # that turns the roof into a both-supported bridge (welded after the cut).
+    # It reaches well inboard so solid walls flank the central bore (a hollow
+    # column is not a rib) and the drip lands deep in the channel.
+    nose_depth = 10.0
+    nose = Box3(-nose_w / 2.0, y_leg + 0.5 - nose_depth, z_exit - 1.0,
+                nose_w / 2.0, y_leg + 0.5, saddle_depth)
+    state.ribs.append(RibFeature(name=f"{name}_nose", box=nose))
+    # OUTBOARD FOOT: ground the leg/tower to the bed so nothing floats.
+    foot = Box3(u0, y_leg, z_exit - 1.0, u1, y_out, 0.6)
+    state.ribs.append(RibFeature(name=f"{name}_foot", box=foot))
+    # straight vertical hose bore — open top (tube push-in) and bottom (drip);
+    # a vertical bore has no roof, so it is support-free by construction.
     state.bores.append(BoreFeature(
         name=f"{name}_hose_drop", axis="Z", center=(0.0, 0.0, 0.0),
         d=bore_d, span=(z_exit, cap_h), overshoot=(1.0, 1.0),
@@ -1117,37 +1169,38 @@ def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
 
     state.regions.extend([
         Region("spout_path", RegionRole.TRANSIENT_WATER_PATH,
-               Box3(-spout_w / 2.0, -bore_d / 2.0 - 2.0, z_exit - 1.0,
-                    spout_w / 2.0, bore_d / 2.0 + 2.0, cap_h + 0.5)),
+               Box3(-nose_w / 2.0, -bore_d / 2.0 - 2.0, z_exit - 1.0,
+                    nose_w / 2.0, bore_d / 2.0 + 2.0, cap_h + 0.5)),
         Region("saddle", RegionRole.INTERFACE_KEEPOUT, slot),
     ])
 
-    # Endcap dock magnets (VF-6): the saddle-slot ceiling rests on the FIRST
-    # rail's back wall top (z = saddle_depth). DOWN pockets there dock onto
-    # that rail's back-end wall-top pockets — magnet to magnet, dry, inboard
-    # of the channel. The cap is narrow, so the dock sits at a modest x.
-    _collect_dock(state, p, name, dock_y=-p.get("dock_inset", 7.0),
-                  z_plane=saddle_depth, side_front=False)
+    # Endcap dock magnets (VF-9 Part B): moved from the wall TOP (Z pockets,
+    # which forced a deep unsupported roof overhang) to the VERTICAL +Y face —
+    # Y-axis pockets in the leg's inboard face (y = y_leg), docking to matching
+    # pockets on the rail's +Y end face. Vertical-face pockets print clean, so
+    # the cap stays support-free. Alignment-only, press-fit, n/a when off.
+    dock_z = saddle_depth - p.get("dock_drop", 4.0)  # same drop below the wall top
+    _collect_dock(state, p, name, dock_y=y_leg, z_plane=dock_z,
+                  side_front=False, style="face")
 
     state.frame.update(
-        outline_u0=u0, outline_v0=v0, outline_u1=u1, outline_v1=v1,
+        outline_u0=u0, outline_v0=y_ledge_in, outline_u1=u1, outline_v1=y_out,
         outline_corner_r=p["corner_r"],
         hose_tube_od=tube_od, hose_bore_d=bore_d,
-        spout_w=spout_w, rail_channel_w=rail_channel_w,
+        spout_w=nose_w, rail_channel_w=rail_channel_w,
         channel_center_x=0.0, channel_w=bore_d, channel_top_z=cap_h,
         channel_floor_z_outlet=z_exit, channel_y_outlet=0.0,
-        saddle_slot_y0=-(wall_t + fit), saddle_slot_y1=fit,
+        saddle_slot_y0=y_ledge_in, saddle_slot_y1=y_leg,
         saddle_floor_z=saddle_depth, saddle_fit=fit,
-        hang_drop=hang_drop,
+        hang_drop=hang_drop, hang_mode=1.0,          # 1 = one-sided hook
+        cap_hook_reach=hook_reach, cap_leg_y=y_leg,
+        cap_nose_bottom_z=z_exit, cap_roof_z=saddle_depth,
     )
     state.datums["spout"] = {"at": [0.0, 0.0, z_exit], "rotate": [0.0, 0.0, 0.0]}
     state.datums["tube_in"] = {"at": [0.0, 0.0, cap_h], "rotate": [0.0, 0.0, 0.0]}
-    # Print support-free (VF-7): as-modeled the saddle slot opens DOWNWARD —
-    # a wide bridge whose outer lip floats (Bambu's "floating cantilever").
-    # Flip 180 about X for print: the saddle becomes an UP-facing recess, the
-    # spout an upright rib, and the flat drip-tower top lands on the bed. The
-    # part frame (and every validator) is untouched; only the export rotates.
-    state.print_orientation = "saddle_up"
+    # Prints as-modeled (VF-9 Part B): the short rest ledge is a <=4mm overhang,
+    # the nose and outboard foot both reach the bed, the hose bore is vertical —
+    # nothing floats, so no saddle_up flip is needed.
 
 
 _register(RecipeOpDecl(
@@ -1159,33 +1212,39 @@ _register(RecipeOpDecl(
         "rail_wall_t": ("length", 13.25), "saddle_fit": ("length", 0.4),
         "saddle_depth": ("length", 8.0), "hang_drop": ("length", 16.5),
         "spout_w": ("length", 14.0), "rail_channel_w": ("length", 16.0),
-        "corner_r": ("length", 3.0),
+        "corner_r": ("length", 3.0), "hook_reach": ("length", 3.5),
         "dock_magnets": ("bool", False),
         "magnet_d": ("length", 6.0), "magnet_t": ("length", 2.0),
         "dock_fit_clearance": ("length", 0.2),
         "dock_x": ("length", 22.0), "dock_inset": ("length", 7.0),
+        "dock_drop": ("length", 4.0),
     },
     validators=(
         "form.hose_bore_ok", "form.spout_drop_path_ok",
         "form.dock_pockets_dry",
         "form.no_standing_water_ir",
+        "manufacturing.cap_supportless_verified",
         "topology.fluid_path_open", "topology.single_connected_solid",
         "topology.cutout_present", "topology.ribs_present",
     ),
     apply=_inlet_cap_body,
-    description="drip-tower inlet cap: vertical hose bore through a spout "
-                "dipping into the rail inlet corridor; saddle-hangs on the "
-                "back wall",
+    description="support-free Г-hook inlet cap (VF-9 Part B): vertical hose "
+                "bore through a nose column dipping into the rail inlet "
+                "channel; hooks the wall's outboard edge, docks on the +Y "
+                "face; prints as-modeled with no floating cantilever",
 ))
 
 
 def _collect_dock(state: RecipeState, p: dict[str, Any], name: str, *,
-                  dock_y: float, z_plane: float, side_front: bool) -> None:
-    """Shared endcap docking magnets (VF-6): a pair of DOWN-facing Z pockets
-    in an endcap arm underside (the plane that contacts the rail END wall
-    top). Gated by ``dock_magnets``; they bore UP into the solid arm (a
-    plastic floor above) at x = +-dock_x, aligned to the rail's UP dock
-    pockets across the contact. Alignment-only, press-fit, n/a when off."""
+                  dock_y: float, z_plane: float, side_front: bool,
+                  style: str = "top") -> None:
+    """Shared endcap docking magnets. ``style="top"`` (VF-6, collector): a pair
+    of DOWN-facing Z pockets in the arm underside that contacts the rail END
+    wall TOP — they bore UP into the arm at x = +-dock_x. ``style="face"``
+    (VF-9 Part B, cap): a pair of -Y-facing Y-axis pockets in the leg's inboard
+    face (at y = dock_y, z = z_plane) that dock to the rail's +Y END-FACE
+    pockets — vertical-face pockets print support-free. Gated by
+    ``dock_magnets``; alignment-only, press-fit, n/a when off."""
     if not p.get("dock_magnets", False):
         state.frame.update(dock_pocket_count=0)
         return
@@ -1193,19 +1252,35 @@ def _collect_dock(state: RecipeState, p: dict[str, Any], name: str, *,
     depth = p.get("magnet_t", 2.0) + 0.4
     dock_x = p.get("dock_x", 22.0)
     for x_label, x in (("e", dock_x), ("w", -dock_x)):
-        state.bores.append(BoreFeature(
-            name=f"{name}_dock_{x_label}", axis="Z",
-            center=(x, dock_y, 0.0), d=d,
-            span=(z_plane, z_plane + depth), overshoot=(1.0, 0.0),
-        ))
-        state.regions.append(Region(
-            f"endcap_dock_{x_label}", RegionRole.INTERFACE_KEEPOUT,
-            Box3(x - d / 2.0 - 1.0, dock_y - d / 2.0 - 1.0, z_plane - 1.0,
-                 x + d / 2.0 + 1.0, dock_y + d / 2.0 + 1.0, z_plane + depth + 1.0)))
+        if style == "face":
+            # -Y-facing pocket: mouth opens -Y at the leg's inboard face, blind
+            # +Y into the leg body (open lo, blind hi).
+            state.bores.append(BoreFeature(
+                name=f"{name}_dock_{x_label}", axis="Y",
+                center=(x, dock_y, z_plane), d=d,
+                span=(dock_y, dock_y + depth), overshoot=(1.0, 0.0),
+            ))
+            state.regions.append(Region(
+                f"endcap_dock_{x_label}", RegionRole.INTERFACE_KEEPOUT,
+                Box3(x - d / 2.0 - 1.0, dock_y - 1.0, z_plane - d / 2.0 - 1.0,
+                     x + d / 2.0 + 1.0, dock_y + depth + 1.0,
+                     z_plane + d / 2.0 + 1.0)))
+        else:
+            state.bores.append(BoreFeature(
+                name=f"{name}_dock_{x_label}", axis="Z",
+                center=(x, dock_y, 0.0), d=d,
+                span=(z_plane, z_plane + depth), overshoot=(1.0, 0.0),
+            ))
+            state.regions.append(Region(
+                f"endcap_dock_{x_label}", RegionRole.INTERFACE_KEEPOUT,
+                Box3(x - d / 2.0 - 1.0, dock_y - d / 2.0 - 1.0, z_plane - 1.0,
+                     x + d / 2.0 + 1.0, dock_y + d / 2.0 + 1.0,
+                     z_plane + depth + 1.0)))
     state.frame.update(
         dock_pocket_count=2, dock_pocket_d=d, dock_pocket_depth=depth,
         dock_x=dock_x, dock_inset=p.get("dock_inset", 7.0), dock_y=dock_y,
         dock_z_plane=z_plane, dock_side_front=1.0 if side_front else 0.0,
+        dock_style_face=1.0 if style == "face" else 0.0,
         dock_fit_clearance=d - p.get("magnet_d", 6.0),
     )
 

@@ -99,6 +99,27 @@ def test_cap_op_satisfies_checks():
     assert "spout" in form.datums and "tube_in" in form.datums
 
 
+def test_cap_supportless_verified_and_cantilever_mutation():
+    """VF-9 Part B: the support-free Г-hook passes cap_supportless_verified
+    (short rest ledge + nose column anchoring the roof). Reopening the roof
+    into a deep floating cantilever (the old flat-bridge geometry) FAILs — the
+    closed VF-7c blind spot."""
+    from artifact_forge_ng.validators.manufacturing import cap_supportless_verified
+    cap = cap_form()
+    assert cap.frame["hang_mode"] == 1.0            # one-sided hook
+    assert cap_supportless_verified(None, cap).status.value == "pass"
+    # widen the saddle-slot roof inboard into a deep unsupported cantilever
+    for i, c in enumerate(cap.cutboxes):
+        if "saddle_slot" in c.name:
+            b = c.box
+            cap.cutboxes[i] = type(c)(name=c.name,
+                                      box=type(b)(b.x0, -14.0, b.z0, b.x1, b.y1, b.z1))
+            break
+    bad = cap_supportless_verified(None, cap)
+    assert bad.status.value == "fail"
+    assert "cantilever" in bad.message
+
+
 def test_collector_op_satisfies_checks():
     form = collector_form()
     for check in (check_hose_bore_ok, check_collector_tray_drains,
@@ -307,7 +328,7 @@ def test_cap_saddle_hangs_on_back_wall():
     pose = compute_pose(joint, rail, cap)
     findings = _saddle_hang_ir(rail, cap, pose, joint)
     assert findings[0].status.value == "pass", findings[0].message
-    assert "straddles" in findings[0].message
+    assert "Г-hook grips" in findings[0].message  # VF-9 Part B one-sided hook
 
 
 def test_collector_saddle_hangs_on_front_wall():
@@ -319,16 +340,20 @@ def test_collector_saddle_hangs_on_front_wall():
     assert findings[0].status.value == "pass", findings[0].message
 
 
-def test_wrong_wall_thickness_fails_saddle():
-    """A cap built for a thinner wall no longer straddles this rail."""
+def test_deep_hook_ledge_fails_saddle():
+    """VF-9 Part B: a hook whose rest ledge reaches too deep onto the wall top
+    is a floating cantilever again — the check rejects it. (The hook itself is
+    wall-thickness-agnostic; it grips the outboard edge, so a wall-thickness
+    mismatch is no longer a failure mode — that is by design.)"""
     rail = rail_form()
-    cap = cap_form(rail_wall_t=9.0)
+    cap = cap_form()
+    cap.frame["saddle_slot_y0"] = -10.0  # ledge reach ~10 >> the short-ledge band
     joint = JointUse(type="saddle_hang", a="rail.feed", b="cap.spout",
                      rotate=[0, 0, 0])
     pose = compute_pose(joint, rail, cap)
     findings = _saddle_hang_ir(rail, cap, pose, joint)
     assert findings[0].status.value == "fail"
-    assert "straddle" in findings[0].message
+    assert "ledge reach" in findings[0].message
 
 
 def test_floating_saddle_fails():
