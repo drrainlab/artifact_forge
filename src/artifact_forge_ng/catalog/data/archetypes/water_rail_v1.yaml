@@ -34,13 +34,17 @@ provides_features:
 
 parameters:
   module_l:
-    {type: length, default: 248mm, min: 200mm, max: 250mm,
+    {type: length, default: 205mm, min: 200mm, max: 250mm,
      role: functional, exposed: true,
-     description: outer module size along the line axis X (grid nominal 250)}
+     description: "outer module size along the line axis X. Default 205 keeps
+       the printed rail (~209 with the tongue) well clear of a 256 bed's
+       exclusion zones (P1S/X1); raise toward 250 only on a printer with a
+       clean edge. ~200 is the design floor — below it the full-width collector
+       no longer fits between the root troughs and the profile band"}
   module_w:
-    {type: length, default: 248mm, min: 200mm, max: 250mm,
+    {type: length, default: 205mm, min: 200mm, max: 250mm,
      role: functional, exposed: true,
-     description: outer module size along the flow axis Y}
+     description: outer module size along the flow axis Y (see module_l)}
   body_h:
     {type: length, default: 30mm, min: 24mm, max: 60mm, role: structural,
      description: rail body height; the seat and channel nest inside it}
@@ -73,10 +77,10 @@ parameters:
     {type: length, default: 0.4mm, min: 0.3mm, max: 0.5mm, role: manufacturing,
      description: per-side clearance of the neighbour's lip in the receiver}
   cassette_l:
-    {type: length, default: 220mm, min: 180mm, max: 236mm, role: assembly,
+    {type: length, default: 177mm, min: 160mm, max: 236mm, role: assembly,
      description: shared cassette envelope X — the Cassette Interface Standard}
   cassette_w:
-    {type: length, default: 220mm, min: 180mm, max: 236mm, role: assembly,
+    {type: length, default: 177mm, min: 160mm, max: 236mm, role: assembly,
      description: shared cassette envelope Y}
   seat_depth:
     {type: length, default: 14mm, min: 10mm, max: 20mm, role: structural,
@@ -85,7 +89,7 @@ parameters:
     {type: length, default: 0.75mm, min: 0.5mm, max: 1mm, role: assembly,
      description: per-side drop-in clearance around the cassette}
   module_pitch:
-    {type: length, default: 250mm, min: 200mm, max: 300mm, role: assembly,
+    {type: length, default: 207mm, min: 200mm, max: 300mm, role: assembly,
      description: nominal grid pitch between module origins along the LINE axis X}
   corner_r:
     {type: length, default: 4mm, min: 2mm, max: 8mm, role: aesthetic}
@@ -104,8 +108,10 @@ parameters:
        drips through) | root_chamber (blind bottom contains overflow +
        open-top root troughs drained forward by the mount) — VF-5"}
   trough_w:
-    {type: length, default: 26mm, min: 18mm, max: 40mm, role: functional,
-     description: root trough width (root_chamber) — cassette spans it}
+    {type: length, default: 18mm, min: 18mm, max: 40mm, role: functional,
+     description: "root trough width (root_chamber) — cassette spans it.
+       Default 18 keeps the outer trough clear of the profile band on a ~205
+       module so the full-width collector's side wall still fits between them"}
   trough_rib:
     {type: length, default: 6mm, min: 4mm, max: 10mm, role: structural,
      description: rib between root troughs (cassette support)}
@@ -117,10 +123,13 @@ parameters:
      description: "optional d6x2 alignment magnets in sealed dry pockets —
        alignment only, never a seal, never a support"}
   magnet_x_offset:
-    {type: length, default: 60mm, min: 40mm, max: 90mm, role: assembly,
-     description: "magnet pocket centers at +-x_offset on both +-Y faces
-       (root_chamber: use ~84 to sit in the solid perimeter, clear of the
-       root troughs — the magnet checks enforce it)"}
+    {type: length, default: 60mm, min: 40mm, max: 106mm, role: assembly,
+     description: "magnet pocket centers at +-x_offset on both +-Y faces.
+       On a small root_chamber module the solid band between the root troughs
+       and the profile is too narrow for a d6 magnet, so sit them OUTSIDE the
+       profile band (~95 on a 205 module, between the profile and the rail
+       edge) — clear of both the troughs and the profile slot; the magnet
+       checks enforce dry"}
   magnet_fit:
     {type: length, default: 0.2mm, min: 0.1mm, max: 0.3mm, role: manufacturing,
      description: "diametral press-fit of the d6x2 magnet in its dry

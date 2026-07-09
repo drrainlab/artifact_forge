@@ -19,6 +19,7 @@ mount_context:
   slope_source: "whole row mounted on a straight 2020 profile at 1.5 deg"
 
 shared:
+  module_l: 248mm
   module_w: 248mm
   seat_depth: 14mm
   channel_d: 5mm
@@ -44,7 +45,7 @@ parts:
       manufacturing:
         material: PETG
         support_policy: none
-        print_orientation: as_modeled
+        print_orientation: saddle_up
         bed: [250mm, 250mm, 250mm]
   - ref: rail_1
     product:

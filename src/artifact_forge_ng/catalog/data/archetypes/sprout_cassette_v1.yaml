@@ -22,11 +22,11 @@ provides_features:
 
 parameters:
   cassette_l:
-    {type: length, default: 220mm, min: 180mm, max: 236mm,
+    {type: length, default: 177mm, min: 160mm, max: 236mm,
      role: assembly, exposed: true,
      description: outer envelope X — shared with the rail seat}
   cassette_w:
-    {type: length, default: 220mm, min: 180mm, max: 236mm,
+    {type: length, default: 177mm, min: 160mm, max: 236mm,
      role: assembly, exposed: true,
      description: outer envelope Y — shared with the rail seat}
   cassette_h:

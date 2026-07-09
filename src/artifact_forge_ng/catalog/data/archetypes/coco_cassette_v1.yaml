@@ -25,11 +25,11 @@ provides_features:
 
 parameters:
   cassette_l:
-    {type: length, default: 220mm, min: 180mm, max: 236mm,
+    {type: length, default: 177mm, min: 160mm, max: 236mm,
      role: assembly, exposed: true,
      description: outer envelope X — shared with the rail seat}
   cassette_w:
-    {type: length, default: 220mm, min: 180mm, max: 236mm,
+    {type: length, default: 177mm, min: 160mm, max: 236mm,
      role: assembly, exposed: true,
      description: outer envelope Y — shared with the rail seat}
   cassette_h:
@@ -45,11 +45,15 @@ parameters:
   corner_r:
     {type: length, default: 3mm, min: 2mm, max: 6mm, role: aesthetic}
   mesh_cell:
-    {type: length, default: 6mm, min: 4mm, max: 8mm,
+    {type: length, default: 8mm, min: 4mm, max: 10mm,
      role: functional, exposed: true,
-     description: "square mesh opening — holds coco, passes water and air"}
+     description: "square mesh opening — holds coco, passes water and air.
+       Default 8: coarse enough that the holey floor tessellates into a
+       clean manifold STL (a fine 4-6mm mesh packs 600+ openings into one
+       planar face and out-runs OCC BRepMesh — manufacturing.mesh_manifold
+       catches it)"}
   mesh_rib:
-    {type: length, default: 1.3mm, min: 1.2mm, max: 1.5mm, role: manufacturing,
+    {type: length, default: 1.5mm, min: 1.2mm, max: 2mm, role: manufacturing,
      description: web between mesh cells}
   mesh_margin:
     {type: length, default: 6mm, min: 4mm, max: 12mm, role: structural,
@@ -201,6 +205,6 @@ contract:
     - closed_water_reservoir
     - uncleanable_snap_cavity
   invariants:
-    - mesh_cell >= 4 and mesh_cell <= 8
+    - mesh_cell >= 4 and mesh_cell <= 10
     - mesh_rib >= 1.2
     - window_drop >= 1.0 and window_drop <= 2.0

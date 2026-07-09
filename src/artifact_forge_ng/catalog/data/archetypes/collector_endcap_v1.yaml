@@ -38,11 +38,11 @@ parameters:
   bore_clearance:
     {type: length, default: 0.4mm, min: 0.2mm, max: 0.8mm, role: manufacturing}
   cassette_w:
-    {type: length, default: 220mm, min: 180mm, max: 236mm, role: assembly}
+    {type: length, default: 177mm, min: 160mm, max: 236mm, role: assembly}
   seat_clearance:
     {type: length, default: 0.75mm, min: 0.5mm, max: 1mm, role: assembly}
   module_w:
-    {type: length, default: 248mm, min: 200mm, max: 250mm, role: assembly}
+    {type: length, default: 205mm, min: 200mm, max: 250mm, role: assembly}
   seat_depth:
     {type: length, default: 14mm, min: 10mm, max: 20mm, role: assembly}
   channel_d:
@@ -62,8 +62,10 @@ parameters:
     {type: length, default: 14mm, min: 8mm, max: 18mm, role: functional,
      description: dry locator tongue width — must fit INSIDE the rail channel}
   tray_slope_deg:
-    {type: number, default: 1.5, min: 0.8, max: 3.0, role: functional,
-     description: tray floor slope toward the drain}
+    {type: number, default: 2.5, min: 0.8, max: 3.0, role: functional,
+     description: "tray floor slope toward the drain — the drain sits at the
+       tray's low point so the floor empties to it (VF-7); the mounted row
+       tilt adds to this"}
   catch_fall:
     {type: length, default: 8.5mm, min: 6mm, max: 12mm, role: functional,
      description: drop from the lip to the tray floor — deep enough to

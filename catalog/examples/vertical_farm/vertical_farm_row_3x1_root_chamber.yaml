@@ -30,19 +30,19 @@ mount_context:
   slope_source: "whole row mounted on straight 2020 profiles at 1.5 deg"
 
 shared:
-  module_w: 248mm
+  module_w: 205mm
   seat_depth: 14mm
   channel_d: 5mm
   channel_w: 16mm
   face_gap: 0.4mm
   lip_len: 4mm
   lip_t: 1.4mm
-  cassette_l: 220mm
-  cassette_w: 220mm
+  cassette_l: 177mm
+  cassette_w: 177mm
   cassette_h: 26mm
   seat_clearance: 0.75mm
   wall: 2.2mm
-  module_pitch: 250mm
+  module_pitch: 207mm
   tube_od: 9mm
 
 parts:
@@ -55,14 +55,14 @@ parts:
       manufacturing:
         material: PETG
         support_policy: none
-        print_orientation: as_modeled
+        print_orientation: saddle_up
         bed: [250mm, 250mm, 250mm]
   - ref: rail_1
     product:
       schema: product/v1
       id: flush_rail_1
       archetype: water_rail_v1@2
-      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 84mm, under_cassette: root_chamber, endcap_dock: back}
+      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 95mm, under_cassette: root_chamber, endcap_dock: back}
       manufacturing:
         material: PETG
         support_policy: none
@@ -73,7 +73,7 @@ parts:
       schema: product/v1
       id: flush_rail_2
       archetype: water_rail_v1@2
-      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 84mm, under_cassette: root_chamber}
+      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 95mm, under_cassette: root_chamber}
       manufacturing:
         material: PETG
         support_policy: none
@@ -84,7 +84,7 @@ parts:
       schema: product/v1
       id: flush_rail_3
       archetype: water_rail_v1@2
-      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 84mm, under_cassette: root_chamber, endcap_dock: front}
+      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 95mm, under_cassette: root_chamber, endcap_dock: front}
       manufacturing:
         material: PETG
         support_policy: none
@@ -128,7 +128,7 @@ parts:
       schema: product/v1
       id: flush_collector
       archetype: collector_endcap_v1@1
-      params: {tray_w: 160mm, dock_magnets: true}
+      params: {tray_w: 120mm, dock_magnets: true}
       manufacturing:
         material: PETG
         support_policy: none
@@ -142,7 +142,7 @@ parts:
       schema: product/v1
       id: flush_profile_e
       archetype: aluminum_profile_ref_v1@2
-      params: {size: "2020", length: 780mm, stations: 3}
+      params: {size: "2020", length: 640mm, stations: 3}
       manufacturing:
         process: reference
         material: aluminum
@@ -151,7 +151,7 @@ parts:
       schema: product/v1
       id: flush_profile_w
       archetype: aluminum_profile_ref_v1@2
-      params: {size: "2020", length: 780mm, stations: 3}
+      params: {size: "2020", length: 640mm, stations: 3}
       manufacturing:
         process: reference
         material: aluminum

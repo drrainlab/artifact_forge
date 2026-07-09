@@ -26,11 +26,11 @@ parameters:
      role: assembly, exposed: true,
      description: standard aluminum extrusion series}
   length:
-    {type: length, default: 780mm, min: 200mm, max: 2000mm,
+    {type: length, default: 640mm, min: 200mm, max: 2000mm,
      role: assembly, exposed: true,
      description: cut-to-length of the standard straight profile}
   module_w:
-    {type: length, default: 248mm, min: 200mm, max: 250mm, role: assembly,
+    {type: length, default: 205mm, min: 200mm, max: 250mm, role: assembly,
      description: shared rail module depth}
   face_gap:
     {type: length, default: 0.4mm, min: 0.3mm, max: 0.6mm, role: assembly,

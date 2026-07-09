@@ -422,3 +422,63 @@ def print_orientation_declared(geometry: Geometry, form: PartForm) -> Finding:
         f"{form.print_orientation!r} — the supportless contract is void",
         suggestion="" if ok else "align manufacturing.print_orientation with the builder",
     )
+
+
+def _nonmanifold_edges(verts, faces) -> int:
+    """Count undirected edges NOT shared by exactly two triangles, after
+    WELDING coincident vertices by position. OCC tessellates per-face, so
+    vertices on a shared edge carry different indices in the two faces — the
+    raw index space is never manifold. We quantize to 1 micron and rebuild
+    the edge incidence on merged positions (the same test a slicer applies
+    to the STL it loads)."""
+    import numpy as np
+    if len(faces) == 0:
+        return 0
+    q = np.round(np.asarray(verts) * 1000.0).astype(np.int64)
+    _, inv = np.unique(q, axis=0, return_inverse=True)
+    tri = inv[np.asarray(faces)]
+    e = np.sort(np.concatenate(
+        [tri[:, [0, 1]], tri[:, [1, 2]], tri[:, [2, 0]]], axis=0), axis=1)
+    e = e[e[:, 0] != e[:, 1]]  # drop degenerate edges
+    _, counts = np.unique(e, axis=0, return_counts=True)
+    return int(np.count_nonzero(counts != 2))
+
+
+@register_probe("manufacturing.mesh_manifold")
+def mesh_manifold(geometry: Geometry, form: PartForm) -> Finding:
+    """The EXPORTED mesh must be edge-manifold watertight — every edge shared
+    by exactly two triangles (after welding coincident vertices, the way a
+    slicer loads the STL). A perfectly valid BRep can still tessellate into a
+    torn mesh: OCC BRepMesh drops hole-triangulations on a single planar face
+    that carries hundreds of openings, leaving non-manifold edges and cells
+    that read as solid. Field-reported on a printed cassette (the slicer
+    flagged '16 non-manifold edges'; cells looked filled). Only field-bearing
+    parts (holey faces) can hit it, so the check meshes at the export
+    tolerance ONLY for them; everything else is trivially manifold."""
+    check = "manufacturing.mesh_manifold"
+    # Only the ORTHOGONAL slot mesh (mesh_floor, pattern="slots") packs
+    # hundreds of coplanar square holes into one planar face — the shape OCC
+    # BRepMesh tears. Organic / hex / voronoi fields have curved or sparse
+    # openings, their own integrity probes, and (for exoskeletons) a BRep
+    # that legitimately tessellates with weld-junction seams; meshing them
+    # here would false-positive.
+    if not any(getattr(f, "pattern", "") == "slots" for f in form.fields):
+        return _finding(check, Status.PASS, "no orthogonal slot mesh — n/a")
+    try:
+        verts, faces = geometry.mesh(0.05)  # match export_stl's linear tolerance
+    except Exception as exc:  # pragma: no cover - tooling guard
+        return _finding(check, Status.WARN, f"could not tessellate for the check: {exc}")
+    if len(faces) == 0:
+        return _finding(check, Status.WARN, "empty tessellation")
+    bad = _nonmanifold_edges(verts, faces)
+    return _finding(
+        check, Status.PASS if bad == 0 else Status.FAIL,
+        f"exported mesh is edge-manifold watertight ({len(faces)} triangles)"
+        if bad == 0 else
+        f"{bad} non-manifold edge(s) in the exported STL — the slicer rejects "
+        "it; a holey planar face out-ran BRepMesh (too many cells in one face)",
+        measured=float(bad), limit=0.0,
+        suggestion="" if bad == 0 else
+        "coarsen the field (larger cell / fewer openings) so each holey face "
+        "tessellates cleanly",
+    )

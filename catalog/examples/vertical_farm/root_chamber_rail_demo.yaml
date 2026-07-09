@@ -10,7 +10,7 @@ params:
   profile: "2020"
   under_cassette: root_chamber
   magnet_enabled: true
-  magnet_x_offset: 84mm
+  magnet_x_offset: 95mm
 manufacturing:
   material: PETG
   support_policy: none

@@ -13,10 +13,10 @@ strict: true
 root: rail_a
 
 shared:
-  module_pitch: 250mm
+  module_pitch: 207mm
   channel_w: 16mm
-  cassette_l: 220mm
-  cassette_w: 220mm
+  cassette_l: 177mm
+  cassette_w: 177mm
 
 parts:
   - ref: rail_a

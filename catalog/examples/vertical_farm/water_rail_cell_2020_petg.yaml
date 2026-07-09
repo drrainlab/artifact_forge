@@ -19,6 +19,8 @@ root: rail
 # desync between rail and cassette is unrepresentable. (`wall` lands in
 # the cassette, `cassette_wall` in the frame — same steel, two views.)
 shared:
+  module_l: 248mm
+  module_w: 248mm
   cassette_l: 220mm
   cassette_w: 220mm
   cassette_h: 26mm

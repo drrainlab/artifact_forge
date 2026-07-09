@@ -21,10 +21,15 @@ def orient_for_print(geometry: Geometry, form: PartForm) -> Geometry:
     Validators always measure in the part frame; only exports go through
     here. "side_profile": the section lies on the bed, extrusion axis (X)
     points up — for a constant-section extrusion that orientation has zero
-    overhangs by construction."""
-    if form.print_orientation != "side_profile":
+    overhangs by construction. "saddle_up": flip the part 180 deg about X so
+    a downward-opening saddle slot faces UP (a clean recess, no bridge) and
+    the drip tower's flat top lands on the bed — the inlet cap's floating
+    cantilever inverts into a self-supported pocket (VF-7)."""
+    if form.print_orientation not in ("side_profile", "saddle_up"):
         return geometry
-    wp = geometry.workplane.rotate((0, 0, 0), (0, 1, 0), -90.0)
+    axis = (0, 1, 0) if form.print_orientation == "side_profile" else (1, 0, 0)
+    angle = -90.0 if form.print_orientation == "side_profile" else 180.0
+    wp = geometry.workplane.rotate((0, 0, 0), axis, angle)
     zmin = wp.val().BoundingBox().zmin
     if abs(zmin) > 1e-9:
         wp = wp.translate((0, 0, -zmin))

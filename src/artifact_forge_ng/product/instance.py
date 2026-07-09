@@ -37,7 +37,7 @@ class ManufacturingSpec(BaseModel):
     #: EXPECTS ("as_modeled" == bottom-down for the vertical farm parts).
     #: None = defer to the builder. A mismatch is a manufacturing FAIL
     #: (manufacturing.print_orientation_declared).
-    print_orientation: Literal["as_modeled", "side_profile"] | None = None
+    print_orientation: Literal["as_modeled", "side_profile", "saddle_up"] | None = None
     #: Print bed (x, y, z). The default mirrors manufacturing.BED; a larger
     #: declared machine (e.g. 250-class for the vertical farm modules) is an
     #: explicit instance-level claim, checked by manufacturing.bed_fit.

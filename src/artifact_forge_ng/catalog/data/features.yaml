@@ -581,11 +581,13 @@ features:
   - id: substrate_mesh_floor
     description: >
       flat orthogonal through-mesh across the cassette floor — holds coco,
-      aerates roots, directs no flow
+      aerates roots, directs no flow, and tessellates into a clean manifold
+      STL (a mesh too fine tears on export — caught, not shipped)
     verified_by:
       - form.mesh_floor_orthogonal_ok
       - form.min_ligament_ok
       - topology.hex_field_present
+      - manufacturing.mesh_manifold
 
   - id: pulse_contact_window
     description: >

@@ -35,12 +35,12 @@ parameters:
     {type: length, default: 0.4mm, min: 0.2mm, max: 0.8mm, role: manufacturing,
      description: push-in grip over the tube OD}
   cassette_w:
-    {type: length, default: 220mm, min: 180mm, max: 236mm, role: assembly,
+    {type: length, default: 177mm, min: 160mm, max: 236mm, role: assembly,
      description: shared cassette envelope — sizes the rail wall the cap hangs on}
   seat_clearance:
     {type: length, default: 0.75mm, min: 0.5mm, max: 1mm, role: assembly}
   module_w:
-    {type: length, default: 248mm, min: 200mm, max: 250mm, role: assembly,
+    {type: length, default: 205mm, min: 200mm, max: 250mm, role: assembly,
      description: shared rail module depth — sizes the rail wall}
   seat_depth:
     {type: length, default: 14mm, min: 10mm, max: 20mm, role: assembly,

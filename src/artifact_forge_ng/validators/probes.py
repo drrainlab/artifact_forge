@@ -236,6 +236,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("manufacturing.brush_access_to_water_channel", Level.MANUFACTURING, "the water channel opens to free air along its whole run and is wide enough to brush"),
         _decl("manufacturing.no_hidden_wet_crevices", Level.MANUFACTURING, "no sub-2mm crevice between cuts inside a wet region — water enters, a brush cannot"),
         _decl("manufacturing.no_unwashable_snap_pockets", Level.MANUFACTURING, "every snap window is void through the full wall on the compiled solid"),
+        _decl("manufacturing.mesh_manifold", Level.MANUFACTURING, "the exported STL of a field-bearing part is edge-manifold watertight — a holey face that out-runs OCC tessellation (torn/solid mesh cells) FAILs here"),
         _decl("manufacturing.reference_geometry", Level.MANUFACTURING, "honesty note: this part is external hardware reference — manufacturability unverified by design"),
         # -- implicit exoskeleton skin (Bio-4M; findings emitted by the skin export stage)
         _decl("manufacturing.mesh_watertight", Level.MANUFACTURING, "exported implicit-skin mesh is edge-manifold watertight"),

@@ -1013,6 +1013,12 @@ def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     )
     state.datums["spout"] = {"at": [0.0, 0.0, z_exit], "rotate": [0.0, 0.0, 0.0]}
     state.datums["tube_in"] = {"at": [0.0, 0.0, cap_h], "rotate": [0.0, 0.0, 0.0]}
+    # Print support-free (VF-7): as-modeled the saddle slot opens DOWNWARD —
+    # a wide bridge whose outer lip floats (Bambu's "floating cantilever").
+    # Flip 180 about X for print: the saddle becomes an UP-facing recess, the
+    # spout an upright rib, and the flat drip-tower top lands on the bed. The
+    # part frame (and every validator) is untouched; only the export rotates.
+    state.print_orientation = "saddle_up"
 
 
 _register(RecipeOpDecl(
@@ -1133,9 +1139,15 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
     floor_at_catch = -catch_fall
     depth_start = rim_z + catch_fall
     y_drain_wall = -(capture_depth + 3.0 + drain_extension)  # sump outer end
-    run = 1.6 - (y_drain_wall + 3.0)  # channel span catch->deep end
+    # The vertical drain sits at the tray's TRUE low point (VF-7): the floor
+    # slopes down to the drain and NOTHING behind it is deeper, so the tray
+    # empties instead of pooling at the back (before, the drain sat forward
+    # of the deep end and water stood behind it). The bore stays inboard of
+    # the sump wall so it keeps solid grip for the push-in tube.
+    y_drain = y_drain_wall + 3.0 + bore_d / 2.0 + 1.0
+    run = 1.6 - y_drain  # channel span: catch -> the drain (the low point)
     depth_end = depth_start + run * math.tan(math.radians(slope))
-    floor_low = rim_z - depth_end  # deepest floor point (design z)
+    floor_low = rim_z - depth_end  # deepest floor point (design z), at the drain
     # base deep enough that the vertical drain grips >= drain_grip of solid
     tray_bottom = min(floor_at_catch - (depth_end - depth_start) - 3.0,
                       floor_low - drain_grip)
@@ -1161,7 +1173,7 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
 
     state.channels.append(ChannelCutFeature(
         name=f"{op_id or 'collector'}_tray", center_x=0.0,
-        y0=1.6, y1=y_drain_wall + 3.0, z_top=rim_z + dz,
+        y0=1.6, y1=y_drain, z_top=rim_z + dz,
         width=tray_w_inner, depth_start=depth_start, depth_end=depth_end,
         bottom_r=1.0,
     ))
@@ -1170,7 +1182,6 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
     # point straight through the solid base and out the bottom — the push-in
     # tube enters FROM BELOW and routes under the row. A vertical bore has
     # no ceiling to bridge, so it prints supportless as-modeled.
-    y_drain = y_drain_wall + 3.0 + bore_d / 2.0 + 1.0  # inboard of the back wall
     state.bores.append(BoreFeature(
         name=f"{name}_drain_hose", axis="Z",
         center=(0.0, y_drain, 0.0),
