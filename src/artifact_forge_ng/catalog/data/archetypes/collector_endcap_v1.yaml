@@ -25,6 +25,7 @@ provides_features:
   - hose_takeoff
   - catch_tray
   - endcap_dock
+  - strainer_seat
 
 parameters:
   tray_w:
@@ -99,6 +100,31 @@ parameters:
   dock_fit:
     {type: length, default: 0.2mm, min: 0.1mm, max: 0.3mm, role: manufacturing,
      description: "diametral press-fit of the d6x2 dock magnet"}
+  screen_seat:
+    {type: bool, default: false, role: assembly, exposed: true,
+     description: "VF-8: carve a LOWERED sump WELL fed by a radial funnel — the
+       tray floor slopes to the drain from every side, the drain sits at the
+       absolute low point, and a drop-in strainer basket seats in the well over
+       it. The seat keys are always published; the funnel + well are cut only
+       when this is on (and the drain shifts to the tray centre)"}
+  screen_seat_w:
+    {type: length, default: 24mm, min: 18mm, max: 90mm, role: assembly,
+     description: "strainer basket OUTER footprint across X; the funnel well
+       mouth is this + 2*clearance (match the drain_screen basket screen_l)"}
+  screen_seat_d:
+    {type: length, default: 13mm, min: 10mm, max: 24mm, role: assembly,
+     description: "strainer basket footprint along Y — must overhang the drain
+       bore so water passes only through the mesh (fits the shallow sump)"}
+  screen_sump_depth:
+    {type: length, default: 5mm, min: 3mm, max: 9mm, role: assembly,
+     description: "how far the sump well floor drops below the tray floor — the
+       radial funnel converges over this depth to the drain (absolute low)"}
+  screen_funnel_w:
+    {type: length, default: 74mm, min: 40mm, max: 120mm, role: assembly,
+     description: "the funnel opening width across X — the tray floor slopes in
+       from here to the well mouth (clamped to the tray interior)"}
+  screen_seat_clearance:
+    {type: length, default: 0.75mm, min: 0.5mm, max: 2mm, role: assembly}
 
 derived:
   rail_wall_t: (module_w - cassette_w - 2 * seat_clearance) / 2
@@ -139,6 +165,12 @@ form:
         dock_x: dock_x
         dock_inset: dock_inset
         dock_fit_clearance: dock_fit
+        screen_seat: screen_seat
+        screen_seat_w: screen_seat_w
+        screen_seat_d: screen_seat_d
+        screen_sump_depth: screen_sump_depth
+        screen_funnel_w: screen_funnel_w
+        screen_seat_clearance: screen_seat_clearance
 
 regions:
   - {id: catch_tray, role: transient_water_path, editable: false,
@@ -165,6 +197,11 @@ interfaces:
     # VF-4.2: the drain exits the BOTTOM — the tube enters from below and
     # routes under the row
     frame: {normal: "-Z", up: "+Y", axis: "-Z"}
+  # VF-8: a drop-in strainer basket nests over the drain, but the mate is
+  # DATUM-BASED (the saddle_hang precedent), not a port — the basket seats in
+  # a sump recess UNDER the arm, where an interface normal cannot point
+  # outward. The `screen_seat` datum + the `drop_in_screen` joint carry it;
+  # assembly.screen_normal_no_bypass proves the no-bypass honesty.
 
 validators:
   - interface.frame_exists
@@ -180,6 +217,10 @@ validators:
   - form.collector_structure_sturdy
   - form.dock_pockets_dry
   - form.no_standing_water_ir
+  - form.collector_sump_is_lowest_point
+  - form.tray_floor_slopes_to_sump
+  - form.basket_not_transverse_flow_barrier
+  - form.no_standing_water_before_screen
   - topology.fluid_path_open
   - topology.single_connected_solid
   - topology.ribs_present

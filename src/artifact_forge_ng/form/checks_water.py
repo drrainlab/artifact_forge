@@ -139,6 +139,24 @@ def check_water_channel_dims_ok(form: PartForm) -> Finding:
     )
 
 
+def _pocket_drained_by_through_bore(box, bores) -> bool:
+    """A floored pocket does NOT pool if a vertical open-bottom bore passes
+    through its footprint down to (or below) the pocket floor: the floor has
+    a drain hole in it, so water leaves through the underside. This is the
+    strainer-seat recess sitting directly over the collector's vertical drain
+    (VF-8) — the recess floor carries the drain bore straight to the bottom."""
+    for bore in bores:
+        if bore.axis != "Z" or bore.overshoot[0] <= 0.0:
+            continue  # only a downward-open (through-to-underside) Z bore drains
+        if bore.span[0] > box.z0 + 0.05:
+            continue  # the bore does not reach down to the pocket floor
+        bx, by = bore.center[0], bore.center[1]
+        if (box.x0 - 0.05 <= bx <= box.x1 + 0.05
+                and box.y0 - 0.05 <= by <= box.y1 + 0.05):
+            return True
+    return False
+
+
 def check_no_standing_water_ir(form: PartForm) -> Finding:
     """Nothing in a wet region may hold water: no blind bore, and no box
     cut whose floor hangs between the body bottom and the channel entry
@@ -171,6 +189,8 @@ def check_no_standing_water_ir(form: PartForm) -> Finding:
             continue  # open to the underside — cannot pool
         if top is not None and b.z0 >= top - 0.05:
             continue  # floor at/above the channel entry plane — a dry step
+        if _pocket_drained_by_through_bore(b, form.bores):
+            continue  # a vertical open-bottom bore in its footprint drains it
         if any(_boxes_overlap(b, w.box) for w in wet):
             offenders.append(f"pocket {cut.name!r} floors at z={b.z0:g} inside the wet path")
     return _finding(
@@ -188,10 +208,14 @@ def check_lap_joint_geometry_ok(form: PartForm) -> Finding:
     neighbour's identical lip lands in, with a deliberate slot left open
     at the tip."""
     f = form.frame
-    keys = ("lap_lip_len", "lap_lip_w", "lap_lip_t", "lap_lip_top_z",
-            "lap_pocket_len", "lap_pocket_w", "face_gap",
-            "channel_floor_z_inlet", "channel_floor_z_outlet")
-    missing = [k for k in keys if k not in f]
+    capped = f.get("inlet_capped", 0.0) >= 0.5
+    # The OUTLET lip is always required (every rail hands water onward via lap);
+    # the INLET receiver is checked only on lap-fed rails. A capped inlet (VF-8,
+    # the cap-fed first rail) has a SOLID inlet floor — the drip landing there is
+    # verified by assembly.drip_lands_on_floor, not by a receiver here.
+    lip_keys = ("lap_lip_len", "lap_lip_w", "lap_lip_t", "lap_lip_top_z",
+                "face_gap", "channel_floor_z_inlet", "channel_floor_z_outlet")
+    missing = [k for k in lip_keys if k not in f]
     if missing:
         return _finding("form.lap_joint_geometry_ok", False,
                         f"no lap frame keys: {', '.join(missing)}")
@@ -213,37 +237,44 @@ def check_lap_joint_geometry_ok(form: PartForm) -> Finding:
     if not (LAP_LIP_T_BAND[0] <= f["lap_lip_t"] <= LAP_LIP_T_BAND[1]):
         problems.append(f"lip thickness {f['lap_lip_t']:g} outside "
                         f"{LAP_LIP_T_BAND[0]}..{LAP_LIP_T_BAND[1]}")
-    pocket = next((c for c in form.cutboxes if "lap_receiver" in c.name), None)
-    if pocket is None:
-        problems.append("no lap receiver cut on the part")
-    else:
-        b = pocket.box
-        if b.z0 > -0.5:
-            problems.append(
-                f"receiver floors at z={b.z0:g} — it must cut THROUGH the body "
-                "(an open bottom is the whole no-sump guarantee)")
-        if b.z1 < f["channel_floor_z_inlet"] - CONST_DEPTH_TOL:
-            problems.append("receiver stops short of the floor plane — the lip cannot land")
-        side = (f["lap_pocket_w"] - f["lap_lip_w"]) / 2.0
-        if not (LAP_SIDE_CLEAR_BAND[0] <= side <= LAP_SIDE_CLEAR_BAND[1]):
-            problems.append(
-                f"per-side lip clearance {side:.2f} outside "
-                f"{LAP_SIDE_CLEAR_BAND[0]}..{LAP_SIDE_CLEAR_BAND[1]}")
-    overlap = f["lap_lip_len"] - f["face_gap"]
-    slot = f["lap_pocket_len"] - overlap
-    if not (LAP_SLOT_BAND[0] <= slot <= LAP_SLOT_BAND[1]):
-        problems.append(
-            f"tip slot {slot:.2f} outside {LAP_SLOT_BAND[0]}..{LAP_SLOT_BAND[1]} — "
-            "the seam must stay deliberately open, and only just")
     if not (FACE_GAP_BAND[0] <= f["face_gap"] <= FACE_GAP_BAND[1]):
         problems.append(f"face gap {f['face_gap']:g} outside "
                         f"{FACE_GAP_BAND[0]}..{FACE_GAP_BAND[1]}")
+    slot = None
+    if not capped:
+        rmissing = [k for k in ("lap_pocket_len", "lap_pocket_w") if k not in f]
+        if rmissing:
+            problems.append(f"no lap receiver keys: {', '.join(rmissing)}")
+        else:
+            pocket = next((c for c in form.cutboxes if "lap_receiver" in c.name), None)
+            if pocket is None:
+                problems.append("no lap receiver cut on the part")
+            else:
+                b = pocket.box
+                if b.z0 > -0.5:
+                    problems.append(
+                        f"receiver floors at z={b.z0:g} — it must cut THROUGH the "
+                        "body (an open bottom is the whole no-sump guarantee)")
+                if b.z1 < f["channel_floor_z_inlet"] - CONST_DEPTH_TOL:
+                    problems.append("receiver stops short of the floor plane — the lip cannot land")
+                side = (f["lap_pocket_w"] - f["lap_lip_w"]) / 2.0
+                if not (LAP_SIDE_CLEAR_BAND[0] <= side <= LAP_SIDE_CLEAR_BAND[1]):
+                    problems.append(
+                        f"per-side lip clearance {side:.2f} outside "
+                        f"{LAP_SIDE_CLEAR_BAND[0]}..{LAP_SIDE_CLEAR_BAND[1]}")
+            slot = f["lap_pocket_len"] - (f["lap_lip_len"] - f["face_gap"])
+            if not (LAP_SLOT_BAND[0] <= slot <= LAP_SLOT_BAND[1]):
+                problems.append(
+                    f"tip slot {slot:.2f} outside {LAP_SLOT_BAND[0]}..{LAP_SLOT_BAND[1]} — "
+                    "the seam must stay deliberately open, and only just")
+    ok_msg = (f"capped inlet — receiver n/a; lip continues the floor plane "
+              f"{f['lap_lip_len']:g} past the face" if capped else
+              f"lip continues the floor plane {f['lap_lip_len']:g} past the face; "
+              f"the receiver is through with a {slot:.1f} open slot at the tip")
     return _finding(
         "form.lap_joint_geometry_ok", not problems,
-        f"lip continues the floor plane {f['lap_lip_len']:g} past the face; "
-        f"the receiver is through with a {slot:.1f} open slot at the tip"
-        if not problems else "; ".join(problems),
-        measured=slot, limit=LAP_SLOT_BAND[1],
+        ok_msg if not problems else "; ".join(problems),
+        measured=slot if slot is not None else None, limit=LAP_SLOT_BAND[1],
     )
 
 
@@ -253,6 +284,9 @@ def check_lap_slot_leak_path_controlled(form: PartForm) -> Finding:
     magnet pockets and dry zones. The nominal stream crosses ON TOP of the
     lip; this check pins down where the stray drops go."""
     f = form.frame
+    if f.get("inlet_capped", 0.0) >= 0.5:
+        return _finding("form.lap_slot_leak_path_controlled", True,
+                        "capped inlet — no receiver leak path to control (n/a)")
     if "lap_pocket_w" not in f:
         return _finding("form.lap_slot_leak_path_controlled", False,
                         "no lap receiver on the part — nothing to control")
@@ -452,6 +486,151 @@ def check_dock_pockets_dry(form: PartForm) -> Finding:
         f"{MAGNET_WET_WALL_MIN:g} plastic to every wet zone"
         if not problems else "; ".join(problems),
         limit=MAGNET_WET_WALL_MIN,
+    )
+
+
+#: A drain-screen basket must not choke the flow: total open area (bottom mesh
+#: + wall slots) at least ~4x the standard Ø9.4 drain bore (~69 mm2). And it
+#: must hold a real debris reservoir so it isn't full after one watering.
+SCREEN_MIN_OPEN_AREA = 300.0   # mm2
+SCREEN_MIN_DEBRIS_ML = 3.0     # ml
+
+
+def check_screen_open_area_ratio_ok(form: PartForm) -> Finding:
+    """VF-8: the strainer's total open area (bottom mesh + wall slots) must be
+    generous vs the drain bore, or the basket itself becomes the plug. n/a-PASS
+    on parts that are not a drain screen."""
+    check = "form.screen_open_area_ratio_ok"
+    area = form.frame.get("screen_open_area_mm2")
+    if area is None:
+        return _finding(check, True, "not a drain screen — n/a")
+    ok = area >= SCREEN_MIN_OPEN_AREA - 1e-6
+    mesh = form.frame.get("screen_mesh_area_mm2", 0.0)
+    slot = form.frame.get("screen_slot_area_mm2", 0.0)
+    return _finding(
+        check, ok,
+        f"open area {area:.0f} mm2 (mesh {mesh:.0f} + slots {slot:.0f}) "
+        f">= {SCREEN_MIN_OPEN_AREA:g} — flow is not choked"
+        if ok else
+        f"open area {area:.0f} mm2 < {SCREEN_MIN_OPEN_AREA:g} — the screen would "
+        "choke the drain; widen the mesh or add wall slots",
+        measured=area, limit=SCREEN_MIN_OPEN_AREA,
+    )
+
+
+def check_screen_debris_capacity_ok(form: PartForm) -> Finding:
+    """VF-8: the basket must hold a real debris reservoir above the mesh so it
+    is not full after a single watering. n/a-PASS when not a drain screen."""
+    check = "form.screen_debris_capacity_ok"
+    vol = form.frame.get("screen_debris_volume_ml")
+    if vol is None:
+        return _finding(check, True, "not a drain screen — n/a")
+    ok = vol >= SCREEN_MIN_DEBRIS_ML - 1e-6
+    return _finding(
+        check, ok,
+        f"debris reservoir {vol:.1f} ml >= {SCREEN_MIN_DEBRIS_ML:g}"
+        if ok else
+        f"debris reservoir {vol:.1f} ml < {SCREEN_MIN_DEBRIS_ML:g} — too shallow, "
+        "deepen the basket or widen its footprint",
+        measured=vol, limit=SCREEN_MIN_DEBRIS_ML,
+    )
+
+
+def check_collector_sump_is_lowest_point(form: PartForm) -> Finding:
+    """VF-8: the strainer sump WELL floor is the collector's absolute low
+    point (a real well below the tray floor) and the vertical drain descends
+    from it, so all water reaches the drain. n/a with no strainer sump."""
+    check = "form.collector_sump_is_lowest_point"
+    sump = form.frame.get("screen_sump_floor_z")
+    if sump is None:
+        return _finding(check, True, "no strainer sump — n/a")
+    tray = form.frame.get("screen_funnel_top_z")
+    drain_ok = any(b.axis == "Z" and b.overshoot[0] > 0.0
+                   and b.span[0] <= sump + 0.05 for b in form.bores)
+    ok = tray is not None and sump < tray - 1.0 and drain_ok
+    return _finding(
+        check, ok,
+        f"sump floor z={sump:.1f} sits {tray - sump:.1f} below the tray floor "
+        "with the drain descending from it — the absolute low point"
+        if ok else
+        f"sump floor z={sump:.1f} is not a drained low point below the tray",
+        measured=sump,
+    )
+
+
+def check_tray_floor_slopes_to_sump(form: PartForm) -> Finding:
+    """VF-8: the tray floor slopes to the sump from every side — a converging
+    funnel cut (wider opening than mouth, mouth over the drain). n/a with no
+    strainer sump."""
+    check = "form.tray_floor_slopes_to_sump"
+    if form.frame.get("screen_sump_floor_z") is None:
+        return _finding(check, True, "no strainer sump — n/a")
+    if not form.funnel_cuts:
+        return _finding(check, False, "strainer sump has no funnel feed")
+    f = form.funnel_cuts[0]
+    dy = form.frame.get("screen_seat_drain_y")
+    x_slope = f.top[0] > f.bottom[0] + 1.0
+    y_reaches = f.top[1] >= f.bottom[1] - 1e-6
+    over_drain = dy is None or (
+        f.bottom_center[1] - f.bottom[1] / 2.0 - 0.6 <= dy
+        <= f.bottom_center[1] + f.bottom[1] / 2.0 + 0.6)
+    ok = f.z_top > f.z_bottom and x_slope and y_reaches and over_drain
+    return _finding(
+        check, ok,
+        f"funnel opening {f.top[0]:.0f}x{f.top[1]:.0f} converges to the "
+        f"{f.bottom[0]:.0f}x{f.bottom[1]:.0f} mouth over the drain — floor slopes "
+        "in from every side"
+        if ok else "funnel does not converge to the drain from every side",
+    )
+
+
+def check_basket_not_transverse_flow_barrier(form: PartForm) -> Finding:
+    """VF-8: the basket seats in a SUNKEN well fed by a funnel wider than the
+    well mouth — water falls INTO it from every side rather than being walled
+    off across the tray. Measured on the collector: funnel opening wider than
+    the mouth, well recessed below the tray floor. n/a with no strainer sump."""
+    check = "form.basket_not_transverse_flow_barrier"
+    sump = form.frame.get("screen_sump_floor_z")
+    if sump is None:
+        return _finding(check, True, "no strainer sump — n/a")
+    if not form.funnel_cuts:
+        return _finding(check, False, "no funnel — a flat basket would wall the tray")
+    f = form.funnel_cuts[0]
+    tray = form.frame.get("screen_funnel_top_z")
+    wider = f.top[0] >= f.bottom[0] + 4.0
+    recessed = tray is not None and sump < tray - 1.0
+    ok = wider and recessed
+    return _finding(
+        check, ok,
+        f"basket sits in a well recessed {tray - sump:.1f} below the tray, fed "
+        f"by a funnel {f.top[0]:.0f} wide vs the {f.bottom[0]:.0f} mouth — water "
+        "falls in, not blocked"
+        if ok else "basket would wall the tray flow, not sit in a fed well",
+    )
+
+
+def check_no_standing_water_before_screen(form: PartForm) -> Finding:
+    """VF-8: nothing upstream of the sump holds water — the funnel descends
+    monotonically to the drain and the sump is the collector low point, so the
+    whole floor path reaches the screen. Complements no_standing_water_ir
+    (which forbids blind pockets). n/a with no strainer sump."""
+    check = "form.no_standing_water_before_screen"
+    sump = form.frame.get("screen_sump_floor_z")
+    if sump is None:
+        return _finding(check, True, "no strainer sump — n/a")
+    tray = form.frame.get("screen_funnel_top_z")
+    dy = form.frame.get("screen_seat_drain_y")
+    has_funnel = bool(form.funnel_cuts)
+    over_drain = has_funnel and (dy is None or (
+        form.funnel_cuts[0].bottom_center[1] - form.funnel_cuts[0].bottom[1] / 2.0 - 0.6
+        <= dy <=
+        form.funnel_cuts[0].bottom_center[1] + form.funnel_cuts[0].bottom[1] / 2.0 + 0.6))
+    ok = has_funnel and over_drain and tray is not None and sump < tray - 1.0
+    return _finding(
+        check, ok,
+        "the funnel descends monotonically to the drain at the sump low point — "
+        "no water stands upstream of the screen"
+        if ok else "the floor upstream of the sump could pool — no converging funnel",
     )
 
 
@@ -753,6 +932,18 @@ register_probe("form.magnet_pockets_do_not_break_wall")(
     lambda form, ctx: check_magnet_pockets_do_not_break_wall(form))
 register_probe("form.dock_pockets_dry")(
     lambda form, ctx: check_dock_pockets_dry(form))
+register_probe("form.screen_open_area_ratio_ok")(
+    lambda form, ctx: check_screen_open_area_ratio_ok(form))
+register_probe("form.screen_debris_capacity_ok")(
+    lambda form, ctx: check_screen_debris_capacity_ok(form))
+register_probe("form.collector_sump_is_lowest_point")(
+    lambda form, ctx: check_collector_sump_is_lowest_point(form))
+register_probe("form.tray_floor_slopes_to_sump")(
+    lambda form, ctx: check_tray_floor_slopes_to_sump(form))
+register_probe("form.basket_not_transverse_flow_barrier")(
+    lambda form, ctx: check_basket_not_transverse_flow_barrier(form))
+register_probe("form.no_standing_water_before_screen")(
+    lambda form, ctx: check_no_standing_water_before_screen(form))
 register_probe("form.lightweight_windows_dry_ok")(
     lambda form, ctx: check_lightweight_windows_dry_ok(form))
 def check_root_chamber_ok(form: PartForm) -> Finding:

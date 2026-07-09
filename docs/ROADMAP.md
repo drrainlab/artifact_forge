@@ -195,6 +195,43 @@ contained; 3 режима съёмности; golden vertical_farm_row_3x1_root_
 **VF-5B** (хекс-соты с дренажными прорезями) — отдельно: желобки уже
 функциональны, соты = разделение корней ценой прорезей.
 
+**VF-6 Endcap magnetic docking ✅ (2026-07-09)**: коллектор и inlet cap
+магнитно докуются на верх торцевых стенок концевых модулей (param-gate
+`endcap_dock`/`dock_magnets`, оп `endcap_dock_pockets`, чек
+`assembly.endcap_docks_to_rail` — honesty-closer: магнит без встречного
+кармана = FAIL).
+
+**VF-7 Print-feedback pass ✅ (2026-07-09)**: правки по осмотру печати —
+манифолдная сетка кассеты (ячейка 6→8 мм + always-on `mesh_manifold`),
+коллектор сливается насухо (слив = низшая точка, уклон 2.5°), габариты под
+P1S (модуль 248→205), cap support-free (print-ориентация `saddle_up`).
+
+**VF-8 Drain screen basket + maintenance ✅ (2026-07-09)**: съёмная
+корзина-фильтр в сампе коллектора над сливом (`drain_screen_v1`, оп
+`screen_wall_slots`, стык `drop_in_screen`). Три fail-safe режима
+(`normal_no_bypass` обязателен; zero unfiltered bypass по умолчанию — засор
+виден в открытом лотке; `emergency_unfiltered_bypass` только через
+`allow_emergency_bypass` opt-in + флаг отчёта). Чеки
+`screen_open_area_ratio_ok` (≥4× бора, ~436 мм²), `screen_debris_capacity_ok`
+(≥3 мл), `assembly.screen_normal_no_bypass`. Machine-derived блок
+`maintenance` в water_report (honest_note «DEBRIS-REDUCED water»). Pump
+topology док-нота (gravity→резервуар→насос, НЕ прямое всасывание).
+
+**VF-8.1 Lowered Sump + Radial Funnel ✅ (2026-07-09)**: новый примитив кернела
+`FunnelCutFeature` — первый пол с уклоном по X И Y (сходящийся скошенный
+фрустум, `cut_funnel` ruled-лофтом). Коллектор = воронка-колодец, слив в
+абсолютно нижней точке, drop-in ведёрко в колодце («вода падает В корзину, не
+поперёк лотка»); +6 чеков (sump_is_lowest / slopes_to_sump / not_barrier /
+no_standing_before / drain_inside_footprint / removable).
+
+**VF-8 Capped Inlet ✅ (2026-07-09, баг-фикс)**: пользователь на рендере поймал —
+cap капал в сквозной `lap_receiver` первого рейла → вода НАСКВОЗЬ мимо жёлоба.
+Явный `inlet_mode: lap_receiver|capped`; первый рейл capped (сплошное дно), lap-
+приёмник только у рейлов, кормимых губой предыдущего. Новый
+`assembly.drip_lands_on_floor` (эмит `saddle_hang` только для cap↔rail.feed).
+Архитектура: `cap → rail_1(capped) → lap → collector → вертикально вниз`.
+**VF-8.2** supportless-cap cleanup — отдельно.
+
 Впереди: **VF-4.3** anti-slide удержание ряда на смонтированном под
 уклоном профиле (посадка полная, продольного замка нет);
 **lightweight_dry_shell_v1** generic-модификатор; **VF-5 Cassette Family**
@@ -588,6 +625,13 @@ A1) и модификаторы (кернел уже умеет):
   в build package; no DRM in core (entitlement только в cloud).
 - **PK-4 Web Studio** ⬜ — платный конфигуратор поверх core API;
   Cockpit остаётся open local debugger.
+
+Подлиния **CP — Community Packs** (канон: [ECOSYSTEM.md](ECOSYSTEM.md),
+«Community Operating Model»): CP-1 Pack Template ⬜ · CP-2 Community
+Registry ⬜ · CP-3 Certification Review ⬜ · CP-4 Maintainer/Governance ⬜.
+Правило: community pack может быть полезным без сертификата; Certified
+обязан быть «boringly reliable». Публикация репо гейтится OS-чеклистом
+(OS-1 лицензия … OS-8 public roadmap, см. ECOSYSTEM.md).
 
 ---
 

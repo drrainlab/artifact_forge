@@ -131,6 +131,12 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.magnet_pockets_outside_water_zone", Level.FORM, "every module magnet pocket sits in dry body — no magnet face sees water"),
         _decl("form.magnet_pockets_do_not_break_wall", Level.FORM, "magnet pockets stay blind (never pierce the face) and keep >= 1.2 plastic to any wet zone"),
         _decl("form.dock_pockets_dry", Level.FORM, "endcap dock magnets are blind vertical (Z) pockets, press-fit, >= 1.2 plastic to every wet zone — the collector/cap arm docks onto the rail wall top"),
+        _decl("form.screen_open_area_ratio_ok", Level.FORM, "VF-8 drain screen: total open area (bottom mesh + wall slots) is generous vs the drain bore so the basket never chokes the flow"),
+        _decl("form.screen_debris_capacity_ok", Level.FORM, "VF-8 drain screen: the basket holds a real debris reservoir above the mesh — not full after one watering"),
+        _decl("form.collector_sump_is_lowest_point", Level.FORM, "VF-8: the strainer sump well floor is the collector's absolute low point and the vertical drain descends from it"),
+        _decl("form.tray_floor_slopes_to_sump", Level.FORM, "VF-8: the collector tray floor slopes to the sump from every side — a converging funnel cut with its mouth over the drain"),
+        _decl("form.basket_not_transverse_flow_barrier", Level.FORM, "VF-8: the strainer sits in a sunken well fed by a funnel wider than the mouth — water falls IN from every side rather than being walled off across the tray"),
+        _decl("form.no_standing_water_before_screen", Level.FORM, "VF-8: the funnel descends monotonically to the drain at the sump low point, so nothing stands upstream of the screen"),
         _decl("form.lightweight_windows_dry_ok", Level.FORM, "lightweight dry-shell windows: open-bottom, clear of every functional zone, >= 2.4 cover under the seat floor, ribs present between windows"),
         _decl("form.substrate_retained_under_mount", Level.FORM, "honesty note: the substrate must not creep downstream under the mounted slope (static for coco; real retention checks arrive with mat cassettes)"),
         # -- VF-4.1 printability & collector hardening -------------------------
@@ -221,6 +227,10 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("assembly.collector_removable_by_hand", Level.ASSEMBLY, "no collector material above the captured lip — the receiver has no ceiling, so the collector lifts straight off"),
         _decl("assembly.collector_catches_root_drainage", Level.ASSEMBLY, "the collector tray mouth spans the final rail's root troughs so the passive root drainage lands in the tray"),
         _decl("assembly.endcap_docks_to_rail", Level.ASSEMBLY, "the endcap's dock magnets land on a matching rail dock pocket across the arm/wall-top contact — the magnetic dock actually mates in the pose"),
+        _decl("assembly.screen_normal_no_bypass", Level.ASSEMBLY, "VF-8: the drop-in screen basket seats over the collector drain so water reaches it only through the mesh (no side bypass), can't slide off the drain, lifts out tool-free, and by default its rim sits above the tray overflow so a clog spills the open tray visibly"),
+        _decl("assembly.drain_inside_screen_footprint", Level.ASSEMBLY, "VF-8: the collector drain bore is fully enclosed by the basket footprint in the assembled pose — water enters only through the mesh"),
+        _decl("assembly.screen_removable_from_sump", Level.ASSEMBLY, "VF-8: the basket stands proud of the sump well and lifts straight out tool-free (drop-in, no snap/screw)"),
+        _decl("assembly.drip_lands_on_floor", Level.ASSEMBLY, "VF-8: the inlet cap drips onto a CAPPED rail inlet (solid channel floor), not into a through open-bottom lap receiver — so the water enters the channel instead of falling through to the level below"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),

@@ -26,6 +26,7 @@ from .part import (
     BoreFeature,
     ChannelCutFeature,
     CutBoxFeature,
+    FunnelCutFeature,
     HoleFeature,
     PinFeature,
     PlateFeature,
@@ -74,6 +75,7 @@ class RecipeState:
     holes: list[HoleFeature] = field(default_factory=list)
     cutboxes: list[CutBoxFeature] = field(default_factory=list)
     channels: list[ChannelCutFeature] = field(default_factory=list)
+    funnel_cuts: list[FunnelCutFeature] = field(default_factory=list)
     bores: list[BoreFeature] = field(default_factory=list)
     ribs: list[RibFeature] = field(default_factory=list)
     plates: list[PlateFeature] = field(default_factory=list)

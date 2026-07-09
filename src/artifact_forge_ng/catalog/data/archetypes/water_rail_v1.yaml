@@ -107,6 +107,13 @@ parameters:
      description: "under-cassette volume: skeleton (-45% plastic, overflow
        drips through) | root_chamber (blind bottom contains overflow +
        open-top root troughs drained forward by the mount) — VF-5"}
+  inlet_mode:
+    {type: choice, choices: ["lap_receiver", "capped"], default: "lap_receiver",
+     role: assembly, exposed: true,
+     description: "how the inlet is fed (VF-8): lap_receiver = through
+       open-bottom pocket that a PREVIOUS rail laps its lip into; capped = a
+       SOLID inlet floor for the FIRST rail, which is fed by a drip from the
+       inlet cap (the drip must land on the floor, not fall through a receiver)"}
   trough_w:
     {type: length, default: 18mm, min: 18mm, max: 40mm, role: functional,
      description: "root trough width (root_chamber) — cassette spans it.
@@ -213,6 +220,7 @@ form:
         trough_depth: trough_depth
         profile: profile
         profile_inset: profile_inset
+        inlet_mode: inlet_mode
     - op: lap_outlet_lip
       id: lap_out
       params:
@@ -223,6 +231,7 @@ form:
       params:
         pocket_len: lap_pocket_len
         side_clearance: lap_side_clearance
+        inlet_mode: inlet_mode
     - op: edge_magnet_pockets
       id: magnets
       params:

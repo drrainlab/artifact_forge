@@ -24,6 +24,7 @@ from .part import (
     ChannelCutFeature,
     CutBoxFeature,
     FieldFeature,
+    FunnelCutFeature,
     RibFeature,
 )
 from .profiles_plate import rounded_rect_loop
@@ -220,6 +221,9 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         face_gap=face_gap, flush_pitch=w + face_gap,
         lw_enabled=lw, lw_window_count=lw_windows,
         lw_rib=lw_rib, lw_span_max=lw_span_max,
+        # VF-8 inlet mode: 1.0 = capped (cap-fed, SOLID inlet floor, no through
+        # receiver); 0.0 = lap_receiver (fed by a previous rail's lap lip).
+        inlet_capped=1.0 if p.get("inlet_mode", "lap_receiver") == "capped" else 0.0,
     )
     state.datums["cassette_seat"] = {"at": [0.0, 0.0, seat_floor], "rotate": [0.0, 0.0, 0.0]}
     state.datums["module_origin"] = {"at": [0.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0]}
@@ -263,6 +267,7 @@ _register(RecipeOpDecl(
         "trough_w": ("length", 26.0), "trough_rib": ("length", 6.0),
         "trough_depth": ("length", 12.0),
         "profile": ("choice", "2020"), "profile_inset": ("length", 24.0),
+        "inlet_mode": ("choice", "lap_receiver"),
     },
     validators=(
         "form.water_channel_constant_depth_ok", "form.water_channel_dims_ok",
@@ -354,12 +359,22 @@ def _lap_inlet_receiver(state: RecipeState, p: dict[str, Any], op_id: str) -> No
         raise RecipeError("lap_inlet_receiver needs a water_rail_body base")
     pocket_len = p.get("pocket_len", 6.0)
     side_clear = p.get("side_clearance", 0.4)
-    if not (0.3 <= side_clear <= 0.5):
-        raise RecipeError(f"side_clearance {side_clear:g} outside 0.3..0.5")
     floor = f["channel_floor_z_inlet"]
     face = f["rail_y1"]
     pocket_w = f["channel_w"] + LAP_LIP_W_MARGIN + 2.0 * side_clear
     name = op_id or "lap_in"
+    # VF-8: a CAPPED inlet (the cap-fed first rail) has NO through receiver — the
+    # drip lands on the SOLID channel floor. Still emit the lap_receiver region
+    # (statically declared + referenced by the `inlet` interface) so it marks
+    # the feed WET ZONE, not a through lap pocket. No cut, no lap_pocket keys.
+    if p.get("inlet_mode", "lap_receiver") == "capped":
+        state.regions.append(Region(
+            "lap_receiver", RegionRole.TRANSIENT_WATER_PATH,
+            Box3(-pocket_w / 2.0, face - pocket_len - 0.5, floor,
+                 pocket_w / 2.0, face + 0.5, f["channel_top_z"])))
+        return
+    if not (0.3 <= side_clear <= 0.5):
+        raise RecipeError(f"side_clearance {side_clear:g} outside 0.3..0.5")
     pocket = Box3(-pocket_w / 2.0, face - pocket_len, -1.0,
                   pocket_w / 2.0, face + 0.5, floor + LAP_TOP_CLEAR)
     state.cutboxes.append(CutBoxFeature(name=f"{name}_lap_receiver", box=pocket))
@@ -374,7 +389,8 @@ def _lap_inlet_receiver(state: RecipeState, p: dict[str, Any], op_id: str) -> No
 _register(RecipeOpDecl(
     name="lap_inlet_receiver",
     kind="feature",
-    params={"pocket_len": ("length", 6.0), "side_clearance": ("length", 0.4)},
+    params={"pocket_len": ("length", 6.0), "side_clearance": ("length", 0.4),
+            "inlet_mode": ("choice", "lap_receiver")},
     validators=(
         "form.lap_joint_geometry_ok", "form.lap_slot_leak_path_controlled",
         "form.no_standing_water_ir", "topology.cutout_present",
@@ -816,6 +832,122 @@ _register(RecipeOpDecl(
 ))
 
 
+# -- screen_wall_slots (feature) -----------------------------------------------
+
+
+def _screen_wall_slots(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """VF-8 drain-screen basket features (on a substrate_tray_body cup): a FINE
+    bottom mesh (the filter — square through-cells) plus WIDE vertical wall
+    slots (fail-safe side-flow when the bottom silts up), and the sizing keys
+    (open area, debris reservoir, rim/floor z, footprint) the seat joint and
+    screen checks read. This does NOT reuse mesh_floor — that op carries
+    coco-cassette validators (cell 4-8mm, open >=0.45) a fine strainer must not
+    subscribe to."""
+    state.require_base("screen_wall_slots")
+    f = state.frame
+    if "shell_h" not in f:
+        raise RecipeError("screen_wall_slots needs a substrate_tray_body base")
+    u0, v0, u1, v1 = f["outline_u0"], f["outline_v0"], f["outline_u1"], f["outline_v1"]
+    iu0, iv0, iu1, iv1 = f["inner_u0"], f["inner_v0"], f["inner_u1"], f["inner_v1"]
+    h, wall = f["shell_h"], f["shell_wall"]
+    floor_t = f.get("floor_t", 2.0)
+    cell, rib, margin = p.get("mesh_cell", 2.0), p.get("mesh_rib", 1.3), p.get("mesh_margin", 2.0)
+    slot_w = p.get("slot_w", 7.0)
+    slot_h = p.get("slot_h", 6.0)
+    name = op_id or "screen"
+
+    # -- fine bottom mesh (the filter) — square through-cells, like mesh_floor
+    mu0, mv0 = iu0 + margin, iv0 + margin
+    mu1, mv1 = iu1 - margin, iv1 - margin
+    if mu1 - mu0 < cell or mv1 - mv0 < cell:
+        raise RecipeError("screen floor too small for a single mesh cell")
+    pitch = cell + rib
+    nx = max(1, int((mu1 - mu0 + rib) // pitch))
+    ny = max(1, int((mv1 - mv0 + rib) // pitch))
+    x0 = (mu0 + mu1) / 2.0 - (nx - 1) * pitch / 2.0
+    y0 = (mv0 + mv1) / 2.0 - (ny - 1) * pitch / 2.0
+    half = cell / 2.0
+    polygons = tuple(
+        ((x0 + i * pitch - half, y0 + j * pitch - half),
+         (x0 + i * pitch + half, y0 + j * pitch - half),
+         (x0 + i * pitch + half, y0 + j * pitch + half),
+         (x0 + i * pitch - half, y0 + j * pitch + half))
+        for i in range(nx) for j in range(ny)
+    )
+    state.fields.append(FieldFeature(
+        plane_z=floor_t, centers=(), cell=cell, depth=floor_t + 1.0,
+        pattern="slots", polygons=polygons, min_ligament=rib,
+    ))
+    state.regions.append(Region(
+        "mesh_canvas", RegionRole.SUBSTRATE_SUPPORT_MESH,
+        Box3(mu0, mv0, -0.1, mu1, mv1, floor_t)))
+    mesh_area = nx * ny * cell * cell
+
+    # -- wide vertical wall slots (the primary filter surface for a compact
+    # cup — the shallow-tray basket has little bottom mesh, so ALL FOUR walls
+    # carry tall side slots). Fail-safe side-flow: a silted bottom drains out
+    # the sides, and a clog rises visibly in the OPEN tray.
+    z0 = floor_t + 1.5
+    z1 = min(z0 + slot_h, h - 2.0)
+    slot_span = max(0.0, z1 - z0)
+    inner_x, inner_y = iu1 - iu0, iv1 - iv0
+    slot_area = 0.0
+
+    def _wall_slots(span, along_x, w0, w1):
+        n = max(1, int((span + 3.0) // (slot_w + 3.0)))
+        used = n * slot_w + (n - 1) * 3.0
+        start = -used / 2.0 + slot_w / 2.0
+        area = 0.0
+        for i in range(n):
+            c = start + i * (slot_w + 3.0)
+            if along_x:
+                box = Box3(c - slot_w / 2.0, w0, z0, c + slot_w / 2.0, w1, z1)
+            else:
+                box = Box3(w0, c - slot_w / 2.0, z0, w1, c + slot_w / 2.0, z1)
+            state.cutboxes.append(CutBoxFeature(
+                name=f"{name}_slot_{'x' if along_x else 'y'}{i}_{w0:.0f}", box=box))
+            area += slot_w * slot_span
+        return n, area
+
+    nx_f, a = _wall_slots(inner_x, True, v0 - 1.0, v0 + wall + 1.0); slot_area += a
+    nx_b, a = _wall_slots(inner_x, True, v1 - wall - 1.0, v1 + 1.0); slot_area += a
+    ny_l, a = _wall_slots(inner_y, False, u0 - 1.0, u0 + wall + 1.0); slot_area += a
+    ny_r, a = _wall_slots(inner_y, False, u1 - wall - 1.0, u1 + 1.0); slot_area += a
+    n = nx_f + nx_b + ny_l + ny_r
+
+    inner_w = iu1 - iu0
+    inner_d = iv1 - iv0
+    debris_ml = (inner_w * inner_d * max(0.0, h - floor_t - 2.0)) / 1000.0
+    state.frame.update(
+        screen_u0=u0, screen_v0=v0, screen_u1=u1, screen_v1=v1,
+        screen_rim_z=h, screen_floor_z=floor_t, screen_wall_t=wall,
+        screen_slot_count=float(n), screen_mesh_cells=float(nx * ny),
+        screen_mesh_area_mm2=mesh_area, screen_slot_area_mm2=slot_area,
+        screen_open_area_mm2=mesh_area + slot_area,
+        screen_debris_volume_ml=debris_ml,
+    )
+
+
+_register(RecipeOpDecl(
+    name="screen_wall_slots",
+    kind="feature",
+    params={
+        "mesh_cell": ("length", 2.0), "mesh_rib": ("length", 1.3),
+        "mesh_margin": ("length", 2.0),
+        "slot_w": ("length", 7.0), "slot_h": ("length", 6.0),
+    },
+    validators=(
+        "form.screen_open_area_ratio_ok",
+        "form.screen_debris_capacity_ok",
+        "form.min_ligament_ok",
+        "topology.hex_field_present",
+    ),
+    apply=_screen_wall_slots,
+    description="VF-8 drain-screen: fine bottom filter mesh + wide fail-safe "
+                "wall slots + sizing keys for a drop-in strainer basket",
+))
+
+
 # -- retainer_frame_body (base) -----------------------------------------------
 
 
@@ -1127,10 +1259,24 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
     # floor's low point — the tube pushes in FROM BELOW and routes under the
     # row (no sagging horizontal ceiling, no teardrop trick needed).
     drain_extension = p.get("drain_extension", 10.0)
-    if not (8.0 - 1e-9 <= drain_extension <= 14.0 + 1e-9):
+    # A drop-in strainer needs a deeper tray so a radial funnel sump fits
+    # around the drain between the back wall and the docking arm — bump the
+    # back reach (and relax the band) when screen_seat is on.
+    screen_on = p.get("screen_seat", False)
+    if screen_on:
+        drain_extension = max(drain_extension, 12.0)
+    band_hi = 22.0 if screen_on else 14.0
+    if not (8.0 - 1e-9 <= drain_extension <= band_hi + 1e-9):
         raise RecipeError(
-            f"drain_extension {drain_extension:g} outside 8..14")
+            f"drain_extension {drain_extension:g} outside 8..{band_hi:g}")
     drain_grip = p.get("drain_grip", 12.0)  # solid depth for the push-in tube
+    # Strainer basket footprint (compact sink-filter cup) — read early so the
+    # drain can be centred in the arm-clear tray for a radial funnel sump.
+    bkt_x = p.get("screen_seat_w", 24.0)
+    bkt_y = p.get("screen_seat_d", 13.0)
+    s_clear = p.get("screen_seat_clearance", 1.0)
+    mouth_x = bkt_x + 2.0 * s_clear
+    mouth_y = bkt_y + 2.0 * s_clear
 
     rim_z = 3.0
     # The catch floor sits catch_fall below the handover datum so the mouth
@@ -1144,7 +1290,21 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
     # empties instead of pooling at the back (before, the drain sat forward
     # of the deep end and water stood behind it). The bore stays inboard of
     # the sump wall so it keeps solid grip for the push-in tube.
-    y_drain = y_drain_wall + 3.0 + bore_d / 2.0 + 1.0
+    y_drain = y_drain_wall + 3.0 + bore_d / 2.0 + 1.0  # snug at the back (default)
+    if screen_on:
+        # Centre the sump well between the back wall and the arm-clear tray
+        # front (the docking arm roofs y >= -1.5), so a radial funnel fits
+        # around the drain with the basket overhanging the bore on every side.
+        arm_clear = -1.5 - 2.0
+        lo = y_drain_wall + wall + mouth_y / 2.0   # back: funnel touches the wall
+        hi = arm_clear - mouth_y / 2.0             # front: clear of the arm roof
+        grip_lo = y_drain_wall + 3.0 + bore_d / 2.0 + 1.0  # keep the bore grip
+        lo = max(lo, grip_lo)
+        if lo > hi + 1e-6:
+            raise RecipeError(
+                f"strainer sump {mouth_y:g} deep does not fit the tray "
+                f"({hi - lo:g} short) — raise drain_extension")
+        y_drain = (lo + hi) / 2.0
     run = 1.6 - y_drain  # channel span: catch -> the drain (the low point)
     depth_end = depth_start + run * math.tan(math.radians(slope))
     floor_low = rim_z - depth_end  # deepest floor point (design z), at the drain
@@ -1188,6 +1348,60 @@ def _collector_endcap_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
         d=bore_d, span=(0.0, floor_low + dz + 0.5),
         overshoot=(1.0, 1.0),
     ))
+    # Strainer sump (VF-8, param-gated): a LOWERED sump WELL around the drain
+    # fed by a RADIAL FUNNEL — the tray floor slopes down to the sump from
+    # every side (a FunnelCutFeature, the kernel's first floor that slopes in
+    # both X and Y), the drain sits at the sump's absolute low point, and a
+    # compact drop-in strainer basket seats in the well OVER the drain. Water
+    # falls INTO the basket (it is not a wall across the tray); a clog rises
+    # visibly in the OPEN tray. The seat FRAME KEYS + datum are ALWAYS
+    # published; the funnel + well geometry is cut only when screen_seat is on.
+    sx = mouth_x / 2.0                        # mouth = basket + clearance (set early)
+    my0, my1 = y_drain - mouth_y / 2.0, y_drain + mouth_y / 2.0
+    tray_floor_z = floor_low + dz            # channel low point = tray floor at drain
+    seat_floor_z = tray_floor_z
+    if screen_on:
+        sump_depth = p.get("screen_sump_depth", 5.0)
+        seat_floor_z = tray_floor_z - sump_depth
+        # radial funnel opening: reaches the back sump wall and forward to the
+        # arm-clear tray front, converging to the well mouth. Skewed (mouth at
+        # the drain, opening spanning the tray) so it drains the whole floor.
+        top_back = min(y_drain_wall + wall, my0)          # touch the back wall
+        top_front = max(-1.5 - 2.0, my1)                  # stay clear of the arm roof
+        top_x = min(p.get("screen_funnel_w", 74.0), tray_w_inner - 6.0)
+        top_x = max(top_x, mouth_x + 2.0)                 # keep mouth enclosed
+        top_cy = (top_back + top_front) / 2.0
+        state.funnel_cuts.append(FunnelCutFeature(
+            name=f"{name}_sump_funnel",
+            bottom_center=(0.0, y_drain), top_center=(0.0, top_cy),
+            z_top=tray_floor_z, z_bottom=seat_floor_z,
+            top=(top_x, top_front - top_back), bottom=(mouth_x, mouth_y),
+        ))
+        # Open the roof over the well: the sump reaches BEHIND the drain but the
+        # tray channel only opens the top down to the drain, so the well's back
+        # half would be roofed. This vertical shaft (well mouth up to the rim)
+        # lets the basket drop in and a brush reach; it drains through the funnel
+        # + bore below (no_standing_water via the through-bore exemption).
+        state.cutboxes.append(CutBoxFeature(
+            name=f"{name}_sump_shaft",
+            box=Box3(-sx, my0, tray_floor_z, sx, my1, rim_z + dz)))
+        state.regions.append(Region(
+            "screen_seat", RegionRole.INTERFACE_KEEPOUT,
+            Box3(-sx, my0, seat_floor_z, sx, my1, rim_z + dz)))
+        # The strainer-sump frame keys + datum are published ONLY when a sump is
+        # actually cut. A base collector must publish NO screen_sump_floor_z, so
+        # the four funnel checks (checks_water.py) stay on their `is None -> n/a`
+        # gate instead of failing on a non-existent sump.
+        state.frame.update(
+            screen_seat_u0=-sx, screen_seat_v0=my0,
+            screen_seat_u1=sx, screen_seat_v1=my1,
+            screen_seat_floor_z=seat_floor_z, screen_seat_clearance=s_clear,
+            screen_seat_drain_y=y_drain, screen_seat_drain_d=bore_d,
+            screen_sump_floor_z=seat_floor_z, screen_funnel_top_z=tray_floor_z,
+            tray_overflow_z=rim_z + dz,
+        )
+        state.datums["screen_seat"] = {
+            "at": [0.0, y_drain, seat_floor_z], "rotate": [0.0, 0.0, 0.0]}
     # No tuck strip (VF correction): the cascade's relief recess is gone —
     # the wall face is solid, and the lap lip carries the drip band
     # lip_overhang outside the face, well inside the tray mouth. A strip
@@ -1294,6 +1508,10 @@ _register(RecipeOpDecl(
         "magnet_d": ("length", 6.0), "magnet_t": ("length", 2.0),
         "dock_fit_clearance": ("length", 0.2),
         "dock_x": ("length", 22.0), "dock_inset": ("length", 7.0),
+        "screen_seat": ("bool", False),
+        "screen_seat_w": ("length", 24.0), "screen_seat_d": ("length", 13.0),
+        "screen_sump_depth": ("length", 5.0), "screen_funnel_w": ("length", 74.0),
+        "screen_seat_clearance": ("length", 0.75),
     },
     validators=(
         "form.hose_bore_ok", "form.collector_tray_drains",

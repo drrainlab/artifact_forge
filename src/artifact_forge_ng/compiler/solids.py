@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 import cadquery as cq
 
 from ..cad.booleans import keep_largest, weld
-from ..cad.bores import cut_bore, cut_box, cut_channel
+from ..cad.bores import cut_bore, cut_box, cut_channel, cut_funnel
 from ..cad.fillets import safe_fillet_edges, safe_fillet_ladder
 from ..cad.geometry import Geometry
 from ..cad.holes import cut_countersunk_hole
@@ -140,6 +140,14 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
         log.channels_cut += int(cut)
         if not cut:
             log.notes.append(f"channel cut {channel.name!r} could not be applied")
+
+    # Funnel cuts are base-level like box/channel cuts: the radial sloped sump
+    # floor is carved before additive ribs.
+    for funnel in form.funnel_cuts:
+        mass, cut = cut_funnel(mass, funnel)
+        log.channels_cut += int(cut)
+        if not cut:
+            log.notes.append(f"funnel cut {funnel.name!r} could not be applied")
 
     for rib in form.ribs:
         b = rib.box

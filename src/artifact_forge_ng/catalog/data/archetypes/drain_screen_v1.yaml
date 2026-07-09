@@ -1,0 +1,145 @@
+schema: archetype/v1
+id: drain_screen_v1
+version: 1
+object_class: water_drain_screen
+maturity: sandbox_buildable
+description: >
+  Vertical Farm Pack VF-8: the Drain Screen Basket — a drop-in strainer that
+  seats in the collector sump over the vertical drain and catches coarse coco
+  chips and root fragments before the water reaches the reservoir/pump. Lift
+  out, rinse, drop back — tool-free (rim finger notches). A fine mesh floor is
+  the filter; wide vertical wall slots are the fail-safe side-flow so a silted
+  bottom drains sideways and, when clogged, water rises visibly in the OPEN
+  collector tray instead of backing up. The basket's flange nests in the
+  collector's sump ledge so water reaches the drain only through the mesh (no
+  bypass). Honest: this gives DEBRIS-REDUCED water, not clean water — fine coco
+  dust may pass, and the exact mesh size vs clog rate is a grow-test.
+
+provides_features:
+  - debris_screen
+  - substrate_mesh_floor
+  - tool_free_removal
+
+parameters:
+  screen_l:
+    {type: length, default: 24mm, min: 18mm, max: 90mm,
+     role: functional, exposed: true,
+     description: "basket footprint along X (the wide dimension); the outer is
+       ~+6mm and must match the collector's funnel-well mouth"}
+  screen_w:
+    {type: length, default: 13mm, min: 10mm, max: 24mm,
+     role: functional, exposed: true,
+     description: "basket footprint along Y — must overhang the collector drain
+       bore so water passes only through the mesh/slots (fits the shallow sump)"}
+  screen_h:
+    {type: length, default: 20mm, min: 14mm, max: 30mm,
+     role: structural, exposed: true,
+     description: "basket height — seats on the sump-well floor with the rim
+       ABOVE the tray overflow so a clog spills the open tray (zero bypass)"}
+  screen_wall:
+    {type: length, default: 1.6mm, min: 1.2mm, max: 3mm, role: structural,
+     description: "basket wall — named distinctly so the row's shared structural
+       `wall` (thick rail/collector walls) does NOT thicken this small cup"}
+  floor_t:
+    {type: length, default: 1.6mm, min: 1.2mm, max: 3mm, role: structural}
+  corner_r:
+    {type: length, default: 2mm, min: 1mm, max: 4mm, role: aesthetic}
+  mesh_cell:
+    {type: length, default: 2mm, min: 1.5mm, max: 3mm,
+     role: functional, exposed: true,
+     description: "fine mesh opening — catches coco chips and root fragments;
+       coarse enough to tessellate manifold. Fine dust may pass (grow-test)"}
+  mesh_rib:
+    {type: length, default: 1.3mm, min: 1.2mm, max: 2mm, role: manufacturing}
+  mesh_margin:
+    {type: length, default: 2mm, min: 1.5mm, max: 6mm, role: structural,
+     description: solid rim inside the walls before the mesh starts}
+  slot_w:
+    {type: length, default: 7mm, min: 4mm, max: 12mm, role: functional,
+     description: "wide wall drainage slot — fail-safe side-flow, not a fine
+       filter; keeps a silted basket draining"}
+  slot_h:
+    {type: length, default: 7mm, min: 4mm, max: 12mm, role: functional}
+  notch_w:
+    {type: length, default: 16mm, min: 16mm, max: 24mm, role: functional,
+     description: rim finger notch width for tool-free lift-out}
+  notch_d:
+    {type: length, default: 6mm, min: 6mm, max: 12mm, role: functional}
+
+constraints:
+  - 2 * screen_wall + 2 * mesh_margin + mesh_cell <= min(screen_l, screen_w)
+  - floor_t + 2 <= screen_h
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: substrate_tray_body
+      id: cup
+      params:
+        cassette_l: screen_l
+        cassette_w: screen_w
+        h: screen_h
+        wall: screen_wall
+        floor_t: floor_t
+        corner_r: corner_r
+    - op: lift_tabs
+      id: lift
+      params:
+        notch_w: notch_w
+        notch_d: notch_d
+    - op: screen_wall_slots
+      id: screen
+      params:
+        mesh_cell: mesh_cell
+        mesh_rib: mesh_rib
+        mesh_margin: mesh_margin
+        slot_w: slot_w
+        slot_h: slot_h
+
+regions:
+  - {id: mesh_canvas, role: substrate_support_mesh, editable: false,
+     label: "Screen mesh",
+     description: "the filter — fully specified by the op; no modifier re-patterns it"}
+  - {id: floor, role: aesthetic_lightening, editable: false, label: "Basket floor"}
+  - {id: cup, role: mounting_surface, editable: false, label: "Basket body"}
+
+surface_style: molded_utility_part
+
+# The drop-in mate is DATUM-BASED, not a port (the saddle_hang / hose_port
+# precedent): the basket drops into a sump recess UNDER the collector arm,
+# where an interface normal cannot point cleanly outward. The mate is fully
+# specified by the `seat` datum + the `drop_in_screen` joint, and its honesty
+# is proven by assembly.screen_normal_no_bypass — no interface port needed.
+
+validators:
+  - form.shell_walls_ok
+  - form.min_ligament_ok
+  - form.lift_access_ok
+  - form.screen_open_area_ratio_ok
+  - form.screen_debris_capacity_ok
+  - topology.cutout_present
+  - topology.single_connected_solid
+  - topology.hex_field_present
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - debris_screen
+    - tool_free_removal
+  must_not_have:
+    # NOT closed_water_reservoir / dead_water_pocket: those are verified by
+    # form.no_standing_water_ir, which needs a TRANSIENT_WATER_PATH region to
+    # protect. The strainer is an OPEN mesh cup with no such region — it is by
+    # construction not a sealed vessel (open top + mesh floor + wall slots),
+    # and asserting an anti-feature we cannot check is a hallucination. The
+    # debris_screen + open-area + debris-capacity checks carry that intent.
+    - hidden_wet_cavity  # checked (n/a — no wet region → no unbrushable crevice)
+  invariants:
+    - mesh_cell >= 1.5 and mesh_cell <= 3.0
+    - screen_h >= 10.0

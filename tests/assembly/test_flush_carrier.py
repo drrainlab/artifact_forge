@@ -444,3 +444,50 @@ def test_undocked_collector_no_dock_finding():
     asm, states, poses = _row_dock(collector_form(tray_w=160.0))  # no dock magnets
     assert "assembly.endcap_docks_to_rail" not in by_check(
         carrier_findings(asm, states, poses))
+
+
+# -- VF-8: the drop-in drain screen seats over the collector drain -------------
+
+
+def _screen_mate(rim_z=15.0, allow_bypass=False, dx=0.0):
+    """A collector strainer seat + a drop-in basket, posed by the seat datum
+    mate (basket origin -> collector screen_seat at the drain)."""
+    from artifact_forge_ng.assembly.joints import JOINT_TYPES
+    coll = SimpleNamespace(frame={
+        "screen_seat_u0": -23.0, "screen_seat_v0": -19.3,
+        "screen_seat_u1": 23.0, "screen_seat_v1": -5.3,
+        "screen_seat_floor_z": 10.8, "screen_seat_clearance": 0.5,
+        "screen_seat_drain_y": -12.3, "screen_seat_drain_d": 9.4,
+        "tray_overflow_z": 24.11})
+    screen = SimpleNamespace(frame={
+        "screen_u0": -22.0 + dx, "screen_v0": -6.0, "screen_u1": 22.0 + dx,
+        "screen_v1": 6.0, "screen_rim_z": rim_z, "screen_floor_z": 1.6})
+    pose = Pose(rotate=(0, 0, 0), translate=(0.0, -12.3, 10.8))
+    joint = JointUse(type="drop_in_screen", a="c.screen_seat", b="s.seat",
+                     rotate=[0, 0, 0],
+                     params={"allow_emergency_bypass": allow_bypass})
+    return JOINT_TYPES["drop_in_screen"].ir_check(coll, screen, pose, joint)[0]
+
+
+def test_screen_seats_no_bypass():
+    f = _screen_mate()
+    assert f.status is Status.PASS, f.message
+    assert "mesh-only" in f.message
+
+
+def test_screen_rim_below_overflow_fails():
+    f = _screen_mate(rim_z=11.0)  # rim posed 21.8 < 24.11 overflow, no opt-in
+    assert f.status is Status.FAIL
+    assert "unfiltered" in f.message.lower()
+
+
+def test_screen_emergency_bypass_opt_in_reported():
+    f = _screen_mate(rim_z=11.0, allow_bypass=True)
+    assert f.status is Status.PASS
+    assert "emergency_unfiltered_bypass" in f.message
+
+
+def test_screen_shifted_off_drain_bypasses():
+    f = _screen_mate(dx=18.0)  # basket slid so the drain pokes out one side
+    assert f.status is Status.FAIL
+    assert "bypass" in f.message.lower() or "past the drain" in f.message

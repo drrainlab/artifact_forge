@@ -578,6 +578,33 @@ features:
       - form.dock_pockets_dry
       - assembly.endcap_docks_to_rail
 
+  - id: debris_screen
+    description: >
+      VF-8 drop-in strainer basket: a fine mesh floor catches coarse coco
+      chips and root fragments (debris-reduced water, not clean), wide wall
+      slots are the fail-safe side-flow, a real debris reservoir above the
+      mesh, tool-free lift-out, and a manifold-printable mesh
+    verified_by:
+      - form.screen_open_area_ratio_ok
+      - form.screen_debris_capacity_ok
+      - form.lift_access_ok
+      - manufacturing.mesh_manifold
+
+  - id: strainer_seat
+    description: >
+      VF-8 collector LOWERED SUMP WELL fed by a radial funnel — the tray floor
+      slopes to the drain from every side, the drain sits at the absolute low
+      point, and a drop-in strainer basket seats in the well OVER it (water
+      falls in, not a barrier; no bypass; a clog spills the open tray visibly)
+    verified_by:
+      - assembly.screen_normal_no_bypass
+      - assembly.drain_inside_screen_footprint
+      - assembly.screen_removable_from_sump
+      - form.collector_sump_is_lowest_point
+      - form.tray_floor_slopes_to_sump
+      - form.basket_not_transverse_flow_barrier
+      - form.no_standing_water_before_screen
+
   - id: substrate_mesh_floor
     description: >
       flat orthogonal through-mesh across the cassette floor — holds coco,
@@ -716,6 +743,7 @@ features:
       - assembly.fluid_joint_ir
       - assembly.no_orphan_ports
       - assembly.row_drains_under_mount
+      - assembly.drip_lands_on_floor
 
   - id: row_flush_integrity
     description: >

@@ -62,7 +62,7 @@ parts:
       schema: product/v1
       id: flush_rail_1
       archetype: water_rail_v1@2
-      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 95mm, under_cassette: root_chamber, endcap_dock: back}
+      params: {profile: "2020", magnet_enabled: true, magnet_x_offset: 95mm, under_cassette: root_chamber, endcap_dock: back, inlet_mode: capped}
       manufacturing:
         material: PETG
         support_policy: none
@@ -128,7 +128,18 @@ parts:
       schema: product/v1
       id: flush_collector
       archetype: collector_endcap_v1@1
-      params: {tray_w: 120mm, dock_magnets: true}
+      params: {tray_w: 120mm, dock_magnets: true, screen_seat: true}
+      manufacturing:
+        material: PETG
+        support_policy: none
+        print_orientation: as_modeled
+        bed: [250mm, 250mm, 250mm]
+  - ref: screen
+    product:
+      schema: product/v1
+      id: flush_drain_screen
+      archetype: drain_screen_v1@1
+      params: {}   # compact drop-in cup — defaults match the collector well
       manufacturing:
         material: PETG
         support_policy: none
@@ -199,6 +210,11 @@ joints:
   - type: saddle_hang
     a: rail_3.drain_edge
     b: collector.rail_in
+    rotate: [0, 0, 0]
+  # VF-8: the drain screen basket drops into the collector sump over the drain
+  - type: drop_in_screen
+    a: collector.screen_seat
+    b: screen.seat
     rotate: [0, 0, 0]
   # carrier: pose each profile off rail_1, verify the rest
   - type: profile_perch

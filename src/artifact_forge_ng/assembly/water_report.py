@@ -225,6 +225,33 @@ def _row_rollup(
     else:
         overflow = {"status": "contained"}
         removal = None
+
+    # Maintenance / service workflow (VF-8): a machine-derived cleaning story
+    # from the parts actually present — the "how do I service this row" answer
+    # alongside the water story. Everything is tool-free.
+    maintenance: dict[str, Any] = {
+        "collector": "open-top tray, brush/wipe; drains dry to the bottom bore",
+        "channel": "brush-reachable along its whole run via the seat corridors",
+        "tubes": "push-in — pull to clean, straight-through drip bore",
+        "all_tool_free": True,
+        "service_interval_hint": "grow-test",
+    }
+    screen_findings = findings_for("assembly.screen_normal_no_bypass")
+    if screen_findings:
+        bypass = any("emergency_unfiltered_bypass" in (s.message or "")
+                     for s in screen_findings)
+        maintenance["drain_screen"] = (
+            "lift-and-rinse, tool-free; a clog rises visibly in the OPEN tray "
+            "(no unfiltered bypass — debris never passed onward)"
+            if not bypass else
+            "lift-and-rinse, tool-free; allow_emergency_bypass ON — a clog "
+            "overtops the basket to the drain UNFILTERED, rinse now")
+        maintenance["honest_note"] = (
+            "the screen gives DEBRIS-REDUCED water, not clean water; mesh size "
+            "vs clog rate is a grow-test (agronomy unverified by CAD)")
+    if removal is not None:
+        maintenance["cassette"] = removal
+
     return {
         "kind": meta.get("row_kind", "tilted_flush_row"),
         "slope_source": ("mounted_profile" if mount is not None
@@ -245,6 +272,7 @@ def _row_rollup(
         "drips_clear_of": ["profiles", "magnets", "dry_zones"],
         "overflow_containment": overflow,
         **({"cassette_removal": removal} if removal is not None else {}),
+        "maintenance": maintenance,
         "saddle_mounts": [
             {"status": s.status.value, "note": s.message} for s in saddles
         ],

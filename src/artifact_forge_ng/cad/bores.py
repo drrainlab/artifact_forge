@@ -11,7 +11,12 @@ import math
 
 import cadquery as cq
 
-from ..form.part import BoreFeature, ChannelCutFeature, CutBoxFeature
+from ..form.part import (
+    BoreFeature,
+    ChannelCutFeature,
+    CutBoxFeature,
+    FunnelCutFeature,
+)
 from .booleans import cut_keep_solid
 
 _AXIS_PLANES = {"X": "YZ", "Y": "XZ", "Z": "XY"}
@@ -102,6 +107,30 @@ def cut_channel(
     wp = _u_wire(wp, half_w, da, ch.bottom_r)
     wp = wp.workplane(offset=ya - yb)
     wp = _u_wire(wp, half_w, db, ch.bottom_r)
+    try:
+        cutter = wp.loft(ruled=True, combine=False)
+    except Exception:  # noqa: BLE001 — OCC raises anything
+        return body, False
+    return cut_keep_solid(body, cutter)
+
+
+def cut_funnel(
+    body: cq.Workplane, funnel: FunnelCutFeature
+) -> tuple[cq.Workplane, bool]:
+    """Cut a downward-converging frustum: a ruled loft from the small mouth
+    rectangle at ``z_bottom`` up to the wide opening rectangle at ``z_top``.
+    Subtracting it leaves a four-sided sloped floor draining to the central
+    mouth from every side — the first floor that slopes in both X and Y."""
+    bx, by = funnel.bottom_center
+    tx, ty = funnel.top_center
+    wp = (
+        cq.Workplane("XY", origin=(bx, by, funnel.z_bottom))
+        .rect(funnel.bottom[0], funnel.bottom[1])
+        .workplane(offset=funnel.depth)
+        # offset the top rect by the centre skew (workplane-local coords)
+        .center(tx - bx, ty - by)
+        .rect(funnel.top[0], funnel.top[1])
+    )
     try:
         cutter = wp.loft(ruled=True, combine=False)
     except Exception:  # noqa: BLE001 — OCC raises anything

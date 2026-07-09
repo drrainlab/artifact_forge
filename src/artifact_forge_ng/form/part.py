@@ -350,6 +350,55 @@ class BlendDirective:
     fallback_ladder: tuple[float, ...] = ()
 
 
+@dataclass(frozen=True)
+class FunnelCutFeature:
+    """A downward-converging (possibly skewed) frustum SUBTRACTED from the
+    body: a wide top opening ``top`` centred at ``top_center`` / ``z_top``
+    tapers to a small bottom mouth ``bottom`` centred at ``bottom_center`` /
+    ``z_bottom``. The bottom rectangle must lie WITHIN the top rectangle's
+    XY footprint (so every wall slopes inward-and-down) and ``z_top`` sits
+    above ``z_bottom``. Subtracting it carves a sloped floor that drains
+    toward the mouth from every side — the collector's radial sump feed
+    (VF-8). This is the kernel's first floor that slopes in BOTH X and Y
+    (``ChannelCutFeature`` slopes along Y only); the offset centres let the
+    mouth sit at a back-corner drain while the opening spans the tray. Built
+    as a ruled loft (bottom rect → top rect), the channel cutter's mechanism."""
+
+    name: str
+    bottom_center: tuple[float, float]  # (x, y) of the mouth
+    top_center: tuple[float, float]  # (x, y) of the opening
+    z_top: float  # wide opening plane (the tray floor)
+    z_bottom: float  # narrow mouth plane (the sump)
+    top: tuple[float, float]  # (lx, ly) opening at z_top
+    bottom: tuple[float, float]  # (lx, ly) mouth at z_bottom
+
+    def __post_init__(self) -> None:
+        if self.z_top <= self.z_bottom + 1e-9:
+            raise ValueError(
+                f"FunnelCutFeature {self.name!r}: z_top must sit above z_bottom")
+        if self.bottom[0] <= 0.0 or self.bottom[1] <= 0.0:
+            raise ValueError(
+                f"FunnelCutFeature {self.name!r} needs a positive mouth")
+        # the mouth footprint must be enclosed by the opening footprint
+        bx0 = self.bottom_center[0] - self.bottom[0] / 2.0
+        bx1 = self.bottom_center[0] + self.bottom[0] / 2.0
+        by0 = self.bottom_center[1] - self.bottom[1] / 2.0
+        by1 = self.bottom_center[1] + self.bottom[1] / 2.0
+        tx0 = self.top_center[0] - self.top[0] / 2.0
+        tx1 = self.top_center[0] + self.top[0] / 2.0
+        ty0 = self.top_center[1] - self.top[1] / 2.0
+        ty1 = self.top_center[1] + self.top[1] / 2.0
+        if not (tx0 - 1e-9 <= bx0 and bx1 <= tx1 + 1e-9
+                and ty0 - 1e-9 <= by0 and by1 <= ty1 + 1e-9):
+            raise ValueError(
+                f"FunnelCutFeature {self.name!r} must CONVERGE downward — the "
+                "mouth must lie within the opening footprint")
+
+    @property
+    def depth(self) -> float:
+        return self.z_top - self.z_bottom
+
+
 @dataclass
 class PartForm:
     name: str
@@ -372,6 +421,7 @@ class PartForm:
     bores: list[BoreFeature] = field(default_factory=list)
     cutboxes: list[CutBoxFeature] = field(default_factory=list)
     channels: list[ChannelCutFeature] = field(default_factory=list)
+    funnel_cuts: list[FunnelCutFeature] = field(default_factory=list)
     ribs: list[RibFeature] = field(default_factory=list)
     lofts: list[LoftFeature] = field(default_factory=list)
     pins: list[PinFeature] = field(default_factory=list)

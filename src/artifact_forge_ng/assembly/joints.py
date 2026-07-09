@@ -759,6 +759,137 @@ _register(JointDecl(
 ))
 
 
+# -- drop_in_screen (vertical farm VF-8: strainer basket in the collector) ------
+
+_SCREEN_A_KEYS = (
+    "screen_seat_u0", "screen_seat_v0", "screen_seat_u1", "screen_seat_v1",
+    "screen_seat_floor_z", "screen_seat_clearance", "screen_seat_drain_y",
+    "screen_seat_drain_d", "tray_overflow_z",
+)
+_SCREEN_B_KEYS = (
+    "screen_u0", "screen_v0", "screen_u1", "screen_v1",
+    "screen_rim_z", "screen_floor_z",
+)
+#: The basket footprint must overhang the drain on every side by at least the
+#: seat clearance PLUS this margin, so even shifted to its clearance limit it
+#: still fully covers the drain (no bypass, no slide-off). The collector sump
+#: is shallow in Y (the drain sits near the back wall), so the margin is modest.
+SCREEN_DRAIN_OVERHANG = 0.5
+
+
+def _drop_in_screen_ir(
+    form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
+) -> list[Finding]:
+    """VF-8: a drop-in strainer basket seats over the collector drain. In the
+    pose: the basket footprint ENCLOSES the drain (water reaches it only
+    through the mesh — no side bypass), it can't slide far enough to expose the
+    drain (anti-shift), it lifts straight out (tool-free), and by default its
+    rim sits ABOVE the tray overflow so a clog spills the OPEN tray visibly
+    rather than overtopping the basket to the drain. `allow_emergency_bypass`
+    opts out of the rim rule and is reported."""
+    check = "assembly.screen_normal_no_bypass"
+    fa, fb = form_a.frame, form_b.frame
+    missing = [k for k in _SCREEN_A_KEYS if k not in fa]
+    if missing:
+        return [_finding(
+            check, False,
+            f"collector has no strainer seat ({', '.join(missing)}) — set "
+            "screen_seat: true on the collector")]
+    missing += [f"B:{k}" for k in _SCREEN_B_KEYS if k not in fb]
+    if missing:
+        return [_finding(check, False, f"screen frame keys missing: {', '.join(missing)}")]
+
+    allow_bypass = bool(joint.params.get("allow_emergency_bypass", False))
+
+    lo = pose.apply((fb["screen_u0"], fb["screen_v0"], fb["screen_floor_z"]))
+    hi = pose.apply((fb["screen_u1"], fb["screen_v1"], fb["screen_rim_z"]))
+    pu0, pu1 = sorted((lo[0], hi[0]))
+    pv0, pv1 = sorted((lo[1], hi[1]))
+    pz_floor = min(lo[2], hi[2])
+    pz_rim = max(lo[2], hi[2])
+
+    problems: list[str] = []
+    clr = fa["screen_seat_clearance"]
+    for side, gap in (("west", pu0 - fa["screen_seat_u0"]),
+                      ("east", fa["screen_seat_u1"] - pu1),
+                      ("front", pv0 - fa["screen_seat_v0"]),
+                      ("back", fa["screen_seat_v1"] - pv1)):
+        if not (INSERT_CLEARANCE_BAND[0] - 1e-6 <= gap <= INSERT_CLEARANCE_BAND[1] + 1e-6):
+            problems.append(f"{side} seat gap {gap:.2f} outside "
+                            f"{INSERT_CLEARANCE_BAND[0]}..{INSERT_CLEARANCE_BAND[1]}")
+
+    # no bypass + anti-shift: the basket overhangs the drain on every side by
+    # >= the seat clearance + margin, so no side path reaches the drain and a
+    # clearance-limit slide can't expose it. Drain center = (x0, dy), radius dr.
+    dy, dr = fa["screen_seat_drain_y"], fa["screen_seat_drain_d"] / 2.0
+    need = clr + SCREEN_DRAIN_OVERHANG
+    for side, overhang in (("west", -dr - pu0), ("east", pu1 - dr),
+                           ("front", (dy - dr) - pv0), ("back", pv1 - (dy + dr))):
+        if overhang < need - 1e-6:
+            problems.append(
+                f"{side} basket edge only {overhang:.1f} past the drain (needs >= "
+                f"{need:.1f}) — water could bypass the mesh or the basket slide off")
+
+    # mesh floor sits at/above the seat floor (over the drain mouth)
+    if pz_floor < fa["screen_seat_floor_z"] - 0.6:
+        problems.append(
+            f"basket floor lands at z={pz_floor:.2f} below the seat floor "
+            f"{fa['screen_seat_floor_z']:g} — it clips the sump")
+
+    # fail-safe: rim above the tray overflow unless emergency bypass is opted in
+    overflow = fa["tray_overflow_z"]
+    bypass_note = ""
+    if pz_rim < overflow - 1e-6:
+        if allow_bypass:
+            bypass_note = (" [emergency_unfiltered_bypass ON: a clog overtops the "
+                           "basket to the drain — rinse the basket]")
+        else:
+            problems.append(
+                f"basket rim z={pz_rim:.1f} below the tray overflow {overflow:.1f} "
+                "— a clog would overtop the basket to the drain UNFILTERED; raise "
+                "the basket or set allow_emergency_bypass: true")
+
+    findings: list[Finding] = []
+    if problems:
+        findings.append(_finding(check, False, "; ".join(problems)))
+    else:
+        findings.append(_finding(
+            check, True,
+            f"basket seats over the drain (mesh-only path, rim {pz_rim - overflow:+.1f} "
+            f"vs tray overflow), lifts out tool-free" + bypass_note,
+        ))
+
+    # the drain footprint is fully inside the basket footprint in the pose
+    enclosed = (pu0 <= -dr + 1e-6 and pu1 >= dr - 1e-6
+                and pv0 <= (dy - dr) + 1e-6 and pv1 >= (dy + dr) - 1e-6)
+    findings.append(_finding(
+        "assembly.drain_inside_screen_footprint", enclosed,
+        "the drain bore is fully within the basket footprint — water enters "
+        "only through the mesh" if enclosed else
+        "the drain pokes past the basket footprint — a rim of unfiltered bypass"))
+
+    # tool-free vertical removal: the rim stands proud of the sump-well floor by
+    # a finger's grip and the mate is a straight lift (drop-in, no snap/screw)
+    proud = pz_rim - fa["screen_seat_floor_z"]
+    lift_ok = proud >= 8.0
+    findings.append(_finding(
+        "assembly.screen_removable_from_sump", lift_ok,
+        f"the basket stands {proud:.0f} mm proud of the sump floor and lifts "
+        "straight out of the well — tool-free" if lift_ok else
+        f"the basket is only {proud:.0f} mm proud — no finger grip to lift it out"))
+    return findings
+
+
+_register(JointDecl(
+    name="drop_in_screen",
+    description="drop-in strainer basket over the collector drain: seats in "
+                "the sump ledge, encloses the drain (no bypass), anti-shift, "
+                "tool-free, zero-bypass fail-safe unless allow_emergency_bypass",
+    ir_check=_drop_in_screen_ir,
+    cad_checks=("assembly.no_interference",),
+))
+
+
 # -- tongue_groove (vertical farm: module-to-module line alignment) --------------
 
 TG_SIDE_BAND = (0.3, 0.5)
@@ -1035,6 +1166,13 @@ def _lap_flow_ir(
     missing = [k for k in _LAP_A_KEYS if k not in fa]
     missing += [f"B:{k}" for k in _LAP_B_KEYS if k not in fb]
     if missing:
+        # VF-8: a lap_flow into a CAPPED rail is the inverse mistake — the
+        # receiving rail has no through receiver to catch the lip.
+        if fb.get("inlet_capped", 0.0) >= 0.5:
+            return [_finding(
+                check, False,
+                "lap_flow into a CAPPED rail — it has no receiver to catch the "
+                "lip; the receiving rail's inlet_mode must be lap_receiver")]
         return [_finding(
             check, False,
             f"lap frame keys missing: {', '.join(missing)} — both sides "
@@ -1117,6 +1255,43 @@ _SADDLE_A_KEYS = ("rail_y0", "rail_y1", "seat_v0", "seat_v1", "body_h", "channel
 _SADDLE_B_KEYS = ("saddle_slot_y0", "saddle_slot_y1", "saddle_floor_z", "spout_w")
 
 
+def _drip_lands_on_floor(form_a: PartForm) -> Finding:
+    """VF-8: the inlet cap drips at the rail's `feed`. That rail MUST have a
+    capped inlet (solid channel floor under the drip) — a through, open-bottom
+    `lap_receiver` there would let the water fall straight through to the level
+    below. IR-level: read the rail's `inlet_capped` flag and confirm no
+    `*_lap_receiver` cutbox sits under the feed column."""
+    check = "assembly.drip_lands_on_floor"
+    fa = form_a.frame
+    capped = fa.get("inlet_capped", 0.0) >= 0.5
+    cx = fa.get("channel_center_x", 0.0)
+    yin = fa.get("channel_y_inlet")
+    floor = fa.get("channel_floor_z_inlet")
+    receiver = None
+    if yin is not None and floor is not None:
+        for c in form_a.cutboxes:
+            if "lap_receiver" not in c.name:
+                continue
+            b = c.box
+            if (b.x0 - 0.05 <= cx <= b.x1 + 0.05
+                    and b.y0 - 0.05 <= yin <= b.y1 + 0.05
+                    and b.z0 < floor - 0.5):
+                receiver = c
+                break
+    if capped and receiver is None:
+        return _finding(check, True,
+                        "the cap drips onto the SOLID inlet floor — capped "
+                        "inlet, no through receiver under the drip")
+    if not capped:
+        return _finding(check, False,
+                        "the cap feeds a lap_receiver rail — the drip falls "
+                        "through the open-bottom inlet receiver to the level "
+                        "below; set the rail's inlet_mode: capped")
+    return _finding(check, False,
+                    f"a lap receiver cut {receiver.name!r} sits under the cap "
+                    "drip — water would fall through, not into the channel")
+
+
 def _saddle_hang_ir(
     form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
 ) -> list[Finding]:
@@ -1157,13 +1332,21 @@ def _saddle_hang_ir(
             f"spout/tongue {fb['spout_w']:g} does not fit the "
             f"{fa['channel_w']:g} channel it dips into")
     if problems:
-        return [_finding(check, False, "; ".join(problems))]
-    return [_finding(
-        check, True,
-        f"saddle straddles the wall (play {play_lo:.2f}/{play_hi:.2f}), "
-        f"rests on its top at z={rest_z:.1f}, spout fits the channel",
-        measured=rest_z, limit=fa["body_h"],
-    )]
+        findings = [_finding(check, False, "; ".join(problems))]
+    else:
+        findings = [_finding(
+            check, True,
+            f"saddle straddles the wall (play {play_lo:.2f}/{play_hi:.2f}), "
+            f"rests on its top at z={rest_z:.1f}, spout fits the channel",
+            measured=rest_z, limit=fa["body_h"],
+        )]
+    # VF-8: emit drip_lands_on_floor ONLY for the inlet-cap -> rail.feed mate
+    # (a: rail.feed; b: the cap, which carries a hose bore) — NEVER the collector
+    # saddle (a: rail.drain_edge, b: collector, no hose bore).
+    if ("feed" in (joint.a_datum or "") and "inlet_capped" in fa
+            and "hose_bore_d" in fb):
+        findings.append(_drip_lands_on_floor(form_a))
+    return findings
 
 
 _register(JointDecl(

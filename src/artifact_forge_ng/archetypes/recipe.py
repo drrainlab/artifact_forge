@@ -91,6 +91,7 @@ def build_form(
         holes=state.holes,
         cutboxes=state.cutboxes,
         channels=state.channels,
+        funnel_cuts=state.funnel_cuts,
         bores=state.bores,
         ribs=state.ribs,
         plates=state.plates,

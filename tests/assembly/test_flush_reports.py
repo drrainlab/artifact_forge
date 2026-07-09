@@ -180,3 +180,107 @@ def test_root_chamber_row_endcaps_dock_magnetically():
     assert states["rail_3"].form.frame["dock_pocket_count"] == 2
     assert states["collector"].report.passed("form.dock_pockets_dry")
     assert states["cap"].report.passed("form.dock_pockets_dry")
+
+
+def test_root_chamber_row_drain_screen_and_maintenance():
+    """VF-8: the drop-in screen basket seats over the collector drain with no
+    unfiltered bypass, and the row reports a machine-derived maintenance
+    workflow."""
+    catalog = load_catalog()
+    asm = load_assembly(ROW_RC)
+    states = {ref: pre_cad_from_instance(inst, catalog, True)
+              for ref, inst in _inject_shared(asm, catalog).items()}
+    findings, poses, _ = _joint_findings(asm, states)
+    nb = [f for f in findings if f.check == "assembly.screen_normal_no_bypass"]
+    assert len(nb) == 1
+    assert nb[0].status.value == "pass", nb[0].message
+    assert "mesh-only" in nb[0].message  # normal_no_bypass
+    # the basket itself validates (open area, debris reservoir, tool-free rim)
+    sc = states["screen"].report
+    assert sc.passed("form.screen_open_area_ratio_ok")
+    assert sc.passed("form.screen_debris_capacity_ok")
+    assert sc.passed("form.lift_access_ok")
+    # maintenance workflow in the water report
+    water = build_water_report(states, findings, asm=asm, poses=poses)
+    m = water["row"]["maintenance"]
+    assert m["all_tool_free"] is True
+    assert "drain_screen" in m and "rinse" in m["drain_screen"]
+    assert "unfiltered bypass" in m["drain_screen"]  # default zero-bypass
+    assert "DEBRIS-REDUCED" in m["honest_note"]
+
+
+def test_root_chamber_row_radial_funnel_sump():
+    """VF-8.1: the collector drains through a LOWERED sump well fed by a radial
+    funnel (the drain at the absolute low point, the basket seated in the well
+    over it, not a barrier), verified by the six named checks."""
+    catalog = load_catalog()
+    asm = load_assembly(ROW_RC)
+    states = {ref: pre_cad_from_instance(inst, catalog, True)
+              for ref, inst in _inject_shared(asm, catalog).items()}
+    col = states["collector"].report
+    for c in ("form.collector_sump_is_lowest_point",
+              "form.tray_floor_slopes_to_sump",
+              "form.basket_not_transverse_flow_barrier",
+              "form.no_standing_water_before_screen"):
+        assert col.passed(c), c
+    # the collector really carries a funnel cut converging to the drain
+    funnels = states["collector"].form.funnel_cuts
+    assert len(funnels) == 1
+    assert funnels[0].top[0] > funnels[0].bottom[0]     # slopes inward in X
+    assert funnels[0].z_top > funnels[0].z_bottom       # and downward to the sump
+    findings, poses, _ = _joint_findings(asm, states)
+    checks = {f.check: f.status.value for f in findings}
+    assert checks.get("assembly.drain_inside_screen_footprint") == "pass"
+    assert checks.get("assembly.screen_removable_from_sump") == "pass"
+
+
+def test_root_chamber_row_builds_strict():
+    """VF-8 strict gate: EVERY part in the row (incl. the collector with the
+    screen_seat recess and the drop-in screen) must have NO critical failure —
+    i.e. `forge build --strict` would not abort. A golden that only validates
+    at pre-CAD but trips enforce_strict is the class this catches cheaply."""
+    catalog = load_catalog()
+    asm = load_assembly(ROW_RC)
+    states = {ref: pre_cad_from_instance(inst, catalog, True)
+              for ref, inst in _inject_shared(asm, catalog).items()}
+    for ref, st in states.items():
+        crit = st.report.critical_failures()
+        assert not crit, f"{ref}: " + ", ".join(f.check for f in crit)
+
+
+def test_capped_first_rail_catches_the_cap_drip():
+    """VF-8: the cap drips at rail_1.feed. rail_1 is a CAPPED inlet (solid
+    channel floor, no through lap_receiver), so the drip lands in the channel
+    instead of falling through to the level below. rail_2 (lap-fed) keeps its
+    through receiver. Exactly one drip_lands_on_floor finding — the collector
+    saddle must NOT emit it."""
+    catalog = load_catalog()
+    asm = load_assembly(ROW_RC)
+    states = {ref: pre_cad_from_instance(inst, catalog, True)
+              for ref, inst in _inject_shared(asm, catalog).items()}
+    assert states["rail_1"].form.frame["inlet_capped"] == 1.0
+    assert not [c for c in states["rail_1"].form.cutboxes
+                if "lap_receiver" in c.name]                 # capped → no through cut
+    assert [c for c in states["rail_2"].form.cutboxes
+            if "lap_receiver" in c.name]                     # lap-fed → receiver present
+    findings, _, _ = _joint_findings(asm, states)
+    drip = [f for f in findings if f.check == "assembly.drip_lands_on_floor"]
+    assert len(drip) == 1                                    # only the cap↔rail_1 mate
+    assert drip[0].status.value == "pass", drip[0].message
+
+
+def test_cap_over_lap_receiver_rail_drip_fails():
+    """Mutation: a cap dripping onto a lap_receiver rail (default) lands over
+    the through open-bottom receiver — the drip would fall through. The
+    IR check must FAIL. Verified directly on the helper with a lap-fed rail."""
+    from artifact_forge_ng.assembly.joints import _drip_lands_on_floor
+    catalog = load_catalog()
+    asm = load_assembly(CELL)  # the standalone cell rail is default lap_receiver
+    states = {ref: pre_cad_from_instance(inst, catalog, True)
+              for ref, inst in _inject_shared(asm, catalog).items()}
+    rail = states["rail"].form
+    assert rail.frame["inlet_capped"] == 0.0
+    assert [c for c in rail.cutboxes if "lap_receiver" in c.name]
+    f = _drip_lands_on_floor(rail)
+    assert f.status.value == "fail"
+    assert "fall" in f.message.lower()
