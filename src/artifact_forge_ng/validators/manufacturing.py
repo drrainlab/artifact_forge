@@ -232,6 +232,48 @@ def brush_access_to_water_channel(geometry: Geometry, form: PartForm) -> Finding
     )
 
 
+#: The flush water path where a downward through-hole is a leak (VF-9). The
+#: collector drain is a BORE (not a cutbox) and lives outside these regions, so
+#: it is the sanctioned exception by construction.
+FLUSH_WET_REGION_NAMES = ("water_channel", "lap_receiver", "lap_lip")
+
+
+@register_probe("manufacturing.no_through_holes_in_wet_lap_zone")
+def no_through_holes_in_wet_lap_zone(geometry: Geometry, form: PartForm) -> Finding:
+    """VF-9 invariant: NO cutbox with an open bottom may sit under the active
+    flush water path (the channel + lap seam) — that is a leak straight down.
+    The only sanctioned downward exit is the collector drain (a bore, outside
+    these regions). n/a on parts with no flush water path."""
+    from ..product.archetype import RegionRole
+    check = "manufacturing.no_through_holes_in_wet_lap_zone"
+    wet = [r for r in form.regions
+           if r.role is RegionRole.TRANSIENT_WATER_PATH
+           and r.name in FLUSH_WET_REGION_NAMES]
+    if not wet:
+        return _finding(check, Status.PASS, "not applicable — no flush water path")
+
+    def _overlaps(b, w) -> bool:
+        return (b.x0 <= w.x1 and w.x0 <= b.x1 and b.y0 <= w.y1
+                and w.y0 <= b.y1 and b.z0 <= w.z1 and w.z0 <= b.z1)
+
+    offenders = []
+    for cut in form.cutboxes:
+        b = cut.box
+        if b.z0 > 0.05:
+            continue  # closed bottom — no downward path
+        if "drain" in cut.name:
+            continue  # the sanctioned collector drain
+        if any(_overlaps(b, w.box) for w in wet):
+            offenders.append(
+                f"cut {cut.name!r} is open-bottom (z0={b.z0:g}) under the water path")
+    ok = not offenders
+    return _finding(
+        check, Status.PASS if ok else Status.FAIL,
+        "no through hole under the active water path — nothing leaks straight down"
+        if ok else "; ".join(offenders),
+    )
+
+
 @register_probe("manufacturing.no_hidden_wet_crevices")
 def no_hidden_wet_crevices(geometry: Geometry, form: PartForm) -> Finding:
     from ..product.archetype import RegionRole
@@ -251,6 +293,14 @@ def no_hidden_wet_crevices(geometry: Geometry, form: PartForm) -> Finding:
     for cut in form.cutboxes:
         b = cut.box
         if not any(_overlaps(b, w.box) for w in wet):
+            continue
+        # VF-9: the floored lap lip-seat is a WIDE, open-top, shallow step (its
+        # narrowest dim is the vertical depth, not a crevice mouth) — a brush
+        # reaches it from above and the neighbour's lip lifts straight out. Not
+        # a hidden crevice as long as the lateral footprint is brush-wide.
+        if ("lap_receiver" in cut.name
+                and (b.x1 - b.x0) >= CREVICE_MIN_OPENING
+                and (b.y1 - b.y0) >= CREVICE_MIN_OPENING):
             continue
         narrowest = min(b.x1 - b.x0, b.y1 - b.y0, b.z1 - b.z0)
         if narrowest < CREVICE_MIN_OPENING:

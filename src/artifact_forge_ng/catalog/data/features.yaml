@@ -743,7 +743,8 @@ features:
       - assembly.fluid_joint_ir
       - assembly.no_orphan_ports
       - assembly.row_drains_under_mount
-      - assembly.drip_lands_on_floor
+      - assembly.cap_drip_lands_in_channel_safe_floor
+      - assembly.lap_joint_no_external_downward_leak
 
   - id: row_flush_integrity
     description: >

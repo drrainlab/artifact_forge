@@ -59,7 +59,7 @@ parts:
       schema: product/v1
       id: flush_rail_1
       archetype: water_rail_v1@2
-      params: {profile: "2020", magnet_enabled: true, inlet_mode: capped}
+      params: {profile: "2020", magnet_enabled: true}
       manufacturing:
         material: PETG
         support_policy: none

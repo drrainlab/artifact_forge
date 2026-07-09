@@ -1,7 +1,7 @@
 """VF-correction CAD acceptance on the 6-part FLUSH SMOKE (cap + two
 rails with ONE real lap seam + cassette + collector + one straight
-profile): the lap lip really lands in the through receiver on compiled
-solids (no interference, real clearances), both drip handovers verified,
+profile): the lap lip really nests in the FLOORED lip-seat receiver on
+compiled solids (no interference, real clearances), both drip handovers verified,
 the flush row reports written. The full 3x1 row is the `forge build`
 acceptance artifact — kept out of the unit suite by design (build cost)."""
 

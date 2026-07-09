@@ -248,39 +248,58 @@ def test_root_chamber_row_builds_strict():
         assert not crit, f"{ref}: " + ", ".join(f.check for f in crit)
 
 
-def test_capped_first_rail_catches_the_cap_drip():
-    """VF-8: the cap drips at rail_1.feed. rail_1 is a CAPPED inlet (solid
-    channel floor, no through lap_receiver), so the drip lands in the channel
-    instead of falling through to the level below. rail_2 (lap-fed) keeps its
-    through receiver. Exactly one drip_lands_on_floor finding — the collector
-    saddle must NOT emit it."""
+def test_universal_rail_floored_inlet_no_through_hole():
+    """VF-9: every rail is UNIVERSAL — a FLOORED lip-seat inlet (solid bottom,
+    no through hole under the water path). The cap drip lands on a channel-safe
+    floor; the module seam has no external downward leak; the always-on
+    no-through-hole invariant passes for every rail."""
+    from artifact_forge_ng.validators.manufacturing import (
+        no_through_holes_in_wet_lap_zone)
     catalog = load_catalog()
     asm = load_assembly(ROW_RC)
     states = {ref: pre_cad_from_instance(inst, catalog, True)
               for ref, inst in _inject_shared(asm, catalog).items()}
-    assert states["rail_1"].form.frame["inlet_capped"] == 1.0
-    assert not [c for c in states["rail_1"].form.cutboxes
-                if "lap_receiver" in c.name]                 # capped → no through cut
-    assert [c for c in states["rail_2"].form.cutboxes
-            if "lap_receiver" in c.name]                     # lap-fed → receiver present
+    for ref in ("rail_1", "rail_2", "rail_3"):
+        st = states[ref]
+        pockets = [c for c in st.form.cutboxes if "lap_receiver" in c.name]
+        assert len(pockets) == 1, ref
+        assert pockets[0].box.z0 > 0.05, f"{ref}: receiver must be FLOORED"  # closed below
+        assert st.report.passed("form.lap_receiver_has_floor"), ref
+        assert st.report.passed("form.lap_receiver_residual_volume_ok"), ref
+        assert st.report.passed("form.rail_universal_inlet_accepts_cap_and_lap"), ref
+        # the manufacturing invariant runs at the CAD stage; assert on the form
+        assert no_through_holes_in_wet_lap_zone(
+            None, st.form).status.value == "pass", ref
     findings, _, _ = _joint_findings(asm, states)
-    drip = [f for f in findings if f.check == "assembly.drip_lands_on_floor"]
-    assert len(drip) == 1                                    # only the cap↔rail_1 mate
-    assert drip[0].status.value == "pass", drip[0].message
+    checks = {}
+    for f in findings:
+        checks.setdefault(f.check, []).append(f.status.value)
+    assert checks.get("assembly.cap_drip_lands_in_channel_safe_floor") == ["pass"]
+    assert all(s == "pass" for s in checks.get(
+        "assembly.lap_joint_no_external_downward_leak", []))
 
 
-def test_cap_over_lap_receiver_rail_drip_fails():
-    """Mutation: a cap dripping onto a lap_receiver rail (default) lands over
-    the through open-bottom receiver — the drip would fall through. The
-    IR check must FAIL. Verified directly on the helper with a lap-fed rail."""
-    from artifact_forge_ng.assembly.joints import _drip_lands_on_floor
+def test_through_receiver_reintroduced_fails_invariant():
+    """Mutation: reintroduce a through open-bottom lap receiver under the water
+    path → the no-through-hole invariant + the has-floor + cap-drip checks all
+    FAIL. Verified directly on the checks with a hand-mutated rail form."""
+    from artifact_forge_ng.form.checks_water import check_lap_receiver_has_floor
+    from artifact_forge_ng.validators.manufacturing import (
+        no_through_holes_in_wet_lap_zone)
+    from artifact_forge_ng.assembly.joints import (
+        _cap_drip_lands_in_channel_safe_floor)
     catalog = load_catalog()
-    asm = load_assembly(CELL)  # the standalone cell rail is default lap_receiver
+    asm = load_assembly(ROW_RC)
     states = {ref: pre_cad_from_instance(inst, catalog, True)
               for ref, inst in _inject_shared(asm, catalog).items()}
-    rail = states["rail"].form
-    assert rail.frame["inlet_capped"] == 0.0
-    assert [c for c in rail.cutboxes if "lap_receiver" in c.name]
-    f = _drip_lands_on_floor(rail)
-    assert f.status.value == "fail"
-    assert "fall" in f.message.lower()
+    rail = states["rail_2"].form
+    # drop the floored pocket to a through hole (open bottom, z0 = -1)
+    for i, c in enumerate(rail.cutboxes):
+        if "lap_receiver" in c.name:
+            b = c.box
+            rail.cutboxes[i] = type(c)(name=c.name, box=type(b)(
+                b.x0, b.y0, -1.0, b.x1, b.y1, b.z1))
+            break
+    assert check_lap_receiver_has_floor(rail).status.value == "fail"
+    assert no_through_holes_in_wet_lap_zone(None, rail).status.value == "fail"
+    assert _cap_drip_lands_in_channel_safe_floor(rail).status.value == "fail"

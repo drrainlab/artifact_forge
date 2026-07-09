@@ -1,8 +1,10 @@
 """lap_flow_joint IR (VF correction): two corrected rails mated
 outlet-on-inlet land FLUSH — floors coplanar, controlled face gap, lip
-3-6 into the through receiver, deliberate tip slot — and every broken
-variant fails with a named problem. Plus the MountContextSpec schema:
-the machine-checked declaration that the mounted row supplies the slope."""
+3-6 into the FLOORED lip-seat receiver, deliberate tip slot — and every
+broken variant fails with a named problem. The joint also emits a second
+finding, assembly.lap_joint_no_external_downward_leak (VF-9), asserting the
+receiver is closed below. Plus the MountContextSpec schema: the
+machine-checked declaration that the mounted row supplies the slope."""
 
 import pytest
 
@@ -54,8 +56,10 @@ def run_lap(form_a: PartForm, form_b: PartForm, joint: JointUse | None = None):
     joint = joint or lap_joint()
     pose = compute_pose(joint, form_a, form_b)
     findings = JOINT_TYPES["lap_flow_joint"].ir_check(form_a, form_b, pose, joint)
-    assert len(findings) == 1
-    return findings[0], pose
+    # the geometry finding is the primary verdict; VF-9 adds a second
+    # no-downward-leak finding on the full-geometry path (tested separately)
+    geo = next(f for f in findings if f.check == "assembly.lap_flow_ir")
+    return geo, pose
 
 
 def test_lap_flow_registered_and_realizes_fluid_ports():
@@ -74,6 +78,26 @@ def test_flush_pair_passes():
     assert pose.translate[2] == pytest.approx(0.0, abs=1e-9)
     assert pose.translate[1] == pytest.approx(-(248.0 + 0.4))
     assert "dZ +0.00" in finding.message
+
+
+def test_no_external_downward_leak_finding():
+    """VF-9: the joint emits a second finding proving the receiver is FLOORED
+    (closed below) — PASS on real rails, FAIL if the receiver is reopened to a
+    through hole."""
+    a, b = build_rail("up"), build_rail("down")
+    joint = lap_joint()
+    pose = compute_pose(joint, a, b)
+    findings = JOINT_TYPES["lap_flow_joint"].ir_check(a, b, pose, joint)
+    leak = next(f for f in findings
+                if f.check == "assembly.lap_joint_no_external_downward_leak")
+    assert leak.status is Status.PASS, leak.message
+    # reopen the receiver to a through hole → the leak finding fails
+    b.frame["lap_pocket_floor_z"] = -1.0
+    findings = JOINT_TYPES["lap_flow_joint"].ir_check(a, b, pose, joint)
+    leak = next(f for f in findings
+                if f.check == "assembly.lap_joint_no_external_downward_leak")
+    assert leak.status is Status.FAIL
+    assert "leak straight down" in leak.message
 
 
 def test_wrong_datum_order_named():

@@ -224,13 +224,20 @@ topology док-нота (gravity→резервуар→насос, НЕ пря
 поперёк лотка»); +6 чеков (sump_is_lowest / slopes_to_sump / not_barrier /
 no_standing_before / drain_inside_footprint / removable).
 
-**VF-8 Capped Inlet ✅ (2026-07-09, баг-фикс)**: пользователь на рендере поймал —
-cap капал в сквозной `lap_receiver` первого рейла → вода НАСКВОЗЬ мимо жёлоба.
-Явный `inlet_mode: lap_receiver|capped`; первый рейл capped (сплошное дно), lap-
-приёмник только у рейлов, кормимых губой предыдущего. Новый
-`assembly.drip_lands_on_floor` (эмит `saddle_hang` только для cap↔rail.feed).
-Архитектура: `cap → rail_1(capped) → lap → collector → вертикально вниз`.
-**VF-8.2** supportless-cap cleanup — отдельно.
+**VF-8 Capped Inlet (2026-07-09, superseded by VF-9)**: первый шаг фикса —
+особый `inlet_mode: capped` для `rail_1` со сплошным дном. Костыль: не убирал
+сквозные дыры под водой на стыках рейл↔рейл и делал `rail_1` особым.
+
+**VF-9 Universal Rail ✅ (2026-07-09)**: инверсия — рейл снова универсален,
+сквозной приёмник заменён **floored lip-seat** (карман опущен на `lip_t+clr`,
+сплошное дно). Губа соседа садится, `верх губы = пол канала` (нет дамбы, нет дыры
+вниз); тот же карман ловит каплю cap → `rail_1` больше не особый, `inlet_mode`
+удалён. Инвариант **`manufacturing.no_through_holes_in_wet_lap_zone`** (нет
+открытых снизу cutbox под мокрым путём, кроме слива коллектора) + form-чеки
+`lap_receiver_has_floor` / `lap_receiver_residual_volume_ok` /
+`rail_universal_inlet_accepts_cap_and_lap` + assembly
+`lap_joint_no_external_downward_leak` / `cap_drip_lands_in_channel_safe_floor`.
+**VF-9 Part B** supportless Г-cap adapter — отложено.
 
 Впереди: **VF-4.3** anti-slide удержание ряда на смонтированном под
 уклоном профиле (посадка полная, продольного замка нет);

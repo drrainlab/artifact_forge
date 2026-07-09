@@ -1,7 +1,8 @@
 """VF-correction/4.1 early CAD smoke: ONE corrected rail really compiles —
-constant-depth channel, lap lip welded past the outlet face, THROUGH
-open-bottom lap receiver, sealed magnet pockets, and the OPEN SKELETON
-lightweight windows (through the under-seat slab — no bridges by
+constant-depth channel, lap lip welded past the outlet face, a FLOORED
+lip-seat receiver (VF-9: shallow recess with SOLID plastic beneath — no
+through hole under the water path), sealed magnet pockets, and the OPEN
+SKELETON lightweight windows (through the under-seat slab — no bridges by
 construction). The lightweight gate is reversible and pays its mass
 saving; the lap geometry is real on the solid, not just in the IR."""
 
@@ -97,18 +98,26 @@ def test_lap_lip_is_real_on_the_solid(solids):
     assert solid_fraction(light.workplane, below) < 0.05
 
 
-def test_lap_receiver_cuts_through(solids):
+def test_lap_receiver_is_a_floored_seat(solids):
+    """VF-9 smoking gun: the inlet receiver is a shallow FLOORED lip-seat, not
+    a through hole. The seat recess is void just below the channel floor (the
+    neighbour's lip nests there), but there is SOLID plastic UNDER the pocket
+    floor — nothing leaks straight down at the seam (this band read ~0 void
+    before VF-9)."""
     form, light, _, _, _, _ = solids
     f = form.frame
     floor = f["channel_floor_z_inlet"]
-    # void from below the body up to the floor plane in the pocket footprint
-    pocket = box_probe(-8.0, 124.0 - f["lap_pocket_len"] + 0.4, 0.3,
-                       8.0, 123.6, floor - 0.3)
-    assert solid_fraction(light.workplane, pocket) < 0.05
-    # the channel walls above the pocket survive (the paz guides, the
-    # opening has no ceiling — modules separate by a vertical lift)
-    wall = box_probe(8.6, 124.0 - f["lap_pocket_len"] + 0.4, floor + 1.0,
-                     9.2, 123.6, 15.0)
+    pf = f["lap_pocket_floor_z"]
+    face = f["rail_y1"]
+    plen = f["lap_pocket_len"]
+    # the shallow seat recess is void (below the channel floor, above the pocket floor)
+    seat = box_probe(-7.0, face - plen + 0.6, pf + 0.3, 7.0, face - 0.6, floor - 0.3)
+    assert solid_fraction(light.workplane, seat) < 0.1
+    # ...but SOLID plastic sits UNDER the pocket floor — no through hole
+    under = box_probe(-6.0, face - plen + 0.6, 2.5, 6.0, face - 0.6, pf - 0.5)
+    assert solid_fraction(light.workplane, under) > 0.9
+    # the channel walls above the seat survive (the paz guides)
+    wall = box_probe(8.6, face - plen + 0.4, floor + 1.0, 9.2, face - 0.6, 15.0)
     assert solid_fraction(light.workplane, wall) > 0.9
 
 

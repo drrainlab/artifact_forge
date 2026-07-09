@@ -221,9 +221,6 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         face_gap=face_gap, flush_pitch=w + face_gap,
         lw_enabled=lw, lw_window_count=lw_windows,
         lw_rib=lw_rib, lw_span_max=lw_span_max,
-        # VF-8 inlet mode: 1.0 = capped (cap-fed, SOLID inlet floor, no through
-        # receiver); 0.0 = lap_receiver (fed by a previous rail's lap lip).
-        inlet_capped=1.0 if p.get("inlet_mode", "lap_receiver") == "capped" else 0.0,
     )
     state.datums["cassette_seat"] = {"at": [0.0, 0.0, seat_floor], "rotate": [0.0, 0.0, 0.0]}
     state.datums["module_origin"] = {"at": [0.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0]}
@@ -267,7 +264,6 @@ _register(RecipeOpDecl(
         "trough_w": ("length", 26.0), "trough_rib": ("length", 6.0),
         "trough_depth": ("length", 12.0),
         "profile": ("choice", "2020"), "profile_inset": ("length", 24.0),
-        "inlet_mode": ("choice", "lap_receiver"),
     },
     validators=(
         "form.water_channel_constant_depth_ok", "form.water_channel_dims_ok",
@@ -350,55 +346,56 @@ _register(RecipeOpDecl(
 
 
 def _lap_inlet_receiver(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """The through, open-bottom lap opening at the inlet (+Y) face: the
-    neighbour's lip lands here, continuing the floor plane; the tip slot
-    stays deliberately open so nothing can dam and nothing hides."""
+    """The FLOORED lip-seat at the inlet (+Y) face (VF-9): a top-open pocket
+    recessed exactly `lip_t + clearance` below the channel floor, with a SOLID
+    bottom — NOT a through hole under the water path. The neighbour's outlet lip
+    drops into it so its top lands flush with this channel's floor (continuous
+    water surface, no dam), and the shallow pocket drains under the mount tilt.
+    A cap drip lands in the same pocket and flows on. Universal: every rail gets
+    the same inlet — cap-fed or lap-fed."""
     state.require_base("lap_inlet_receiver")
     f = state.frame
     if "channel_floor_z_inlet" not in f:
         raise RecipeError("lap_inlet_receiver needs a water_rail_body base")
     pocket_len = p.get("pocket_len", 6.0)
     side_clear = p.get("side_clearance", 0.4)
+    if not (0.3 <= side_clear <= 0.5):
+        raise RecipeError(f"side_clearance {side_clear:g} outside 0.3..0.5")
+    lip_t = p.get("lip_t", 1.4)
+    lip_clr = p.get("lip_clearance", 0.3)
     floor = f["channel_floor_z_inlet"]
     face = f["rail_y1"]
     pocket_w = f["channel_w"] + LAP_LIP_W_MARGIN + 2.0 * side_clear
+    pocket_floor = floor - (lip_t + lip_clr)   # shallow lip-seat, SOLID below
     name = op_id or "lap_in"
-    # VF-8: a CAPPED inlet (the cap-fed first rail) has NO through receiver — the
-    # drip lands on the SOLID channel floor. Still emit the lap_receiver region
-    # (statically declared + referenced by the `inlet` interface) so it marks
-    # the feed WET ZONE, not a through lap pocket. No cut, no lap_pocket keys.
-    if p.get("inlet_mode", "lap_receiver") == "capped":
-        state.regions.append(Region(
-            "lap_receiver", RegionRole.TRANSIENT_WATER_PATH,
-            Box3(-pocket_w / 2.0, face - pocket_len - 0.5, floor,
-                 pocket_w / 2.0, face + 0.5, f["channel_top_z"])))
-        return
-    if not (0.3 <= side_clear <= 0.5):
-        raise RecipeError(f"side_clearance {side_clear:g} outside 0.3..0.5")
-    pocket = Box3(-pocket_w / 2.0, face - pocket_len, -1.0,
+    pocket = Box3(-pocket_w / 2.0, face - pocket_len, pocket_floor,
                   pocket_w / 2.0, face + 0.5, floor + LAP_TOP_CLEAR)
     state.cutboxes.append(CutBoxFeature(name=f"{name}_lap_receiver", box=pocket))
     state.regions.append(Region(
         "lap_receiver", RegionRole.TRANSIENT_WATER_PATH,
-        Box3(-pocket_w / 2.0, face - pocket_len - 0.5, -1.0,
+        Box3(-pocket_w / 2.0, face - pocket_len - 0.5, pocket_floor,
              pocket_w / 2.0, face + 0.5, f["channel_top_z"])))
     state.frame.update(lap_pocket_len=pocket_len, lap_pocket_w=pocket_w,
-                       lap_side_clearance=side_clear)
+                       lap_side_clearance=side_clear,
+                       lap_pocket_floor_z=pocket_floor,
+                       lap_pocket_depth=lip_t + lip_clr)
 
 
 _register(RecipeOpDecl(
     name="lap_inlet_receiver",
     kind="feature",
     params={"pocket_len": ("length", 6.0), "side_clearance": ("length", 0.4),
-            "inlet_mode": ("choice", "lap_receiver")},
+            "lip_t": ("length", 1.4), "lip_clearance": ("length", 0.3)},
     validators=(
         "form.lap_joint_geometry_ok", "form.lap_slot_leak_path_controlled",
+        "form.lap_receiver_has_floor", "form.lap_receiver_residual_volume_ok",
+        "form.rail_universal_inlet_accepts_cap_and_lap",
         "form.no_standing_water_ir", "topology.cutout_present",
     ),
     apply=_lap_inlet_receiver,
-    description="through open-bottom lap opening in the inlet floor — the "
-                "flush handover receiver; the tip slot is a controlled, "
-                "visible, cleanable leak path",
+    description="floored top-open lip-seat in the inlet floor (VF-9) — the "
+                "flush handover receiver: the neighbour's lip nests flush, no "
+                "through hole under the water path, shallow + cleanable",
 ))
 
 

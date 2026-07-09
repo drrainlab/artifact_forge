@@ -447,40 +447,49 @@ Golden: `vertical_farm_row_3x1_root_chamber` — коллектор `screen_seat
 точный размер ячейки vs скорость засора — grow-test (агрономия CAD'ом не
 верифицируется).
 
-## Capped inlet — cap кормит ПЕРВЫЙ рейл на сплошное дно (VF-8, баг-фикс)
+## Universal rail — floored lip-seat receiver, без сквозных дыр под водой (VF-9)
 
-Пользователь на рендере поймал фундаментальный дефект: cap капает в
-`rail_1.feed`, но КАЖДЫЙ рейл безусловно получал сквозной, открытый снизу
-приёмник `lap_in_lap_receiver` на входе (y-пролёт накрывает feed). Бор cap стоял
-ровно над этим проёмом → капля падала НАСКВОЗЬ на уровень ниже, мимо жёлоба
-(CAD-проба под выходом бора: 0.00 solid). Сквозной приёмник нужен ТОЛЬКО там,
-где предыдущий рейл передаёт воду губой (lap); первый рейл кормится КАПЛЕЙ и
-должен иметь **сплошное дно**. Чеки это пропускали — стыки мерили только
-совпадение датумов, не «куда падает капля» (слепая зона).
+VF-8 сделал `rail_1` особым (`inlet_mode: capped`) — костыль от двух симптомов
+ОДНОЙ проблемы: сквозной, открытый снизу приёмник `lap_in_lap_receiver` под
+жёлобом. Он (1) заставлял cap кормить особый capped-рейл и (2) на КАЖДОМ стыке
+рейл↔рейл оставлял открытую вниз дыру прямо под водой — «будет вытекать», не
+«контролируемая протечка». Корень — сама идея сквозного приёмника (чтобы
+сплошное дно не давало дамбу при ΔZ=0).
 
-Фикс — явный параметр рейла **`inlet_mode: lap_receiver | capped`** (default
-`lap_receiver`, все существующие ячейки/голдены байт-в-байт):
-- `capped` → `_lap_inlet_receiver` НЕ режет сквозной проём (дно жёлоба цело),
-  но всё равно эмитит region `lap_receiver` (маркирует feed WET-зону, не
-  сквозной карман — статически декларирован + нужен интерфейсу `inlet`); публикует
-  флаг `inlet_capped=1.0`.
-- Голдены: `rail_1` во всех трёх рядах = `capped`; `rail_2/3` и standalone-ячейки
-  = default `lap_receiver`.
-- `check_lap_joint_geometry_ok`: губа-выход (rail_1→rail_2) проверяется ВСЕГДА;
-  под-чек приёмника — только при `lap_receiver`. `lap_slot_leak_path_controlled`
-  n/a при capped.
-- Новый **`assembly.drip_lands_on_floor`** (IR, эмитится стыком `saddle_hang`
-  ТОЛЬКО для пары inlet-cap↔`rail.feed`, не для коллекторного седла): PASS ⇔
-  `inlet_capped==1` И нет `_lap_receiver` cutbox под колонкой feed; в
-  `row_water_chain.verified_by`. Обратная ошибка (lap_flow в capped-рейл) ловится
-  в `lap_flow_ir` явным сообщением. CAD-проба после фикса: под каплей solid=1.00.
+Инверсия (VF-9): рейл снова **УНИВЕРСАЛЬНЫЙ**, а приёмник — top-open **FLOORED
+lip-seat**: карман опущен ровно на `lip_t + clearance` ниже пола канала, со
+**сплошным дном**. Губа соседа садится в него, `верх губы = пол канала` —
+непрерывная водная поверхность (нет дамбы), при этом **нет дыры вниз**. Тот же
+floored-карман ловит и каплю cap (не проваливается) — поэтому `rail_1` перестаёт
+быть особым, а cap больше не обязан доставлять воду вовнутрь.
 
-Архитектура ряда закреплена: `cap → rail_1 (capped) → lap rail_2 → lap rail_3 →
-collector → вертикально вниз (резервуар / cap ряда ниже)`. Магниты только
-выравнивают соседние рейлы; коллектор — единственный вертикальный выход вниз.
-Cap как деталь НЕ меняется (спаут по-прежнему ныряет в канал). Остаток:
-переименовать capped-region `lap_receiver`→`inlet_wet_zone` (косметика);
-supportless-cap = отдельный VF-8.2.
+- `_lap_inlet_receiver`: `pocket_floor = channel_floor − (lip_t + lip_clearance)`
+  (по умолчанию 1.4 + 0.3 = 1.7 мм), карман z от `pocket_floor` до `floor+0.2` —
+  мелкий (глубина ≤ 2.2, exempt в `no_standing_water_ir`). Публикует
+  `lap_pocket_floor_z`, `lap_pocket_depth`. Никакого `inlet_mode`/`inlet_capped`.
+- `check_lap_joint_geometry_ok` / `lap_slot_leak_path_controlled` переписаны:
+  приёмник ДОЛЖЕН быть floored (`z0 > 0.05`, floor = `lap_pocket_floor_z`); нет
+  открытого пути вниз, открыт только верхний tip-slot на стыке.
+- Новые form-чеки: **`lap_receiver_has_floor`** (сплошное дно),
+  **`lap_receiver_residual_volume_ok`** (это lip-SEAT, глубина ≤ 2 мм, не
+  резервуар — репортит `lap_receiver_residual_volume_mm3`),
+  **`rail_universal_inlet_accepts_cap_and_lap`** (один floored-вход ловит и каплю,
+  и губу).
+- **Инвариант `manufacturing.no_through_holes_in_wet_lap_zone`** (always-on): ни
+  один cutbox с открытым дном (`z0 ≤ 0.05`) не стоит под активным водным путём
+  (регионы `water_channel`/`lap_receiver`/`lap_lip`), КРОМЕ санкционированного
+  слива коллектора. PASS после floored-фикса; FAIL если вернуть сквозной приёмник.
+- Assembly-чеки: **`assembly.lap_joint_no_external_downward_leak`** (стык lap_flow —
+  приёмник закрыт снизу) и **`assembly.cap_drip_lands_in_channel_safe_floor`** (cap↔
+  rail.feed — капля падает на channel-safe дно, не в сквозную дыру), оба в
+  `row_water_chain.verified_by`.
+- Голдены: у `rail_1` убран `inlet_mode: capped` — все рейлы одинаковы.
+
+Архитектура ряда: `универсальный рейл (floored-приёмник + губа-выход, без мокрых
+сквозных дыр) → lap-переток без внешней протечки вниз → collector = единственный
+намеренный слив вниз`. CAD-проба (rail_2): под колонкой feed теперь solid (было
+0.00 сквозное); мелкий seat-паз выше, сплошное дно ниже. Cap как деталь пока не
+меняется (supportless Г-адаптер = VF-9 Part B, отложено).
 
 ## Overflow honesty (VF-4.2, до VF-5 Root Chamber)
 

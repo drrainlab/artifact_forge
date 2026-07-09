@@ -191,6 +191,9 @@ def check_no_standing_water_ir(form: PartForm) -> Finding:
             continue  # floor at/above the channel entry plane — a dry step
         if _pocket_drained_by_through_bore(b, form.bores):
             continue  # a vertical open-bottom bore in its footprint drains it
+        if "lap_receiver" in cut.name and (b.z1 - b.z0) <= 2.2:
+            continue  # VF-9: a SHALLOW floored lip-seat — the neighbour's lip
+            # fills it and it drains forward under the mount tilt, not a sump
         if any(_boxes_overlap(b, w.box) for w in wet):
             offenders.append(f"pocket {cut.name!r} floors at z={b.z0:g} inside the wet path")
     return _finding(
@@ -202,24 +205,22 @@ def check_no_standing_water_ir(form: PartForm) -> Finding:
 
 
 def check_lap_joint_geometry_ok(form: PartForm) -> Finding:
-    """The flush handover pair on one rail: a lip that CONTINUES the
-    channel floor plane (top at floor level — anything higher is a dam,
-    anything lower a step) and a THROUGH open-bottom receiver the
-    neighbour's identical lip lands in, with a deliberate slot left open
-    at the tip."""
+    """The flush handover pair on one rail (VF-9): an outlet lip that CONTINUES
+    the channel floor plane (top at floor level — higher is a dam, lower a step)
+    and an inlet FLOORED lip-seat the neighbour's lip nests into (its top lands
+    flush with the floor), with a deliberate slot left open only at the tip. The
+    receiver is a shallow CLOSED-bottom pocket — never a through hole under the
+    water path."""
     f = form.frame
-    capped = f.get("inlet_capped", 0.0) >= 0.5
-    # The OUTLET lip is always required (every rail hands water onward via lap);
-    # the INLET receiver is checked only on lap-fed rails. A capped inlet (VF-8,
-    # the cap-fed first rail) has a SOLID inlet floor — the drip landing there is
-    # verified by assembly.drip_lands_on_floor, not by a receiver here.
-    lip_keys = ("lap_lip_len", "lap_lip_w", "lap_lip_t", "lap_lip_top_z",
-                "face_gap", "channel_floor_z_inlet", "channel_floor_z_outlet")
-    missing = [k for k in lip_keys if k not in f]
+    keys = ("lap_lip_len", "lap_lip_w", "lap_lip_t", "lap_lip_top_z",
+            "lap_pocket_len", "lap_pocket_w", "lap_pocket_floor_z", "face_gap",
+            "channel_floor_z_inlet", "channel_floor_z_outlet")
+    missing = [k for k in keys if k not in f]
     if missing:
         return _finding("form.lap_joint_geometry_ok", False,
                         f"no lap frame keys: {', '.join(missing)}")
     problems: list[str] = []
+    # -- OUTLET LIP (continues the floor) --
     lip = next((r for r in form.ribs if "lap_lip" in r.name), None)
     if lip is None:
         problems.append("no lap lip rib on the part")
@@ -240,53 +241,46 @@ def check_lap_joint_geometry_ok(form: PartForm) -> Finding:
     if not (FACE_GAP_BAND[0] <= f["face_gap"] <= FACE_GAP_BAND[1]):
         problems.append(f"face gap {f['face_gap']:g} outside "
                         f"{FACE_GAP_BAND[0]}..{FACE_GAP_BAND[1]}")
-    slot = None
-    if not capped:
-        rmissing = [k for k in ("lap_pocket_len", "lap_pocket_w") if k not in f]
-        if rmissing:
-            problems.append(f"no lap receiver keys: {', '.join(rmissing)}")
-        else:
-            pocket = next((c for c in form.cutboxes if "lap_receiver" in c.name), None)
-            if pocket is None:
-                problems.append("no lap receiver cut on the part")
-            else:
-                b = pocket.box
-                if b.z0 > -0.5:
-                    problems.append(
-                        f"receiver floors at z={b.z0:g} — it must cut THROUGH the "
-                        "body (an open bottom is the whole no-sump guarantee)")
-                if b.z1 < f["channel_floor_z_inlet"] - CONST_DEPTH_TOL:
-                    problems.append("receiver stops short of the floor plane — the lip cannot land")
-                side = (f["lap_pocket_w"] - f["lap_lip_w"]) / 2.0
-                if not (LAP_SIDE_CLEAR_BAND[0] <= side <= LAP_SIDE_CLEAR_BAND[1]):
-                    problems.append(
-                        f"per-side lip clearance {side:.2f} outside "
-                        f"{LAP_SIDE_CLEAR_BAND[0]}..{LAP_SIDE_CLEAR_BAND[1]}")
-            slot = f["lap_pocket_len"] - (f["lap_lip_len"] - f["face_gap"])
-            if not (LAP_SLOT_BAND[0] <= slot <= LAP_SLOT_BAND[1]):
-                problems.append(
-                    f"tip slot {slot:.2f} outside {LAP_SLOT_BAND[0]}..{LAP_SLOT_BAND[1]} — "
-                    "the seam must stay deliberately open, and only just")
-    ok_msg = (f"capped inlet — receiver n/a; lip continues the floor plane "
-              f"{f['lap_lip_len']:g} past the face" if capped else
-              f"lip continues the floor plane {f['lap_lip_len']:g} past the face; "
-              f"the receiver is through with a {slot:.1f} open slot at the tip")
+    # -- INLET FLOORED lip-seat (closed bottom, lip nests flush) --
+    pocket = next((c for c in form.cutboxes if "lap_receiver" in c.name), None)
+    if pocket is None:
+        problems.append("no lap receiver cut on the part")
+    else:
+        b = pocket.box
+        if b.z0 <= 0.05:
+            problems.append(
+                f"receiver is open-bottom (z0={b.z0:g}) — it must be FLOORED "
+                "(a closed lip-seat, no through hole under the water path)")
+        if abs(b.z0 - f["lap_pocket_floor_z"]) > 0.05:
+            problems.append("receiver floor disagrees with lap_pocket_floor_z")
+        if b.z1 < f["channel_floor_z_inlet"] - CONST_DEPTH_TOL:
+            problems.append("receiver stops short of the floor plane — the lip cannot land")
+        side = (f["lap_pocket_w"] - f["lap_lip_w"]) / 2.0
+        if not (LAP_SIDE_CLEAR_BAND[0] <= side <= LAP_SIDE_CLEAR_BAND[1]):
+            problems.append(
+                f"per-side lip clearance {side:.2f} outside "
+                f"{LAP_SIDE_CLEAR_BAND[0]}..{LAP_SIDE_CLEAR_BAND[1]}")
+    slot = f["lap_pocket_len"] - (f["lap_lip_len"] - f["face_gap"])
+    if not (LAP_SLOT_BAND[0] <= slot <= LAP_SLOT_BAND[1]):
+        problems.append(
+            f"tip slot {slot:.2f} outside {LAP_SLOT_BAND[0]}..{LAP_SLOT_BAND[1]} — "
+            "the seam must stay deliberately open, and only just")
     return _finding(
         "form.lap_joint_geometry_ok", not problems,
-        ok_msg if not problems else "; ".join(problems),
-        measured=slot if slot is not None else None, limit=LAP_SLOT_BAND[1],
+        f"lip continues the floor plane {f['lap_lip_len']:g} past the face; the "
+        f"receiver is a floored lip-seat with a {slot:.1f} tip slot"
+        if not problems else "; ".join(problems),
+        measured=slot, limit=LAP_SLOT_BAND[1],
     )
 
 
 def check_lap_slot_leak_path_controlled(form: PartForm) -> Finding:
     """The deliberate seam slot must leak into KNOWN air: straight down
-    through the open-bottom receiver, laterally far from the profile slots,
-    magnet pockets and dry zones. The nominal stream crosses ON TOP of the
-    lip; this check pins down where the stray drops go."""
+    the FLOORED lip-seat has no open bottom (no downward leak); the only opening
+    is the top tip-slot at the seam, whose stray drops must stay laterally far
+    from the profile slots, magnet pockets and dry zones. The nominal stream
+    crosses ON TOP of the nested lip."""
     f = form.frame
-    if f.get("inlet_capped", 0.0) >= 0.5:
-        return _finding("form.lap_slot_leak_path_controlled", True,
-                        "capped inlet — no receiver leak path to control (n/a)")
     if "lap_pocket_w" not in f:
         return _finding("form.lap_slot_leak_path_controlled", False,
                         "no lap receiver on the part — nothing to control")
@@ -296,14 +290,10 @@ def check_lap_slot_leak_path_controlled(form: PartForm) -> Finding:
         problems.append("no lap receiver cut on the part")
     else:
         b = pocket.box
-        if b.z0 > -0.5:
-            problems.append("receiver is not open-bottom — drips would pool, not fall")
-        # nothing of the rail may sit under the slot footprint
-        for cut in form.cutboxes:
-            if cut is pocket:
-                continue
-            if cut.box.z1 <= 0.0 and _boxes_overlap(cut.box, b):
-                problems.append(f"feature {cut.name!r} sits under the slot footprint")
+        if b.z0 <= 0.05:
+            problems.append(
+                f"receiver is open-bottom (z0={b.z0:g}) — it must be FLOORED so "
+                "nothing leaks straight down at the seam")
         half = f["lap_pocket_w"] / 2.0
         slot_x = half
         px = f.get("profile_slot_x")
@@ -326,11 +316,73 @@ def check_lap_slot_leak_path_controlled(form: PartForm) -> Finding:
             problems.append("the dry back zone extends under the leak slot")
     return _finding(
         "form.lap_slot_leak_path_controlled", not problems,
-        "seam drips fall through open air between the profiles — clear of "
-        "aluminum, magnets and dry zones (leak: controlled, visible, cleanable)"
+        "floored lip-seat — no downward leak; the top tip-slot's stray drops "
+        "stay clear of aluminum, magnets and dry zones (non-gasketed, cleanable)"
         if not problems else "; ".join(problems),
         limit=LAP_LATERAL_CLEAR_MIN,
     )
+
+
+LAP_RECEIVER_MAX_DEPTH = 2.0   # mm — a lip-SEAT, not a reservoir
+
+
+def check_lap_receiver_has_floor(form: PartForm) -> Finding:
+    """VF-9: the inlet lap receiver is a top-open pocket with a SOLID bottom (a
+    floored lip-seat), not a through hole under the water path. n/a with no
+    receiver."""
+    check = "form.lap_receiver_has_floor"
+    pocket = next((c for c in form.cutboxes if "lap_receiver" in c.name), None)
+    if pocket is None or "lap_pocket_floor_z" not in form.frame:
+        return _finding(check, True, "no lap receiver — n/a")
+    z0 = pocket.box.z0
+    ok = z0 > 0.05
+    return _finding(
+        check, ok,
+        f"lap receiver is floored (pocket floor z={z0:.1f}) — closed below, no "
+        "through hole under the water path"
+        if ok else
+        f"lap receiver is open-bottom (z0={z0:g}) — a through hole under the water path",
+        measured=z0)
+
+
+def check_lap_receiver_residual_volume_ok(form: PartForm) -> Finding:
+    """VF-9: the lap receiver is a SHALLOW lip-SEAT, not a small reservoir —
+    depth <= 2 mm, open-top and cleanable — so that without the neighbour's lip it
+    does not hold a deep wet pocket. Reports `lap_receiver_residual_volume_mm3`.
+    n/a with no receiver."""
+    check = "form.lap_receiver_residual_volume_ok"
+    f = form.frame
+    depth = f.get("lap_pocket_depth")
+    if depth is None:
+        return _finding(check, True, "no lap receiver — n/a")
+    pw = f.get("lap_pocket_w", 0.0)
+    slot = f.get("lap_pocket_len", 0.0) - (f.get("lap_lip_len", 0.0) - f.get("face_gap", 0.0))
+    residual = pw * max(0.0, slot) * depth   # lap_receiver_residual_volume_mm3
+    ok = depth <= LAP_RECEIVER_MAX_DEPTH + 1e-6
+    return _finding(
+        check, ok,
+        f"shallow lip-seat: depth {depth:.1f} mm, residual ~{residual:.0f} mm3 "
+        "when the neighbour's lip is out — drains, not a reservoir"
+        if ok else
+        f"pocket depth {depth:.1f} > {LAP_RECEIVER_MAX_DEPTH:g} mm — too deep, a "
+        "reservoir not a lip seat",
+        measured=depth, limit=LAP_RECEIVER_MAX_DEPTH)
+
+
+def check_rail_universal_inlet_accepts_cap_and_lap(form: PartForm) -> Finding:
+    """VF-9: the rail inlet is UNIVERSAL — one floored lip-seat that both catches
+    an inlet-cap drip AND seats a neighbour's lap lip (no special capped variant).
+    n/a on parts without a lap receiver."""
+    check = "form.rail_universal_inlet_accepts_cap_and_lap"
+    pocket = next((c for c in form.cutboxes if "lap_receiver" in c.name), None)
+    if pocket is None or "lap_pocket_floor_z" not in form.frame:
+        return _finding(check, True, "not a flush rail inlet — n/a")
+    ok = pocket.box.z0 > 0.05   # floored → catches a drip AND seats a lip
+    return _finding(
+        check, ok,
+        "universal inlet — one floored lip-seat catches a cap drip and seats a "
+        "neighbour's lap lip"
+        if ok else "inlet is not a floored universal seat")
 
 
 def check_drainage_requires_mount(form: PartForm) -> Finding:
@@ -924,6 +976,12 @@ register_probe("form.lap_joint_geometry_ok")(
     lambda form, ctx: check_lap_joint_geometry_ok(form))
 register_probe("form.lap_slot_leak_path_controlled")(
     lambda form, ctx: check_lap_slot_leak_path_controlled(form))
+register_probe("form.lap_receiver_has_floor")(
+    lambda form, ctx: check_lap_receiver_has_floor(form))
+register_probe("form.lap_receiver_residual_volume_ok")(
+    lambda form, ctx: check_lap_receiver_residual_volume_ok(form))
+register_probe("form.rail_universal_inlet_accepts_cap_and_lap")(
+    lambda form, ctx: check_rail_universal_inlet_accepts_cap_and_lap(form))
 register_probe("form.drainage_requires_mount")(
     lambda form, ctx: check_drainage_requires_mount(form))
 register_probe("form.magnet_pockets_outside_water_zone")(

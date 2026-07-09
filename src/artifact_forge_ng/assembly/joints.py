@@ -1150,10 +1150,11 @@ _LAP_B_KEYS = ("lap_pocket_len", "lap_pocket_w", "channel_floor_z_inlet",
 def _lap_flow_ir(
     form_a: PartForm, form_b: PartForm, pose: Pose, joint: JointUse
 ) -> list[Finding]:
-    """The flush handover: a's lap lip lands in b's through receiver with
-    the floors COPLANAR (dZ = 0 — nothing falls between modules), the
+    """The flush handover: a's lap lip nests in b's FLOORED lip-seat receiver
+    with the floors COPLANAR (dZ = 0 — nothing falls between modules), the
     faces at the controlled gap, the lip overlapping 3-6 into the opening
-    and the deliberate 0.5-2.5 slot left at the tip. a: is the UPSTREAM
+    and the deliberate 0.5-2.5 slot left at the tip. The receiver is closed
+    below (VF-9) — no external downward leak at the seam. a: is the UPSTREAM
     rail (outlet), b: the downstream (inlet)."""
     check = "assembly.lap_flow_ir"
     fa, fb = form_a.frame, form_b.frame
@@ -1166,13 +1167,6 @@ def _lap_flow_ir(
     missing = [k for k in _LAP_A_KEYS if k not in fa]
     missing += [f"B:{k}" for k in _LAP_B_KEYS if k not in fb]
     if missing:
-        # VF-8: a lap_flow into a CAPPED rail is the inverse mistake — the
-        # receiving rail has no through receiver to catch the lip.
-        if fb.get("inlet_capped", 0.0) >= 0.5:
-            return [_finding(
-                check, False,
-                "lap_flow into a CAPPED rail — it has no receiver to catch the "
-                "lip; the receiving rail's inlet_mode must be lap_receiver")]
         return [_finding(
             check, False,
             f"lap frame keys missing: {', '.join(missing)} — both sides "
@@ -1220,20 +1214,34 @@ def _lap_flow_ir(
             f"receiving channel {fb['channel_w']:g} narrower than the "
             f"giving {fa['channel_w']:g}")
     if problems:
-        return [_finding(check, False, "; ".join(problems))]
-    return [_finding(
-        check, True,
-        f"flush handover: floors coplanar (dZ {dz:+.2f}), face gap {gap:.2f}, "
-        f"lip {overlap:.1f} into the opening, {slot:.1f} slot at the tip",
-        measured=dz, limit=LAP_DZ_TOL,
-    )]
+        findings = [_finding(check, False, "; ".join(problems))]
+    else:
+        findings = [_finding(
+            check, True,
+            f"flush handover: floors coplanar (dZ {dz:+.2f}), face gap {gap:.2f}, "
+            f"lip {overlap:.1f} into the opening, {slot:.1f} slot at the tip",
+            measured=dz, limit=LAP_DZ_TOL,
+        )]
+    # VF-9: the receiver is a FLOORED lip-seat — no open bottom under the seam,
+    # so water crosses over the nested lip with no external downward leak (only
+    # the controlled top tip-slot stays open).
+    pf = fb.get("lap_pocket_floor_z")
+    floored = pf is not None and pf > 0.05
+    findings.append(_finding(
+        "assembly.lap_joint_no_external_downward_leak", floored,
+        f"the lap receiver is floored (pocket floor z={pf:.1f}) — no open path "
+        "straight down at the seam"
+        if floored else
+        "the lap receiver is open-bottom — water would leak straight down at the seam"))
+    return findings
 
 
 _register(JointDecl(
     name="lap_flow_joint",
     description="flush module-to-module water handover: the upstream lap "
-                "lip continues the floor plane into the downstream through "
-                "receiver — dZ = 0, controlled face gap, deliberate tip slot",
+                "lip continues the floor plane into the downstream FLOORED "
+                "lip-seat receiver — dZ = 0, controlled face gap, deliberate "
+                "tip slot, no downward leak (closed below)",
     ir_check=_lap_flow_ir,
     cad_checks=("assembly.no_interference",),
 ))
@@ -1255,41 +1263,31 @@ _SADDLE_A_KEYS = ("rail_y0", "rail_y1", "seat_v0", "seat_v1", "body_h", "channel
 _SADDLE_B_KEYS = ("saddle_slot_y0", "saddle_slot_y1", "saddle_floor_z", "spout_w")
 
 
-def _drip_lands_on_floor(form_a: PartForm) -> Finding:
-    """VF-8: the inlet cap drips at the rail's `feed`. That rail MUST have a
-    capped inlet (solid channel floor under the drip) — a through, open-bottom
-    `lap_receiver` there would let the water fall straight through to the level
-    below. IR-level: read the rail's `inlet_capped` flag and confirm no
-    `*_lap_receiver` cutbox sits under the feed column."""
-    check = "assembly.drip_lands_on_floor"
+def _cap_drip_lands_in_channel_safe_floor(form_a: PartForm) -> Finding:
+    """VF-9: the inlet cap drips at the rail's `feed`. The rail's inlet must be
+    a CHANNEL-SAFE floor there — the FLOORED lip-seat pocket or the solid channel
+    floor right after it — never a through hole that drops the water to the level
+    below. Deliberately NOT fragile on the exact landing point: it passes as long
+    as no open-bottom `*_lap_receiver` cutbox sits under the feed column."""
+    check = "assembly.cap_drip_lands_in_channel_safe_floor"
     fa = form_a.frame
-    capped = fa.get("inlet_capped", 0.0) >= 0.5
-    cx = fa.get("channel_center_x", 0.0)
     yin = fa.get("channel_y_inlet")
-    floor = fa.get("channel_floor_z_inlet")
-    receiver = None
-    if yin is not None and floor is not None:
-        for c in form_a.cutboxes:
-            if "lap_receiver" not in c.name:
-                continue
-            b = c.box
-            if (b.x0 - 0.05 <= cx <= b.x1 + 0.05
-                    and b.y0 - 0.05 <= yin <= b.y1 + 0.05
-                    and b.z0 < floor - 0.5):
-                receiver = c
-                break
-    if capped and receiver is None:
-        return _finding(check, True,
-                        "the cap drips onto the SOLID inlet floor — capped "
-                        "inlet, no through receiver under the drip")
-    if not capped:
-        return _finding(check, False,
-                        "the cap feeds a lap_receiver rail — the drip falls "
-                        "through the open-bottom inlet receiver to the level "
-                        "below; set the rail's inlet_mode: capped")
-    return _finding(check, False,
-                    f"a lap receiver cut {receiver.name!r} sits under the cap "
-                    "drip — water would fall through, not into the channel")
+    through = None
+    for c in form_a.cutboxes:
+        if "lap_receiver" not in c.name:
+            continue
+        b = c.box
+        if (yin is None or (b.y0 - 0.5 <= yin <= b.y1 + 0.5)) and b.z0 <= 0.05:
+            through = c
+            break
+    ok = through is None
+    return _finding(
+        check, ok,
+        "the cap drips onto a channel-safe floor (floored lip-seat / solid "
+        "channel floor) — no fall-through"
+        if ok else
+        f"the cap drips over a through hole {through.name!r} — water would fall "
+        "to the level below; the inlet receiver must be FLOORED")
 
 
 def _saddle_hang_ir(
@@ -1340,12 +1338,12 @@ def _saddle_hang_ir(
             f"rests on its top at z={rest_z:.1f}, spout fits the channel",
             measured=rest_z, limit=fa["body_h"],
         )]
-    # VF-8: emit drip_lands_on_floor ONLY for the inlet-cap -> rail.feed mate
-    # (a: rail.feed; b: the cap, which carries a hose bore) — NEVER the collector
-    # saddle (a: rail.drain_edge, b: collector, no hose bore).
-    if ("feed" in (joint.a_datum or "") and "inlet_capped" in fa
+    # VF-9: emit cap_drip_lands_in_channel_safe_floor ONLY for the inlet-cap ->
+    # rail.feed mate (a: rail.feed, carries channel_y_inlet; b: the cap, carries a
+    # hose bore) — NEVER the collector saddle (a: rail.drain_edge, no hose bore).
+    if ("feed" in (joint.a_datum or "") and "channel_y_inlet" in fa
             and "hose_bore_d" in fb):
-        findings.append(_drip_lands_on_floor(form_a))
+        findings.append(_cap_drip_lands_in_channel_safe_floor(form_a))
     return findings
 
 

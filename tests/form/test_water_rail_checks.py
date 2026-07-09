@@ -4,8 +4,9 @@ water_rail ops publish) passes everything; each surgically broken variant
 fails exactly the check that owns the defect.
 
 The healthy rail is LEVEL: constant-depth channel, lap lip continuing the
-floor plane past the outlet face, a through open-bottom lap receiver in the
-inlet floor. Slope is the mount's job (assembly.row_drains_under_mount)."""
+floor plane past the outlet face, a shallow FLOORED lip-seat receiver in the
+inlet floor (VF-9: closed bottom, no through hole under the water path). Slope
+is the mount's job (assembly.row_drains_under_mount)."""
 
 from artifact_forge_ng.core.findings import Status
 from artifact_forge_ng.form.checks_water import (
@@ -13,6 +14,8 @@ from artifact_forge_ng.form.checks_water import (
     check_cassette_support_span_ok,
     check_drainage_requires_mount,
     check_lap_joint_geometry_ok,
+    check_lap_receiver_has_floor,
+    check_lap_receiver_residual_volume_ok,
     check_lap_slot_leak_path_controlled,
     check_lightweight_windows_dry_ok,
     check_magnet_pockets_do_not_break_wall,
@@ -20,6 +23,7 @@ from artifact_forge_ng.form.checks_water import (
     check_no_secondary_water_channel,
     check_no_standing_water_ir,
     check_profile_seat_dry_ok,
+    check_rail_universal_inlet_accepts_cap_and_lap,
     check_tongue_groove_profile_ok,
     check_water_channel_constant_depth_ok,
     check_water_channel_dims_ok,
@@ -43,6 +47,9 @@ RAIL_CHECKS = (
     check_no_standing_water_ir,
     check_lap_joint_geometry_ok,
     check_lap_slot_leak_path_controlled,
+    check_lap_receiver_has_floor,
+    check_lap_receiver_residual_volume_ok,
+    check_rail_universal_inlet_accepts_cap_and_lap,
     check_magnet_pockets_outside_water_zone,
     check_magnet_pockets_do_not_break_wall,
     check_lightweight_windows_dry_ok,
@@ -61,6 +68,9 @@ FLOOR = SEAT_FLOOR - DEPTH  # 11.0
 FACE_GAP = 0.4
 LIP_LEN, LIP_T, LIP_W = 4.0, 1.4, 18.0
 POCKET_LEN, POCKET_W = 6.0, 18.8
+LIP_CLR = 0.3
+POCKET_DEPTH = LIP_T + LIP_CLR      # 1.7 — a shallow lip-SEAT
+POCKET_FLOOR = FLOOR - POCKET_DEPTH  # 9.3 — solid below, no through hole
 
 
 def good_channel(**over) -> ChannelCutFeature:
@@ -82,6 +92,7 @@ def good_frame(**over) -> dict:
         lap_lip_len=LIP_LEN, lap_lip_w=LIP_W, lap_lip_t=LIP_T,
         lap_lip_top_z=FLOOR, lap_lip_tip_y=-HALF - LIP_LEN,
         lap_pocket_len=POCKET_LEN, lap_pocket_w=POCKET_W,
+        lap_pocket_floor_z=POCKET_FLOOR, lap_pocket_depth=POCKET_DEPTH,
         lap_side_clearance=0.4,
         seat_u0=-110.75, seat_v0=-110.75, seat_u1=110.75, seat_v1=110.75,
         seat_floor_z=SEAT_FLOOR, seat_depth=14.0, seat_clearance=0.75,
@@ -107,7 +118,7 @@ def good_regions() -> list[Region]:
                Box3(-LIP_W / 2.0, -HALF - LIP_LEN - 0.5, FLOOR - LIP_T - 0.5,
                     LIP_W / 2.0, -HALF + 2.0, SEAT_FLOOR)),
         Region("lap_receiver", RegionRole.TRANSIENT_WATER_PATH,
-               Box3(-POCKET_W / 2.0, HALF - POCKET_LEN - 0.5, -1.0,
+               Box3(-POCKET_W / 2.0, HALF - POCKET_LEN - 0.5, POCKET_FLOOR,
                     POCKET_W / 2.0, HALF + 0.5, SEAT_FLOOR)),
         Region("cassette_seat_walls", RegionRole.INTERFACE_KEEPOUT,
                Box3(-113.0, -113.0, SEAT_FLOOR, 113.0, 113.0, 30.0)),
@@ -122,7 +133,7 @@ def good_cutboxes() -> list[CutBoxFeature]:
         CutBoxFeature("body_corridor_out", Box3(-10.0, -124.5, SEAT_FLOOR, 10.0, -110.0, 31.0)),
         CutBoxFeature("body_corridor_in", Box3(-10.0, 110.0, SEAT_FLOOR, 10.0, 124.5, 31.0)),
         CutBoxFeature("lap_in_lap_receiver",
-                      Box3(-POCKET_W / 2.0, HALF - POCKET_LEN, -1.0,
+                      Box3(-POCKET_W / 2.0, HALF - POCKET_LEN, POCKET_FLOOR,
                            POCKET_W / 2.0, HALF + 0.5, FLOOR + 0.2)),
         CutBoxFeature("edges_groove", Box3(-124.0, -3.4, 4.0, -120.0, 3.4, 8.0)),
         CutBoxFeature("body_profile_slot_e", Box3(89.8, -HALF, 0.0, 110.2, HALF, 6.0)),
@@ -253,18 +264,40 @@ def test_dam_lip_rejected():
     assert "check_lap_joint_geometry_ok" in failing(form)
 
 
-def test_blind_receiver_rejected():
-    """A receiver that does not cut THROUGH is a hidden sump: it fails the
-    lap geometry, the leak-path control AND the standing-water guard."""
+def test_through_receiver_rejected():
+    """VF-9 inversion: a through open-bottom receiver (z0=-1) is now the defect
+    — water leaks straight down at the seam. It fails the lap geometry, the
+    leak-path control AND the has-floor guard."""
     cuts = [c for c in good_cutboxes() if "lap_receiver" not in c.name] + [
         CutBoxFeature("lap_in_lap_receiver",
-                      Box3(-POCKET_W / 2.0, HALF - POCKET_LEN, 2.0,
+                      Box3(-POCKET_W / 2.0, HALF - POCKET_LEN, -1.0,
                            POCKET_W / 2.0, HALF + 0.5, FLOOR + 0.2)),
     ]
     form = make_rail(cutboxes=cuts)
     fails = failing(form)
     assert "check_lap_joint_geometry_ok" in fails
     assert "check_lap_slot_leak_path_controlled" in fails
+    assert "check_lap_receiver_has_floor" in fails
+
+
+def test_deep_sump_receiver_rejected():
+    """A FLOORED but too-deep receiver is a hidden reservoir, not a lip-seat:
+    it passes has-floor but fails the residual-volume guard AND the
+    standing-water guard (depth > the shallow-seat exemption)."""
+    deep_floor = 2.0
+    cuts = [c for c in good_cutboxes() if "lap_receiver" not in c.name] + [
+        CutBoxFeature("lap_in_lap_receiver",
+                      Box3(-POCKET_W / 2.0, HALF - POCKET_LEN, deep_floor,
+                           POCKET_W / 2.0, HALF + 0.5, FLOOR + 0.2)),
+    ]
+    form = make_rail(
+        cutboxes=cuts,
+        frame=good_frame(lap_pocket_floor_z=deep_floor,
+                         lap_pocket_depth=FLOOR - deep_floor),  # 9.0 mm deep
+    )
+    fails = failing(form)
+    assert "check_lap_receiver_has_floor" not in fails   # it IS floored...
+    assert "check_lap_receiver_residual_volume_ok" in fails   # ...but a reservoir
     assert "check_no_standing_water_ir" in fails
 
 
@@ -478,8 +511,9 @@ def test_bottoming_tongue_rejected():
 
 
 def test_wet_profile_slot_rejected():
+    # a centerline profile slot reaching up into the channel floor plane is wet
     cuts = [c for c in good_cutboxes() if "profile" not in c.name] + [
-        CutBoxFeature("body_profile_slot_e", Box3(-10.2, -HALF, 0.0, 10.2, HALF, 6.0)),
+        CutBoxFeature("body_profile_slot_e", Box3(-10.2, -HALF, 0.0, 10.2, HALF, 12.0)),
     ]
     form = make_rail(cutboxes=cuts)
     assert "check_profile_seat_dry_ok" in failing(form)
