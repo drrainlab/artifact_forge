@@ -25,6 +25,54 @@ class TestHexField:
     def test_empty_window_no_centers(self):
         assert hex_field_centers(Rect2D(5, 5, 5, 5), 5.0, 1.5) == []
 
+    def test_centers_mirror_symmetric_odd_rows(self):
+        """The lattice is anchored on the window CENTER: with an odd row
+        count every cell has a (u,−v) mirror AND a (−u,v) mirror — a
+        corner-anchored grid printed visibly off-center (the wall tool
+        mount lesson). Height 35 fits 7 rows (odd) at row_pitch 5.655."""
+        window = Rect2D(0.0, -17.5, 40.0, 17.5)  # center (20, 0)
+        centers = hex_field_centers(window, cell=5.0, wall_gap=1.5)
+        assert len(centers) > 10
+        assert len({round(v, 6) for _, v in centers}) == 7
+        have = {(round(u, 6), round(v, 6)) for u, v in centers}
+        for u, v in centers:
+            assert (round(u, 6), round(-v, 6)) in have, f"no v-mirror for {(u, v)}"
+            assert (round(40.0 - u, 6), round(v, 6)) in have, f"no u-mirror for {(u, v)}"
+        cu = sum(u for u, _ in centers) / len(centers)
+        cv = sum(v for _, v in centers) / len(centers)
+        assert cu == pytest.approx(20.0, abs=1e-6)
+        assert cv == pytest.approx(0.0, abs=1e-6)
+
+    def test_even_row_stack_stays_centered(self):
+        """Height 40 fits 8 rows (even): strict point mirror is impossible
+        for a staggered stack, but the STACK is centered (row positions
+        mirror about mid-v) and every row is centered in u — no leftover
+        margin dumped on one side."""
+        window = Rect2D(0.0, -20.0, 40.0, 20.0)
+        centers = hex_field_centers(window, cell=5.0, wall_gap=1.5)
+        rows: dict[float, list[float]] = {}
+        for u, v in centers:
+            rows.setdefault(round(v, 6), []).append(u)
+        vs = sorted(rows)
+        assert len(vs) == 8
+        for a, b in zip(vs, reversed(vs)):
+            assert a == pytest.approx(-b, abs=1e-6)  # row positions mirror
+        for v, us in rows.items():
+            assert sum(us) / len(us) == pytest.approx(20.0, abs=1e-6)
+
+    def test_stagger_survives_centering(self):
+        """Consecutive rows stay offset by pitch/2 — centering must not
+        collapse the hex packing into a square grid."""
+        centers = hex_field_centers(Rect2D(0, 0, 40, 40), cell=5.0, wall_gap=1.5)
+        rows: dict[float, list[float]] = {}
+        for u, v in centers:
+            rows.setdefault(round(v, 6), []).append(u)
+        vs = sorted(rows)
+        assert len(vs) >= 3
+        for a, b in zip(vs, vs[1:]):
+            # min-u of neighbouring rows differs by half a pitch
+            assert abs(min(rows[a]) - min(rows[b])) == pytest.approx(6.5 / 2)
+
     def test_keepouts_filter_cells(self):
         keepout = Region2D(
             "screw", RegionRole.FASTENER_KEEPOUT, Circle2D(Pt(15, 15), 6.0)

@@ -80,16 +80,20 @@ def add_grid_slot_field(
             )
         )
         return [note(use.id, "window smaller than margins — zero slots (honest)")]
-    # slots run along the window's longer side
+    # slots run along the window's longer side; the STACK is centered on
+    # the window so the leftover margin splits evenly (symmetric pattern
+    # on a symmetric part — the wall tool mount lesson)
     along_u = inner.width >= inner.height
     polygons: list[tuple[tuple[float, float], ...]] = []
     pitch = slot_w + web
-    pos = (inner.v0 if along_u else inner.u0) + slot_w / 2.0
-    end = (inner.v1 if along_u else inner.u1) - slot_w / 2.0
+    span = inner.height if along_u else inner.width
+    count = int((span - slot_w + 1e-9) // pitch) + 1 if span >= slot_w else 0
+    mid = ((inner.v0 + inner.v1) if along_u else (inner.u0 + inner.u1)) / 2.0
+    pos = mid - (count - 1) * pitch / 2.0
     from ..form.regions import Region2D  # noqa: F401  (typing aid)
     from ..form.section import Pt
 
-    while pos <= end + 1e-9:
+    for _ in range(count):
         if along_u:
             rect = [
                 (inner.u0, pos - slot_w / 2), (inner.u1, pos - slot_w / 2),

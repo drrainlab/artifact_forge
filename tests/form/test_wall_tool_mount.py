@@ -196,6 +196,54 @@ def test_field_modifiers_ground_only_on_the_flange_panel():
             "outer_shell", "anchors_0", "anchors_1"} <= protected
 
 
+def _grinder_with_modifier(mod: dict) -> "ProductInstance":
+    data = load_instance(GRINDER).model_dump(by_alias=True)
+    data["modifiers"] = [mod]
+    data["id"] = "wtm_field_symmetry"
+    return ProductInstance.model_validate(data)
+
+
+def test_hex_field_symmetric_about_the_centerline():
+    """The printed-part regression: hex lightening on the flange must be
+    mirror-symmetric about y=0 — the part, the region and the keepouts all
+    are, so an off-center pattern is the generator's fault."""
+    catalog = load_catalog()
+    instance = _grinder_with_modifier({
+        "id": "add_hex_perforation", "target": "flange_lightening",
+        "params": {"cell_d": "6mm", "wall_gap": "2mm", "cut_mode": "through"},
+    })
+    state = pre_cad_from_instance(instance, catalog, True)
+    assert state.form is not None
+    field = next(f for f in state.form.fields if f.centers)
+    have = {(round(x, 6), round(y, 6)) for x, y in field.centers}
+    for x, y in field.centers:
+        assert (round(x, 6), round(-y, 6)) in have, f"no mirror for {(x, y)}"
+    cy = sum(y for _, y in field.centers) / len(field.centers)
+    assert cy == pytest.approx(0.0, abs=1e-6)
+
+
+def test_slot_field_symmetric_about_the_centerline():
+    catalog = load_catalog()
+    instance = _grinder_with_modifier({
+        "id": "add_grid_slot_field", "target": "flange_lightening",
+        "params": {"slot_w": "4mm", "web": "3mm"},
+    })
+    state = pre_cad_from_instance(instance, catalog, True)
+    assert state.form is not None
+    field = next(f for f in state.form.fields if f.polygons)
+    # slots run along x (the window is taller than wide) — their center
+    # positions across y... along_u = width >= height; window is x∈[36,121]
+    # (u), y∈±35 (v) → along_u, slots stacked in v(y): stack centered on 0
+    ys = sorted(
+        sum(p[1] for p in poly) / len(poly) for poly in field.polygons
+    )
+    assert len(ys) >= 3
+    mid = (ys[0] + ys[-1]) / 2.0
+    assert mid == pytest.approx(0.0, abs=1e-6)
+    for a, b in zip(ys, reversed(ys)):
+        assert a == pytest.approx(-b, abs=1e-6)
+
+
 def test_voronoi_cells_respect_anchor_keepouts():
     state = run_pre_cad(GRINDER, None)
     assert state.form is not None
