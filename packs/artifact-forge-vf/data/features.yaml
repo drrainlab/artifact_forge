@@ -1,0 +1,249 @@
+schema: features/v1
+
+features:
+  # -- vertical farm pack v1 (docs/VERTICAL_FARM_PACK.md) --------------------
+
+  - id: constant_depth_water_channel
+    description: >
+      open U-channel of CONSTANT depth inside a level body — the drainage
+      slope comes from mounting the row (mount_context), never from the
+      rail; buildable horizontal, operational mounted
+    verified_by:
+      - form.water_channel_constant_depth_ok
+      - form.water_channel_dims_ok
+      - form.drainage_requires_mount
+      - topology.water_channel_open
+      - topology.water_channel_floor_solid
+
+  - id: lap_flow_handover
+    description: >
+      flush module-to-module water handover — a lip continuing the channel
+      floor plane lands in the neighbour's through open-bottom receiver;
+      the tip slot is a controlled, visible, cleanable leak path, and the
+      seam is never the primary water path
+    verified_by:
+      - form.lap_joint_geometry_ok
+      - form.lap_slot_leak_path_controlled
+      - form.no_standing_water_ir
+
+  - id: root_chamber
+    description: >
+      the under-cassette volume is a passive root chamber: a solid blind
+      bottom that contains overflow, with open-top level troughs the mount
+      drains forward (passive_root_drainage_return, never a second pulse
+      channel); roots grow in, brush-open after the cassette lifts
+    verified_by:
+      - form.root_chamber_ok
+      - form.cassette_support_span_ok
+      - form.no_secondary_water_channel
+
+  - id: lightweight_dry_shell
+    description: >
+      the rail is a dry OPEN SKELETON around a protected water core —
+      large smooth THROUGH windows between the channel and the profile
+      bands (no bridges by construction), ribbed, never honeycomb; the
+      cassette covers every opening, the profile carries
+    verified_by:
+      - form.lightweight_windows_dry_ok
+      - form.cassette_support_span_ok
+
+  - id: cassette_seat
+    description: >
+      recessed drop-in seat matching the shared cassette envelope with
+      the declared clearance, floor on the channel entry plane
+    verified_by:
+      - form.cassette_seat_fit_ok
+
+  - id: module_alignment_edges
+    description: >
+      tongue (+X) / groove (-X) line-alignment interface — positions
+      neighbouring modules, carries nothing, seals nothing
+    verified_by:
+      - form.tongue_groove_profile_ok
+      - topology.ribs_present
+
+  - id: aluminum_profile_seat
+    description: >
+      bottom slots dropping the module onto 2020/3030 aluminum rails,
+      tool-free and fully outside the water path
+    verified_by:
+      - form.profile_seat_dry_ok
+      - topology.cutout_present
+
+  - id: endcap_dock
+    description: >
+      VF-6 magnetic docking of the row endcaps: UP pockets in the terminal
+      module's END wall top take the collector (front) or inlet cap (back)
+      arm's DOWN pockets — magnet to magnet, dry perimeter wall, alignment
+      only. The seating check proves the pockets actually mate in the pose
+    verified_by:
+      - form.dock_pockets_dry
+      - assembly.endcap_docks_to_rail
+
+  - id: debris_screen
+    description: >
+      VF-8 drop-in strainer basket: a fine mesh floor catches coarse coco
+      chips and root fragments (debris-reduced water, not clean), wide wall
+      slots are the fail-safe side-flow, a real debris reservoir above the
+      mesh, tool-free lift-out, and a manifold-printable mesh
+    verified_by:
+      - form.screen_open_area_ratio_ok
+      - form.screen_debris_capacity_ok
+      - form.lift_access_ok
+      - manufacturing.mesh_manifold
+
+  - id: strainer_seat
+    description: >
+      VF-8 collector LOWERED SUMP WELL fed by a radial funnel — the tray floor
+      slopes to the drain from every side, the drain sits at the absolute low
+      point, and a drop-in strainer basket seats in the well OVER it (water
+      falls in, not a barrier; no bypass; a clog spills the open tray visibly)
+    verified_by:
+      - assembly.screen_normal_no_bypass
+      - assembly.drain_inside_screen_footprint
+      - assembly.screen_removable_from_sump
+      - form.collector_sump_is_lowest_point
+      - form.tray_floor_slopes_to_sump
+      - form.basket_not_transverse_flow_barrier
+      - form.no_standing_water_before_screen
+
+  - id: substrate_mesh_floor
+    description: >
+      flat orthogonal through-mesh across the cassette floor — holds coco,
+      aerates roots, directs no flow, and tessellates into a clean manifold
+      STL (a mesh too fine tears on export — caught, not shipped)
+    verified_by:
+      - form.mesh_floor_orthogonal_ok
+      - form.min_ligament_ok
+      - topology.hex_field_present
+      - manufacturing.mesh_manifold
+
+  - id: pulse_contact_window
+    description: >
+      localized lowered window reaching 1-2 mm into the channel's upper
+      zone — substrate touches pulse water only, drained water never
+    verified_by:
+      - form.contact_window_geometry_ok
+      - topology.contact_window_present
+
+  - id: tool_free_removal
+    description: finger notches through the rim — lifts out by hand
+    verified_by:
+      - form.lift_access_ok
+      - topology.cutout_present
+
+  - id: cleanable_snap_interface
+    description: >
+      every snap pocket pierces its wall — open both sides, brushable,
+      no hidden wet cavity
+    verified_by:
+      - form.snap_pockets_cleanable
+
+  # Cassette Interface Standard: the assembly-level contract ANY cassette
+  # archetype must satisfy against the rail. The frame-key contract:
+  # rail publishes seat_u0/v0/u1/v1, seat_floor_z, seat_depth,
+  # channel_center_x/top_z/floor_z_inlet/floor_z_outlet; the cassette
+  # publishes cassette_u0/v0/u1/v1, cassette_h, floor_bottom_z,
+  # window_cx/window_w/window_floor_z. Verified in the assembled pose.
+  - id: vertical_farm_cassette_interface
+    description: >
+      the cassette drops into the rail seat within the clearance band,
+      lifts out by hand, and its contact window rides over the channel in
+      pulse-only reach — the machine-checked half of the Cassette
+      Interface Standard
+    verified_by:
+      - assembly.removable_insert_ir
+      - assembly.no_interference
+
+  - id: module_line_interface
+    description: >
+      adjacent modules align on tongue/groove at the grid pitch with
+      channel centerlines continuous — a line, not a seal
+    verified_by:
+      - assembly.tongue_groove_ir
+      - assembly.no_interference
+
+  - id: snapped_retainer
+    description: >
+      the retainer frame clicks onto the cassette with printable flexure
+      strain and real lip engagement
+    verified_by:
+      - assembly.snap_joint_ir
+      - assembly.hooks_engage
+
+
+  # -- VF-3 fluid row (docs/VERTICAL_FARM_PACK.md) ---------------------------
+
+  - id: hose_takeoff
+    description: >
+      push-in bore gripping an external silicone tube — the tube is
+      hardware (BOM), never a printed mate
+    verified_by:
+      - form.hose_bore_ok
+
+  - id: drip_spout
+    description: >
+      drip-tower water path: a vertical bore falling through a spout that
+      dips into the receiving rail corridor — no pockets by construction
+    verified_by:
+      - form.spout_drop_path_ok
+      - topology.fluid_path_open
+
+  - id: catch_tray
+    description: >
+      sloped catch tray under the rail's overflow lip, draining fully
+      into a through hose bore at the floor's lowest point
+    verified_by:
+      - form.collector_tray_drains
+      - topology.fluid_path_open
+
+  # Assembly-level: the flush row's water story — drip in at the cap, lap
+  # handovers between modules, drip out at the collector, and the whole
+  # path drains ONLY under the declared mount slope.
+  - id: row_water_chain
+    description: >
+      the water chain cap -> flush modules -> collector verified in the
+      pose: drip handovers at both ends, lap-flow handovers between
+      modules, no orphan required fluid ports, and the row drains under
+      its mount_context
+    verified_by:
+      - assembly.lap_flow_ir
+      - assembly.fluid_joint_ir
+      - assembly.no_orphan_ports
+      - assembly.row_drains_under_mount
+      - assembly.cap_drip_lands_in_channel_safe_floor
+      - assembly.cap_chute_drains_under_mount
+      - assembly.lap_joint_no_external_downward_leak
+
+  - id: row_flush_integrity
+    description: >
+      the modules form ONE plane: lap joints verified, dZ = 0 row
+      alignment at the flush pitch, and the seam slots leak only into
+      controlled open air
+    verified_by:
+      - assembly.lap_flow_ir
+      - assembly.row_flush_aligned
+      - form.lap_slot_leak_path_controlled
+
+  - id: saddle_mount
+    description: >
+      auxiliary verification: adapters really hang on the rail walls in
+      the pose the fluid joints set — straddle, rest, corridor fit
+    verified_by:
+      - assembly.saddle_hang_ir
+
+  # VF-4: the row is mechanically CARRIED by the aluminum profile carrier
+  # (reference proxy of a standard straight 2020/3030 at the global row
+  # slope) — every rail rests at its station, pitch aligned, slope matches
+  # the cascade. Required only in carried-row assemblies' contracts.
+  - id: row_carried_by_profile
+    description: >
+      every rail in the row rests FULL LENGTH on standard straight
+      aluminum profiles (span gap zero — no cell hangs on a water joint),
+      rails march flush at module_w + face_gap, and the whole row drains
+      under its declared mount slope
+    verified_by:
+      - assembly.profile_perch_ir
+      - assembly.profile_support_full_length
+      - assembly.row_flush_aligned
+      - assembly.row_drains_under_mount

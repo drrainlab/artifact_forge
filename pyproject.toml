@@ -40,7 +40,16 @@ web = [
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    # private dev monorepo: the VF pack rides in the dev venv so the full
+    # (core + pack) suite runs; the public core never depends on it
+    "artifact-forge-vf",
 ]
+
+[tool.uv.workspace]
+members = ["packs/artifact-forge-vf"]
+
+[tool.uv.sources]
+artifact-forge-vf = { workspace = true }
 
 [project.scripts]
 forge = "artifact_forge_ng.cli:main"
@@ -53,7 +62,7 @@ build-backend = "hatchling.build"
 packages = ["src/artifact_forge_ng"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "packs/artifact-forge-vf/tests"]
 markers = [
     "cad: tests that require the cadquery kernel (deselect with '-m \"not cad\"')",
 ]

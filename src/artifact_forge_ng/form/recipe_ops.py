@@ -2,8 +2,7 @@
 
 Ops live in the recipe_ops_* family modules; importing this module
 registers all of them in the original order. Public names keep their
-import path. Water-family ops (recipe_ops_water) register between the
-wearable and dovetail families — original textual order.
+import path.
 """
 from __future__ import annotations
 
@@ -15,5 +14,4 @@ from . import recipe_ops_base  # noqa: E402,F401
 from . import recipe_ops_fasteners  # noqa: E402,F401
 from . import recipe_ops_mount  # noqa: E402,F401
 from . import recipe_ops_wearable  # noqa: E402,F401
-from . import recipe_ops_water  # noqa: E402,F401
 from . import recipe_ops_dovetail  # noqa: E402,F401

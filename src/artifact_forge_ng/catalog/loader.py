@@ -215,16 +215,28 @@ LOCAL_DIR = Path(__file__).resolve().parents[3] / "catalog" / "local"
 
 
 def load_catalog(data_dir: Path | None = None) -> Catalog:
-    # Packs register their ops/checks/joints and contribute archetype dirs
-    # before any YAML binds against the registries (idempotent; disabled by
-    # ARTIFACT_FORGE_DISABLE_PACKS=1). An explicit data_dir is an isolated
-    # catalog (tests) — pack archetypes are not merged there.
-    from ..packs import load_packs, pack_archetype_dirs
+    # Packs register their ops/checks/joints and contribute catalog data
+    # dirs before any YAML binds against the registries (idempotent;
+    # disabled by ARTIFACT_FORGE_DISABLE_PACKS=1). An explicit data_dir is
+    # an isolated catalog (tests) — pack data is not merged there.
+    from ..packs import load_packs, pack_data_dirs
     load_packs()
     root = data_dir or DATA_DIR
     vocabulary = _load_features(root / "features.yaml")
+    pack_dirs = pack_data_dirs() if data_dir is None else []
+    for pack_id, pack_dir in pack_dirs:
+        feats = pack_dir / "features.yaml"
+        if feats.exists():
+            for fid, feat in _load_features(feats).items():
+                if fid in vocabulary:
+                    raise CatalogError(
+                        f"pack {pack_id!r}: duplicate feature id {fid!r}")
+                vocabulary[fid] = feat
     modifiers: dict[str, ModifierDef] = {}
-    for path in sorted((root / "modifiers").glob("*.yaml")):
+    modifier_files = list(sorted((root / "modifiers").glob("*.yaml")))
+    for _pack_id, pack_dir in pack_dirs:
+        modifier_files += sorted((pack_dir / "modifiers").glob("*.yaml"))
+    for path in modifier_files:
         mod = _load_modifier(path, vocabulary)
         if mod.id in modifiers:
             raise CatalogError(f"duplicate modifier id {mod.id!r}")
@@ -234,16 +246,15 @@ def load_catalog(data_dir: Path | None = None) -> Catalog:
     archetype_files = [
         (path, "builtin") for path in sorted((root / "archetypes").glob("*.yaml"))
     ]
-    if data_dir is None:
-        for pack_id, pack_dir in pack_archetype_dirs():
-            archetype_files += [
-                (path, f"pack:{pack_id}")
-                for path in sorted(pack_dir.glob("*.yaml"))
-            ]
-        if LOCAL_DIR.exists():
-            archetype_files += [
-                (path, "local") for path in sorted(LOCAL_DIR.glob("*.yaml"))
-            ]
+    for pack_id, pack_dir in pack_dirs:
+        archetype_files += [
+            (path, f"pack:{pack_id}")
+            for path in sorted((pack_dir / "archetypes").glob("*.yaml"))
+        ]
+    if data_dir is None and LOCAL_DIR.exists():
+        archetype_files += [
+            (path, "local") for path in sorted(LOCAL_DIR.glob("*.yaml"))
+        ]
     for path, origin in archetype_files:
         spec = _load_archetype(path, vocabulary, modifiers)
         if spec.id in archetypes:

@@ -47,22 +47,46 @@ class PackContext:
     """Handed to each pack's ``register``; collects its contributions."""
 
     pack_id: str
-    archetype_dirs: list[Path] = field(default_factory=list)
+    data_dirs: list[Path] = field(default_factory=list)
     overrides: set[str] = field(default_factory=set)
 
-    def add_archetype_dir(self, path: Path | str) -> None:
+    def add_data_dir(self, path: Path | str) -> None:
+        """A catalog-data dir mirroring core's layout: optional
+        ``features.yaml``, ``archetypes/``, ``modifiers/``."""
         p = Path(path)
         if not p.is_dir():
             raise PackError(
-                f"pack {self.pack_id!r}: archetype dir {p} does not exist")
-        self.archetype_dirs.append(p)
+                f"pack {self.pack_id!r}: data dir {p} does not exist")
+        self.data_dirs.append(p)
 
     def declare_override(self, name: str) -> None:
         """Explicitly allow this pack to replace one existing registration."""
         self.overrides.add(name)
 
+    def add_assembly_finding_hook(self, fn) -> None:
+        """``fn(asm, states, poses, findings) -> Iterable[Finding]`` — extra
+        assembly-level findings appended during assembly validation."""
+        ASSEMBLY_FINDING_HOOKS.append(fn)
 
-#: pack_id -> its archetype dirs, in load order. None = not discovered yet.
+    def add_assembly_report_hook(self, fn) -> None:
+        """``fn(asm, states, joint_findings, poses) ->
+        Iterable[(key, filename|None, payload)]`` — report sections; a
+        filename also writes ``<target>/<filename>`` and records the export."""
+        ASSEMBLY_REPORT_HOOKS.append(fn)
+
+    def add_part_report_hook(self, fn) -> None:
+        """``fn(state) -> (key, payload) | None`` — extra report section for
+        a single-part CAD build."""
+        PART_REPORT_HOOKS.append(fn)
+
+
+#: Pack-contributed pipeline hooks, in pack load order.
+ASSEMBLY_FINDING_HOOKS: list = []
+ASSEMBLY_REPORT_HOOKS: list = []
+PART_REPORT_HOOKS: list = []
+
+
+#: pack_id -> its data dirs, in load order. None = not discovered yet.
 _loaded: dict[str, list[Path]] | None = None
 
 
@@ -127,12 +151,12 @@ def load_packs() -> dict[str, list[Path]]:
         except Exception as exc:
             raise PackError(f"pack {ep.name!r}: register() failed: {exc}") from exc
         _verify_no_clobber(ep.name, before, ctx.overrides)
-        loaded[ep.name] = list(ctx.archetype_dirs)
+        loaded[ep.name] = list(ctx.data_dirs)
 
     _loaded = loaded
     return _loaded
 
 
-def pack_archetype_dirs() -> list[tuple[str, Path]]:
+def pack_data_dirs() -> list[tuple[str, Path]]:
     """``(pack_id, dir)`` pairs of every loaded pack, in load order."""
     return [(pid, d) for pid, dirs in load_packs().items() for d in dirs]

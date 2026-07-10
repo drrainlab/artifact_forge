@@ -166,9 +166,12 @@ def _joint_findings(
                 critical=True,
             ))
     findings.extend(interface_findings(asm, states))
-    from .carrier import carrier_findings
+    # Pack-contributed assembly findings (e.g. the VF pack's carrier/row
+    # verification).
+    from ..packs import ASSEMBLY_FINDING_HOOKS
 
-    findings.extend(carrier_findings(asm, states, poses, findings))
+    for hook in ASSEMBLY_FINDING_HOOKS:
+        findings.extend(hook(asm, states, poses, findings))
     return findings, poses, pose_report
 
 
@@ -465,10 +468,7 @@ def run_assembly_build(
     }
     if asm.meta:
         report["meta"] = dict(asm.meta)
-    # Vertical farm pack: the water contract report + view metadata, when
-    # any part carries a water channel (dry assemblies stay untouched).
     from .bom import build_bom
-    from .water_report import build_views, build_water_report
 
     bom = build_bom(asm, states, catalog)
     bom_path = target / "bom.yaml"
@@ -476,27 +476,23 @@ def run_assembly_build(
     report["bom"] = bom
     report["exports"]["bom"] = str(bom_path)
 
-    from .frame_report import build_frame_report
+    # Pack-contributed report sections (e.g. the VF pack's frame report,
+    # water contract report and view metadata). A section with a filename
+    # is also written next to the assembly report and recorded in exports.
+    from ..packs import ASSEMBLY_REPORT_HOOKS
 
-    frame = build_frame_report(asm, states, joint_findings)
-    if frame is not None:
-        frame_path = target / "frame_report.yaml"
-        frame_path.write_text(
-            yaml.safe_dump(frame, sort_keys=False, allow_unicode=True))
-        report["frame"] = frame
-        report["exports"]["frame_report"] = str(frame_path)
-
-    water = build_water_report(states, joint_findings, asm=asm, poses=poses)
-    if water is not None:
-        water_path = target / "water_report.yaml"
-        water_path.write_text(
-            yaml.safe_dump(water, sort_keys=False, allow_unicode=True)
-        )
-        report["water"] = water
-        report["exports"]["water_report"] = str(water_path)
-    views = build_views(asm, states, poses)
-    if views is not None:
-        report["views"] = views
+    for hook in ASSEMBLY_REPORT_HOOKS:
+        for key, filename, payload in hook(
+                asm=asm, states=states, joint_findings=joint_findings,
+                poses=poses):
+            if payload is None:
+                continue
+            report[key] = payload
+            if filename:
+                section_path = target / filename
+                section_path.write_text(yaml.safe_dump(
+                    payload, sort_keys=False, allow_unicode=True))
+                report["exports"][Path(filename).stem] = str(section_path)
     (target / "assembly_report.yaml").write_text(
         yaml.safe_dump(report, sort_keys=False, allow_unicode=True)
     )

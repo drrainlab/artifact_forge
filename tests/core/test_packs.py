@@ -28,7 +28,7 @@ def _reset_pack_state(monkeypatch):
 def test_no_packs_installed_is_a_noop(monkeypatch):
     monkeypatch.setattr(packs, "_discover", lambda: [])
     assert packs.load_packs() == {}
-    assert packs.pack_archetype_dirs() == []
+    assert packs.pack_data_dirs() == []
 
 
 def test_disable_env_skips_discovery(monkeypatch):
@@ -100,9 +100,9 @@ def test_register_crash_is_wrapped(monkeypatch):
         packs.load_packs()
 
 
-def test_missing_archetype_dir_fails(monkeypatch, tmp_path):
+def test_missing_data_dir_fails(monkeypatch, tmp_path):
     def register(ctx):
-        ctx.add_archetype_dir(tmp_path / "nope")
+        ctx.add_data_dir(tmp_path / "nope")
 
     monkeypatch.setattr(packs, "_discover",
                         lambda: [_FakeEntryPoint("demo", register)])
@@ -110,13 +110,13 @@ def test_missing_archetype_dir_fails(monkeypatch, tmp_path):
         packs.load_packs()
 
 
-def test_archetype_dirs_are_collected(monkeypatch, tmp_path):
-    d = tmp_path / "archetypes"
+def test_data_dirs_are_collected(monkeypatch, tmp_path):
+    d = tmp_path / "data"
     d.mkdir()
 
     def register(ctx):
-        ctx.add_archetype_dir(d)
+        ctx.add_data_dir(d)
 
     monkeypatch.setattr(packs, "_discover",
                         lambda: [_FakeEntryPoint("demo", register)])
-    assert packs.pack_archetype_dirs() == [("demo", d)]
+    assert packs.pack_data_dirs() == [("demo", d)]

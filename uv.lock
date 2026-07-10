@@ -6,6 +6,12 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 
+[manifest]
+members = [
+    "artifact-forge-ng",
+    "artifact-forge-vf",
+]
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.7.1"
@@ -219,6 +225,7 @@ web = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "artifact-forge-vf" },
     { name = "pytest" },
 ]
 
@@ -236,7 +243,21 @@ requires-dist = [
 provides-extras = ["cad", "web"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=8.0" }]
+dev = [
+    { name = "artifact-forge-vf", editable = "packs/artifact-forge-vf" },
+    { name = "pytest", specifier = ">=8.0" },
+]
+
+[[package]]
+name = "artifact-forge-vf"
+version = "0.1.0"
+source = { editable = "packs/artifact-forge-vf" }
+dependencies = [
+    { name = "artifact-forge-ng" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "artifact-forge-ng", editable = "." }]
 
 [[package]]
 name = "attrs"

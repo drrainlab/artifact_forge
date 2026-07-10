@@ -23,7 +23,3 @@ from .topology_structure import (  # noqa: F401
     arm_reaches_tip, seat_lips_present, pockets_present, rail_present,
     exoskeleton_ribs_materialized, organic_windows_open,
 )
-from .topology_water import (  # noqa: F401
-    water_channel_open, water_channel_floor_solid, contact_window_present,
-    fluid_path_open,
-)
