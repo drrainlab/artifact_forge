@@ -127,7 +127,52 @@ def carrier_findings(
     if cap is not None and posed_rails:
         findings.extend(_endcap_dock(
             cap, posed_rails[0][0], "back", states, poses))
+        findings.extend(_cap_chute_drains_under_mount(asm, cap, states, poses))
     return findings
+
+
+# -- assembly.cap_chute_drains_under_mount ----------------------------------------
+
+
+def _cap_chute_drains_under_mount(
+    asm: Any, cap_ref: str, states: dict[str, Any], poses: dict[str, Any],
+) -> list[Finding]:
+    """VF-9.2: the cap's open chute has a LEVEL floor — it drains toward the
+    drip tip only because the mounted row is tilted. Verify it IN THE ASSEMBLED
+    POSE, not in cap-local coordinates: virtual heights v = z + y*tan(slope) of
+    the chute's uphill end and its tip — the uphill end must sit higher, so the
+    film runs to the nose and drips off. Emitted only for a posed chute cap in
+    a row with a declared mount."""
+    check = "assembly.cap_chute_drains_under_mount"
+    st, pose = states.get(cap_ref), poses.get(cap_ref)
+    if st is None or st.form is None or pose is None:
+        return []
+    f = st.form.frame
+    if "chute_tip_y" not in f:
+        return []  # not a chute cap — nothing to verify
+    mount = getattr(asm, "mount_context", None)
+    if mount is None:
+        return [_finding(
+            check, False,
+            "the cap's level chute drains only under the row mount — declare "
+            "mount_context for the row")]
+    grade = math.tan(math.radians(mount.slope_deg))
+    z_floor = f["channel_floor_z_outlet"]
+    up = pose.apply((0.0, f.get("chute_uphill_y", 0.0), z_floor))
+    tip = pose.apply((0.0, f["chute_tip_y"], z_floor))
+    v_up = up[2] + up[1] * grade
+    v_tip = tip[2] + tip[1] * grade
+    drop = v_up - v_tip
+    ok = drop > 1e-3
+    return [_finding(
+        check, ok,
+        f"the chute floor descends {drop:.2f} virtual mm toward the drip tip "
+        f"under the {mount.slope_deg:g} deg mount — the level trough drains"
+        if ok else
+        f"the chute floor does NOT descend toward the tip under the mount "
+        f"(virtual drop {drop:.2f}) — water would sit in the trough",
+        measured=drop, limit=0.0,
+    )]
 
 
 # -- assembly.row_flush_aligned -------------------------------------------------

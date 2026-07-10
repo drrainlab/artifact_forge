@@ -4,19 +4,21 @@ version: 1
 object_class: water_inlet_cap
 maturity: sandbox_buildable
 description: >
-  Vertical Farm Pack (VF-9 Part B): the Water Inlet Cap — a compact,
-  support-free Г-hook. A drip line pushes into a vertical bore from the top;
-  water falls straight through a nose column that dips into the rail's inlet
-  channel and drips onto the floored lip-seat (fluid_joint, gravity is the
-  pump). One straight vertical path: brush- and eye-cleanable from above with
-  the tube pulled. HOOKS the outboard edge of the rail back wall — a short
-  rest ledge (~4mm) on the wall top, an outboard leg gripping the +Y face down
-  to the bed, the nose column anchoring the roof over the channel. Nothing
-  floats: it prints AS-MODELED with no saddle_up flip
+  Vertical Farm Pack (VF-9.2 chute-cap): the Water Inlet Cap — a support-free
+  Г-hook whose water path is VISIBLE. The drip line seats in a vertical tube
+  socket on a STOP SHOULDER (it cannot be pushed through); a narrower drip
+  orifice drops the water through a short covered chamber into an OPEN-TOP
+  chute (a U-trough) that carries it inboard and drips it off the nose tip
+  onto the rail's floored lip-seat, safely inside the channel (fluid_joint,
+  gravity is the pump; the mounted row tilt drains both the level trough and
+  the rail channel). No closed horizontal water tunnel, no ambiguous through
+  bore (form.cap_water_path_visible); brush-cleanable from above. HOOKS the
+  outboard edge of the rail back wall — a short rest ledge on the wall top, an
+  outboard leg/foot to the bed — and prints AS-MODELED with no saddle_up flip
   (manufacturing.cap_supportless_verified). Magnets dock on the vertical +Y
-  face (Y-axis pockets), not the wall top. assembly.saddle_hang_ir verifies the
-  hang in the fluid pose. Local frame: y=0 = the rail back face, -Y inboard
-  toward the channel; z=0 = the cap body bottom.
+  face. assembly.saddle_hang_ir verifies the hang in the fluid pose. Local
+  frame: y=0 = the rail back face, -Y inboard toward the channel; z=0 = the
+  cap body bottom.
 
 provides_features:
   - hose_takeoff
@@ -37,6 +39,16 @@ parameters:
   bore_clearance:
     {type: length, default: 0.4mm, min: 0.2mm, max: 0.8mm, role: manufacturing,
      description: push-in grip over the tube OD}
+  socket_depth:
+    {type: length, default: 12mm, min: 8mm, max: 14mm, role: functional,
+     exposed: true,
+     description: "VF-9.2: tube socket depth to the STOP SHOULDER — the tube
+       seats there and physically cannot be pushed through the cap"}
+  orifice_d:
+    {type: length, default: 5mm, min: 4mm, max: 7mm, role: functional,
+     exposed: true,
+     description: "VF-9.2: the drip orifice below the stop — narrower than
+       the tube (the stop is real) yet wide enough not to clog"}
   cassette_w:
     {type: length, default: 177mm, min: 160mm, max: 236mm, role: assembly,
      description: shared cassette envelope — sizes the rail wall the cap hangs on}
@@ -104,6 +116,8 @@ form:
         cap_h: cap_h
         tube_od: tube_od
         bore_clearance: bore_clearance
+        socket_depth: socket_depth
+        orifice_d: orifice_d
         rail_wall_t: rail_wall_t
         saddle_fit: saddle_fit
         saddle_depth: saddle_depth
@@ -148,6 +162,7 @@ validators:
   - interface.keepouts_preserved
   - form.hose_bore_ok
   - form.spout_drop_path_ok
+  - form.cap_water_path_visible
   - form.dock_pockets_dry
   - form.no_standing_water_ir
   - manufacturing.cap_supportless_verified
@@ -170,3 +185,4 @@ contract:
     - hidden_wet_cavity
   invariants:
     - spout_w <= channel_w - 2
+    - orifice_d <= tube_od - 2

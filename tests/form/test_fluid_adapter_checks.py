@@ -1,32 +1,38 @@
-"""Mutation tests for the VF-3 fluid adapter checks: a healthy hand-built
-cap IR (vertical hose drop through a descending spout) and collector IR
-(sloped catch tray into a through drain) pass; each surgical break fails
-exactly the owning check."""
+"""Mutation tests for the fluid adapter checks. VF-9.2 cap: a healthy
+hand-built chute-cap IR (stepped tube socket with a stop shoulder, drip
+orifice, covered chamber, OPEN U-trough) and collector IR (sloped catch tray
+into a through drain) pass; each surgical break fails exactly the owning
+check."""
 
 import math
 
 from artifact_forge_ng.core.findings import Status
 from artifact_forge_ng.form.checks_water import (
+    check_cap_water_path_visible,
     check_collector_tray_drains,
     check_hose_bore_ok,
+    check_no_standing_water_ir,
     check_spout_drop_path_ok,
 )
 from artifact_forge_ng.form.part import (
     BoreFeature,
     ChannelCutFeature,
+    CutBoxFeature,
     PartForm,
     RibFeature,
 )
-from artifact_forge_ng.form.regions import Box3
+from artifact_forge_ng.form.regions import Box3, Region
 from artifact_forge_ng.form.section import ArcSeg, Pt, ProfileLoop, SectionProfile
 from artifact_forge_ng.form.style import MOLDED_UTILITY_PART
+from artifact_forge_ng.product.archetype import RegionRole
 
 TUBE_OD = 9.0
 BORE_D = 9.4
 
 
 def make_form(name="adapter", frame=None, bores=None, ribs=None,
-              channels=None) -> PartForm:
+              channels=None, cutboxes=None, regions=None,
+              datums=None) -> PartForm:
     c = Pt(0.0, -10.0)
     loop = ProfileLoop([
         ArcSeg(Pt(0, -5), Pt(0, -15), c, ccw=True),
@@ -37,88 +43,187 @@ def make_form(name="adapter", frame=None, bores=None, ribs=None,
         section=SectionProfile(name=name, outer=loop),
         width=22.0, style=MOLDED_UTILITY_PART,
         bores=bores or [], ribs=ribs or [], channels=channels or [],
+        cutboxes=cutboxes or [], regions=regions or [], datums=datums or {},
     )
 
 
-# -- inlet cap ---------------------------------------------------------------
+# -- inlet cap (VF-9.2 chute-cap geometry, mirroring the op's numbers) ---------
+
+Y_SOCK = 6.7        # socket/orifice axis
+STOP_Z = 10.0       # tube-stop shoulder plane (cap_h 22 - socket_depth 12)
+CHAMBER_TOP = 6.0   # chamber ceiling = orifice exit
+TIP_Y = -4.5        # chute tip (DRIP_INSET inboard of the rail face)
+Z_EXIT = -8.5       # drip height (trough floor top)
+
 
 def cap_frame(**over) -> dict:
     f = dict(
-        hose_tube_od=TUBE_OD, spout_w=14.0, rail_channel_w=16.0,
-        channel_floor_z_outlet=-8.5, saddle_floor_z=8.0,
+        hose_tube_od=TUBE_OD, hose_bore_d=BORE_D,
+        hose_socket_depth=12.0, hose_socket_y=Y_SOCK, drip_orifice_d=5.0,
+        chute_tip_y=TIP_Y, chute_uphill_y=9.5,
+        spout_w=14.0, rail_channel_w=16.0, channel_top_z=22.0,
+        channel_floor_z_outlet=Z_EXIT, saddle_floor_z=8.0,
     )
     f.update(over)
     return f
 
 
-def cap_bore(**over) -> BoreFeature:
+def cap_socket(**over) -> BoreFeature:
     kw: dict = dict(
-        name="hose_drop", axis="Z", center=(0.0, -14.0, 0.0),
-        d=BORE_D, span=(-8.5, 22.0), overshoot=(1.0, 1.0),
+        name="cap_hose_socket", axis="Z", center=(0.0, Y_SOCK, 0.0),
+        d=BORE_D, span=(STOP_Z, 22.0), overshoot=(0.0, 1.0),
     )
     kw.update(over)
     return BoreFeature(**kw)
 
 
-def cap_spout() -> RibFeature:
-    return RibFeature("cap_spout", Box3(-9.0, -18.0, -9.5, 9.0, -10.0, 0.6))
+def cap_orifice(**over) -> BoreFeature:
+    kw: dict = dict(
+        name="cap_hose_drop", axis="Z", center=(0.0, Y_SOCK, 0.0),
+        d=5.0, span=(CHAMBER_TOP, STOP_Z), overshoot=(1.0, 1.0),
+    )
+    kw.update(over)
+    return BoreFeature(**kw)
 
 
-def healthy_cap() -> PartForm:
-    return make_form("cap", frame=cap_frame(), bores=[cap_bore()],
-                     ribs=[cap_spout()])
+def cap_trough() -> list[RibFeature]:
+    return [
+        RibFeature("cap_nose_wall_e", Box3(5.0, TIP_Y, Z_EXIT - 1.0, 7.0, 9.5, 8.0)),
+        RibFeature("cap_nose_wall_w", Box3(-7.0, TIP_Y, Z_EXIT - 1.0, -5.0, 9.5, 8.0)),
+        RibFeature("cap_nose_floor", Box3(-7.0, TIP_Y, Z_EXIT - 1.0, 7.0, 9.5, Z_EXIT)),
+    ]
+
+
+def cap_cuts() -> list[CutBoxFeature]:
+    return [
+        CutBoxFeature("cap_chamber", Box3(-5.0, 0.4, -9.5, 5.0, 9.5, CHAMBER_TOP)),
+        CutBoxFeature("cap_chute_sky", Box3(-5.0, -4.0, -9.5, 5.0, 0.4, 23.0)),
+    ]
+
+
+def healthy_cap(**frame_over) -> PartForm:
+    return make_form(
+        "cap", frame=cap_frame(**frame_over),
+        bores=[cap_socket(), cap_orifice()],
+        ribs=cap_trough(), cutboxes=cap_cuts(),
+        datums={"spout": {"at": [0.0, TIP_Y, Z_EXIT], "rotate": [0.0, 0.0, 0.0]}},
+    )
 
 
 def test_healthy_cap_passes():
     form = healthy_cap()
-    for check in (check_hose_bore_ok, check_spout_drop_path_ok):
+    for check in (check_hose_bore_ok, check_spout_drop_path_ok,
+                  check_cap_water_path_visible):
         finding = check(form)
         assert finding.status is Status.PASS, (finding.check, finding.message)
 
 
-def test_loose_hose_bore_rejected():
-    form = make_form("cap", frame=cap_frame(),
-                     bores=[cap_bore(d=TUBE_OD + 1.5)], ribs=[cap_spout()])
+def test_loose_socket_grip_rejected():
+    form = healthy_cap()
+    form.bores[0] = cap_socket(d=TUBE_OD + 1.5)
     assert check_hose_bore_ok(form).status is Status.FAIL
 
 
-def test_blind_hose_bore_rejected():
-    form = make_form("cap", frame=cap_frame(),
-                     bores=[cap_bore(overshoot=(0.0, 1.0))], ribs=[cap_spout()])
+def test_through_socket_no_stop_rejected():
+    """VF-9.2 core mutation: a socket open at the bottom has NO stop — the
+    tube can be pushed clean through the cap."""
+    form = healthy_cap()
+    form.bores[0] = cap_socket(span=(CHAMBER_TOP, 22.0), overshoot=(1.0, 1.0))
     finding = check_hose_bore_ok(form)
     assert finding.status is Status.FAIL
-    assert "blind" in finding.message
+    assert "pushed clean through" in finding.message
 
 
-def test_missing_spout_rejected():
-    form = make_form("cap", frame=cap_frame(), bores=[cap_bore()])
+def test_wide_orifice_rejected():
+    """An orifice as wide as the tube leaves no stop shoulder."""
+    form = healthy_cap()
+    form.bores[1] = cap_orifice(d=TUBE_OD - 1.0)
+    finding = check_hose_bore_ok(form)
+    assert finding.status is Status.FAIL
+    assert "stop" in finding.message
+
+
+def test_offset_orifice_rejected():
+    form = healthy_cap()
+    form.bores[1] = cap_orifice(center=(3.0, Y_SOCK, 0.0))
+    finding = check_hose_bore_ok(form)
+    assert finding.status is Status.FAIL
+    assert "coaxial" in finding.message
+
+
+def test_interrupted_orifice_rejected():
+    """An orifice that stops short of the socket bottom leaves solid plastic
+    between them — the water path is interrupted at the stop."""
+    form = healthy_cap()
+    form.bores[1] = cap_orifice(span=(CHAMBER_TOP, STOP_Z - 2.0))
+    finding = check_hose_bore_ok(form)
+    assert finding.status is Status.FAIL
+    assert "interrupted" in finding.message
+
+
+def test_plugged_socket_without_orifice_rejected():
+    """A blind socket with NO draining orifice is a hidden sump: hose_bore_ok
+    misses its pair AND no_standing_water_ir flags the undrained blind bore."""
+    form = make_form(
+        "cap", frame=cap_frame(),
+        bores=[cap_socket()], ribs=cap_trough(), cutboxes=cap_cuts(),
+        regions=[Region("spout_path", RegionRole.TRANSIENT_WATER_PATH,
+                        Box3(-5.0, -5.0, -9.6, 5.0, 11.5, 22.5))],
+        datums={"spout": {"at": [0.0, TIP_Y, Z_EXIT], "rotate": [0.0, 0.0, 0.0]}},
+    )
+    assert check_hose_bore_ok(form).status is Status.FAIL
+    standing = check_no_standing_water_ir(form)
+    assert standing.status is Status.FAIL
+    assert "blind bore" in standing.message
+
+
+def test_missing_floor_rejected():
+    form = healthy_cap()
+    form.ribs[:] = [r for r in form.ribs if "floor" not in r.name]
     finding = check_spout_drop_path_ok(form)
     assert finding.status is Status.FAIL
-    assert "no spout/nose rib" in finding.message
+    assert "floor" in finding.message
 
 
-def test_spout_above_body_rejected():
-    form = make_form("cap", frame=cap_frame(channel_floor_z_outlet=2.0),
-                     bores=[cap_bore()], ribs=[cap_spout()])
+def test_missing_wall_rejected():
+    form = healthy_cap()
+    form.ribs[:] = [r for r in form.ribs if "wall_w" not in r.name]
+    finding = check_spout_drop_path_ok(form)
+    assert finding.status is Status.FAIL
+    assert "wall" in finding.message
+
+
+def test_tip_above_body_rejected():
+    form = healthy_cap(channel_floor_z_outlet=2.0)
     finding = check_spout_drop_path_ok(form)
     assert finding.status is Status.FAIL
     assert "descend" in finding.message
 
 
-def test_wide_spout_rejected():
-    form = make_form("cap", frame=cap_frame(spout_w=15.5),
-                     bores=[cap_bore()], ribs=[cap_spout()])
+def test_wide_trough_rejected():
+    form = healthy_cap(spout_w=15.5)
     finding = check_spout_drop_path_ok(form)
     assert finding.status is Status.FAIL
     assert "channel" in finding.message
 
 
-def test_interrupted_drop_rejected():
-    form = make_form("cap", frame=cap_frame(),
-                     bores=[cap_bore(span=(-2.0, 22.0))], ribs=[cap_spout()])
-    finding = check_spout_drop_path_ok(form)
+def test_closed_tunnel_no_sky_rejected():
+    """VF-9.2 user rule: without the sky opening the chute is a roofed
+    horizontal water tunnel — the path is hidden."""
+    form = healthy_cap()
+    form.cutboxes[:] = [c for c in form.cutboxes if "sky" not in c.name]
+    finding = check_cap_water_path_visible(form)
     assert finding.status is Status.FAIL
-    assert "interrupted" in finding.message
+    assert "hidden" in finding.message
+
+
+def test_long_covered_chamber_rejected():
+    form = healthy_cap()
+    form.cutboxes[0] = CutBoxFeature(
+        "cap_chamber", Box3(-5.0, 0.4, -9.5, 5.0, 12.5, CHAMBER_TOP))
+    finding = check_cap_water_path_visible(form)
+    assert finding.status is Status.FAIL
+    assert "tunnel" in finding.message
 
 
 # -- collector ----------------------------------------------------------------

@@ -41,6 +41,16 @@ CORRIDOR_MARGIN = 2.0
 #: This is the ONLY place a fall survives after the VF correction — rails
 #: hand water to each other flush, over lap lips, with no step at all.
 FALL_ENTRY = 2.5
+#: VF-9.2: the cap's drip point sits this far INBOARD of the rail face — safely
+#: inside the channel run, not at its very edge. PAIRED between the rail's
+#: `feed` datum and the cap's `spout` datum (both inset equally), so the row
+#: pose is unchanged while the datums honestly mark the real drip point.
+DRIP_INSET = 4.5
+#: VF-9.2: the drip orifice below the cap's tube-stop shoulder is this long.
+ORIFICE_LEN = 4.0
+#: VF-9.2: the covered chamber under the cap's socket may be at most this long
+#: in Y — a small drop shaft, never a closed horizontal water tunnel.
+CAP_COVERED_RUN_MAX = 10.0
 
 
 # -- water_rail_body (base) ---------------------------------------------------
@@ -239,9 +249,13 @@ def _water_rail_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         "rotate": [0.0, 0.0, 0.0],
     }
     # The feed datum keeps the ONLY fall in the corrected row: the inlet
-    # cap's drip tower targets this point, FALL_ENTRY above the floor.
+    # cap's chute tip targets this point, FALL_ENTRY above the floor and
+    # DRIP_INSET inboard of the face (VF-9.2 — the drip lands safely INSIDE
+    # the channel run, paired with the cap's spout datum so the pose is
+    # unchanged).
+    state.frame.update(feed_y=v1 - DRIP_INSET)
     state.datums["feed"] = {
-        "at": [0.0, v1, floor_z + FALL_ENTRY],
+        "at": [0.0, v1 - DRIP_INSET, floor_z + FALL_ENTRY],
         "rotate": [0.0, 0.0, 0.0],
     }
 
@@ -1091,20 +1105,19 @@ _register(RecipeOpDecl(
 
 
 def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """The Water Inlet Cap (VF-9 Part B): a compact, support-free Г-hook — no
-    saddle_up flip. A drip line pushes into a vertical bore from the top; water
-    falls straight through a nose column that dips into the rail's inlet channel
-    and drips onto the floored lip-seat (Part A) — one straight vertical path,
-    brush- and eye-cleanable from above. The cap HOOKS the outboard edge of the
-    rail back wall: a short rest ledge (~4mm) lands on the wall top, an outboard
-    leg/foot grips the +Y face down to the bed, and the nose column over the
-    channel anchors the roof (a both-supported bridge, not a floating
-    cantilever). Because the ledge is short and the nose reaches the bed,
-    NOTHING floats as-modeled (manufacturing.cap_supportless_verified). Magnets
-    dock on the VERTICAL +Y face (Y-axis pockets), not the wall top, so no deep
-    overhang is needed. Local frame: y=0 = the rail back (+Y) face, -Y = inboard
-    toward the channel, +Y = outboard off the rail end; z=0 = the cap body
-    bottom, wall top at z = saddle_depth."""
+    """The Water Inlet Cap (VF-9.2 chute-cap): a support-free Г-hook whose water
+    path is VISIBLE — no closed horizontal tunnel, no ambiguous through bore.
+    The path: a vertical TUBE SOCKET in the tower (blind, with a stop shoulder —
+    the tube cannot be pushed through) -> a narrow DRIP ORIFICE through the stop
+    -> a small covered CHAMBER (a short drop shaft) -> an OPEN-TOP CHUTE (a
+    U-trough: floor + two walls) that carries the drip inboard and drops it off
+    the nose tip onto the rail's floored lip-seat, DRIP_INSET inside the channel
+    (the mounted row tilt then carries the water along the rail channel — the
+    cap transports nothing sideways itself; the level trough drains by the same
+    tilt). The cap HOOKS the outboard edge of the rail back wall (short rest
+    ledge + outboard leg/foot to the bed, VF-9 Part B) and prints AS-MODELED.
+    Local frame: y=0 = the rail back (+Y) face, -Y inboard toward the channel;
+    z=0 = the cap body bottom, wall top at z = saddle_depth."""
     if state.section is not None:
         raise RecipeError("inlet_cap_body must be the (single) base op")
     cap_w, cap_h = p["cap_w"], p["cap_h"]
@@ -1115,7 +1128,9 @@ def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     nose_w = p["spout_w"]
     rail_channel_w = p["rail_channel_w"]
     hook_reach = p.get("hook_reach", 3.5)  # rest-ledge reach onto the wall top
-    bore_d = tube_od + grip
+    socket_depth = p.get("socket_depth", 12.0)
+    orifice_d = p.get("orifice_d", 5.0)
+    socket_d = tube_od + grip
     z_exit = saddle_depth - hang_drop
     if z_exit > -1.0:
         raise RecipeError(
@@ -1124,17 +1139,31 @@ def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     if nose_w > rail_channel_w - 2.0:
         raise RecipeError(
             f"nose {nose_w:g} cannot dip into the {rail_channel_w:g} rail channel")
-    if bore_d > nose_w - 3.0:
-        raise RecipeError(
-            f"hose bore {bore_d:g} leaves no nose wall in {nose_w:g}")
     if not (2.5 <= hook_reach <= 5.0):
         raise RecipeError(
             f"hook_reach {hook_reach:g} outside 2.5..5.0 — the rest ledge must "
             "be a short printable overhang on the wall top, not a deep cantilever")
+    if not (8.0 <= socket_depth <= 14.0):
+        raise RecipeError(f"socket_depth {socket_depth:g} outside 8..14")
+    if not (4.0 <= orifice_d <= tube_od - 2.0):
+        raise RecipeError(
+            f"orifice_d {orifice_d:g} outside 4..{tube_od - 2.0:g} — the stop "
+            "shoulder must be real (narrower than the tube) yet not clog")
 
     y_leg = fit                    # outboard leg inboard face (fit off the wall)
     y_ledge_in = -hook_reach       # rest-ledge inboard edge (short reach)
-    y_out = 12.0                   # outboard leg/tower back
+    trough_half = nose_w / 2.0     # trough outer half-width (fits the channel)
+    slot_half = trough_half - 2.0  # trough inner half-width (2mm walls)
+    # the socket needs solid tower on both sides of its Ø in Y:
+    y_sock = y_leg + 1.6 + socket_d / 2.0            # inboard wall >= 1.6
+    y_out = y_sock + socket_d / 2.0 + 1.9            # outboard wall >= 1.9
+    y_chamber_out = y_sock + orifice_d / 2.0 + 0.3   # chamber covers the orifice
+    if y_chamber_out - y_leg > CAP_COVERED_RUN_MAX:
+        raise RecipeError(
+            f"covered chamber run {y_chamber_out - y_leg:.1f} exceeds "
+            f"{CAP_COVERED_RUN_MAX:g} — a closed horizontal water tunnel")
+    stop_z = cap_h - socket_depth        # the tube-stop shoulder plane
+    chamber_top_z = stop_z - ORIFICE_LEN  # the chamber ceiling (orifice exit)
     u0, u1 = -cap_w / 2.0, cap_w / 2.0
     state.section = SectionProfile(
         name="recipe",
@@ -1148,37 +1177,63 @@ def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     # ledge lands on the wall top and the leg grips the +Y face (open bottom).
     slot = Box3(u0 - 1.0, y_ledge_in - 0.5, -1.0, u1 + 1.0, y_leg, saddle_depth)
     state.cutboxes.append(CutBoxFeature(name=f"{name}_saddle_slot", box=slot))
-    # NOSE COLUMN over the channel: refills the slot at |x|<nose/2 and descends
-    # into the channel — the straight vertical drip path AND the inboard anchor
-    # that turns the roof into a both-supported bridge (welded after the cut).
-    # It reaches well inboard so solid walls flank the central bore (a hollow
-    # column is not a rib) and the drip lands deep in the channel.
-    nose_depth = 10.0
-    nose = Box3(-nose_w / 2.0, y_leg + 0.5 - nose_depth, z_exit - 1.0,
-                nose_w / 2.0, y_leg + 0.5, saddle_depth)
-    state.ribs.append(RibFeature(name=f"{name}_nose", box=nose))
-    # OUTBOARD FOOT: ground the leg/tower to the bed so nothing floats.
-    foot = Box3(u0, y_leg, z_exit - 1.0, u1, y_out, 0.6)
-    state.ribs.append(RibFeature(name=f"{name}_foot", box=foot))
-    # straight vertical hose bore — open top (tube push-in) and bottom (drip);
-    # a vertical bore has no roof, so it is support-free by construction.
+    # CHAMBER: the short covered drop shaft under the orifice — cut into the
+    # tower interior; the trough floor rib (welded after all cuts) closes its
+    # bottom. Ceiling = a counterbore-scale 2x`slot_half` bridge, printable.
+    chamber = Box3(-slot_half, y_leg, z_exit - 1.0,
+                   slot_half, y_chamber_out, chamber_top_z)
+    state.cutboxes.append(CutBoxFeature(name=f"{name}_chamber", box=chamber))
+    # SKY SLOT: open the roof/ledge over the chute run — the water path is
+    # visible and brushable from above. z0 below the floor keeps the cut
+    # open-bottom at IR (the floor rib closes it after welding).
+    sky = Box3(-slot_half, y_ledge_in - 0.5, z_exit - 1.0,
+               slot_half, y_leg, cap_h + 1.0)
+    state.cutboxes.append(CutBoxFeature(name=f"{name}_chute_sky", box=sky))
+    # U-FOOT: ground the leg/tower to the bed AROUND the chamber (a single
+    # full-width foot would refill the chamber — ribs weld after cuts). Welded
+    # FIRST: the feet root in the tower body and reach the bed, giving the
+    # walls and floor below z=0 something to weld onto.
+    for tag, bx in (("e", Box3(slot_half, y_leg, z_exit - 1.0, u1, y_out, 0.6)),
+                    ("w", Box3(u0, y_leg, z_exit - 1.0, -slot_half, y_out, 0.6)),
+                    ("c", Box3(-slot_half, y_chamber_out, z_exit - 1.0,
+                               slot_half, y_out, 0.6))):
+        state.ribs.append(RibFeature(name=f"{name}_foot_{tag}", box=bx))
+    # OPEN CHUTE: a U-trough — two walls (rooted in the tower), then the level
+    # floor (welds onto the feet/walls; drains inboard by the mounted row
+    # tilt, exactly like the rail channel itself). The tip edge at
+    # y = -DRIP_INSET drips from z_exit into the channel. Same outer envelope
+    # as the VF-9B nose: it passes through the rail's inlet corridor void.
+    for tag, x0, x1 in (("e", slot_half, trough_half),
+                        ("w", -trough_half, -slot_half)):
+        state.ribs.append(RibFeature(
+            name=f"{name}_nose_wall_{tag}",
+            box=Box3(x0, -DRIP_INSET, z_exit - 1.0, x1, y_chamber_out,
+                     saddle_depth)))
+    floor = Box3(-trough_half, -DRIP_INSET, z_exit - 1.0,
+                 trough_half, y_chamber_out, z_exit)
+    state.ribs.append(RibFeature(name=f"{name}_nose_floor", box=floor))
+    # TUBE SOCKET: blind, open-top — its flat bottom IS the stop shoulder the
+    # tube seats on (the tube physically cannot be pushed through). The DRIP
+    # ORIFICE continues coaxially through the stop into the chamber.
     state.bores.append(BoreFeature(
-        name=f"{name}_hose_drop", axis="Z", center=(0.0, 0.0, 0.0),
-        d=bore_d, span=(z_exit, cap_h), overshoot=(1.0, 1.0),
+        name=f"{name}_hose_socket", axis="Z", center=(0.0, y_sock, 0.0),
+        d=socket_d, span=(stop_z, cap_h), overshoot=(0.0, 1.0),
+    ))
+    state.bores.append(BoreFeature(
+        name=f"{name}_hose_drop", axis="Z", center=(0.0, y_sock, 0.0),
+        d=orifice_d, span=(chamber_top_z, stop_z), overshoot=(1.0, 1.0),
     ))
 
     state.regions.extend([
         Region("spout_path", RegionRole.TRANSIENT_WATER_PATH,
-               Box3(-nose_w / 2.0, -bore_d / 2.0 - 2.0, z_exit - 1.0,
-                    nose_w / 2.0, bore_d / 2.0 + 2.0, cap_h + 0.5)),
+               Box3(-slot_half, -DRIP_INSET - 0.5, z_exit - 1.1,
+                    slot_half, y_sock + socket_d / 2.0 + 0.1, cap_h + 0.5)),
         Region("saddle", RegionRole.INTERFACE_KEEPOUT, slot),
     ])
 
-    # Endcap dock magnets (VF-9 Part B): moved from the wall TOP (Z pockets,
-    # which forced a deep unsupported roof overhang) to the VERTICAL +Y face —
-    # Y-axis pockets in the leg's inboard face (y = y_leg), docking to matching
-    # pockets on the rail's +Y end face. Vertical-face pockets print clean, so
-    # the cap stays support-free. Alignment-only, press-fit, n/a when off.
+    # Endcap dock magnets (VF-9 Part B): Y-axis pockets in the leg's inboard
+    # face, docking to the rail's +Y END-FACE pockets — vertical faces print
+    # support-free. Alignment-only, press-fit, n/a when off.
     dock_z = saddle_depth - p.get("dock_drop", 4.0)  # same drop below the wall top
     _collect_dock(state, p, name, dock_y=y_leg, z_plane=dock_z,
                   side_front=False, style="face")
@@ -1186,21 +1241,27 @@ def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     state.frame.update(
         outline_u0=u0, outline_v0=y_ledge_in, outline_u1=u1, outline_v1=y_out,
         outline_corner_r=p["corner_r"],
-        hose_tube_od=tube_od, hose_bore_d=bore_d,
+        hose_tube_od=tube_od, hose_bore_d=socket_d,
+        hose_socket_depth=socket_depth, hose_socket_y=y_sock,
+        drip_orifice_d=orifice_d,
+        chute_tip_y=-DRIP_INSET, chute_uphill_y=y_chamber_out,
         spout_w=nose_w, rail_channel_w=rail_channel_w,
-        channel_center_x=0.0, channel_w=bore_d, channel_top_z=cap_h,
-        channel_floor_z_outlet=z_exit, channel_y_outlet=0.0,
+        channel_center_x=0.0, channel_w=2.0 * slot_half, channel_top_z=cap_h,
+        channel_floor_z_outlet=z_exit, channel_y_outlet=-DRIP_INSET,
         saddle_slot_y0=y_ledge_in, saddle_slot_y1=y_leg,
         saddle_floor_z=saddle_depth, saddle_fit=fit,
         hang_drop=hang_drop, hang_mode=1.0,          # 1 = one-sided hook
         cap_hook_reach=hook_reach, cap_leg_y=y_leg,
         cap_nose_bottom_z=z_exit, cap_roof_z=saddle_depth,
     )
-    state.datums["spout"] = {"at": [0.0, 0.0, z_exit], "rotate": [0.0, 0.0, 0.0]}
-    state.datums["tube_in"] = {"at": [0.0, 0.0, cap_h], "rotate": [0.0, 0.0, 0.0]}
-    # Prints as-modeled (VF-9 Part B): the short rest ledge is a <=4mm overhang,
-    # the nose and outboard foot both reach the bed, the hose bore is vertical —
-    # nothing floats, so no saddle_up flip is needed.
+    # The spout datum = the REAL drip point: the trough tip edge, DRIP_INSET
+    # inboard of the rail face — paired with the rail's feed datum inset.
+    state.datums["spout"] = {"at": [0.0, -DRIP_INSET, z_exit],
+                             "rotate": [0.0, 0.0, 0.0]}
+    state.datums["tube_in"] = {"at": [0.0, y_sock, cap_h],
+                               "rotate": [0.0, 0.0, 0.0]}
+    # Prints as-modeled: short rest ledge, trough floor and feet reach the bed,
+    # socket/orifice vertical, chamber ceiling a counterbore-scale bridge.
 
 
 _register(RecipeOpDecl(
@@ -1209,6 +1270,7 @@ _register(RecipeOpDecl(
     params={
         "cap_w": ("length", 64.0), "cap_h": ("length", 22.0),
         "tube_od": ("length", 9.0), "bore_clearance": ("length", 0.4),
+        "socket_depth": ("length", 12.0), "orifice_d": ("length", 5.0),
         "rail_wall_t": ("length", 13.25), "saddle_fit": ("length", 0.4),
         "saddle_depth": ("length", 8.0), "hang_drop": ("length", 16.5),
         "spout_w": ("length", 14.0), "rail_channel_w": ("length", 16.0),
@@ -1221,6 +1283,7 @@ _register(RecipeOpDecl(
     },
     validators=(
         "form.hose_bore_ok", "form.spout_drop_path_ok",
+        "form.cap_water_path_visible",
         "form.dock_pockets_dry",
         "form.no_standing_water_ir",
         "manufacturing.cap_supportless_verified",

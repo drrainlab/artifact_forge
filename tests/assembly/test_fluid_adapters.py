@@ -9,6 +9,7 @@ from artifact_forge_ng.assembly.joints import (
     _fluid_joint_ir,
     _saddle_hang_ir,
     JOINT_TYPES,
+    Pose,
     compute_pose,
 )
 from artifact_forge_ng.core.findings import Status
@@ -91,12 +92,37 @@ def collector_form(name="collector", **over) -> PartForm:
 # -- op outputs pass their own checks -----------------------------------------
 
 def test_cap_op_satisfies_checks():
+    from artifact_forge_ng.form.checks_water import check_cap_water_path_visible
     form = cap_form()
     for check in (check_hose_bore_ok, check_spout_drop_path_ok,
-                  check_no_standing_water_ir):
+                  check_cap_water_path_visible, check_no_standing_water_ir):
         finding = check(form)
         assert finding.status is Status.PASS, (finding.check, finding.message)
     assert "spout" in form.datums and "tube_in" in form.datums
+    # VF-9.2: the spout datum is the REAL drip point — the chute tip
+    assert form.datums["spout"]["at"][1] == form.frame["chute_tip_y"]
+
+
+def test_cap_chute_drains_under_mount():
+    """VF-9.2: the chute's LEVEL floor drains only under the mounted row tilt
+    — verified with virtual heights IN THE POSE, not cap-local coordinates.
+    Without a declared mount the level trough honestly does not drain."""
+    from types import SimpleNamespace
+
+    from artifact_forge_ng.assembly.carrier import _cap_chute_drains_under_mount
+
+    cap = cap_form()
+    states = {"cap": SimpleNamespace(form=cap)}
+    poses = {"cap": Pose(rotate=(0, 0, 0), translate=(0.0, 123.5, 22.0))}
+    mount = SimpleNamespace(slope_deg=1.5, slope_source="mounted profile")
+    ok = _cap_chute_drains_under_mount(
+        SimpleNamespace(mount_context=mount), "cap", states, poses)[0]
+    assert ok.status.value == "pass", ok.message
+    assert ok.measured is not None and ok.measured > 0.2  # ~14mm * tan(1.5deg)
+    bad = _cap_chute_drains_under_mount(
+        SimpleNamespace(mount_context=None), "cap", states, poses)[0]
+    assert bad.status.value == "fail"
+    assert "mount" in bad.message
 
 
 def test_cap_supportless_verified_and_cantilever_mutation():

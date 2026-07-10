@@ -910,13 +910,30 @@ def contact_window_present(geometry: Geometry, form: PartForm) -> Finding:
 
 @register_probe("topology.fluid_path_open")
 def fluid_path_open(geometry: Geometry, form: PartForm) -> Finding:
-    """The fluid adapter's whole water path, probed on the solid: every
-    hose bore is void end-to-end and (on the collector) the tray run is
-    void above its sloped floor. A blocked path is a plug, not a port."""
+    """The fluid adapter's whole water path, probed on the solid. VF-9.2: a
+    part with a STEPPED tube socket (the inlet cap, `hose_socket_depth` in the
+    frame) is probed as ONE composite polyline — down the socket, through the
+    orifice, down the chamber and along the open chute past the tip — never
+    demanding void below the socket's intentional stop shoulder at the socket
+    diameter, and catching a plugged chamber/chute that per-bore probes miss.
+    Plain hose/drain ports keep the end-to-end bore probe; the collector's
+    tray run is probed above its sloped floor."""
     probes: list[tuple[str, object]] = []
-    for bore in form.bores:
-        if "hose" in bore.name or "drain" in bore.name:
-            probes.append((bore.name, channel_probe(bore.path(), d=bore.d * 0.7)))
+    f = form.frame
+    if "hose_socket_depth" in f:
+        d = f.get("drip_orifice_d", 5.0) * 0.7
+        lift = d / 2.0 + 0.6
+        y_sock = f.get("hose_socket_y", 0.0)
+        z_top = f.get("channel_top_z", 22.0) + 0.5
+        z_run = f["channel_floor_z_outlet"] + lift
+        tip_y = f.get("chute_tip_y", 0.0)
+        path = [(0.0, y_sock, z_top), (0.0, y_sock, z_run),
+                (0.0, tip_y - 1.0, z_run)]
+        probes.append(("cap_water_path", channel_probe(path, d=d)))
+    else:
+        for bore in form.bores:
+            if "hose" in bore.name or "drain" in bore.name:
+                probes.append((bore.name, channel_probe(bore.path(), d=bore.d * 0.7)))
     for ch in form.channels:
         d = min(ch.width * 0.4, 6.0)
         probes.append((ch.name, channel_probe(ch.centerline(lift=d / 2.0 + 0.8), d=d)))

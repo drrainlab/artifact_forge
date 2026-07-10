@@ -744,6 +744,7 @@ features:
       - assembly.no_orphan_ports
       - assembly.row_drains_under_mount
       - assembly.cap_drip_lands_in_channel_safe_floor
+      - assembly.cap_chute_drains_under_mount
       - assembly.lap_joint_no_external_downward_leak
 
   - id: row_flush_integrity

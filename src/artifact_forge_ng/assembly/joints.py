@@ -1272,7 +1272,10 @@ def _cap_drip_lands_in_channel_safe_floor(form_a: PartForm) -> Finding:
     as no open-bottom `*_lap_receiver` cutbox sits under the feed column."""
     check = "assembly.cap_drip_lands_in_channel_safe_floor"
     fa = form_a.frame
-    yin = fa.get("channel_y_inlet")
+    # VF-9.2: the drip lands at the feed point (DRIP_INSET inboard of the
+    # face), not at the channel's very edge — fall back to the face for
+    # hand-built fixtures that predate feed_y.
+    yin = fa.get("feed_y", fa.get("channel_y_inlet"))
     through = None
     for c in form_a.cutboxes:
         if "lap_receiver" not in c.name:

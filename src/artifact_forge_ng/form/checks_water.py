@@ -139,6 +139,25 @@ def check_water_channel_dims_ok(form: PartForm) -> Finding:
     )
 
 
+def _blind_bore_drained_below(bore, bores) -> bool:
+    """VF-9.2: a vertical bore blind at the BOTTOM does not pool when a
+    coaxial bore adjoins its blind floor and continues downward — the stepped
+    tube socket draining through its drip orifice. The stop shoulder is the
+    intended tube seat, not a hidden sump."""
+    if bore.axis != "Z" or bore.overshoot[0] > 0.0:
+        return False  # only a bottom-blind Z bore qualifies
+    bottom = min(bore.span)
+    for other in bores:
+        if other is bore or other.axis != "Z":
+            continue
+        if (abs(other.center[0] - bore.center[0]) <= 0.1
+                and abs(other.center[1] - bore.center[1]) <= 0.1
+                and max(other.span) >= bottom - 0.1
+                and min(other.span) < bottom - 0.1):
+            return True
+    return False
+
+
 def _pocket_drained_by_through_bore(box, bores) -> bool:
     """A floored pocket does NOT pool if a vertical open-bottom bore passes
     through its footprint down to (or below) the pocket floor: the floor has
@@ -181,6 +200,9 @@ def check_no_standing_water_ir(form: PartForm) -> Finding:
             bbox = Box3(x - r, lo, z - r, x + r, hi, z + r)
         else:
             bbox = Box3(lo, y - r, z - r, hi, y + r, z + r)
+        if _blind_bore_drained_below(bore, form.bores):
+            continue  # VF-9.2: a stepped tube socket — the coaxial orifice
+            # adjoining its blind bottom drains it (the stop is intentional)
         if any(_boxes_overlap(bbox, w.box) for w in wet):
             offenders.append(f"blind bore {bore.name!r} in the wet path")
     for cut in form.cutboxes:
@@ -1089,14 +1111,62 @@ COLLECTOR_ARM_WELD_MIN = 3.0
 
 
 def check_hose_bore_ok(form: PartForm) -> Finding:
+    """VF-9.2: parts with a stepped socket (`hose_socket_depth` in the frame,
+    the inlet cap) seat the tube on a STOP SHOULDER — the socket must be BLIND
+    at the bottom (a tube that can be pushed clean through is the defect), with
+    a narrower coaxial drip orifice continuing through the stop. Parts with a
+    plain hose port (the collector's push-in drain) keep the old rule: grip
+    band + open through (cleanable)."""
+    check = "form.hose_bore_ok"
     tube_od = form.frame.get("hose_tube_od")
     if tube_od is None:
-        return _finding("form.hose_bore_ok", False,
+        return _finding(check, False,
                         "no hose_tube_od frame key — the tube spec is unbound")
+    stepped = "hose_socket_depth" in form.frame
+    problems: list[str] = []
+    if stepped:
+        socket = next((b for b in form.bores if "hose_socket" in b.name), None)
+        orifice = next((b for b in form.bores if "hose_drop" in b.name), None)
+        if socket is None or orifice is None:
+            return _finding(check, False,
+                            "stepped hose port needs BOTH a hose_socket and a "
+                            "hose_drop orifice bore")
+        grip = socket.d - tube_od
+        if not (HOSE_GRIP_BAND[0] - 1e-6 <= grip <= HOSE_GRIP_BAND[1] + 1e-6):
+            problems.append(
+                f"socket grip {grip:.2f} outside "
+                f"{HOSE_GRIP_BAND[0]}..{HOSE_GRIP_BAND[1]} over the {tube_od:g} tube")
+        if socket.overshoot[0] > 0.0:
+            problems.append(
+                "socket opens THROUGH at the bottom — no stop shoulder, the "
+                "tube can be pushed clean through the cap")
+        if socket.overshoot[1] <= 0.0:
+            problems.append("socket is closed at the top — the tube cannot enter")
+        depth = max(socket.span) - min(socket.span)
+        if not (8.0 - 1e-6 <= depth <= 14.0 + 1e-6):
+            problems.append(f"socket depth {depth:.1f} outside 8..14 — not a "
+                            "real push-in grip")
+        if not (4.0 - 1e-6 <= orifice.d <= tube_od - 2.0 + 1e-6):
+            problems.append(
+                f"orifice {orifice.d:g} outside 4..{tube_od - 2.0:g} — the stop "
+                "must be real (narrower than the tube) yet not clog")
+        if (abs(orifice.center[0] - socket.center[0]) > 0.1
+                or abs(orifice.center[1] - socket.center[1]) > 0.1):
+            problems.append("orifice is not coaxial with the socket — the water "
+                            "path bends inside solid plastic")
+        if abs(max(orifice.span) - min(socket.span)) > 0.1:
+            problems.append("orifice does not meet the socket bottom — the "
+                            "water path is interrupted at the stop")
+        return _finding(
+            check, not problems,
+            f"tube seats on the stop shoulder at z={min(socket.span):g}; the "
+            f"Ø{orifice.d:g} drip orifice continues the path"
+            if not problems else "; ".join(problems),
+            measured=socket.d, limit=tube_od + HOSE_GRIP_BAND[1],
+        )
     bores = [b for b in form.bores if "hose" in b.name]
     if not bores:
-        return _finding("form.hose_bore_ok", False, "no hose bore on the part")
-    problems: list[str] = []
+        return _finding(check, False, "no hose bore on the part")
     for bore in bores:
         grip = bore.d - tube_od
         if not (HOSE_GRIP_BAND[0] - 1e-6 <= grip <= HOSE_GRIP_BAND[1] + 1e-6):
@@ -1109,7 +1179,7 @@ def check_hose_bore_ok(form: PartForm) -> Finding:
                 f"{bore.name!r} is blind — a hose port must open through "
                 "(cleanable, no hidden wet pocket)")
     return _finding(
-        "form.hose_bore_ok", not problems,
+        check, not problems,
         f"{len(bores)} hose bore(s) grip the {tube_od:g} tube and open through"
         if not problems else "; ".join(problems),
         measured=bores[0].d, limit=tube_od + HOSE_GRIP_BAND[1],
@@ -1117,45 +1187,122 @@ def check_hose_bore_ok(form: PartForm) -> Finding:
 
 
 def check_spout_drop_path_ok(form: PartForm) -> Finding:
+    """VF-9.2 chute semantics: the cap's water path is socket -> orifice ->
+    chamber -> an OPEN U-trough (floor + two walls) whose tip edge drips into
+    the rail channel. The trough must exist (floor + both walls), descend below
+    the body into the channel, fit inside the rail channel width, and the tip
+    must be the spout datum — the geometry itself explains where the water
+    goes."""
+    check = "form.spout_drop_path_ok"
     f = form.frame
-    keys = ("spout_w", "rail_channel_w", "channel_floor_z_outlet", "saddle_floor_z")
+    keys = ("spout_w", "rail_channel_w", "channel_floor_z_outlet",
+            "saddle_floor_z", "chute_tip_y")
     missing = [k for k in keys if k not in f]
     if missing:
-        return _finding("form.spout_drop_path_ok", False,
+        return _finding(check, False,
                         f"no spout frame keys: {', '.join(missing)}")
     problems: list[str] = []
-    spout = [r for r in form.ribs if "spout" in r.name or "nose" in r.name]
-    if not spout:
-        problems.append("no spout/nose rib on the part")
-    if f["channel_floor_z_outlet"] > -0.5:
+    floor = next((r for r in form.ribs if "nose_floor" in r.name), None)
+    walls = [r for r in form.ribs if "nose_wall" in r.name]
+    if floor is None:
+        problems.append("no chute floor rib on the part")
+    if len(walls) < 2:
+        problems.append(f"chute has {len(walls)} wall rib(s) — a U-trough "
+                        "needs both")
+    z_exit = f["channel_floor_z_outlet"]
+    if z_exit > -0.5:
         problems.append(
-            f"spout exits at z={f['channel_floor_z_outlet']:g} — it must "
-            "descend below the body to reach into the rail corridor")
-    # The spout dips BELOW the rail seat floor into the channel itself
-    # (exit = inlet floor + FALL_ENTRY), so the budget is the channel
-    # width, not the wider corridor above it.
+            f"chute tip exits at z={z_exit:g} — it must descend below the "
+            "body to reach into the rail channel")
+    if floor is not None:
+        if abs(floor.box.z1 - z_exit) > 0.1:
+            problems.append(
+                f"chute floor top {floor.box.z1:g} is not the declared exit "
+                f"plane {z_exit:g}")
+        if floor.box.y0 > f["chute_tip_y"] + 0.1:
+            problems.append(
+                f"chute floor stops at y={floor.box.y0:g} short of the tip "
+                f"{f['chute_tip_y']:g}")
+    # The trough dips into the channel, so the budget is the channel width.
     budget = f["rail_channel_w"] - 2.0
     if f["spout_w"] > budget:
         problems.append(
-            f"spout {f['spout_w']:g} wide does not fit inside the "
+            f"chute {f['spout_w']:g} wide does not fit inside the "
             f"{f['rail_channel_w']:g} rail channel it dips into")
-    drops = [b for b in form.bores if "hose" in b.name and b.axis == "Z"]
+    drops = [b for b in form.bores if "hose_drop" in b.name and b.axis == "Z"]
     if not drops:
-        problems.append("no vertical drop bore — the cap's water path must "
-                        "fall straight (no pockets by construction)")
-    else:
-        bore = drops[0]
-        lo = min(bore.span)
-        if lo > f["channel_floor_z_outlet"] + 0.1:
-            problems.append(
-                f"drop bore stops at z={lo:g} above the spout exit "
-                f"{f['channel_floor_z_outlet']:g} — the path is interrupted")
+        problems.append("no vertical drip orifice — water must fall from the "
+                        "socket into the chute")
+    spout = form.datums.get("spout")
+    if spout is not None and abs(spout["at"][1] - f["chute_tip_y"]) > 0.1:
+        problems.append(
+            f"spout datum y={spout['at'][1]:g} is not the chute tip "
+            f"{f['chute_tip_y']:g} — the datum must mark the real drip point")
     return _finding(
-        "form.spout_drop_path_ok", not problems,
-        f"spout descends to {f['channel_floor_z_outlet']:g} with a straight "
-        "vertical drop — gravity does the rest"
+        check, not problems,
+        f"open chute carries the drip to y={f['chute_tip_y']:g} and drops it "
+        f"from z={z_exit:g} into the channel — gravity does the rest"
         if not problems else "; ".join(problems),
         measured=f["spout_w"], limit=budget,
+    )
+
+
+def check_cap_water_path_visible(form: PartForm) -> Finding:
+    """VF-9.2 (user rule): the inlet cap must NOT contain a closed horizontal
+    water tunnel — the eye must be able to follow the water. Legal path:
+    vertical socket+orifice, a SHORT covered chamber (the drop shaft), then an
+    OPEN-TOP chute all the way to the tip. n/a on parts without a chute."""
+    from .recipe_ops_water import CAP_COVERED_RUN_MAX
+
+    check = "form.cap_water_path_visible"
+    f = form.frame
+    if "chute_tip_y" not in f:
+        return _finding(check, True, "no chute on this part — n/a")
+    problems: list[str] = []
+    chamber = next((c for c in form.cutboxes if "chamber" in c.name), None)
+    sky = next((c for c in form.cutboxes if "chute_sky" in c.name), None)
+    if chamber is None:
+        problems.append("no chamber cut — the orifice has nowhere to drop")
+    else:
+        covered = chamber.box.y1 - chamber.box.y0
+        if covered > CAP_COVERED_RUN_MAX + 1e-6:
+            problems.append(
+                f"covered chamber run {covered:.1f} > {CAP_COVERED_RUN_MAX:g} "
+                "— a closed horizontal water tunnel, not a small drop shaft")
+    if sky is None:
+        problems.append("no sky opening over the chute — the water path is "
+                        "hidden under the roof")
+    else:
+        b = sky.box
+        if b.z1 < f.get("channel_top_z", 0.0) - 0.05:
+            problems.append(
+                f"sky opening stops at z={b.z1:g} below the cap top — the "
+                "chute is still roofed")
+        if chamber is not None and b.y1 < chamber.box.y0 - 0.1:
+            problems.append("sky opening does not adjoin the chamber — a "
+                            "covered gap hides the path")
+    # a horizontal bore inside the wet path would be a closed side tunnel
+    spout = form.region("spout_path")
+    if spout is not None:
+        for bore in form.bores:
+            if bore.axis == "Z":
+                continue
+            x, y, z = bore.center
+            r = bore.d / 2.0
+            lo, hi = bore.span
+            bbox = (Box3(x - r, lo, z - r, x + r, hi, z + r)
+                    if bore.axis == "Y"
+                    else Box3(lo, y - r, z - r, hi, y + r, z + r))
+            if _boxes_overlap(bbox, spout.box):
+                problems.append(
+                    f"horizontal bore {bore.name!r} runs inside the water "
+                    "path — a closed tunnel")
+    return _finding(
+        check, not problems,
+        "the water path is visible: vertical socket, a short drop shaft, then "
+        "an open-top chute to the drip tip"
+        if not problems else "; ".join(problems),
+        limit=CAP_COVERED_RUN_MAX,
     )
 
 
@@ -1261,6 +1408,8 @@ def check_collector_structure_sturdy(form: PartForm) -> Finding:
 
 register_probe("form.hose_bore_ok")(
     lambda form, ctx: check_hose_bore_ok(form))
+register_probe("form.cap_water_path_visible")(
+    lambda form, ctx: check_cap_water_path_visible(form))
 register_probe("form.spout_drop_path_ok")(
     lambda form, ctx: check_spout_drop_path_ok(form))
 
