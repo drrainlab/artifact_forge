@@ -28,7 +28,7 @@ from .part import (
     RibFeature,
 )
 from .profiles_plate import rounded_rect_loop
-from .recipe_ops import RECIPE_OPS, RecipeError, RecipeOpDecl, RecipeState, _register
+from .recipe_ops_core import RECIPE_OPS, RecipeError, RecipeOpDecl, RecipeState, _register
 from .regions import Box3, Region
 from .section import SectionProfile
 
