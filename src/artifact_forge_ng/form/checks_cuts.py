@@ -4,7 +4,7 @@ before any CAD. Self-registers in KNOWN_CHECKS on import.
 
 from __future__ import annotations
 
-from ..core.findings import Finding, Level, Status
+from ..core.findings import Finding
 from ..validators.probes import register_probe
 from .part import BoreFeature, PartForm
 from .regions import Box3, RegionRole
@@ -15,14 +15,8 @@ _PROTECTED_ROLES = frozenset(
 )
 
 
-def _finding(check: str, ok: bool, message: str, *, critical: bool = True) -> Finding:
-    return Finding(
-        check=check,
-        status=Status.PASS if ok else Status.FAIL,
-        level=Level.FORM,
-        message=message,
-        critical=critical and not ok,
-    )
+from .checks_common import make_finding
+_finding = make_finding
 
 
 def _bore_aabb(bore: BoreFeature) -> Box3:

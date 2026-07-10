@@ -16,14 +16,8 @@ from .part import PartForm
 from .regions import Box3
 
 
-def _finding(check: str, ok: bool, message: str) -> Finding:
-    return Finding(
-        check=check,
-        status=Status.PASS if ok else Status.FAIL,
-        level=Level.FORM,
-        message=message,
-        critical=not ok,
-    )
+from .checks_common import make_finding
+_finding = make_finding
 
 
 @register_probe("interface.frame_exists")

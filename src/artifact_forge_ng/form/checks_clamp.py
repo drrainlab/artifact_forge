@@ -29,12 +29,8 @@ MIN_DOVETAIL_ANGLE_DEG = 6.0
 _CLAMP_KEYS = ("mate_z", "saddle_r", "saddle_cz", "saddle_mouth_half", "clamp_gap")
 
 
-def _finding(check: str, ok: bool, message: str, *, measured: float | None = None,
-             limit: float | None = None) -> Finding:
-    return Finding(
-        check=check, status=Status.PASS if ok else Status.FAIL, level=Level.FORM,
-        message=message, critical=not ok, measured=measured, limit=limit,
-    )
+from .checks_common import make_finding
+_finding = make_finding
 
 
 def _not_a_clamp(form: PartForm) -> bool:

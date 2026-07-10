@@ -6,7 +6,7 @@ Self-registers on import.
 
 from __future__ import annotations
 
-from ..core.findings import Finding, Level, Status
+from ..core.findings import Finding
 from ..validators.probes import register_probe
 from .part import PartForm
 from .section import Pt
@@ -16,13 +16,8 @@ from .silhouette import cavity_coverage_deg
 ARC_TOL_DEG = 9.0
 
 
-def _finding(check: str, ok: bool, message: str, *, measured: float | None = None,
-             limit: float | None = None) -> Finding:
-    return Finding(
-        check=check, status=Status.PASS if ok else Status.FAIL, level=Level.FORM,
-        message=message, critical=not ok, measured=measured, limit=limit,
-        unit="" if measured is None else "deg" if "deg" in message else "mm",
-    )
+from .checks_common import make_finding
+_finding = make_finding
 
 
 def check_snap_arc_coverage(form: PartForm) -> Finding:

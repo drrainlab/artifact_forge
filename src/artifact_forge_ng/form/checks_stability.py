@@ -5,7 +5,7 @@ of mass stays inside the base footprint. Self-registers.
 
 from __future__ import annotations
 
-from ..core.findings import Finding, Level, Status
+from ..core.findings import Finding
 from ..validators.probes import register_probe
 from .part import PartForm
 from .section import LineSeg
@@ -14,15 +14,8 @@ from .section import LineSeg
 PETG_DENSITY = 1.24e-3
 
 
-def _finding(check: str, ok: bool, message: str, **kw) -> Finding:
-    return Finding(
-        check=check,
-        status=Status.PASS if ok else Status.FAIL,
-        level=Level.FORM,
-        message=message,
-        critical=not ok,
-        **kw,
-    )
+from .checks_common import make_finding
+_finding = make_finding
 
 
 def check_device_slot_fits(form: PartForm) -> Finding:

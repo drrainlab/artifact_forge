@@ -31,13 +31,8 @@ LIFT_NOTCH_MIN_W = 16.0
 LIFT_NOTCH_MIN_D = 6.0
 
 
-def _finding(check: str, ok: bool, message: str, *, measured: float | None = None,
-             limit: float | None = None, suggestion: str = "") -> Finding:
-    return Finding(
-        check=check, status=Status.PASS if ok else Status.FAIL, level=Level.FORM,
-        message=message, critical=not ok, measured=measured, limit=limit,
-        suggestion=suggestion,
-    )
+from .checks_common import make_finding
+_finding = make_finding
 
 
 def _poly_bbox(polygons) -> tuple[float, float, float, float] | None:

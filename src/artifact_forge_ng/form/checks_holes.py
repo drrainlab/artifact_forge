@@ -7,7 +7,7 @@ circular ones via ``outline_outer_r`` (+``outline_cx/cy``, ``outline_inner_r``).
 
 from __future__ import annotations
 
-from ..core.findings import Finding, Level, Status
+from ..core.findings import Finding
 from ..validators.probes import register_probe
 from .part import PartForm
 from .patterns import CircleOutline, Outline, RectOutline, min_web_violations
@@ -16,14 +16,8 @@ from .regions import Rect2D
 DEFAULT_MIN_WEB = 3.0
 
 
-def _finding(check: str, ok: bool, message: str) -> Finding:
-    return Finding(
-        check=check,
-        status=Status.PASS if ok else Status.FAIL,
-        level=Level.FORM,
-        message=message,
-        critical=not ok,
-    )
+from .checks_common import make_finding
+_finding = make_finding
 
 
 def _outline_from(form: PartForm) -> Outline | None:

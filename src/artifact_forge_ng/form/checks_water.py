@@ -47,13 +47,8 @@ CASSETTE_COVER = 4.0  # every skeleton opening hides this far under the seat
 CASSETTE_SPAN_MAX = 45.0  # worst unsupported span under the cassette floor
 
 
-def _finding(check: str, ok: bool, message: str, *, measured: float | None = None,
-             limit: float | None = None, suggestion: str = "") -> Finding:
-    return Finding(
-        check=check, status=Status.PASS if ok else Status.FAIL, level=Level.FORM,
-        message=message, critical=not ok, measured=measured, limit=limit,
-        suggestion=suggestion,
-    )
+from .checks_common import make_finding
+_finding = make_finding
 
 
 def _boxes_overlap(a: Box3, b: Box3) -> bool:

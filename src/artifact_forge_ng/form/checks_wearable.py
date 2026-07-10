@@ -30,17 +30,8 @@ PAYLOAD_GAP_LO, PAYLOAD_GAP_HI = 0.4, 0.97
 MIN_STRAP_BRIDGE = 5.0
 
 
-def _finding(check: str, ok: bool, message: str, *, measured: float | None = None,
-             limit: float | None = None, critical: bool = True) -> Finding:
-    return Finding(
-        check=check,
-        status=Status.PASS if ok else Status.FAIL,
-        level=Level.FORM,
-        message=message,
-        measured=measured,
-        limit=limit,
-        critical=critical and not ok,
-    )
+from .checks_common import make_finding
+_finding = make_finding
 
 
 def _not_a_cuff(form: PartForm) -> bool:
