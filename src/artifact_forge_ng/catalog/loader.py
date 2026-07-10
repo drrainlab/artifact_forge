@@ -215,6 +215,12 @@ LOCAL_DIR = Path(__file__).resolve().parents[3] / "catalog" / "local"
 
 
 def load_catalog(data_dir: Path | None = None) -> Catalog:
+    # Packs register their ops/checks/joints and contribute archetype dirs
+    # before any YAML binds against the registries (idempotent; disabled by
+    # ARTIFACT_FORGE_DISABLE_PACKS=1). An explicit data_dir is an isolated
+    # catalog (tests) — pack archetypes are not merged there.
+    from ..packs import load_packs, pack_archetype_dirs
+    load_packs()
     root = data_dir or DATA_DIR
     vocabulary = _load_features(root / "features.yaml")
     modifiers: dict[str, ModifierDef] = {}
@@ -228,10 +234,16 @@ def load_catalog(data_dir: Path | None = None) -> Catalog:
     archetype_files = [
         (path, "builtin") for path in sorted((root / "archetypes").glob("*.yaml"))
     ]
-    if data_dir is None and LOCAL_DIR.exists():
-        archetype_files += [
-            (path, "local") for path in sorted(LOCAL_DIR.glob("*.yaml"))
-        ]
+    if data_dir is None:
+        for pack_id, pack_dir in pack_archetype_dirs():
+            archetype_files += [
+                (path, f"pack:{pack_id}")
+                for path in sorted(pack_dir.glob("*.yaml"))
+            ]
+        if LOCAL_DIR.exists():
+            archetype_files += [
+                (path, "local") for path in sorted(LOCAL_DIR.glob("*.yaml"))
+            ]
     for path, origin in archetype_files:
         spec = _load_archetype(path, vocabulary, modifiers)
         if spec.id in archetypes:
