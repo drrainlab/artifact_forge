@@ -2,6 +2,22 @@
 name = "artifact-forge-ng"
 version = "0.1.0"
 description = "Deterministic-first YAML Product Grammar engine for 3D-printable parts"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md"]
+authors = [
+    { name = "Gleb Bondarenko", email = "pinepico8@gmail.com" },
+]
+keywords = ["3d-printing", "cad", "parametric", "generative-design", "cadquery", "yaml"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Manufacturing",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Multimedia :: Graphics :: 3D Modeling",
+]
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.7",
