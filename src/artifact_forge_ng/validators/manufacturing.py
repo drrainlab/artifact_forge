@@ -196,9 +196,9 @@ def max_opening_span(geometry: Geometry, form: PartForm) -> Finding:
 # short-circuits to PASS "not applicable" when the form carries no water
 # geometry — a cable clip must never pay for the water contract.
 
-BRUSH_D = 8.0
-BRUSH_MIN_CHANNEL_W = 10.0
-CREVICE_MIN_OPENING = 2.0
+
+
+H_BORE_OK_D = 8.0
 
 
 @register_probe("manufacturing.horizontal_bore_supportless")

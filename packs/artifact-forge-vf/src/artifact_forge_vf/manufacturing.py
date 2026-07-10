@@ -11,6 +11,9 @@ from artifact_forge_ng.form.part import PartForm
 from artifact_forge_ng.validators.probes import register_probe
 from artifact_forge_ng.validators.manufacturing import _finding
 
+BRUSH_D = 8.0
+BRUSH_MIN_CHANNEL_W = 10.0
+CREVICE_MIN_OPENING = 2.0
 CAP_ROOF_OVERHANG_MAX = 5.0  # mm — a printable one-sided ledge, not a cantilever
 
 
@@ -179,7 +182,6 @@ CEILING_BRIDGE_OK = 25.0
 CEILING_BRIDGE_FAIL = 35.0
 #: A horizontal circular bore prints acceptably up to this diameter; above
 #: it the round ceiling sags — use a teardrop roof or a vertical bore.
-H_BORE_OK_D = 8.0
 
 @register_probe("manufacturing.supportless_lightweight_windows_ok")
 def supportless_lightweight_windows_ok(geometry: Geometry, form: PartForm) -> Finding:
