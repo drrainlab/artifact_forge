@@ -62,7 +62,7 @@ RULES: list[RepairRule] = [
     ),
 ]
 
-#: User-phrase semantics -> patches (the ТЗ repair map, deterministic).
+#: User-phrase semantics -> patches (the spec repair map, deterministic).
 SEMANTIC_RULES: dict[str, Callable[[ProductInstance], Patch]] = {
     "falls_out": lambda i: _patch(
         "cable falls out",

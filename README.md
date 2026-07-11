@@ -1,212 +1,221 @@
-# Artifact Forge NG — YAML Product Grammar Engine
+# Artifact Forge — YAML Product Grammar Engine
 
-Deterministic-first генератор 3D-печатаемых изделий. Источник истины —
-типизированная YAML Product Grammar (каталог архетипов + product instance),
-не свободный LLM-spec. LLM (фаза 4, ещё не подключён) — только переводчик
-намерения в YAML; мозг геометрии — каталог, Form IR и валидаторы.
+A deterministic-first generator of 3D-printable functional parts. The
+source of truth is a typed YAML Product Grammar (a catalog of archetypes +
+a product instance), not a free-form LLM spec. The geometry brain is the
+catalog, the CAD-free Form IR and the validator registry; an LLM is only
+ever a translator of intent into YAML — and everything works without one.
+
+The engine's rule is **honesty**: a feature is only claimed as built after
+its validators PASS on the measured geometry; an unknown op / check /
+joint name is a load error, never a silent skip; a critical failure is a
+failing exit code, never a prettified report.
 
 ## Pipeline
 
 ```
 product.yaml
-  → catalog load (fail-fast привязка всех имён)
+  → catalog load (fail-fast binding of every name)
   → parameter resolve (units, expr, clamps, declaration order)
   → capability report (requested / supported / built / missing)
-  → Form IR (точные line/arc-профили, semantic regions — БЕЗ CadQuery)
-  → form validators (golden gate: пока не зелёные, CAD не трогаем)
-  → compile_part (CadQuery: экструзия профиля, weld, blends, holes, hex)
-  → geometry validators (topology probes / regions / manufacturing)
-  → contract + score (critical FAIL → grade F, score не маскирует)
+  → Form IR (exact line/arc profiles, semantic regions — NO CadQuery)
+  → form validators (golden gate: CAD is not touched until these pass)
+  → compile_part (CadQuery: profile extrusion, weld, blends, holes, fields)
+  → geometry validators (topology / region / manufacturing probes)
+  → contract + score (critical FAIL → grade F; the score can't mask it)
   → honesty report + STL/STEP
 ```
 
-## Команды
+More detail: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (layers,
+registries, the pack extension point) and
+[docs/VALIDATION.md](docs/VALIDATION.md) (check levels and the honesty
+model).
+
+## Quickstart
 
 ```bash
-uv sync --extra cad                 # окружение (form-слой работает и без cad)
-uv run forge validate catalog/examples/desk_cable_clip_20mm.yaml   # без CAD
+uv sync --extra cad                 # environment (the form layer also works without cad)
+uv run forge validate catalog/examples/desk_cable_clip_20mm.yaml   # no CAD needed
 uv run forge build    catalog/examples/desk_cable_clip_20mm.yaml -o out
-uv run pytest                       # 140 тестов; tier-1 без cadquery
-uv run pytest -m "not cad"          # только быстрые IR-тесты
+uv run forge ui                     # local web cockpit (extra [web])
+uv run pytest -m "not cad"          # fast IR tier (~2 minutes, no cadquery)
+uv run pytest                       # full suite including CAD-tier probes
 ```
 
-## Ключевые гарантии
+`import artifact_forge_ng` never loads the CAD kernel; cadquery is only
+needed by `forge build`. No API keys are required for the core, the CLI
+or the tests — an Anthropic key only enables the optional LLM intent
+translator in the web cockpit (see `.env.example`).
 
-- **built ⊆ supported** на уровне pydantic-схемы: unsupported-фича физически
-  не сериализуется как built; фича built ⟺ все её `verified_by`-валидаторы PASS.
-- **Симметричное C-кольцо непредставимо случайно**: рот, губы и стенка — один
-  замкнутый 2D-контур; клампы (`lower ≥ 1.6×upper`, `mouth_gap ≤ 0.7×bundle_d`)
-  живут в YAML архетипа; топология-пробы меряют реальный солид.
-- **strict mode**: unknown validator = ошибка загрузки; unsupported requested
-  feature = fail; critical topology fail = exit ≠ 0; никаких fallback'ов.
-- **Ремонт только YAML-патчами** (`+3mm` / absolute / expr) с ре-валидацией
-  через те же схемы; правила детерминированные, выжившие находки → engine_gaps.
+## Key guarantees
 
-## Структура
+- **built ⊆ supported** at the pydantic-schema level: an unsupported
+  feature physically cannot serialize as built; a feature is built ⟺ all
+  of its `verified_by` validators PASS.
+- **A symmetric C-ring is unrepresentable by accident**: mouth, lips and
+  wall are one closed 2D contour; clamps (`lower ≥ 1.6×upper`,
+  `mouth_gap ≤ 0.7×bundle_d`) live in the archetype YAML; topology probes
+  measure the real solid.
+- **strict mode**: unknown validator = load error; unsupported requested
+  feature = fail; critical topology fail = non-zero exit; no fallbacks.
+- **Repair is YAML patches only** (`+3mm` / absolute / expr) re-validated
+  through the same schemas; rules are deterministic, surviving findings
+  become engine_gaps.
+
+## Source tree
 
 ```
 src/artifact_forge_ng/
-  core/        units, expr (sandboxed AST), грамматика значений, findings
-  product/     pydantic-схемы (archetype/instance/modifier/contract), resolver, capability
+  core/        units, sandboxed-AST expr, value grammar, findings
+  product/     pydantic schemas (archetype/instance/modifier/contract), resolver, capability
   catalog/     loader + data/ (features.yaml, modifiers/, archetypes/)
-  form/        Form IR: section (line/arc), profiles, molded, regions, fields,
-               silhouette, validators — не импортирует cadquery (есть тест)
-  archetypes/  Python form-билдеры (underdesk_cable_clip)
-  cad/         Geometry-шов (порт v1), booleans (weld), fillets, holes, probes
-  compiler/    wires → solids (compile_part) → pipeline (forge build)
-  validators/  реестр проверок + topology/region/manufacturing пробы + runner
-  review/      score (hard gate), quality v0, honesty report
-  repair/      YAML-патчи + детерминированные правила + ledger
+  form/        Form IR: sections (line/arc), profiles, regions, fields,
+               recipe-op registry (recipe_ops_core + op family modules),
+               checks_* validators — never imports cadquery (tested)
+  archetypes/  Python form builders bound to catalog sections
+  modifiers/   typed, region-bound IR transformations
+  validators/  check registry (probes.py) + topology/region/manufacturing probes
+  cad/         Geometry seam, booleans (weld), fillets, holes, probes
+  compiler/    wires → solids (compile_part) → build pipeline; implicit/ SDF skin
+  assembly/    assembly/v1: joints registry, poses, BOM, reports
+  review/      score (hard gate), honesty report
+  repair/      YAML patches + deterministic rules (forge edit)
+  web/         Product Cockpit — local engineering debugger
+  packs.py     the extension point: domain packs plug in via entry points
 ```
 
-## Каталог (фаза 5)
+## Catalog
 
-| Архетип | Что это | Ключевые проверки |
+| Archetype | What it is | Key checks |
 |---|---|---|
-| `underdesk_cable_clip_v2_molded` | флагман: асимметричная боковая клипса под стол | not_symmetric_c_ring, mouth/lips, screw_access |
-| `adapter_plate_v1` | переходная пластина: 2 узора отверстий + борт | min_web, holes_within_outline |
-| `cable_comb_v1` | гребёнка: полость+горло на каждый кабель | slots_open, throat_retention (горло < кабеля) |
-| `zip_tie_anchor_v1` | площадка под стяжку (омега-туннель) | tunnel_fits_tie, tunnel_open |
-| `wall_hook_v1` | J-крюк на саморезы (вешалка/ключи) | tip_lip_present, bay_open |
-| `headphone_hook_v1` | широкий крюк для наушников (тот же билдер) | + wide_contact_band |
-| `lamp_socket_cup_v1` | чашка патрона E27/GU10 (revolve) | revolve_axis_clear, cavity_open |
-| `lamp_bracket_v1` | кронштейн лампы с каналом проводки | **channel_continuous по L-пути** |
-| `phone_stand_v1` | подставка для телефона | slot=f(tilt) точно, **stability_footprint (COM)** |
+| `underdesk_cable_clip_v2_molded` | flagship: asymmetric side-entry desk clip | not_symmetric_c_ring, mouth/lips, screw_access |
+| `adapter_plate_v1` | adapter plate: 2 hole patterns + rim | min_web, holes_within_outline |
+| `cable_comb_v1` | cable comb: cavity+throat per cable | slots_open, throat_retention |
+| `zip_tie_anchor_v1` | zip-tie anchor (omega tunnel) | tunnel_fits_tie, tunnel_open |
+| `wall_hook_v1` | J-hook on screws | tip_lip_present, bay_open |
+| `lamp_socket_cup_v1` | E27/GU10 socket cup (revolve) | revolve_axis_clear, cavity_open |
+| `lamp_bracket_v1` | lamp bracket with a wiring channel | channel_continuous along the L-path |
+| `phone_stand_v1` | phone stand | slot=f(tilt) exact, stability_footprint (COM) |
+| `enclosure_base_v1` + lids | electronics box family (YAML-only recipe) | shell_walls_ok, snap/lid joints |
+| `bearing_turntable_base_v1` | 608 bearing seat + phyllotaxis spiral | bearing lip measured |
 
-Примеры: `catalog/examples/*.yaml` — все строятся `forge build` в pass/A.
-Пара кронштейн+чашка стыкуется: датум `arm_tip` ↔ bolt-circle `mount_bc`.
+Examples: [catalog/examples](catalog/examples) — every one builds with
+`forge build` at grade pass/A. The bracket+cup pair mates: datum
+`arm_tip` ↔ bolt circle `mount_bc`.
 
-## Модификаторы (Modifier Kernel v1)
+## Modifiers (Modifier Kernel v1)
 
-Typed, region-bound трансформации над Form IR — модификатор не имеет права
-ломать продуктовую топологию. Архетип владеет функцией, модификатор —
-адаптацией. Каждый: читает целевой регион → выводит keepouts (защищённые
-регионы + отверстия + **вырезы более ранних модификаторов**) → эмитит
-IR-фичи → компилятор режет/приваривает ровно их → валидаторы подтверждают
-→ только после PASS фича считается built.
+Typed, region-bound transformations over the Form IR — a modifier may
+never break product topology. The archetype owns the function; the
+modifier owns the adaptation. Each one: reads its target region → derives
+keepouts (protected regions + holes + cuts of earlier modifiers) → emits
+IR features → the compiler cuts/welds exactly those → validators confirm →
+only after PASS is the feature counted as built.
 
-| Модификатор | Тип | Гарантия |
+| Modifier | Kind | Guarantee |
 |---|---|---|
-| `add_hex_perforation` | field | web между ячейками ≥ wall_gap (меряется!) |
-| `add_grid_slot_field` | field | слоты целиком вне keepouts |
-| `add_voronoi_field` | field | **стабильный seed** (тот же YAML → тот же объект), Lloyd-релаксация, лигамент ≥ min_ligament |
-| `add_magnet_pockets` | interface | глухие карманы, кожа за дном проверяется целой |
-| `add_zip_tie_slots` | interface | пара сквозных слотов, fail если keepout мешает |
-| `add_ribs` | structural (**аддитивный**) | рёбра приварены (weld-правило) и подтверждены пробой |
+| `add_hex_perforation` | field | web between cells ≥ wall_gap (measured!) |
+| `add_grid_slot_field` | field | slots entirely outside keepouts |
+| `add_voronoi_field` | field | stable seed (same YAML → same object), Lloyd relaxation, ligament ≥ min_ligament |
+| `add_magnet_pockets` | interface | blind pockets, the skin behind the floor verified intact |
+| `add_zip_tie_slots` | interface | a through slot pair, fails if a keepout interferes |
+| `add_ribs` | structural (additive) | ribs welded (weld rule) and probe-confirmed |
 
-`cut_mode: through | recess` у всех полей. Функциональные подстройки
-(mouth_gap и т.п.) — это YAML-патчи repair-слоя, НЕ модификаторы.
+All fields take `cut_mode: through | recess`. Functional tweaks
+(mouth_gap etc.) are repair-layer YAML patches, NOT modifiers.
 
 ## Bio-organic SurfaceStyle
 
-`style: {surface: biomorphic_utility_part, organicity, softness, asymmetry,
-vein_rhythm, seed}` — НЕ «сделай органично», а компиляция слайдеров в
-контролируемые form-проходы:
-- **softness** масштабирует декоративные радиусы (contact_r — инженерный,
-  не трогается);
-- **organicity** выгибает длинные внешние грани профиля наружу (материал
-  только добавляется, стенки не тоньшают); стыки дуга-дуга скругляются
-  честными тангенциальными филлетами;
-- **asymmetry** — детерминированный jitter прогибов (seed в YAML);
-- **vein_rhythm** — вены-гребни поперёк спинки (архетип сам назначает
-  грань), позиции читаются с УЖЕ выгнутой дуги профиля.
+`style: {surface: biomorphic_utility_part, organicity, softness,
+asymmetry, vein_rhythm, seed}` is not "make it organic" — it compiles
+sliders into controlled form passes: softness scales decorative radii
+(contact_r is engineering, untouched); organicity bows long outer profile
+edges outward (material is only added, walls never thin); asymmetry is a
+deterministic, seeded jitter; vein_rhythm lays ridge veins across the
+spine. Untouchable by construction: contact surfaces, mouths/slots, the
+flat print base, fasteners, the silhouette family. See
+[docs/BIOMORPHIC.md](docs/BIOMORPHIC.md) and `phone_stand_bio.yaml`.
 
-Неприкосновенно by construction: контактные поверхности, пазы/рты, плоское
-печатное основание, крепёж, силуэтное семейство. Пример:
-`phone_stand_bio.yaml` — та же инженерия (тригонометрия паза, COM-гейт),
-органическая кожа.
+## Product Cockpit (forge ui)
 
-## Product Cockpit (forge ui) — Dark Forge OS v2
-
-`uv run forge ui` (extra `[web]`) поднимает локальную кабину — **визуальный
-отладчик инженерной правды**, не «чат + 3D viewer». UI показывает цепочку
-понял → может → построил → проверил → честно сообщил и никогда не выдумывает
-состояние: каждая панель — view model из serialize.py поверх того же
-пайплайна (паритет CLI ↔ Cockpit закреплён тестом). Сердце — CAD-free
-`/api/validate` (живые слайдеры, wizard, patch-preview). Пять линз:
-3D (STL + позы сборок из assembly_pose), **Section — точный SVG из
-IR-сегментов** (для профильных изделий правда живёт тут, не в меше),
-Region (цветные семантические регионы), Honesty (requested/supported/
-built/verified), Manufacturing. Wizard 5 стадий (intent → contract →
-capability → live-параметры → Form-превью → Forge); семантические правки —
-patch-preview до какого-либо CAD. LLM (Anthropic) — строго переводчик
-intent/patch; без ключа кабина честно показывает LLM: OFF и работает
-детерминированно (keyword-intent + intents-кнопки). Ошибки — всегда
-structured findings, не traceback.
+`uv run forge ui` (extra `[web]`) starts a local cockpit — a **visual
+debugger of engineering truth**, not a "chat + 3D viewer". Every panel is
+a view model over the same pipeline (CLI ↔ Cockpit parity is pinned by a
+test). The heart is the CAD-free `/api/validate` (live sliders, wizard,
+patch preview). Five lenses: 3D (STL + assembly poses), Section (exact
+SVG from IR segments), Region, Honesty (requested/supported/built/
+verified), Manufacturing. The LLM (Anthropic) is strictly an
+intent/patch translator; without a key the cockpit honestly shows
+LLM: OFF and works deterministically (bilingual keyword intents + intent
+buttons). Errors are always structured findings, never a traceback.
 
 ## Verified Assemblies (assembly/v1)
 
-Сборка — typed-объект, а не текстовое соглашение между деталями. `forge
-validate|build` принимают `assembly/v1` теми же командами: root-деталь как
-единственная система отсчёта, части inline (self-contained), `shared:`
-инжектит стыковочные размеры ОДИН раз (рассинхрон mount_bc непредставим),
-joints из fail-fast реестра. Проверки в два эшелона: joint-IR ДО CAD
-(совпадение болт-кругов в позе, совместимость диаметров clear↔tap) и
-fit-пробы в собранной позе после per-part билдов: `assembly.no_interference`
-(объём пересечения), `assembly.screw_axes_clear` (каждый винт физически
-пройдёт) и киллер-проверка `assembly.channel_continuous_across` — кабель
-проходит через ВСЕ детали (по-сегментный worst-case, пробку не разбавить
-длинным путём). Каждая деталь печатается в своей ориентации; `assembled.step`
-— compound в позе (без fuse), `assembly_report.yaml` — позы/joints/grade.
-Демо: `desk_lamp_e27.yaml` (кронштейн + чашка E27, 4×M4, сквозная
-проводка) и `esp32_box_with_lid.yaml` — коробка с крышкой: `lid_seat`
-(размерная цепочка плаг↔интерьер−2·clearance до CAD + посадка в позе),
-`screw_joint` в бобышки и `press_fit_pin_pair` (пин ТОЛЩЕ гнезда на
-interference; реальный overlap измеряется и обязан попасть в декларацию).
-Дорожная карта сборочного слоя — [docs/ROADMAP.md](docs/ROADMAP.md)
-(волны A1 ports/interfaces → A2 hardware/BOM → A3 requirements → A4 systems).
+An assembly is a typed object, not a textual agreement between parts.
+`forge validate|build` accept `assembly/v1` with the same commands: the
+root part is the single frame of reference, parts are inline
+(self-contained), `shared:` injects mating dimensions ONCE (a desynced
+bolt circle is unrepresentable), joints come from a fail-fast registry.
+Checks run in two echelons: joint IR BEFORE any CAD (bolt circles
+coincide in the pose, clear↔tap diameters compatible) and fit probes in
+the assembled pose after per-part builds: `assembly.no_interference`,
+`assembly.screw_axes_clear`, and `assembly.channel_continuous_across` —
+the cable passes through EVERY part (per-segment worst case). Each part
+prints in its own orientation; `assembled.step` is a posed compound,
+`assembly_report.yaml` carries poses/joints/grade. Demos:
+`desk_lamp_e27.yaml` (bracket + E27 cup, 4×M4, through wiring) and
+`esp32_box_with_lid.yaml` (lid_seat dimension chain + screw_joint +
+press_fit_pin_pair with measured interference).
 
-## Roadmap (docs/ROADMAP.md)
+## Geometry Builders & Recipes
 
-Мастер-план развития — [docs/ROADMAP.md](docs/ROADMAP.md): «инженерная
-грамматика сборки» (ports/interfaces, BOM, requirements, solver,
-physics-lite, failure critic, workshop memory) волнами A → E → M, плюс
-линия P (Cinema/Props и Fashion/Wearable режимы поверх одного ядра).
-Позиционирование: платформа параметрического создания функциональных
-артефактов — от крепежа до кино-реквизита и носимых конструкций.
-
-## Geometry Builders & Recipe (docs/BUILDERS.md)
-
-Канонический реестр билдеров — [docs/BUILDERS.md](docs/BUILDERS.md):
-`archetype = что делаем · builder = каким приёмом · modifier = как адаптируем`.
-Контракт билдера: геометрия + semantic regions + frame-ключи + валидаторы —
-все четыре, иначе это галлюцинация. Волна R1 реализована: `form: {type:
-recipe, ops: [...]}` — архетип собирается из зарегистрированных ops прямо в
-YAML, без нового Python. Ops биндятся fail-fast при загрузке каталога, и
-каталог ОТКАЗЫВАЕТСЯ грузить рецепт, не подписанный на валидаторы своих ops.
-YAML-only архетипы (ни строчки нового Python): `cable_grommet_plate_v1`
-(грометка), `enclosure_base_v1` (корпус: шелл + бобышки + usb-порт +
-вентиляция модификатором), `bearing_turntable_base_v1` (посадка 608 с
-проверяемой губой + филлотаксис-спираль). Плюс новые Python-билдеры волн:
-snap C-clip с балкой в профиле (`broom_clip_25mm`, support-free) и
-лофт-кронштейн с косынками (`shelf_bracket_150`, конус by construction).
+The canonical builder registry — [docs/BUILDERS.md](docs/BUILDERS.md):
+`archetype = what we make · builder = by which technique · modifier = how
+we adapt it`. The builder contract: geometry + semantic regions + frame
+keys + validators — all four, or it's a hallucination. Recipe archetypes
+(`form: {type: recipe, ops: [...]}`) compose registered ops directly in
+YAML with no new Python; ops bind fail-fast at catalog load, and the
+catalog REFUSES a recipe that isn't subscribed to its ops' validators.
 
 ## Semantic Edit (forge edit)
 
-Правка = **rebuild from semantic source**, не хирургия меша:
+An edit is a **rebuild from the semantic source**, never mesh surgery:
 
 ```bash
 uv run forge edit catalog/examples/desk_cable_clip_20mm.yaml \
     --intent make_support_free -o out
 ```
 
-Патчи типизированы (functional / manufacturing / structural / style) и несут
-**preserve-контракт**: перечисленные параметры обязаны выйти из пересборки
-численно идентичными, а фичи — validator-built. Нарушение = провал правки
-(проверяется, а не обещается). Intents v1: `make_support_free`, `make_biomorphic`, `remove_perforation`,
-`make_stronger`. Выход: самодостаточный отредактированный YAML + STL +
-`edit_report.yaml` (preserved / changed / printability before-after).
+Patches are typed (functional / manufacturing / structural / style) and
+carry a **preserve contract**: the listed parameters must come out of the
+rebuild numerically identical, and features validator-built. A violation
+fails the edit (checked, not promised). Intents v1: `make_support_free`,
+`make_biomorphic`, `remove_perforation`, `make_stronger`. A patch can even
+migrate between archetypes of one object_class — `make_support_free`
+moves the clip to a side-print variant whose print orientation has zero
+overhangs by construction (verified by `form.constant_section` and an
+honest `manufacturing.overhang`).
 
-Патч умеет **миграцию между архетипами** одного object_class:
-`make_support_free` на клипсе переводит её на
-`underdesk_cable_clip_v3_sideprint` — вариант, где крепёжный фланец лежит
-ВНУТРИ экструдируемого профиля (язык назад за крюк, саморезы вдоль языка).
-Деталь становится константной экструзией, а `print_orientation:
-side_profile` запекает в STL ориентацию «профилем на стол, ось экструзии
-вверх» — у такой печати ноль нависаний **by construction** (каждый слой —
-одна и та же фигура), что проверяется `form.constant_section` и честным
-`manufacturing.overhang`. Тот же валидатор честен и про v2 фланцем вниз:
-мостящийся круглый потолок полости И консольные губы (урок реальной
-слайсер-сессии). Trade-off тоже в отчёте: изгиб губ идёт поперёк слоёв —
-3+ периметра. Teardrop-полость (`cavity_roof: teardrop`) остаётся ручным
-патчем для тех, кто хочет печатать фланцем вниз.
+## Domain packs
+
+The engine is open-core. Domain packs plug in through the
+`artifact_forge_ng.packs` entry-point group: a pack registers its recipe
+ops, checks and joints into the same fail-fast registries, contributes
+catalog data and pipeline report hooks (see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). Commercial packs may define
+additional terms for outputs produced from those packs.
+
+## Licensing
+
+The core engine is **Apache-2.0** ([LICENSE](LICENSE)). Models you
+generate from the open-core archetypes are **yours to use** — print them,
+sell the prints, remix the YAML. Vendored third-party code is listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Known limitations
+
+- The CAD tier needs `cadquery` (heavy install); CI runs the fast IR tier,
+  the CAD tier is expected to run locally.
+- The web cockpit is a local engineering tool, not a hosted product.
+- Geometry checks measure what they declare — parts outside the archetype
+  vocabulary need a new archetype or a pack, not a prompt.

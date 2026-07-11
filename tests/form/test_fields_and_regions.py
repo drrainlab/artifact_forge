@@ -187,7 +187,7 @@ class TestFlagshipForm:
             form.holes = original_holes
 
     def test_narrow_spacing_clamped_to_driver_clearance(self, flagship_form):
-        """ТЗ regression asks ~30mm spacing; the archetype floor honestly
+        """Spec regression asks ~30mm spacing; the archetype floor honestly
         clamps it past the hook so the screws stay reachable."""
         from artifact_forge_ng.catalog.loader import load_catalog, load_instance
         from artifact_forge_ng.product.instance import ProductInstance
