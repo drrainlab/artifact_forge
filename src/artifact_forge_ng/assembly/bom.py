@@ -5,7 +5,7 @@ tube spec, screw joints carry screws, profile slots reference aluminum
 rail), and the print block rolls up materials and bed needs.
 
 Deliberately minimal: no HardwareSpec class, no catalog/data/hardware/ —
-those names belong to wave A2 (docs/ROADMAP.md). VF-3 needed a bill of
+those names belong to wave A2. The fluid row needed a bill of
 materials, not an ontology; when A2 lands, these derivations become its
 first clients.
 """
@@ -63,7 +63,7 @@ def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
                 "length_mm": round(fr.get("profile_len", 0.0), 1),
                 "note": (
                     f"{mount_note}; nothing is milled or wedge-cut; "
-                    "anti-slide retention under the mounted slope — VF-4.1"
+                    "anti-slide retention under the mounted slope"
                 ),
             })
             line["qty"] += 1

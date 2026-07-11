@@ -51,14 +51,14 @@ class RegionRole(StrEnum):
     #: Functional interface volume no modifier may cut into (boss columns,
     #: channel reservations, rail zones …) — flavor lives in the region id.
     INTERFACE_KEEPOUT = "interface_keepout"
-    # -- wearable pack (wave P2, docs/ROADMAP.md) --------------------------
+    # -- wearable roles (wave P2) ------------------------------------------
     #: Surface touching human skin — the strictest class: absolutely
     #: cut-protected (member of every PROTECTED set), immune to all
     #: modifiers, read by form.body_clearance_ok / comfort_edge checks.
     #: NOT soft_contact_surface, which is deliberately cuttable-into
     #: (cord slots exit through the clamp saddle).
     BODY_CONTACT_SURFACE = "body_contact_surface"
-    # -- vertical farm pack (docs/VERTICAL_FARM_PACK.md) --------------------
+    # -- wet-path roles (used by water-domain packs) ------------------------
     #: The transient water path: channel, overflow lip, drip receiver,
     #: contact window. Modifier-protected (never cut the wet path); the
     #: base op's OWN channel/relief cuts live inside these regions, so the

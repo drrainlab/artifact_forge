@@ -3,7 +3,7 @@ id: forearm_cuff_v1
 version: 1
 object_class: wearable_cuff
 description: >
-  Wave P2 (docs/ROADMAP.md, линия P): the first wearable — a forearm cuff
+  Wave P2: the first wearable — a forearm cuff
   with a cylindrical payload snap-clip (flashlight / prop cylinder
   20..30 mm) on top. ONE constant YZ section extruded along X (X = the
   forearm axis), printed on its profile: support-free by construction.

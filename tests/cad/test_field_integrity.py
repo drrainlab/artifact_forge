@@ -1,4 +1,4 @@
-"""Field integrity (VF-4.1, user-reported defect): a printed cassette
+"""Field integrity (user-reported defect): a printed part
 arrived with 1-3 random SOLID mesh cells — the old probe sampled one cell
 and statistically never landed on them. Now EVERY cell is probed (one
 compound boolean for the fast path) and the finding names the solid cells;
@@ -89,60 +89,6 @@ def test_single_missing_cell_caught():
     finding = hex_field_present(Geometry(body), form_with(declared))
     assert finding.status is Status.FAIL
     assert "1/36" in finding.message
-
-
-# -- VF-7: the EXPORTED mesh must be edge-manifold (the slicer's test) ----------
-
-
-def _cassette_form(cell: float, rib: float):
-    """A real coco cassette: tray + contact window + mesh floor + snaps +
-    lift tabs. A fine mesh packs hundreds of openings into one planar floor
-    face and OCC BRepMesh drops some — the STL arrives non-manifold."""
-    from artifact_forge_ng.form.recipe_ops import RECIPE_OPS, RecipeState
-
-    st = RecipeState()
-    RECIPE_OPS["substrate_tray_body"].apply(
-        st, {"cassette_l": 192.0, "cassette_w": 192.0, "h": 26.0,
-             "wall": 2.4, "floor_t": 2.0, "corner_r": 3.0}, "tray")
-    RECIPE_OPS["contact_window"].apply(
-        st, {"window_w": 12.0, "window_l": 60.0, "drop": 1.5,
-             "cx": 0.0, "cy": 0.0}, "window")
-    RECIPE_OPS["mesh_floor"].apply(st, {"cell": cell, "rib": rib, "margin": 6.0}, "mesh")
-    for oid, off in (("snap_window_a", -60.0), ("snap_window_b", 60.0)):
-        RECIPE_OPS["snap_window_pair"].apply(
-            st, {"w": 10.0, "h": 4.0, "top_offset": 8.5, "offset": off}, oid)
-    RECIPE_OPS["lift_tabs"].apply(st, {"notch_w": 18.0, "notch_d": 8.0}, "lift")
-    return PartForm(
-        name="c", params={}, frame=st.frame, section=st.section, width=st.width,
-        style=MOLDED_UTILITY_PART, channels=st.channels, cutboxes=st.cutboxes,
-        bores=st.bores, ribs=st.ribs, fields=st.fields, regions=st.regions,
-        datums=st.datums)
-
-
-def test_default_cassette_mesh_is_manifold():
-    """The shipped default (8 mm cells) tessellates into a clean manifold STL."""
-    from artifact_forge_ng.compiler.solids import compile_part
-    from artifact_forge_ng.validators.manufacturing import mesh_manifold
-
-    form = _cassette_form(cell=8.0, rib=1.5)
-    geo, _ = compile_part(form)
-    f = mesh_manifold(geo, form)
-    assert f.status is Status.PASS, f.message
-    assert "watertight" in f.message
-
-
-def test_fine_cassette_mesh_flagged_non_manifold():
-    """A too-fine 6 mm mesh (~600+ openings in one face) out-runs BRepMesh —
-    the check FAILs instead of shipping the torn STL the user's slicer
-    rejected."""
-    from artifact_forge_ng.compiler.solids import compile_part
-    from artifact_forge_ng.validators.manufacturing import mesh_manifold
-
-    form = _cassette_form(cell=6.0, rib=1.3)
-    geo, _ = compile_part(form)
-    f = mesh_manifold(geo, form)
-    assert f.status is Status.FAIL
-    assert "non-manifold" in f.message and f.measured > 0
 
 
 def test_non_slot_part_manifold_na():

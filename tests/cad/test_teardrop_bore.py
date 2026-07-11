@@ -1,4 +1,4 @@
-"""BoreFeature.roof="teardrop" (VF-4.1): a horizontal bore whose ceiling
+"""BoreFeature.roof="teardrop": a horizontal bore whose ceiling
 is two 45-degree chords meeting at a peak — self-supporting on FDM. The
 teardrop volume is a SUPERSET of the cylinder (probes stay valid), the
 peak reaches r*sqrt(2), and vertical bores ignore the roof."""

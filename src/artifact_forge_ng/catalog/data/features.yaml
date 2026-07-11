@@ -457,7 +457,7 @@ features:
       - assembly.screw_axes_clear
       - assembly.no_interference
 
-  # -- wearable pack (wave P2, docs/ROADMAP.md line P) ---------------------
+  # -- wearable pack (wave P2) ----------------------------------------------
 
   - id: body_cradle_fit
     description: >

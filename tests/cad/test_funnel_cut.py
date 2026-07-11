@@ -1,4 +1,4 @@
-"""VF-8.1: the FunnelCutFeature primitive — the kernel's first floor that
+"""The FunnelCutFeature primitive — the kernel's first floor that
 slopes in BOTH X and Y (ChannelCutFeature slopes along Y only). A downward-
 converging (optionally skewed) frustum, subtracted, carves a radial sump."""
 import pytest

@@ -1,4 +1,4 @@
-"""Interface layer (wave A1, docs/ROADMAP.md) — typed connection ports.
+"""Interface layer (wave A1) — typed connection ports.
 
 An INTERFACE is a declared, typed, gendered connection point on an
 archetype: the formalization of what the Cassette Interface Standard and
@@ -120,7 +120,7 @@ def _decl(name: str, description: str, joints: tuple[str, ...], **kw: Any
 
 
 #: The A1 vocabulary. Types whose joints tuple is empty are declared ahead
-#: of their joint (fluid line fittings land with the VF-3 adapters).
+#: of their joint (fluid line fittings land with their adapters).
 INTERFACE_TYPES: dict[str, InterfaceTypeDecl] = dict([
     _decl("screw_pattern",
           "bolt circle / hole pattern fastened with screws",

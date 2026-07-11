@@ -1,4 +1,4 @@
-"""VF-4.1 always-on printability checks, measured on real solids: a blind
+"""Always-on printability checks, measured on real solids: a blind
 bottom pocket with a wide flat ceiling is a bridge (WARN <= 35, FAIL
 above), a THROUGH opening is supportless by construction, a horizontal
 circular bore over d8 sags unless teardrop-roofed — and every dry part

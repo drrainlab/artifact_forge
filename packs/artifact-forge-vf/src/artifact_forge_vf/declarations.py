@@ -83,8 +83,20 @@ VF_CHECKS = dict(
         _decl("manufacturing.brush_access_to_water_channel", Level.MANUFACTURING, "the water channel opens to free air along its whole run and is wide enough to brush"),
         _decl("manufacturing.no_hidden_wet_crevices", Level.MANUFACTURING, "no sub-2mm crevice between cuts inside a wet region — water enters, a brush cannot"),
         _decl("manufacturing.no_unwashable_snap_pockets", Level.MANUFACTURING, "every snap window is void through the full wall on the compiled solid"),
+    _decl("assembly.row_drains_under_mount", Level.ASSEMBLY, "under the declared mount_context slope the whole water path descends monotonically — no context, out-of-band or reversed slope FAILS"),
     ]
 )
+
+
+#: VF forbidden-form vocabulary -> detector check (merged into the core map).
+VF_FORBIDDEN_FORMS = {
+    "closed_water_reservoir": "form.no_standing_water_ir",
+    "dead_water_pocket": "form.no_standing_water_ir",
+    "secondary_water_channel": "form.no_secondary_water_channel",
+    "permanent_substrate_flooding": "form.contact_window_geometry_ok",
+    "hidden_wet_cavity": "manufacturing.no_hidden_wet_crevices",
+    "uncleanable_snap_cavity": "form.snap_pockets_cleanable",
+}
 
 
 def declare() -> None:
@@ -96,3 +108,5 @@ def declare() -> None:
         elif existing is not decl:
             raise RuntimeError(f"VF pack: check {name!r} already declared "
                                "by someone else")
+    from artifact_forge_ng.validators.probes import FORBIDDEN_FORM_DETECTORS
+    FORBIDDEN_FORM_DETECTORS.update(VF_FORBIDDEN_FORMS)

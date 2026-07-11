@@ -32,14 +32,14 @@ class ManufacturingSpec(BaseModel):
     nozzle: float = 0.4
     layer_height: float = 0.2
     support_policy: Literal["avoid", "none", "allow"] = "avoid"
-    #: Declared print orientation (VF-4.1) — the CONTRACT half: the builder
+    #: Declared print orientation — the CONTRACT half: the builder
     #: decides how the part is modeled, this field pins what the instance
-    #: EXPECTS ("as_modeled" == bottom-down for the vertical farm parts).
+    #: EXPECTS ("as_modeled" == bottom-down).
     #: None = defer to the builder. A mismatch is a manufacturing FAIL
     #: (manufacturing.print_orientation_declared).
     print_orientation: Literal["as_modeled", "side_profile", "saddle_up"] | None = None
     #: Print bed (x, y, z). The default mirrors manufacturing.BED; a larger
-    #: declared machine (e.g. 250-class for the vertical farm modules) is an
+    #: declared machine is an
     #: explicit instance-level claim, checked by manufacturing.bed_fit.
     bed: list[float] = [220.0, 220.0, 250.0]
 

@@ -253,4 +253,3 @@ def payload_void_open(geometry: Geometry, form: PartForm) -> Finding:
     )
 
 
-# -- vertical farm water probes (docs/VERTICAL_FARM_PACK.md) ------------------

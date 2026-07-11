@@ -372,7 +372,7 @@ _register(RecipeOpDecl(
 def _snap_window_pair(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     """Receiver windows through the +-X shell walls for a snap lid.
     ``offset`` shifts the pair along Y so several pairs stack on one shell
-    (the vertical farm retainer frame runs four hooks)."""
+    (a retainer frame typically runs four hooks)."""
     state.require_base("snap_window_pair")
     f = state.frame
     if "shell_wall" not in f:

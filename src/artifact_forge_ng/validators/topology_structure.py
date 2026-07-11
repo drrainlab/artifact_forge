@@ -29,7 +29,7 @@ def hex_field_present(geometry: Geometry, form: PartForm) -> Finding:
         if not field.centers and not field.polygons:
             empty.append(f"{field.pattern} (zero cells survived the keepouts)")
     fields = [f for f in form.fields if f.centers or f.polygons]
-    # EVERY cell is probed (VF-4.1): a user's printed cassette arrived with
+    # EVERY cell is probed (user-reported defect): a printed part arrived with
     # 1-3 random solid cells — a single-sample probe statistically never
     # lands on them. All per-cell probe boxes fuse into ONE compound, so
     # the whole-field verdict still costs a single boolean; the per-cell

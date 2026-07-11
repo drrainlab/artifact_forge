@@ -127,7 +127,7 @@ class BoreFeature:
     a blind pocket entered from the low end. Verification reuses the
     swept-cylinder channel probe along the same span.
 
-    ``roof`` (VF-4.1): a HORIZONTAL bore (axis X/Y) printed as-modeled has
+    ``roof``: a HORIZONTAL bore (axis X/Y) printed as-modeled has
     a bridged circular ceiling; ``"teardrop"`` replaces the top quarter
     with two 45-degree tangent chords meeting at a peak d/2*sqrt(2) above
     center — self-supporting on FDM. The teardrop volume is a superset of
@@ -359,7 +359,7 @@ class FunnelCutFeature:
     XY footprint (so every wall slopes inward-and-down) and ``z_top`` sits
     above ``z_bottom``. Subtracting it carves a sloped floor that drains
     toward the mouth from every side — the collector's radial sump feed
-    (VF-8). This is the kernel's first floor that slopes in BOTH X and Y
+    This is the kernel's first floor that slopes in BOTH X and Y
     (``ChannelCutFeature`` slopes along Y only); the offset centres let the
     mouth sit at a back-corner drain while the opening spans the tray. Built
     as a ruled loft (bottom rect → top rect), the channel cutter's mechanism."""

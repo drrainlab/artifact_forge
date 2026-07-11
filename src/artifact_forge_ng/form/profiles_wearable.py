@@ -1,5 +1,4 @@
-"""Analytic section builder for the wearable forearm cuff (wave P2,
-docs/ROADMAP.md — параллельная линия P).
+"""Analytic section builder for the wearable forearm cuff (wave P2).
 
 The whole artifact is ONE constant section in the ``(u, v)`` = (Y, Z)
 plane, extruded along X (X = the forearm axis), printed ``side_profile``:

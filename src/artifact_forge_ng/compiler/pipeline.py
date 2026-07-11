@@ -24,7 +24,7 @@ def orient_for_print(geometry: Geometry, form: PartForm) -> Geometry:
     overhangs by construction. "saddle_up": flip the part 180 deg about X so
     a downward-opening saddle slot faces UP (a clean recess, no bridge) and
     the drip tower's flat top lands on the bed — the inlet cap's floating
-    cantilever inverts into a self-supported pocket (VF-7)."""
+    cantilever inverts into a self-supported pocket."""
     if form.print_orientation not in ("side_profile", "saddle_up"):
         return geometry
     axis = (0, 1, 0) if form.print_orientation == "side_profile" else (1, 0, 0)

@@ -105,12 +105,6 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.strap_access_ok", Level.FORM, "each strap tab carries a through slot pair clear of the arm circle with a solid strap bar"),
         _decl("form.dovetail_socket_profile_ok", Level.FORM, "the payload socket groove is a measured female dovetail at the declared widths and depth"),
         _decl("form.dovetail_foot_profile_ok", Level.FORM, "the adapter foot is a measured male dovetail whose free end is the wide end"),
-        # -- vertical farm water checks (impls in form/checks_water.py) -------
-        # -- vertical farm cassette checks (impls in form/checks_substrate_cassette.py)
-        # -- vertical farm fluid adapters (VF-3; impls in form/checks_water.py)
-        # -- VF-4 profile-carried row (impls in checks_water.py / carrier.py)
-        # -- VF-correction: tilted flush row (impls in checks_water.py) --------
-        # -- VF-4.1 printability & collector hardening -------------------------
         # -- interface level (wave A1, form-time) ------------------------------
         _decl("interface.frame_exists", Level.FORM, "every declared interface's datum is published on the form with its type's frame keys"),
         _decl("interface.keepouts_preserved", Level.FORM, "no cut touched a declared interface keepout region"),
@@ -146,7 +140,6 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("topology.payload_void_open", Level.TOPOLOGY, "the payload cylinder and its upward mouth window are real voids on the solid"),
         _decl("topology.exoskeleton_ribs_materialized", Level.TOPOLOGY, "every rib graph edge is solid material on the compiled part (Bio-3)"),
         _decl("topology.organic_windows_open", Level.TOPOLOGY, "every organic window removed material through the panel (Bio-3)"),
-        # -- vertical farm topology probes --------------------------------------
         # -- assembly level: cross-part checks in the assembled pose ----------
         _decl("assembly.screw_joint_ir", Level.ASSEMBLY, "bolt patterns coincide with compatible diameters in the pose"),
         _decl("assembly.joint_pose", Level.ASSEMBLY, "every part is posed by a joint against existing datums"),
@@ -169,9 +162,6 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("interface.mate_frames_opposed", Level.ASSEMBLY, "mated port normals oppose in the pose; orientation-sensitive types keep up/axis agreement"),
         _decl("assembly.no_orphan_ports", Level.ASSEMBLY, "every required interface of every part is mated by some joint"),
         _decl("assembly.dovetail_ir", Level.ASSEMBLY, "male dovetail rides its groove with the clearance band, never bottoms, full engagement"),
-        # -- vertical farm assembly checks (impls in assembly/joints.py) -------
-        # -- VF-correction: tilted flush row assembly checks --------------------
-        _decl("assembly.row_drains_under_mount", Level.ASSEMBLY, "under the declared mount_context slope the whole water path descends monotonically — no context, out-of-band or reversed slope FAILS"),
         # -- region level ------------------------------------------------------
         _decl("region.keepouts_preserved", Level.REGION, "no cut touched a fastener/stress keepout region"),
         _decl("region.snap_root_not_perforated", Level.REGION, "the high-stress snap root region is solid"),
@@ -182,7 +172,6 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("manufacturing.bed_fit", Level.MANUFACTURING, "bounding box fits the print bed"),
         _decl("manufacturing.overhang", Level.MANUFACTURING, "overhang fraction acceptable for the support policy"),
         _decl("manufacturing.max_opening_span", Level.MANUFACTURING, "widest through-wall opening bridges without support"),
-        # -- vertical farm cleanability (n/a fast-path on non-water parts) ------
         _decl("manufacturing.mesh_manifold", Level.MANUFACTURING, "the exported STL of a field-bearing part is edge-manifold watertight — a holey face that out-runs OCC tessellation (torn/solid mesh cells) FAILs here"),
         _decl("manufacturing.reference_geometry", Level.MANUFACTURING, "honesty note: this part is external hardware reference — manufacturability unverified by design"),
         # -- implicit exoskeleton skin (Bio-4M; findings emitted by the skin export stage)
@@ -226,13 +215,6 @@ FORBIDDEN_FORM_DETECTORS: dict[str, str] = {
     "closed_cuff_ring": "form.arm_mouth_dons_ok",
     "payload_on_skin_side": "form.payload_mount_not_on_skin_side",
     "sharp_body_edges": "form.comfort_edge_radius_ok",
-    # vertical farm pack (docs/VERTICAL_FARM_PACK.md): transient water honesty
-    "closed_water_reservoir": "form.no_standing_water_ir",
-    "dead_water_pocket": "form.no_standing_water_ir",
-    "secondary_water_channel": "form.no_secondary_water_channel",
-    "permanent_substrate_flooding": "form.contact_window_geometry_ok",
-    "hidden_wet_cavity": "manufacturing.no_hidden_wet_crevices",
-    "uncleanable_snap_cavity": "form.snap_pockets_cleanable",
 }
 
 

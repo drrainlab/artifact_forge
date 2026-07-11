@@ -191,12 +191,6 @@ def max_opening_span(geometry: Geometry, form: PartForm) -> Finding:
     )
 
 
-# -- vertical farm cleanability (docs/VERTICAL_FARM_PACK.md) -----------------
-# These run on EVERY part (the always-on manufacturing suite), so each one
-# short-circuits to PASS "not applicable" when the form carries no water
-# geometry — a cable clip must never pay for the water contract.
-
-
 
 H_BORE_OK_D = 8.0
 
@@ -233,7 +227,7 @@ def horizontal_bore_supportless(geometry: Geometry, form: PartForm) -> Finding:
 
 @register_probe("manufacturing.print_orientation_declared")
 def print_orientation_declared(geometry: Geometry, form: PartForm) -> Finding:
-    """The instance may PIN its print orientation (VF-4.1 contract:
+    """The instance may PIN its print orientation (the contract:
     manufacturing.print_orientation on the instance). The builder's actual
     orientation must match — a silent flip invalidates every supportless
     guarantee. n/a when nothing is declared."""
