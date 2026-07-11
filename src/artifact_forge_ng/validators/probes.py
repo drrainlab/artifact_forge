@@ -149,6 +149,10 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
               "every rod socket holds its rod: depth and wall measured"),
         _decl("form.socket_bores_isolated", Level.FORM,
               "blind socket ends stay clear of the hub center — no accidental tunnels"),
+        _decl("form.tube_wall_ok", Level.FORM,
+              "every limb of a branched tube keeps a real wall"),
+        _decl("form.branch_path_connected", Level.FORM,
+              "each branch bore's inner end lands inside the main run bore"),
         # -- text relief (impls in form/checks_text.py) ------------------------
         _decl("form.min_stroke_width_ok", Level.FORM,
               "the thinnest glyph stem survives the nozzle (analytic per the bundled font)"),

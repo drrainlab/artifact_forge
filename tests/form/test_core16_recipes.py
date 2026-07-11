@@ -54,6 +54,14 @@ WAVE_EXAMPLES = [
     "maker_initials_stamp",
     "leather_stamp_gb",
     "clay_pattern_stamp",
+    # stage 4
+    "hose_tee_12mm",
+    "hose_cross_10mm",
+    "reducing_tee_16_12",
+    "rod_clamp_15mm_lower",
+    "rod_clamp_15mm_upper",
+    "mic_boom_clamp_19mm_lower",
+    "rod_clamp_15mm_quarter20_lower",
 ]
 
 
@@ -410,3 +418,57 @@ def test_stamp_example_resolves_string_param():
     assert tr.mirror is True
     assert tr.direction == "down"
     assert tr.plane_z == 0.0
+
+
+# -- tube connector -----------------------------------------------------------------
+
+
+def _tee(**over) -> RecipeState:
+    st = RecipeState()
+    p = {"config": "tee", "run_d_a": 12.0, "run_d_b": 0.0, "branch_d": 0.0,
+         "spigot_len": 28.0, "branch_len": 24.0, "wall": 2.4,
+         "barb_h": 0.8, "barb_count": 3, "flange_t": 8.0, "flange_lip": 3.0}
+    p.update(over)
+    RECIPE_OPS["tee_body"].apply(st, p, "tee")
+    return st
+
+
+def test_tee_branch_bore_meets_the_run():
+    from artifact_forge_ng.form.checks_connector import (
+        check_branch_path_connected, check_tube_wall_ok)
+
+    st = _tee()
+    assert check_branch_path_connected(st).status.value == "pass"
+    assert check_tube_wall_ok(st).status.value == "pass"
+    assert st.frame["tee_branch_count"] == 1.0
+    bores = {b.name for b in st.bores}
+    assert "tee_px_bore" in bores
+
+
+def test_cross_grows_both_branches():
+    st = _tee(config="cross")
+    assert st.frame["tee_branch_count"] == 2.0
+    assert {p.name for p in st.pins} == {"tee_px_spigot", "tee_mx_spigot"}
+
+
+def test_tee_tiny_branch_refused():
+    with pytest.raises(RecipeError, match="branch bore"):
+        _tee(branch_d=8.0, wall=2.4)
+
+
+def test_tee_elbow_config_honestly_refused():
+    with pytest.raises(RecipeError, match="TODO"):
+        _tee(config="elbow")
+
+
+# -- camera rod clamp ---------------------------------------------------------------
+
+
+def test_rod_clamp_pair_shares_the_split_clamp_law():
+    lower = run_pre_cad(EXAMPLES / "rod_clamp_15mm_lower.yaml", None)
+    upper = run_pre_cad(EXAMPLES / "rod_clamp_15mm_upper.yaml", None)
+    # saddle center sits compression_gap/2 beyond each mating plane
+    assert lower.form.frame["saddle_r"] == pytest.approx(7.5)
+    assert upper.form.frame["saddle_r"] == pytest.approx(7.5)
+    # the upper half carries the accessory rail
+    assert "rail_interface" in {r.name for r in upper.form.regions}

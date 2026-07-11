@@ -1,0 +1,21 @@
+schema: product/v1
+id: reducing_tee_16_12
+archetype: tube_connector_v1@1
+strict: true
+
+requested_features:
+  - hose_barb_spigots
+  - adapter_stop_flange
+  - branched_tube_body
+
+params:
+  config: tee
+  run_d_a: 16mm
+  run_d_b: 16mm
+  branch_d: 12mm
+  flange_t: 10mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

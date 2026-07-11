@@ -495,6 +495,14 @@ features:
       - form.min_stroke_width_ok
       - topology.text_relief_present
 
+  - id: branched_tube_body
+    description: barbed run + branch spigots whose bores meet inside the run
+    verified_by:
+      - form.tube_wall_ok
+      - form.branch_path_connected
+      - topology.bores_open
+      - topology.pins_present
+
   # -- wall tool mounts pack ---------------------------------------------------
 
   - id: tool_saddle_ring

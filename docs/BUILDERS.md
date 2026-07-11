@@ -71,6 +71,7 @@ at runtime.
 | `pot_body` | ✅ | recipe op: tapered vessel + RAISED drainage floor over a foot ring; superellipse plan waits on loft (recipe_ops_revolve.py) |
 | `net_pot_body` | ✅ | recipe op: thin tapered cup + hanging rim flange (recipe_ops_revolve.py) |
 | `multi_socket_hub` | ✅ | recipe op: revolved connector hub the socket arms weld into (recipe_ops_connector.py) |
+| `tee_body` | ✅ | recipe op: barbed tube tee/cross — wraps hose_adapter_body + smooth X branch spigots rooted in the flange; elbows (capped run) TODO |
 
 ### feature — fasteners, pockets, cutouts
 
@@ -192,6 +193,25 @@ branches; Box3 ribs are not enough). Each of these has its own physics and
 validators; a feature without them would be a hallucination, which is why they
 are not "finished off" but planned as separate iterations on the completed
 foundation (recipe + joints + pose probes).
+
+Core-expansion wave (R2.x) deliberate deferrals — each is one bounded
+iteration, none is a bug:
+
+- superellipse plant pot plan (needs `loft_between_sections` rect→superellipse);
+- non-90° connector/tube branches (needs an oriented kernel primitive:
+  angled Bore/Pin + swept probes + non-axis-aligned interface frames);
+- tube ELBOW config on `tee_body` (a capped-run revolve profile);
+- SVG relief on `text_emboss` (path→polygon needs a new dependency, e.g.
+  svgelements; text-only in v1);
+- TPU pad recess + revolved press-fit body for `furniture_foot_v1`
+  (`foot_body` op; today's v1 is the screw-on captive-nut pad);
+- multiple bushing rows on one `drill_guide_v1` (bushing_seat_line frame
+  keys are not op_id-namespaced — one row per part until they are);
+- interfaces for `pcb_tray_v1` / `strap_mount_base_v1` (boss_pattern and
+  the slot ops publish no datum yet — add datums, then declare
+  screw_pattern / strap_slot_pair ports);
+- a `rod_socket` interface type for trellis/tube limb mates (today the
+  sockets publish datums only).
 
 ## Print orientation — a cross-cutting concern
 

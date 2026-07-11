@@ -73,3 +73,46 @@ register_probe("form.socket_engagement_ok")(
     lambda form, ctx: check_socket_engagement_ok(form))
 register_probe("form.socket_bores_isolated")(
     lambda form, ctx: check_socket_bores_isolated(form))
+
+
+def check_tube_wall_ok(form: PartForm) -> Finding:
+    """Every limb of a branched tube keeps a real wall."""
+    check = "form.tube_wall_ok"
+    f = form.frame
+    if "tee_run_wall" not in f:
+        return _finding(check, True, "n/a — not a branched tube",
+                        critical=False)
+    problems: list[str] = []
+    for what, key in (("run", "tee_run_wall"), ("branch", "tee_branch_wall")):
+        if f[key] < SOCKET_WALL_MIN - 1e-6:
+            problems.append(f"{what} wall {f[key]:.2f} < {SOCKET_WALL_MIN:g}")
+    if problems:
+        return _finding(check, False, "; ".join(problems))
+    return _finding(
+        check, True,
+        f"run wall {f['tee_run_wall']:g}, branch wall "
+        f"{f['tee_branch_wall']:g} >= {SOCKET_WALL_MIN:g}")
+
+
+def check_branch_path_connected(form: PartForm) -> Finding:
+    """Each branch bore's inner end must land INSIDE the main run bore —
+    a fluid tee whose branch stops short is a decorative stub."""
+    check = "form.branch_path_connected"
+    f = form.frame
+    if "tee_branch_inner_x" not in f:
+        return _finding(check, True, "n/a — not a branched tube",
+                        critical=False)
+    reach = abs(f["tee_branch_inner_x"])
+    limit = f["tee_run_bore_r"] - 0.5
+    ok = reach <= limit + 1e-6
+    return _finding(
+        check, ok,
+        f"branch inner end at |x|={reach:g} "
+        f"{'inside' if ok else 'OUTSIDE'} the run bore (r={f['tee_run_bore_r']:g})",
+        measured=reach, limit=limit)
+
+
+register_probe("form.tube_wall_ok")(
+    lambda form, ctx: check_tube_wall_ok(form))
+register_probe("form.branch_path_connected")(
+    lambda form, ctx: check_branch_path_connected(form))

@@ -1,0 +1,94 @@
+schema: archetype/v1
+id: tube_connector_v1
+version: 1
+object_class: tube_connector
+description: >
+  Branched hose connector: a barbed two-spigot run (the hose_adapter
+  grammar) with one (tee) or two (cross) smooth branch spigots rooted
+  in the stop flange — X-branch barbs are a revolve the axis-aligned
+  kernel cannot make, so branches take a hose clip. Straight runs and
+  reducers ARE hose_adapter_v1 (showcase pack); elbows wait on a
+  capped-run op. Pressure honesty: gravity/siphon duty, never certified
+  for pressurized lines (docs/CLAIMS.md).
+
+provides_features:
+  - hose_barb_spigots
+  - adapter_stop_flange
+  - branched_tube_body
+
+parameters:
+  config:
+    {type: choice, choices: [tee, cross], default: tee, role: functional, exposed: true}
+  run_d_a:
+    {type: length, default: 12mm, min: 8mm, max: 40mm, role: functional, exposed: true,
+     description: "run spigot Ø = barb crest = nominal hose bore (end A)"}
+  run_d_b:
+    {type: length, default: 0mm, min: 0mm, max: 40mm, role: functional,
+     description: "end B spigot Ø; 0 = same as end A (a reducing tee sets both)"}
+  branch_d:
+    {type: length, default: 0mm, min: 0mm, max: 40mm, role: functional, exposed: true,
+     description: "branch spigot Ø; 0 = same as run end A"}
+  spigot_len:
+    {type: length, default: 28mm, min: 15mm, max: 60mm, role: functional}
+  branch_len:
+    {type: length, default: 24mm, min: 12mm, max: 60mm, role: functional}
+  wall:
+    {type: length, default: 2.4mm, min: 2mm, max: 4mm, role: structural}
+  barb_h:
+    {type: length, default: 0.8mm, min: 0.4mm, max: 1.5mm, role: functional}
+  barb_count:
+    {type: count, default: 3, min: 2, max: 6, role: functional}
+  flange_t:
+    {type: length, default: 8mm, min: 6mm, max: 14mm, role: structural}
+  flange_lip:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: structural}
+
+constraints:
+  - run_d_a > 2 * wall + 4
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: tee_body
+      id: tee
+      params: {config: config, run_d_a: run_d_a, run_d_b: run_d_b,
+               branch_d: branch_d, spigot_len: spigot_len,
+               branch_len: branch_len, wall: wall, barb_h: barb_h,
+               barb_count: barb_count, flange_t: flange_t,
+               flange_lip: flange_lip}
+
+regions:
+  - {id: tee_flange, role: mounting_surface, editable: false,
+     label: stop flange, aliases: [flange, grip band]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: repair
+  modes: [utility]
+  tags: [hose, tee, cross, barb, tube]
+
+validators:
+  - form.barb_retention_ok
+  - form.tube_wall_ok
+  - form.branch_path_connected
+  - form.revolve_profile_clear_of_axis
+  - topology.pins_present
+  - topology.bores_open
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - hose_barb_spigots
+    - adapter_stop_flange
+    - branched_tube_body
+  must_not_have: []
+  invariants:
+    - run_d_a > 2 * wall + 4

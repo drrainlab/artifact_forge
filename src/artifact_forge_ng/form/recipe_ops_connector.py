@@ -187,3 +187,104 @@ _register(RecipeOpDecl(
     description="one blind rod socket arm on a hub (±X/±Y/+Z only — the "
                 "axis-aligned kernel is the honest v1 scope)",
 ))
+
+# -- tee_body ---------------------------------------------------------------------
+
+
+def _tee_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Branched tube connector: the barbed two-spigot Z-run of
+    hose_adapter_body (invoked as its own base — the sanctioned wrap
+    pattern) plus one or two SMOOTH branch spigots on the X axis at the
+    flange. Barbs live on the Z ends only — a barb is a revolve and the
+    revolve axis is Z; X branches are smooth push-fits for a hose clip.
+    Elbows (a capped run) stay an honest TODO."""
+    from .recipe_ops_core import RECIPE_OPS
+
+    config = p["config"]
+    if config not in ("tee", "cross"):
+        raise RecipeError(
+            f"config {config!r} not in (tee, cross) — a straight run IS "
+            "hose_adapter_body; elbows need a capped-run op (TODO)")
+    wall = p["wall"]
+    RECIPE_OPS["hose_adapter_body"].apply(state, {
+        "spigot_d_a": p["run_d_a"],
+        "spigot_d_b": p["run_d_b"] if p["run_d_b"] > 1e-9 else p["run_d_a"],
+        "spigot_len_a": p["spigot_len"], "spigot_len_b": p["spigot_len"],
+        "wall": wall, "barb_h": p["barb_h"],
+        "barb_count_a": p["barb_count"], "barb_count_b": p["barb_count"],
+        "flange_t": p["flange_t"], "flange_lip": p["flange_lip"],
+    }, op_id)
+
+    f = state.frame
+    branch_d = p["branch_d"] if p["branch_d"] > 1e-9 else p["run_d_a"]
+    branch_len = p["branch_len"]
+    branch_bore = branch_d - 2.0 * wall
+    if branch_bore < 4.0:
+        raise RecipeError(
+            f"branch bore {branch_bore:.1f} < 4 — branch too small for "
+            "the declared wall")
+    z_fl = (f["flange_z0"] + f["flange_z1"]) / 2.0
+    if branch_d > f["flange_z1"] - f["flange_z0"] + 2.0 * p["flange_lip"] + 6.0:
+        # the branch must root in the flange band, not float on a spigot
+        raise RecipeError(
+            f"branch Ø{branch_d:g} overwhelms the {f['flange_z1'] - f['flange_z0']:g} "
+            "flange — grow flange_t/flange_lip")
+    r_fl = state.width / 2.0
+    name = op_id or "tee"
+    main_bore_r = f["bore_d"] / 2.0
+
+    sides = (1.0,) if config == "tee" else (1.0, -1.0)
+    for sign in sides:
+        tag = "px" if sign > 0 else "mx"
+        start = r_fl - 1.0 if sign > 0 else -(r_fl + branch_len - 1.0)
+        state.pins.append(PinFeature(
+            name=f"{name}_{tag}_spigot", axis="X", at=(0.0, z_fl),
+            d=branch_d, z0=start, length=branch_len + 1.0,
+            bore_d=branch_bore))
+        span = (0.0, r_fl + branch_len) if sign > 0 else (-(r_fl + branch_len), 0.0)
+        state.bores.append(BoreFeature(
+            name=f"{name}_{tag}_bore", axis="X", d=branch_bore,
+            center=(0.0, 0.0, z_fl), span=span,
+            overshoot=(0.0, 1.0) if sign > 0 else (1.0, 0.0),
+            roof="teardrop"))
+        state.datums[f"branch_{tag}"] = {
+            "at": [sign * (r_fl + branch_len), 0.0, z_fl],
+            "rotate": [0.0, 0.0, 0.0]}
+    state.frame.update(
+        tee_branch_d=branch_d, tee_branch_bore_d=branch_bore,
+        tee_branch_len=branch_len, tee_branch_count=float(len(sides)),
+        tee_branch_inner_x=0.0, tee_run_bore_r=main_bore_r,
+        tee_run_wall=wall, tee_branch_wall=(branch_d - branch_bore) / 2.0,
+        tee_branch_z=z_fl,
+    )
+
+
+_register(RecipeOpDecl(
+    name="tee_body",
+    kind="base",
+    params={
+        "config": ("choice", "tee"),
+        "run_d_a": ("length", None),
+        "run_d_b": ("length", 0.0),
+        "spigot_len": ("length", 28.0),
+        "branch_d": ("length", 0.0),
+        "branch_len": ("length", 24.0),
+        "wall": ("length", 2.4),
+        "barb_h": ("length", 0.8),
+        "barb_count": ("count", 3),
+        "flange_t": ("length", 8.0),
+        "flange_lip": ("length", 3.0),
+    },
+    validators=(
+        "form.barb_retention_ok",
+        "form.tube_wall_ok",
+        "form.branch_path_connected",
+        "form.revolve_profile_clear_of_axis",
+        "topology.pins_present",
+        "topology.bores_open",
+        "topology.single_connected_solid",
+    ),
+    apply=_tee_body,
+    description="barbed tube tee/cross: hose-adapter Z-run + smooth X "
+                "branch spigots rooted in the stop flange",
+))

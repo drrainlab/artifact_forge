@@ -1,0 +1,174 @@
+schema: archetype/v1
+id: camera_rod_clamp_lower_v1
+version: 1
+object_class: camera_rod_clamp
+description: >
+  Lower half of the split rod clamp for camera / light / mic rigs: the
+  15 mm rod standard by default, any rod or boom diameter by parameter.
+  Same split-clamp law as the branch clamp — the saddle center sits
+  compression_gap/2 beyond the mating plane, so the bolted pair always
+  squeezes the rod and never closes a loose hole around it. Recessed
+  TPU pad lands grip the rod without marring; heatset bolt columns in
+  the wings receive the upper half; the cord slots take a safety lanyard.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - split_branch_clamp
+  - branch_saddle
+  - three_point_tpu_contact
+  - heatset_pockets
+  - tie_slots
+
+parameters:
+  rod_d:
+    {type: length, default: 15mm, min: 10mm, max: 45mm,
+     role: functional, exposed: true,
+     description: rod / boom diameter at the clamping point (15 mm = rig standard)}
+  clamp_w:
+    {type: length, default: 32mm, min: 30mm, max: 80mm,
+     role: structural, exposed: true,
+     description: clamp body width along the rod axis}
+  compression_gap:
+    {type: length, default: 2mm, min: 1.5mm, max: 4mm, role: functional,
+     description: designed daylight between the bolted mating faces}
+  screw:
+    {type: choice, choices: [M4, M5, 1/4-20], default: M5, role: assembly,
+     description: clamp bolts (heatset inserts in this half)}
+  base_t:
+    {type: length, default: 6mm, min: 5mm, max: 12mm, role: structural}
+  flange_t:
+    {type: length, default: 8mm, min: 8mm, max: 12mm, role: structural}
+  wall:
+    {type: length, default: 3.5mm, min: 3mm, max: 6mm, role: structural}
+  bolt_web:
+    {type: length, default: 7mm, min: 0mm, max: 14mm, role: structural}
+  edge_m:
+    {type: length, default: 8mm, min: 6mm, max: 14mm, role: structural}
+  corner_r:
+    {type: length, default: 2mm, min: 1mm, max: 4mm, role: aesthetic}
+  land_angle:
+    {type: number, default: 50, min: 30, max: 65, role: functional}
+  land_w:
+    {type: length, default: 8mm, min: 5mm, max: 14mm, role: functional}
+  pad_recess:
+    {type: length, default: 0.8mm, min: 0.6mm, max: 1.5mm, role: functional}
+  insert_depth:
+    {type: length, default: 6mm, min: 5mm, max: 8mm, role: assembly}
+  cord_y:
+    {type: length, default: 5mm, min: 4mm, max: 8mm, role: functional}
+
+derived:
+  saddle_r: rod_d / 2
+  mate_z: base_t + saddle_r - compression_gap / 2
+  bolt_y: saddle_r + bolt_web
+  bolt_dx: clamp_w - 16
+
+constraints:
+  - compression_gap >= 1.5
+  - mate_z > flange_t + 1
+  - bolt_dx >= 12
+
+form:
+  type: recipe
+  section: recipe
+  plane: YZ
+  width_axis: X
+  ops:
+    - op: clamp_half_lower
+      id: body
+      params:
+        branch_d: rod_d
+        clamp_w: clamp_w
+        gap: compression_gap
+        base_t: base_t
+        flange_t: flange_t
+        bolt_y: bolt_y
+        edge_m: edge_m
+        wall: wall
+        corner_r: corner_r
+        land_angle: land_angle
+        land_w: land_w
+        pad_recess: pad_recess
+    - op: heatset_insert_pocket
+      id: mount_pilot_a
+      params:
+        screw: screw
+        depth: insert_depth
+        spacing: bolt_dx
+        cx: "expr(clamp_w / 2)"
+        cy: bolt_y
+        z_top: mate_z
+    - op: heatset_insert_pocket
+      id: mount_pilot_b
+      params:
+        screw: screw
+        depth: insert_depth
+        spacing: bolt_dx
+        cx: "expr(clamp_w / 2)"
+        cy: "expr(-bolt_y)"
+        z_top: mate_z
+    - op: cord_slot_pair
+      id: cord_slots
+      params:
+        slot_l: 7mm
+        slot_w: 3.5mm
+        spacing: "expr(2 * cord_y)"
+
+regions:
+  - {id: saddle_contact, role: soft_contact_surface, editable: false,
+     label: "Rod contact saddle",
+     description: "the open half-circle the rod rests in, including the
+       recessed TPU pad lands — never cut"}
+  - {id: outer_shell, role: exoskeleton_panel, editable: true,
+     label: "Outer shell",
+     aliases: [outer surface, shell],
+     description: "body flanks and belly"}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: cinema
+  modes: [cinema_prop, engineering]
+  tags: [rod, 15mm, clamp, rig, camera]
+
+interfaces:
+  - id: clamp_mate
+    type: heatset_insert_pattern
+    gender: female
+    datum: clamp_mate
+    frame: {normal: "+Z", up: "+Y"}
+    accepts: [camera_rod_clamp]
+
+validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
+  - interface.up_consistent
+  - form.saddle_geometry_ok
+  - form.pad_lands_present
+  - form.cuts_respect_keepouts
+  - topology.cavity_open
+  - topology.single_connected_solid
+  - topology.pockets_present
+  - topology.cutout_present
+  - region.keepouts_preserved
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - branch_saddle
+    - three_point_tpu_contact
+    - heatset_pockets
+    - tie_slots
+  must_not_have:
+    - closed_branch_hole_without_split
+    - weak_saddle_contact
+    - perforated_bolt_boss
+  invariants:
+    - compression_gap >= 1.5
+    - bolt_dx >= 12
