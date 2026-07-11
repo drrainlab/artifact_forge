@@ -1,0 +1,19 @@
+schema: product/v1
+id: hinge_leaf_a_60
+archetype: pin_hinge_leaf_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - hinge_knuckle_barrel
+  - countersunk_screw_holes
+
+params:
+  side: a
+  mode: pin
+
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

@@ -1,0 +1,91 @@
+"""Hinge form checks — pin fit, knuckle geometry and the family's
+honesty note: AF verifies the printed geometry; hinge torque, wear and
+friction preload live in the hardware and the assembled pair."""
+from __future__ import annotations
+
+from ..core.findings import Finding
+from ..validators.probes import register_probe
+from .checks_common import make_finding
+from .part import PartForm
+from .recipe_ops_hinge import HINGE_GAP_BAND, HINGE_PIN_SLIP_BAND, HINGE_WELD_BITE
+
+_finding = make_finding
+
+
+def check_hinge_pin_fit_ok(form: PartForm) -> Finding:
+    """Pin mode: the barrel bore must SLIP on the hardware pin — the
+    band keeps it turning without wobble. Bolt mode: the bore is the
+    screw's own clearance table entry, pass by construction."""
+    check = "form.hinge_pin_fit_ok"
+    f = form.frame
+    if "hinge_pin_d" not in f:
+        return _finding(check, True, "n/a — no hinge on this part",
+                        critical=False)
+    if f["hinge_is_bolt"] > 0:
+        return _finding(check, True,
+                        "bolt mode — clearance from the screw table")
+    lo, hi = HINGE_PIN_SLIP_BAND
+    slip = f["hinge_bore_d"] - f["hinge_pin_d"]
+    ok = lo <= slip <= hi
+    return _finding(
+        check, ok,
+        f"bore slips the pin by {slip:.2f} "
+        f"({'inside' if ok else 'outside'} [{lo:g}, {hi:g}])",
+        measured=slip, limit=hi)
+
+
+def check_hinge_knuckle_geometry_ok(form: PartForm) -> Finding:
+    """The knuckle pattern must actually mesh with its sibling: axial
+    gap in band, the barrel biting the plate edge, real barrel wall."""
+    check = "form.hinge_knuckle_geometry_ok"
+    f = form.frame
+    if "hinge_knuckle_d" not in f:
+        return _finding(check, True, "n/a — no hinge on this part",
+                        critical=False)
+    problems: list[str] = []
+    lo, hi = HINGE_GAP_BAND
+    if not lo <= f["hinge_gap"] <= hi:
+        problems.append(f"gap {f['hinge_gap']:g} outside [{lo:g}, {hi:g}]")
+    bite = f["hinge_knuckle_d"] / 2.0 - (f["hinge_axis_y"] - f["outline_v1"])
+    if bite < HINGE_WELD_BITE - 1e-6:
+        problems.append(f"barrel bites the plate by {bite:.2f} < "
+                        f"{HINGE_WELD_BITE:g}")
+    wall = (f["hinge_knuckle_d"] - f["hinge_bore_d"]) / 2.0
+    if wall < 1.0 - 1e-6:
+        problems.append(f"barrel wall {wall:.2f} < 1.0")
+    mine = f["hinge_knuckles_mine"]
+    total = f["hinge_knuckles_total"]
+    expect = (total + 1) // 2 if f["hinge_side"] < 0.5 else total // 2
+    if mine != expect:
+        problems.append(
+            f"{mine:g} segments built, side expects {expect:g}")
+    if problems:
+        return _finding(check, False, "; ".join(problems))
+    return _finding(
+        check, True,
+        f"{mine:g}/{total:g} knuckles, gap {f['hinge_gap']:g}, barrel "
+        f"wall {wall:.2f} — meshes its sibling by construction")
+
+
+def check_hinge_motion_unverified(form: PartForm) -> Finding:
+    """Honesty note: AF measures the printed geometry only — hinge
+    torque, friction preload and cycle life live in the hardware pin /
+    bolt and the assembled pair."""
+    check = "form.hinge_motion_unverified"
+    f = form.frame
+    if "hinge_pin_d" not in f:
+        return _finding(check, True, "n/a — no hinge on this part",
+                        critical=False)
+    return _finding(
+        check, True,
+        "geometry verified; torque/friction/cycle-life are hardware and "
+        "assembly properties, not printed ones",
+        critical=False)
+
+
+register_probe("form.hinge_pin_fit_ok")(
+    lambda form, ctx: check_hinge_pin_fit_ok(form))
+register_probe("form.hinge_knuckle_geometry_ok")(
+    lambda form, ctx: check_hinge_knuckle_geometry_ok(form))
+register_probe("form.hinge_motion_unverified")(
+    lambda form, ctx: check_hinge_motion_unverified(form))

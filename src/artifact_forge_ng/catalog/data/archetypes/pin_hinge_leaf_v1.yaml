@@ -1,0 +1,118 @@
+schema: archetype/v1
+id: pin_hinge_leaf_v1
+version: 1
+object_class: hinge_leaf
+description: >
+  One leaf of a pin hinge: a mounting plate whose edge carries
+  interleaved knuckle segments around a teardrop axial bore. Print a
+  side-a and a side-b leaf, slide a hardware pin (nail, music wire)
+  through — mode: bolt turns the pair into a FRICTION hinge held by
+  bolt preload. Printed-in-place hinges are deliberately refused: a
+  fused pin is a broken hinge. Torque and cycle life are hardware and
+  assembly properties — the honesty check says so out loud.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - mounting_plate_body
+  - hinge_knuckle_barrel
+  - countersunk_screw_holes
+
+parameters:
+  leaf_l:
+    {type: length, default: 60mm, min: 30mm, max: 140mm, role: functional, exposed: true,
+     description: hinge length along the pin axis}
+  leaf_w:
+    {type: length, default: 25mm, min: 15mm, max: 60mm, role: functional, exposed: true}
+  t:
+    {type: length, default: 3mm, min: 2.4mm, max: 6mm, role: structural}
+  corner_r:
+    {type: length, default: 3mm, min: 1mm, max: 8mm, role: aesthetic}
+  knuckle_d:
+    {type: length, default: 8mm, min: 5mm, max: 14mm, role: functional}
+  knuckles:
+    {type: count, default: 5, min: 3, max: 9, role: functional,
+     description: TOTAL knuckle slots across the pair (odd; side a takes the extras)}
+  side:
+    {type: choice, choices: [a, b], default: a, role: assembly, exposed: true}
+  mode:
+    {type: choice, choices: [pin, bolt], default: pin, role: assembly, exposed: true,
+     description: "pin = hardware pin slips; bolt = friction hinge via preload"}
+  hinge_gap:
+    {type: length, default: 0.4mm, min: 0.2mm, max: 0.8mm, role: manufacturing}
+  pin_d:
+    {type: length, default: 3mm, min: 1.5mm, max: 6mm, role: assembly,
+     description: hardware pin diameter (pin mode)}
+  pin_clearance:
+    {type: length, default: 0.35mm, min: 0.2mm, max: 0.6mm, role: manufacturing}
+  bolt:
+    {type: choice, choices: [m3, m4, m5], default: m4, role: assembly,
+     description: through bolt (bolt mode)}
+  screw:
+    {type: choice, choices: [M3, M4], default: M3, role: assembly,
+     description: leaf mounting screws}
+  screw_spacing:
+    {type: length, default: "expr(leaf_l - 20)", min: 10mm, max: 120mm, role: assembly}
+  screw_row_cy:
+    {type: length, default: "expr(-(leaf_w / 2 - 7))", min: -30mm, max: 0mm, role: assembly}
+
+constraints:
+  - knuckle_d >= t
+  - leaf_l > knuckles * 6
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: hinge_leaf
+      id: leaf
+      params: {leaf_l: leaf_l, leaf_w: leaf_w, t: t, corner_r: corner_r,
+               knuckle_d: knuckle_d, knuckles: knuckles, side: side,
+               mode: mode, gap: hinge_gap, pin_d: pin_d,
+               pin_clearance: pin_clearance, screw: bolt}
+    - op: countersunk_hole_pattern
+      id: mount_screws
+      params: {kind: line, screw: screw, count: 2, spacing: screw_spacing,
+               cy: screw_row_cy, cs_face: top}
+
+regions:
+  - {id: leaf, role: mounting_surface, editable: false,
+     label: leaf plate, aliases: [leaf, plate]}
+  - {id: leaf_lightening, role: aesthetic_lightening, editable: true,
+     label: leaf canvas, aliases: [plate face]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: workshop
+  modes: [workshop, utility]
+  tags: [hinge, pin, friction, knuckle]
+
+validators:
+  - form.hinge_pin_fit_ok
+  - form.hinge_knuckle_geometry_ok
+  - form.hinge_motion_unverified
+  - form.cuts_respect_keepouts
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.pins_present
+  - topology.bores_open
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - hinge_knuckle_barrel
+    - countersunk_screw_holes
+  must_not_have: []
+  invariants:
+    - knuckle_d >= t

@@ -64,6 +64,7 @@ at runtime.
 | `loft_between_sections` | ✅ | rect→rect (LoftFeature/tapered_beam) + POLYGON sections (PolyLoftFeature, kind section_loft): additive body + subtractive cavities — superellipse_pot_body is the first client |
 | `tapered_beam` | ✅ | LoftFeature (taper by construction) + topology.arm_reaches_tip (shelf_bracket_v1) |
 | `truss_beam` | ✅ | truss_web_cutouts op: warren triangles, ligament = strut by construction (truss_beam_180) |
+| `hinge_leaf` | ✅ | recipe op (R2.11): plate + interleaved knuckle barrel + axial teardrop pin bore — side a/b mesh by construction; mode bolt = friction hinge via preload; printed-in-place refused (a fused pin is a broken hinge) |
 | `hose_adapter_body` | ✅ | recipe op (promoted from showcase): barbed two-spigot revolve polyline + Spare Fit checks (recipe_ops_spare.py) |
 | `knob_body` | ✅ | recipe op (promoted from showcase): revolved grip + blind square socket + optional lobed scallops (recipe_ops_spare.py) |
 | `angle_bracket_body` | ✅ | recipe op: L-section + optional diagonal gusset web, holes in BOTH legs, side-profile print (recipe_ops_mount.py) |

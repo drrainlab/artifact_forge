@@ -59,6 +59,9 @@ WAVE_EXAMPLES = [
     "clay_pattern_stamp",
     "logo_stamp_arrow",
     # deferral wave
+    "hinge_leaf_a_60",
+    "hinge_leaf_b_60",
+    "friction_hinge_leaf_m5",
     "cup_holder_post_20",
     "cup_holder_post_25_tall",
     "step_drill_guide_8_5",
@@ -128,6 +131,46 @@ def test_press_foot_short_spigot_refused():
             st, {"pad_d": 40.0, "pad_t": 8.0, "tube_id": 21.0, "press": 0.25,
                  "spigot_l": 6.0, "pad_recess_d": 0.0, "pad_recess_t": 0.8},
             "foot")
+
+
+# -- hinge leaves --------------------------------------------------------------------
+
+
+def _leaf(**over) -> RecipeState:
+    st = RecipeState()
+    p = {"leaf_l": 60.0, "leaf_w": 25.0, "t": 3.0, "corner_r": 3.0,
+         "knuckle_d": 8.0, "knuckles": 5, "side": "a", "mode": "pin",
+         "gap": 0.4, "pin_d": 3.0, "pin_clearance": 0.35, "screw": "m4"}
+    p.update(over)
+    RECIPE_OPS["hinge_leaf"].apply(st, p, "leaf")
+    return st
+
+
+def test_hinge_sides_interleave_complementarily():
+    a, b = _leaf(side="a"), _leaf(side="b")
+    assert a.frame["hinge_knuckles_mine"] == 3.0
+    assert b.frame["hinge_knuckles_mine"] == 2.0
+    ax = sorted(p.z0 for p in a.pins)
+    bx = sorted(p.z0 for p in b.pins)
+    # b's segments land exactly in a's gaps (shared pitch grid)
+    assert all(x not in ax for x in bx)
+    from artifact_forge_ng.form.checks_hinge import (
+        check_hinge_knuckle_geometry_ok, check_hinge_pin_fit_ok)
+    assert check_hinge_pin_fit_ok(a).status.value == "pass"
+    assert check_hinge_knuckle_geometry_ok(b).status.value == "pass"
+
+
+def test_even_knuckles_refused():
+    with pytest.raises(RecipeError, match="odd"):
+        _leaf(knuckles=4)
+
+
+def test_tight_pin_fails_fit_check():
+    from artifact_forge_ng.form.checks_hinge import check_hinge_pin_fit_ok
+
+    st = _leaf(pin_clearance=0.2)
+    st.frame["hinge_bore_d"] = st.frame["hinge_pin_d"] + 0.1  # binds
+    assert check_hinge_pin_fit_ok(st).status.value == "fail"
 
 
 # -- cup holder / square post sleeve ------------------------------------------------
