@@ -500,6 +500,8 @@ from . import (  # noqa: E402,F401
     checks_wearable,
     checks_spare,
     checks_jig,
+    checks_organizer,
+    checks_pots,
 )
 
 #: Structural sanity every archetype gets whether it asks or not — mirrors

@@ -46,11 +46,25 @@ def hex_field_present(geometry: Geometry, form: PartForm) -> Finding:
             for poly in field.polygons:
                 cu = sum(p[0] for p in poly) / len(poly)
                 cv = sum(p[1] for p in poly) / len(poly)
-                # Probe must fit INSIDE the cell — bound by the narrow bbox
-                # dimension (a long slot is narrower than its area hints).
-                bb_w = max(p[0] for p in poly) - min(p[0] for p in poly)
-                bb_h = max(p[1] for p in poly) - min(p[1] for p in poly)
-                cells.append((cu, cv, 0.3 * max(0.5, min(bb_w, bb_h))))
+                # Probe must fit INSIDE the cell — bound by the cell's TRUE
+                # narrow dimension (min extent across any edge normal), not
+                # the axis-aligned bbox: a ROTATED slot (a radial tie slot)
+                # has a fat bbox but stays 4 mm wide, and a bbox-sized probe
+                # would poke into the ligaments and cry wolf.
+                width = None
+                n = len(poly)
+                for i in range(n):
+                    x0, y0 = poly[i]
+                    x1, y1 = poly[(i + 1) % n]
+                    ex, ey = x1 - x0, y1 - y0
+                    edge_l = math.hypot(ex, ey)
+                    if edge_l < 1e-9:
+                        continue
+                    nx, ny = -ey / edge_l, ex / edge_l
+                    ds = [(px - x0) * nx + (py - y0) * ny for px, py in poly]
+                    span = max(ds) - min(ds)
+                    width = span if width is None else min(width, span)
+                cells.append((cu, cv, 0.3 * max(0.5, width or 0.5)))
 
         def _cell_probe(cu: float, cv: float, r: float):
             # World-space probe box at the cell's mid-depth — works for

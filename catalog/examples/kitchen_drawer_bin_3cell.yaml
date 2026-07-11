@@ -1,0 +1,22 @@
+schema: product/v1
+id: kitchen_drawer_bin_3cell
+archetype: drawer_organizer_bin_v1@1
+strict: true
+
+requested_features:
+  - box_shell
+  - divider_cells
+  - finger_scoop
+  - stacking_lip
+
+params:
+  bin_l: 150mm
+  bin_w: 80mm
+  bin_h: 45mm
+  nx: 2
+  ny: 0
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

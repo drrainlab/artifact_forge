@@ -17,3 +17,5 @@ from . import recipe_ops_wearable  # noqa: E402,F401
 from . import recipe_ops_dovetail  # noqa: E402,F401
 from . import recipe_ops_spare  # noqa: E402,F401
 from . import recipe_ops_jig  # noqa: E402,F401
+from . import recipe_ops_organizer  # noqa: E402,F401
+from . import recipe_ops_revolve  # noqa: E402,F401

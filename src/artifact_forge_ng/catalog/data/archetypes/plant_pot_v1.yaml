@@ -1,0 +1,87 @@
+schema: archetype/v1
+id: plant_pot_v1
+version: 1
+object_class: plant_pot
+description: >
+  Plant pot with honest drainage: a tapered vessel whose floor is RAISED
+  above a standing foot ring — the drainage bores exit into open air
+  under the floor, so water never pools against the shelf or saucer.
+  Circular plan in v1 (revolve); superellipse plans wait on the loft
+  kernel. Sizes are examples, not archetypes.
+
+provides_features:
+  - pot_vessel
+  - drainage_bores
+
+parameters:
+  top_d:
+    {type: length, default: 90mm, min: 40mm, max: 220mm, role: functional, exposed: true}
+  bottom_d:
+    {type: length, default: 70mm, min: 35mm, max: 200mm, role: functional, exposed: true}
+  pot_h:
+    {type: length, default: 85mm, min: 30mm, max: 220mm, role: functional, exposed: true}
+  wall:
+    {type: length, default: 2.4mm, min: 1.6mm, max: 5mm, role: structural}
+  floor_t:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: structural}
+  floor_raise:
+    {type: length, default: 6mm, min: 2mm, max: 20mm, role: functional}
+  drain_count:
+    {type: count, default: 4, min: 1, max: 9, role: functional}
+  drain_d:
+    {type: length, default: 7mm, min: 4mm, max: 14mm, role: functional}
+  drain_bc_d:
+    {type: length, default: "expr(bottom_d / 2)", min: 0mm, max: 160mm, role: functional}
+
+constraints:
+  - top_d >= bottom_d
+  - pot_h > floor_raise + floor_t + 10
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: pot_body
+      id: pot
+      params: {top_d: top_d, bottom_d: bottom_d, h: pot_h, wall: wall,
+               floor_t: floor_t, floor_raise: floor_raise}
+    - op: bore_pattern
+      id: drains
+      params: {kind: bolt_circle, d: drain_d, count: drain_count,
+               bc_d: drain_bc_d,
+               z_top: "expr(floor_raise + floor_t)", through: floor_t}
+
+regions:
+  - {id: pot_cavity, role: soft_contact_surface, editable: false,
+     label: root cavity, aliases: [cavity, soil volume]}
+  - {id: pot_outer_shell, role: aesthetic_lightening, editable: false,
+     label: outer wall, aliases: [outer surface, pot wall]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: grow
+  modes: [utility, fluid_grow]
+  tags: [pot, planter, drainage, plant]
+
+validators:
+  - form.pot_taper_ok
+  - form.pot_floor_drains
+  - form.holes_within_outline
+  - topology.bores_open
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - pot_vessel
+    - drainage_bores
+  must_not_have: []
+  invariants:
+    - top_d >= bottom_d

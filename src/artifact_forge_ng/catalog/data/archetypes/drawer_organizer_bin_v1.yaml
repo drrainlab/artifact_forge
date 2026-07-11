@@ -1,0 +1,110 @@
+schema: archetype/v1
+id: drawer_organizer_bin_v1
+version: 1
+object_class: organizer_bin
+description: >
+  Parametric drawer/storage bin: an open shell with interior divider
+  walls (nx across the length, ny across the width), a rounded finger
+  scoop through the front wall, and a stacking lip so the same family
+  nests — bins of one footprint stack lip-into-groove. One of the most
+  universal household prints; sizes and layouts are examples.
+
+provides_features:
+  - box_shell
+  - divider_cells
+  - finger_scoop
+  - stacking_lip
+
+parameters:
+  bin_l:
+    {type: length, default: 120mm, min: 50mm, max: 250mm, role: functional, exposed: true}
+  bin_w:
+    {type: length, default: 80mm, min: 40mm, max: 200mm, role: functional, exposed: true}
+  bin_h:
+    {type: length, default: 40mm, min: 20mm, max: 90mm, role: functional, exposed: true}
+  wall:
+    {type: length, default: 2.4mm, min: 1.6mm, max: 4mm, role: structural}
+  floor_t:
+    {type: length, default: 3mm, min: 2mm, max: 5mm, role: structural}
+  corner_r:
+    {type: length, default: 5mm, min: 2mm, max: 12mm, role: aesthetic}
+  nx:
+    {type: count, default: 1, min: 0, max: 6, role: functional, exposed: true}
+  ny:
+    {type: count, default: 0, min: 0, max: 4, role: functional, exposed: true}
+  divider_t:
+    {type: length, default: 2mm, min: 1.2mm, max: 4mm, role: structural}
+  min_cell:
+    {type: length, default: 20mm, min: 12mm, max: 60mm, role: functional}
+  scoop_d:
+    {type: length, default: 30mm, min: 16mm, max: 60mm, role: functional}
+  lip_h:
+    {type: length, default: 2.4mm, min: 1.5mm, max: 6mm, role: assembly}
+  lip_wall:
+    {type: length, default: 1.6mm, min: 1.2mm, max: 2.4mm, role: assembly}
+  stack_clearance:
+    {type: length, default: 0.3mm, min: 0.15mm, max: 0.6mm, role: manufacturing}
+
+constraints:
+  - scoop_d < bin_w
+  - lip_wall <= wall
+  - lip_h + stack_clearance < floor_t
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_box_shell
+      id: shell
+      params: {l: bin_l, w: bin_w, h: bin_h, wall: wall,
+               floor_t: floor_t, corner_r: corner_r}
+    - op: bin_dividers
+      id: dividers
+      params: {nx: nx, ny: ny, divider_t: divider_t, min_cell: min_cell}
+    - op: finger_scoop
+      id: scoop
+      params: {scoop_d: scoop_d, face: "+y"}
+    - op: stacking_lip
+      id: lip
+      params: {lip_h: lip_h, lip_wall: lip_wall, clearance: stack_clearance}
+
+regions:
+  - {id: shell, role: mounting_surface, editable: false,
+     label: bin shell, aliases: [bin, walls]}
+  - {id: floor, role: aesthetic_lightening, editable: true,
+     label: bin floor, aliases: [floor, base]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: household
+  modes: [utility]
+  tags: [organizer, bin, drawer, stacking, divider]
+
+validators:
+  - form.shell_walls_ok
+  - form.dividers_span_cavity
+  - form.divider_cells_min_size
+  - form.scoop_clears_floor
+  - form.stacking_lip_nests
+  - topology.cutout_present
+  - topology.ribs_present
+  - topology.bores_open
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - box_shell
+    - divider_cells
+    - finger_scoop
+    - stacking_lip
+  must_not_have: []
+  invariants:
+    - lip_h + stack_clearance < floor_t

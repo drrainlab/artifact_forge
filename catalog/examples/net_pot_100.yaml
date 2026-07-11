@@ -1,0 +1,19 @@
+schema: product/v1
+id: net_pot_100
+archetype: net_pot_v1@1
+strict: true
+
+requested_features:
+  - pot_vessel
+  - open_mesh_floor
+  - aeration_wall_slots
+
+params:
+  top_d: 105mm
+  bottom_d: 75mm
+  pot_h: 75mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

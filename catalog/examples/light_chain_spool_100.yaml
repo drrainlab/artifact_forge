@@ -1,0 +1,18 @@
+schema: product/v1
+id: light_chain_spool_100
+archetype: cord_spool_v1@1
+strict: true
+
+requested_features:
+  - spool_flanged_body
+  - flange_tie_slots
+
+params:
+  flange_d: 100mm
+  barrel_d: 50mm
+  barrel_l: 60mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

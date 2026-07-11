@@ -1,0 +1,94 @@
+schema: archetype/v1
+id: cord_spool_v1
+version: 1
+object_class: cord_spool
+description: >
+  Cord / string / light-chain spool: an H-profile revolve — two flanges
+  joined by a barrel, an axial through bore (hang it on a rod or bolt a
+  handle through), radial tie slots on the top flange anchoring the
+  cord's start and finish, and finger holes through the flanges.
+
+provides_features:
+  - spool_flanged_body
+  - flange_tie_slots
+
+parameters:
+  flange_d:
+    {type: length, default: 90mm, min: 40mm, max: 200mm, role: functional, exposed: true}
+  barrel_d:
+    {type: length, default: 45mm, min: 20mm, max: 120mm, role: functional, exposed: true}
+  barrel_l:
+    {type: length, default: 40mm, min: 10mm, max: 120mm, role: functional, exposed: true}
+  flange_t:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: structural}
+  bore_d:
+    {type: length, default: 8mm, min: 4mm, max: 30mm, role: assembly, exposed: true}
+  tie_slots:
+    {type: count, default: 3, min: 1, max: 8, role: functional}
+  tie_slot_w:
+    {type: length, default: 4mm, min: 2.5mm, max: 8mm, role: functional}
+  finger_holes:
+    {type: count, default: 4, min: 0, max: 8, role: functional}
+  finger_hole_d:
+    {type: length, default: 10mm, min: 5mm, max: 20mm, role: functional}
+  finger_bc_d:
+    {type: length, default: "expr((barrel_d + flange_d) / 2)", min: 20mm, max: 180mm, role: functional}
+
+constraints:
+  - flange_d >= barrel_d + 8
+  - barrel_d >= bore_d + 4
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: spool_body
+      id: spool
+      params: {flange_d: flange_d, barrel_d: barrel_d, barrel_l: barrel_l,
+               flange_t: flange_t, bore_d: bore_d}
+    - op: flange_slot_pattern
+      id: ties
+      params: {count: tie_slots, slot_w: tie_slot_w, flange: top}
+    - op: bore_pattern
+      id: fingers
+      params: {kind: bolt_circle, d: finger_hole_d, count: finger_holes,
+               bc_d: finger_bc_d,
+               z_top: "expr(2 * flange_t + barrel_l)",
+               through: "expr(2 * flange_t + barrel_l)"}
+
+regions:
+  - {id: spool_flanges, role: mounting_surface, editable: false,
+     label: spool flanges, aliases: [flanges, spool]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: household
+  modes: [utility]
+  tags: [spool, cord, cable, string, lights]
+
+validators:
+  - form.spool_flanges_ok
+  - form.revolve_profile_clear_of_axis
+  - form.min_ligament_ok
+  - form.field_cells_present
+  - form.holes_within_outline
+  - topology.revolve_cavity_open
+  - topology.hex_field_present
+  - topology.bores_open
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - spool_flanged_body
+    - flange_tie_slots
+  must_not_have: []
+  invariants:
+    - flange_d >= barrel_d + 8

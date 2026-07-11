@@ -362,6 +362,64 @@ features:
       - form.cuts_respect_keepouts
       - topology.cutout_present
 
+  - id: divider_cells
+    description: interior divider walls welded wall-to-wall, cells at or above the usable minimum
+    verified_by:
+      - form.dividers_span_cavity
+      - form.divider_cells_min_size
+      - topology.ribs_present
+
+  - id: finger_scoop
+    description: rounded finger cove through one wall, open through the rim
+    verified_by:
+      - form.scoop_clears_floor
+      - topology.bores_open
+
+  - id: stacking_lip
+    description: nesting rim lip with a matching bottom groove so the family stacks
+    verified_by:
+      - form.stacking_lip_nests
+      - topology.cutout_present
+
+  - id: spool_flanged_body
+    description: H-profile spool — two cord-holding flanges, a barrel and an axial bore
+    verified_by:
+      - form.spool_flanges_ok
+      - topology.revolve_cavity_open
+      - topology.single_connected_solid
+
+  - id: flange_tie_slots
+    description: radial cord anchor slots through a spool flange with measured ligaments
+    verified_by:
+      - form.min_ligament_ok
+      - topology.hex_field_present
+
+  - id: pot_vessel
+    description: upward-opening tapered vessel with a printable wall lean
+    verified_by:
+      - form.pot_taper_ok
+      - topology.single_connected_solid
+
+  - id: drainage_bores
+    description: vertical drainage bores spanning the raised floor into the air gap
+    verified_by:
+      - form.pot_floor_drains
+      - topology.bores_open
+
+  - id: open_mesh_floor
+    description: through-mesh floor whose open-area ratio sits in the working band
+    verified_by:
+      - form.floor_open_area_ok
+      - form.min_ligament_ok
+      - topology.hex_field_present
+
+  - id: aeration_wall_slots
+    description: vertical slot ring around the wall, clear of floor and flange bands
+    verified_by:
+      - form.wall_slots_ok
+      - form.min_ligament_ok
+      - topology.hex_field_present
+
   # -- wall tool mounts pack ---------------------------------------------------
 
   - id: tool_saddle_ring

@@ -1,0 +1,92 @@
+schema: archetype/v1
+id: net_pot_v1
+version: 1
+object_class: net_pot
+description: >
+  Hydroponic net pot: a thin tapered cup with a hanging rim flange, a
+  square through-mesh floor (open-area ratio is measured, not hoped)
+  and a ring of vertical wall slots for roots and aeration. Standard
+  hole sizes — 50 / 75 / 100 mm — live as examples.
+
+provides_features:
+  - pot_vessel
+  - open_mesh_floor
+  - aeration_wall_slots
+
+parameters:
+  top_d:
+    {type: length, default: 70mm, min: 35mm, max: 140mm, role: functional, exposed: true}
+  bottom_d:
+    {type: length, default: 48mm, min: 25mm, max: 120mm, role: functional, exposed: true}
+  pot_h:
+    {type: length, default: 55mm, min: 25mm, max: 120mm, role: functional, exposed: true}
+  wall:
+    {type: length, default: 1.6mm, min: 1.2mm, max: 3mm, role: structural}
+  floor_t:
+    {type: length, default: 1.6mm, min: 1.2mm, max: 3mm, role: structural}
+  flange_w:
+    {type: length, default: 5mm, min: 2mm, max: 14mm, role: functional, exposed: true}
+  flange_t:
+    {type: length, default: 2.4mm, min: 1.6mm, max: 5mm, role: structural}
+  mesh_cell:
+    {type: length, default: 6mm, min: 3mm, max: 10mm, role: functional}
+  mesh_rib:
+    {type: length, default: 1.4mm, min: 1mm, max: 3mm, role: structural}
+  slot_count:
+    {type: count, default: 8, min: 3, max: 16, role: functional}
+  slot_w:
+    {type: length, default: 4mm, min: 2.5mm, max: 8mm, role: functional}
+
+constraints:
+  - top_d > bottom_d
+  - pot_h > flange_t + 10
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: net_pot_body
+      id: cup
+      params: {top_d: top_d, bottom_d: bottom_d, h: pot_h, wall: wall,
+               floor_t: floor_t, flange_w: flange_w, flange_t: flange_t}
+    - op: grid_floor
+      id: mesh
+      params: {cell: mesh_cell, rib: mesh_rib}
+    - op: wall_slot_ring
+      id: slots
+      params: {count: slot_count, slot_w: slot_w}
+
+regions:
+  - {id: cup_flange, role: mounting_surface, editable: false,
+     label: hanging flange, aliases: [flange, rim]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: grow
+  modes: [fluid_grow]
+  tags: [net pot, hydroponics, mesh, aeration]
+
+validators:
+  - form.pot_taper_ok
+  - form.floor_open_area_ok
+  - form.wall_slots_ok
+  - form.min_ligament_ok
+  - form.field_cells_present
+  - topology.hex_field_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - pot_vessel
+    - open_mesh_floor
+    - aeration_wall_slots
+  must_not_have: []
+  invariants:
+    - top_d > bottom_d

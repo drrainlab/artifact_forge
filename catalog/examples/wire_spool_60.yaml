@@ -1,0 +1,20 @@
+schema: product/v1
+id: wire_spool_60
+archetype: cord_spool_v1@1
+strict: true
+
+requested_features:
+  - spool_flanged_body
+  - flange_tie_slots
+
+params:
+  flange_d: 60mm
+  barrel_d: 28mm
+  barrel_l: 30mm
+  finger_holes: 3
+  finger_hole_d: 6mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

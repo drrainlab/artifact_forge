@@ -1,0 +1,23 @@
+schema: product/v1
+id: desk_drawer_bin_4cell
+archetype: drawer_organizer_bin_v1@1
+strict: true
+
+requested_features:
+  - box_shell
+  - divider_cells
+  - finger_scoop
+  - stacking_lip
+
+params:
+  bin_l: 120mm
+  bin_w: 120mm
+  bin_h: 35mm
+  nx: 1
+  ny: 1
+  scoop_d: 24mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

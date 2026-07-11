@@ -1,0 +1,24 @@
+schema: product/v1
+id: screw_bin_small
+archetype: drawer_organizer_bin_v1@1
+strict: true
+
+requested_features:
+  - box_shell
+  - divider_cells
+  - finger_scoop
+  - stacking_lip
+
+params:
+  bin_l: 70mm
+  bin_w: 50mm
+  bin_h: 30mm
+  nx: 0
+  ny: 0
+  scoop_d: 20mm
+  min_cell: 12mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

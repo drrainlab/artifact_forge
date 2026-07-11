@@ -26,6 +26,17 @@ WAVE_EXAMPLES = [
     "proto_tray_90x70",
     "strap_mount_25mm",
     "strap_mount_50mm",
+    # stage 2
+    "kitchen_drawer_bin_3cell",
+    "desk_drawer_bin_4cell",
+    "screw_bin_small",
+    "light_chain_spool_100",
+    "wire_spool_60",
+    "herb_pot_90",
+    "floor_pot_180",
+    "net_pot_50",
+    "net_pot_75",
+    "net_pot_100",
 ]
 
 
@@ -134,3 +145,103 @@ def test_strap_mount_keeps_center_bar():
     cuts = {c.name: c.box for c in state.form.cutboxes}
     assert cuts["slot_a"].x1 < cuts["slot_b"].x0  # solid bar between slots
     assert cuts["slot_b"].x0 - cuts["slot_a"].x1 == pytest.approx(10.0)
+
+
+# -- organizer bin ----------------------------------------------------------------
+
+
+def _bin_shell(l=120.0, w=80.0, h=40.0, wall=2.4, floor_t=3.0) -> RecipeState:
+    st = RecipeState()
+    RECIPE_OPS["rounded_box_shell"].apply(
+        st, {"l": l, "w": w, "h": h, "wall": wall, "floor_t": floor_t,
+             "corner_r": 5.0}, "shell")
+    return st
+
+
+def test_bin_crowded_dividers_refused():
+    st = _bin_shell()
+    with pytest.raises(RecipeError, match="cells along X"):
+        RECIPE_OPS["bin_dividers"].apply(
+            st, {"nx": 6, "ny": 0, "divider_t": 2.0, "height": 0.0,
+                 "min_cell": 20.0}, "dividers")
+
+
+def test_bin_dividers_weld_into_walls_and_floor():
+    st = _bin_shell()
+    RECIPE_OPS["bin_dividers"].apply(
+        st, {"nx": 2, "ny": 1, "divider_t": 2.0, "height": 0.0,
+             "min_cell": 20.0}, "dividers")
+    from artifact_forge_ng.form.checks_organizer import check_dividers_span_cavity
+    assert check_dividers_span_cavity(st).status.value == "pass"
+    assert len([r for r in st.ribs if "_div_" in r.name]) == 3
+
+
+def test_deep_lip_on_thin_floor_refused():
+    st = _bin_shell(floor_t=2.4)
+    with pytest.raises(RecipeError, match="severs the wall"):
+        RECIPE_OPS["stacking_lip"].apply(
+            st, {"lip_h": 4.0, "lip_wall": 1.6, "clearance": 0.3}, "lip")
+
+
+def test_scoop_too_deep_refused():
+    st = _bin_shell(h=25.0)
+    with pytest.raises(RecipeError, match="floor"):
+        RECIPE_OPS["finger_scoop"].apply(
+            st, {"scoop_d": 30.0, "drop": 2.0, "face": "+y", "offset": 0.0},
+            "scoop")
+
+
+# -- spool ------------------------------------------------------------------------
+
+
+def test_spool_flat_flanges_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="out-reach the barrel"):
+        RECIPE_OPS["spool_body"].apply(
+            st, {"flange_d": 52.0, "barrel_d": 50.0, "barrel_l": 40.0,
+                 "flange_t": 4.0, "bore_d": 8.0}, "spool")
+
+
+def test_spool_slot_ligament_refused():
+    st = RecipeState()
+    RECIPE_OPS["spool_body"].apply(
+        st, {"flange_d": 60.0, "barrel_d": 28.0, "barrel_l": 30.0,
+             "flange_t": 4.0, "bore_d": 8.0}, "spool")
+    with pytest.raises(RecipeError, match="ligament"):
+        RECIPE_OPS["flange_slot_pattern"].apply(
+            st, {"count": 16, "slot_w": 6.0, "flange": "top",
+                 "r_inner": 0.0}, "ties")
+
+
+# -- pots -------------------------------------------------------------------------
+
+
+def test_pot_upside_down_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="open upward"):
+        RECIPE_OPS["pot_body"].apply(
+            st, {"top_d": 60.0, "bottom_d": 80.0, "h": 80.0, "wall": 2.4,
+                 "floor_t": 3.0, "floor_raise": 6.0}, "pot")
+
+
+def test_pot_without_drains_fails_check():
+    from artifact_forge_ng.form.checks_pots import check_pot_floor_drains
+
+    st = RecipeState()
+    RECIPE_OPS["pot_body"].apply(
+        st, {"top_d": 90.0, "bottom_d": 70.0, "h": 85.0, "wall": 2.4,
+             "floor_t": 3.0, "floor_raise": 6.0}, "pot")
+    assert check_pot_floor_drains(st).status.value == "fail"
+    RECIPE_OPS["bore_pattern"].apply(
+        st, {"kind": "bolt_circle", "d": 7.0, "count": 4, "bc_d": 35.0,
+             "nx": 2, "ny": 2, "spacing": 20.0, "spacing_y": 0.0,
+             "cx": 0.0, "cy": 0.0, "z_top": 9.0, "through": 3.0}, "drains")
+    assert check_pot_floor_drains(st).status.value == "pass"
+
+
+def test_net_pot_slots_stay_inside_band():
+    state = run_pre_cad(EXAMPLES / "net_pot_75.yaml", None)
+    f = state.form.frame
+    assert f["wall_slot_z0"] >= f["net_floor_t"] + 1.5
+    assert f["wall_slot_z1"] <= f["net_rim_z"] - f["net_flange_t"] - 1.5
+    assert f["floor_open_ratio"] > 0.2

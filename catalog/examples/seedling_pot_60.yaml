@@ -1,0 +1,21 @@
+schema: product/v1
+id: seedling_pot_60
+archetype: plant_pot_v1@1
+strict: true
+
+requested_features:
+  - pot_vessel
+  - drainage_bores
+
+params:
+  top_d: 60mm
+  bottom_d: 48mm
+  pot_h: 55mm
+  wall: 1.8mm
+  drain_count: 3
+  drain_d: 5mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

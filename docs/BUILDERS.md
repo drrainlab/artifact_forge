@@ -66,6 +66,10 @@ at runtime.
 | `truss_beam` | ✅ | truss_web_cutouts op: warren triangles, ligament = strut by construction (truss_beam_180) |
 | `hose_adapter_body` | ✅ | recipe op (promoted from showcase): barbed two-spigot revolve polyline + Spare Fit checks (recipe_ops_spare.py) |
 | `knob_body` | ✅ | recipe op (promoted from showcase): revolved grip + blind square socket + optional lobed scallops (recipe_ops_spare.py) |
+| `angle_bracket_body` | ✅ | recipe op: L-section + optional diagonal gusset web, holes in BOTH legs, side-profile print (recipe_ops_mount.py) |
+| `spool_body` | ✅ | recipe op: H-profile flanged spool + axial bore (recipe_ops_revolve.py) |
+| `pot_body` | ✅ | recipe op: tapered vessel + RAISED drainage floor over a foot ring; superellipse plan waits on loft (recipe_ops_revolve.py) |
+| `net_pot_body` | ✅ | recipe op: thin tapered cup + hanging rim flange (recipe_ops_revolve.py) |
 
 ### feature — fasteners, pockets, cutouts
 
@@ -83,6 +87,12 @@ at runtime.
 | `standoff_pattern` | ✅ | recipe op: PCB standoffs on a plate + blind pilots |
 | `lid_seat` | ✅ | inset_plug op + lid_seat joint: dimensional chain + pose probe (esp32_box_with_lid) |
 | `bore_pattern` (line/grid/bolt-circle) | ✅ | recipe op: plain vertical bores, no screw semantics (drainage / finger holes / vents) |
+| `bin_dividers` | ✅ | recipe op: interior walls welded wall-to-wall + floor, cells measured (recipe_ops_organizer.py) |
+| `finger_scoop` | ✅ | recipe op: rounded cove through a shell wall, open through the rim by construction |
+| `stacking_lip` | ✅ | recipe op: inner-rim lip + bottom rebate plug — the classic stacking-box joint; lip_h bounded by floor_t |
+| `flange_slot_pattern` | ✅ | recipe op: radial tie slots as rotated field polygons (probe measures true cell width, not bbox) |
+| `grid_floor` | ✅ | recipe op: square through-mesh across a circular floor disc, open-area ratio measured |
+| `wall_slot_ring` | ✅ | recipe op: vertical slot ring on a TAPERED wall via cylindrical field mapping (radial cutters overshoot the taper) |
 | `bushing_seat_line` | ✅ | recipe op (promoted from showcase): press-fit steel bushing seats + form.bushing_fit_ok (recipe_ops_jig.py); frame keys not op_id-namespaced yet — one row per part |
 | `stop_fence` | ✅ | recipe op (promoted from showcase): registration fence under a plate edge (recipe_ops_jig.py) |
 
