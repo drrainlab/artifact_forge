@@ -1,0 +1,117 @@
+schema: archetype/v1
+id: pcb_tray_v1
+version: 1
+object_class: pcb_tray
+description: >
+  Open mounting tray for a bare PCB: a low-walled shell, four screw
+  bosses on the board's hole span (pilot bores sized for heatset
+  inserts by default), a rim cable notch and two countersunk base
+  screws through the floor. The open cousin of enclosure_base_v1 —
+  reach for the enclosure when the board needs a closed box and lid.
+
+provides_features:
+  - box_shell
+  - screw_bosses
+  - pass_through_cutout
+
+parameters:
+  tray_l:
+    {type: length, default: 90mm, min: 50mm, max: 200mm, role: functional, exposed: true}
+  tray_w:
+    {type: length, default: 70mm, min: 40mm, max: 160mm, role: functional, exposed: true}
+  wall_h:
+    {type: length, default: 15mm, min: 8mm, max: 40mm, role: functional, exposed: true}
+  wall:
+    {type: length, default: 2.4mm, min: 1.6mm, max: 4mm, role: structural}
+  floor_t:
+    {type: length, default: 3mm, min: 2.4mm, max: 6mm, role: structural}
+  corner_r:
+    {type: length, default: 4mm, min: 2mm, max: 10mm, role: aesthetic}
+  pcb_sx:
+    {type: length, default: 66mm, min: 15mm, max: "expr(tray_l - 18)", role: assembly, exposed: true}
+  pcb_sy:
+    {type: length, default: 48mm, min: 15mm, max: "expr(tray_w - 18)", role: assembly, exposed: true}
+  boss:
+    {type: length, default: 7mm, min: 5mm, max: 10mm, role: structural}
+  boss_h:
+    {type: length, default: 6mm, min: 4mm, max: 12mm, role: assembly}
+  pilot_d:
+    {type: length, default: 4mm, min: 2.4mm, max: 5.6mm, role: assembly}
+  cable_d:
+    {type: length, default: 6mm, min: 3mm, max: 14mm, role: functional}
+  mount_screw:
+    {type: choice, choices: [M3, M4], default: M4, role: assembly}
+  min_web:
+    {type: length, default: 3mm, min: 3mm, max: 8mm, role: manufacturing}
+
+derived:
+  mount_spacing: expr(tray_l - 24)
+
+constraints:
+  - boss_h < wall_h
+  - pcb_sx > boss + 4
+  - pcb_sy > boss + 4
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_box_shell
+      id: shell
+      params: {l: tray_l, w: tray_w, h: wall_h, wall: wall,
+               floor_t: floor_t, corner_r: corner_r}
+    - op: boss_pattern
+      id: standoffs
+      params: {sx: pcb_sx, sy: pcb_sy, boss: boss, height: boss_h,
+               pilot_d: pilot_d, pilot_depth: "expr(boss_h - 1)"}
+    - op: wire_exit
+      id: cable
+      params: {cable_d: cable_d, face: "+x"}
+    - op: countersunk_hole_pattern
+      id: base_screws
+      params: {kind: line, screw: mount_screw, count: 2,
+               spacing: mount_spacing, cy: 0mm, cs_face: top,
+               z_top: floor_t, through: floor_t}
+
+regions:
+  - {id: shell, role: mounting_surface, editable: false,
+     label: tray shell, aliases: [tray, walls]}
+  - {id: floor, role: aesthetic_lightening, editable: true,
+     label: tray floor, aliases: [floor, base]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: electronics
+  modes: [engineering, utility]
+  tags: [pcb, tray, standoffs, arduino, esp32]
+
+validators:
+  - form.shell_walls_ok
+  - form.cuts_respect_keepouts
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.cutout_present
+  - topology.ribs_present
+  - topology.pockets_present
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_hex_perforation
+  - add_voronoi_field
+  - fillet_soften
+
+contract:
+  must_have:
+    - box_shell
+    - screw_bosses
+    - pass_through_cutout
+  must_not_have: []
+  invariants:
+    - boss_h < wall_h

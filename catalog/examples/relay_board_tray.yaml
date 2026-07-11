@@ -1,0 +1,22 @@
+schema: product/v1
+id: relay_board_tray
+archetype: pcb_tray_v1@1
+strict: true
+
+requested_features:
+  - box_shell
+  - screw_bosses
+  - pass_through_cutout
+
+params:
+  tray_l: 90mm
+  tray_w: 62mm
+  wall_h: 20mm
+  pcb_sx: 68mm    # common 4-channel relay module span (verify your module)
+  pcb_sy: 44mm
+  cable_d: 10mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

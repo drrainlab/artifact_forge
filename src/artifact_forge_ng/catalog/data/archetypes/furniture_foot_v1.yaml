@@ -1,0 +1,77 @@
+schema: archetype/v1
+id: furniture_foot_v1
+version: 1
+object_class: furniture_foot
+description: >
+  Screw-on furniture foot / glide: a rounded pad with a captive hex nut
+  socket at its center — the leg bolt threads through the nut, the pad
+  carries the load. corner_r sweeps the plan form from near-square
+  (corner_r small) to a squircle (corner_r near half the side). A
+  revolved press-fit foot and a TPU pad recess are the planned v2 ops.
+
+provides_features:
+  - mounting_plate_body
+  - nut_traps
+
+parameters:
+  foot_l:
+    {type: length, default: 40mm, min: 25mm, max: 80mm, role: functional, exposed: true}
+  foot_w:
+    {type: length, default: 40mm, min: 25mm, max: 80mm, role: functional, exposed: true}
+  foot_t:
+    {type: length, default: 12mm, min: 8mm, max: 20mm, role: structural, exposed: true}
+  corner_r:
+    {type: length, default: 8mm, min: 1mm, max: "expr(min(foot_l, foot_w) / 2 - 1)", role: aesthetic}
+  screw:
+    {type: choice, choices: [M5, M6, M8], default: M6, role: assembly, exposed: true}
+  nut_clearance:
+    {type: length, default: 0.25mm, min: 0.1mm, max: 0.5mm, role: manufacturing}
+
+constraints:
+  - foot_t >= 8
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: pad
+      params: {l: foot_l, w: foot_w, t: foot_t, corner_r: corner_r}
+    - op: nut_trap
+      id: leg_nut
+      params: {screw: screw, clearance: nut_clearance, cx: 0mm, cy: 0mm}
+
+regions:
+  - {id: pad, role: mounting_surface, editable: false,
+     label: floor pad face, aliases: [pad, foot face]}
+  - {id: pad_lightening, role: aesthetic_lightening, editable: true,
+     label: pad top canvas, aliases: [top face, foot top]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: household
+  modes: [utility]
+  tags: [foot, furniture, leveling, glide]
+
+validators:
+  - form.holes_within_outline
+  - form.min_web_between_holes
+  - topology.hex_field_present
+  - topology.bores_open
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - nut_traps
+  must_not_have: []
+  invariants:
+    - foot_t >= 8

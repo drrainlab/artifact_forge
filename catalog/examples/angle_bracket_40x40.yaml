@@ -1,0 +1,20 @@
+schema: product/v1
+id: angle_bracket_40x40
+archetype: angle_bracket_v1@1
+strict: true
+
+requested_features:
+  - l_bracket_body
+
+params:
+  leg_a: 40mm
+  leg_b: 40mm
+  width: 30mm
+  t: 4mm
+  gusset: 12mm
+  screw: M4
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

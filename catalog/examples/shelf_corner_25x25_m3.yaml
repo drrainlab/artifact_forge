@@ -1,0 +1,22 @@
+schema: product/v1
+id: shelf_corner_25x25_m3
+archetype: angle_bracket_v1@1
+strict: true
+
+requested_features:
+  - l_bracket_body
+
+params:
+  leg_a: 25mm
+  leg_b: 25mm
+  width: 15mm
+  t: 3mm
+  gusset: 0mm
+  screw: M3
+  holes_per_leg: 1
+  hole_inset: 6mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

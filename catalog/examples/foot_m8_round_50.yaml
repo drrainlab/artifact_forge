@@ -1,0 +1,20 @@
+schema: product/v1
+id: foot_m8_round_50
+archetype: furniture_foot_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - nut_traps
+
+params:
+  foot_l: 50mm
+  foot_w: 50mm
+  foot_t: 14mm
+  corner_r: 24mm   # squircle: corner_r near half the side
+  screw: M8
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

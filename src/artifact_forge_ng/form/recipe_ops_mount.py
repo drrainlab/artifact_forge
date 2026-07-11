@@ -1,15 +1,17 @@
-"""Mounting recipe ops — wall ring mount, revolve band.
+"""Mounting recipe ops — wall ring mount, revolve band, angle bracket.
 """
 from __future__ import annotations
 
 import math
 from typing import Any
+from ..core.fasteners import FDM_CLEARANCE, screw_spec
 from .profiles_plate import rounded_rect_loop
+from .profiles_revolve import loop_from_points
 from .regions import Box3, Region
-from .section import SectionProfile
+from .section import Pt, SectionProfile
 from ..product.archetype import RegionRole
-from .part import PlateFeature, RibFeature
-from .recipe_ops_core import RecipeError, RecipeState, RecipeOpDecl, _register
+from .part import BoreFeature, PlateFeature, RibFeature
+from .recipe_ops_core import KEEPOUT_CLEARANCE, RecipeError, RecipeState, RecipeOpDecl, _register
 
 
 # -- wall_ring_mount ------------------------------------------------------------
@@ -251,3 +253,137 @@ _register(RecipeOpDecl(
 ))
 
 
+# -- angle_bracket_body ----------------------------------------------------------
+
+
+def _angle_bracket_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Universal L-bracket: two perpendicular legs sharing a corner,
+    optionally webbed by a full-width diagonal gusset, with clearance
+    holes cut in BOTH legs by the op itself (the base owns its holes —
+    hole_pattern cuts along Z only and cannot reach the standing leg).
+
+    Model frame: the L-section lives in XZ (leg A along +X on the bed,
+    leg B rising +Z), extruded along Y by ``width`` — the natural
+    side-profile print, support-free by construction. Leg A holes are
+    Z-bores, leg B holes are X-bores; pan-head screws seat proud (no
+    countersink in v1)."""
+    if state.section is not None:
+        raise RecipeError("angle_bracket_body must be the (single) base op")
+    leg_a, leg_b, w, t = p["leg_a"], p["leg_b"], p["width"], p["t"]
+    g = p["gusset"]
+    n = int(round(p["holes_per_leg"]))
+    inset = p["hole_inset"]
+    spec = screw_spec(p["screw"])
+    bore_d = spec["clear"] + FDM_CLEARANCE
+    head_r = spec["head"] / 2.0
+
+    if min(leg_a, leg_b) < t + 10.0:
+        raise RecipeError(
+            f"legs must clear the corner: min leg {min(leg_a, leg_b):g} "
+            f"< t + 10 = {t + 10.0:g}")
+    if g < 0.0 or (g > 0.0 and g + t + 2.0 > min(leg_a, leg_b)):
+        raise RecipeError(
+            f"gusset reach {g:g} runs past a leg (max "
+            f"{min(leg_a, leg_b) - t - 2.0:g})")
+    if w / 2.0 - bore_d / 2.0 < 3.0:
+        raise RecipeError(
+            f"width {w:g} leaves under 3 mm web beside a {bore_d:g} bore")
+    if n < 1:
+        raise RecipeError("angle_bracket_body needs holes_per_leg >= 1")
+
+    # -- the L-section (XZ, CCW), gusset as a diagonal web in the corner --
+    pts = [Pt(0.0, 0.0), Pt(leg_a, 0.0), Pt(leg_a, t)]
+    if g > 0.0:
+        pts += [Pt(t + g, t), Pt(t, t + g)]
+    else:
+        pts.append(Pt(t, t))
+    pts += [Pt(t, leg_b), Pt(0.0, leg_b)]
+    state.section = SectionProfile(
+        name="recipe",
+        outer=loop_from_points(pts),
+        plane="XZ",
+        width_axis="Y",
+    )
+    state.width = w
+    state.print_orientation = "side_profile"
+
+    # -- holes: evenly spread between the corner zone and the leg end -----
+    name = op_id or "bracket"
+
+    def _centers(leg_len: float) -> list[float]:
+        lo = t + g + head_r + 3.0
+        hi = leg_len - inset
+        if hi < lo:
+            raise RecipeError(
+                f"leg {leg_len:g} too short for holes past the corner zone "
+                f"(needs > {lo + inset:g})")
+        if n == 1:
+            return [(lo + hi) / 2.0]
+        if (hi - lo) / (n - 1) < bore_d + 3.0:
+            raise RecipeError(
+                f"{n} holes on a {leg_len:g} leg leave webs under 3 mm")
+        step = (hi - lo) / (n - 1)
+        return [lo + i * step for i in range(n)]
+
+    for i, x in enumerate(_centers(leg_a)):
+        state.bores.append(BoreFeature(
+            name=f"{name}_a_{i}", axis="Z", d=bore_d,
+            center=(x, 0.0, 0.0), span=(0.0, t), overshoot=(1.0, 1.0)))
+        state.regions.append(Region(
+            f"{name}_a_{i}_keep", RegionRole.FASTENER_KEEPOUT,
+            Box3(x - head_r - KEEPOUT_CLEARANCE, -head_r - KEEPOUT_CLEARANCE, 0.0,
+                 x + head_r + KEEPOUT_CLEARANCE, head_r + KEEPOUT_CLEARANCE, t)))
+        state.frame[f"{name}_a_{i}_x"] = x
+    for i, z in enumerate(_centers(leg_b)):
+        state.bores.append(BoreFeature(
+            name=f"{name}_b_{i}", axis="X", d=bore_d,
+            center=(0.0, 0.0, z), span=(0.0, t), overshoot=(1.0, 1.0)))
+        state.regions.append(Region(
+            f"{name}_b_{i}_keep", RegionRole.FASTENER_KEEPOUT,
+            Box3(0.0, -head_r - KEEPOUT_CLEARANCE, z - head_r - KEEPOUT_CLEARANCE,
+                 t, head_r + KEEPOUT_CLEARANCE, z + head_r + KEEPOUT_CLEARANCE)))
+        state.frame[f"{name}_b_{i}_z"] = z
+
+    # -- semantic regions ---------------------------------------------------
+    state.regions.extend([
+        Region("leg_a_face", RegionRole.MOUNTING_SURFACE,
+               Box3(0.0, -w / 2.0, 0.0, leg_a, w / 2.0, t)),
+        Region("leg_b_face", RegionRole.MOUNTING_SURFACE,
+               Box3(0.0, -w / 2.0, 0.0, t, w / 2.0, leg_b)),
+        Region("corner", RegionRole.HIGH_STRESS_REGION,
+               Box3(0.0, -w / 2.0, 0.0, t + g, w / 2.0, t + g)),
+    ])
+    # Leg A carries the outline the Z-bore web checks measure against; the
+    # X-bores on leg B are guarded by the op's own spacing math above.
+    state.frame.update(
+        leg_a_len=leg_a, leg_b_len=leg_b, angle_t=t,
+        bracket_w=w, gusset_reach=g,
+        holes_per_leg=float(n), bracket_bore_d=bore_d,
+        outline_u0=0.0, outline_v0=-w / 2.0,
+        outline_u1=leg_a, outline_v1=w / 2.0,
+        plate_t=t,
+    )
+    state.datums["corner_line"] = {
+        "at": [t, 0.0, t], "rotate": [0.0, 0.0, 0.0],
+    }
+
+
+_register(RecipeOpDecl(
+    name="angle_bracket_body",
+    kind="base",
+    params={
+        "leg_a": ("length", None), "leg_b": ("length", None),
+        "width": ("length", 30.0), "t": ("length", 4.0),
+        "gusset": ("length", 12.0), "screw": ("choice", "M4"),
+        "holes_per_leg": ("count", 2), "hole_inset": ("length", 8.0),
+    },
+    validators=(
+        "form.holes_within_outline",
+        "form.min_web_between_holes",
+        "topology.bores_open",
+        "topology.single_connected_solid",
+    ),
+    apply=_angle_bracket_body,
+    description="L-bracket: two perpendicular legs + optional diagonal "
+                "gusset web, clearance holes in both legs (side-profile print)",
+))

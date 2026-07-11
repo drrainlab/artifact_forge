@@ -1,0 +1,21 @@
+schema: product/v1
+id: angle_bracket_60x40_gusset
+archetype: angle_bracket_v1@1
+strict: true
+
+requested_features:
+  - l_bracket_body
+
+params:
+  leg_a: 60mm
+  leg_b: 50mm
+  width: 40mm
+  t: 5mm
+  gusset: 10mm
+  screw: M5
+  holes_per_leg: 2
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

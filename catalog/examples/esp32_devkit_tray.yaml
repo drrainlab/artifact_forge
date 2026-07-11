@@ -1,0 +1,24 @@
+schema: product/v1
+id: esp32_devkit_tray
+archetype: pcb_tray_v1@1
+strict: true
+
+requested_features:
+  - box_shell
+  - screw_bosses
+  - pass_through_cutout
+
+params:
+  tray_l: 72mm
+  tray_w: 46mm
+  wall_h: 12mm
+  pcb_sx: 44mm    # ESP32 DevKitC hole span (verify against your board rev)
+  pcb_sy: 22mm
+  boss: 6mm
+  cable_d: 6mm
+  mount_screw: M3
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

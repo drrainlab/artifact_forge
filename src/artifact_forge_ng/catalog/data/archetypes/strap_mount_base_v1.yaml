@@ -1,0 +1,98 @@
+schema: archetype/v1
+id: strap_mount_base_v1
+version: 1
+object_class: strap_mount_base
+description: >
+  Webbing anchor plate: a rounded base with a paired strap slot (the
+  strap threads down one slot, under the center bar, up the other) and
+  two countersunk screws for hard-mounting. strap_w covers the common
+  webbing standards — 20 / 25 / 38 / 50 mm — as plain examples, not
+  separate archetypes. Carries payloads from the forearm platform onto
+  chest straps, backpack panels and belts.
+
+provides_features:
+  - mounting_plate_body
+  - strap_slot_pair_cuts
+
+parameters:
+  base_l:
+    {type: length, default: 70mm, min: 40mm, max: 140mm, role: functional, exposed: true}
+  base_w:
+    {type: length, default: 40mm, min: 25mm, max: 80mm, role: functional, exposed: true}
+  t:
+    {type: length, default: 5mm, min: 4mm, max: 10mm, role: structural}
+  corner_r:
+    {type: length, default: 4mm, min: 2mm, max: 12mm, role: aesthetic}
+  strap_w:
+    {type: length, default: 25mm, min: 15mm, max: 55mm, role: functional, exposed: true}
+  slot_gap:
+    {type: length, default: 4mm, min: 3mm, max: 6mm, role: assembly}
+  bridge_w:
+    {type: length, default: 10mm, min: 6mm, max: 18mm, role: structural}
+  screw:
+    {type: choice, choices: [M4, M5], default: M4, role: assembly, exposed: true}
+
+derived:
+  screw_spacing: expr(base_l - 18)
+
+constraints:
+  - strap_w + 10 < base_w
+  - screw_spacing > bridge_w + 2 * slot_gap + 16
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params: {l: base_l, w: base_w, t: t, corner_r: corner_r}
+    - op: rounded_rect_cutout
+      id: slot_a
+      params: {w: slot_gap, h: "expr(strap_w + 2)",
+               cx: "expr(-(bridge_w + slot_gap) / 2)", cy: 0mm}
+    - op: rounded_rect_cutout
+      id: slot_b
+      params: {w: slot_gap, h: "expr(strap_w + 2)",
+               cx: "expr((bridge_w + slot_gap) / 2)", cy: 0mm}
+    - op: countersunk_hole_pattern
+      id: screws
+      params: {kind: line, screw: screw, count: 2,
+               spacing: screw_spacing, cy: 0mm, cs_face: top}
+
+regions:
+  - {id: plate, role: mounting_surface, editable: false,
+     label: base plate, aliases: [base, mount face]}
+  - {id: plate_lightening, role: aesthetic_lightening, editable: true,
+     label: plate canvas, aliases: [top face]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: wearable
+  modes: [utility, wearable]
+  tags: [strap, webbing, mount, molle]
+
+validators:
+  - form.cuts_respect_keepouts
+  - form.holes_within_outline
+  - form.min_web_between_holes
+  - topology.cutout_present
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_strap_slots
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - strap_slot_pair_cuts
+  must_not_have: []
+  invariants:
+    - strap_w + 10 < base_w

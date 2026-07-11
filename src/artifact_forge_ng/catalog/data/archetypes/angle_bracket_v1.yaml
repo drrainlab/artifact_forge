@@ -1,0 +1,80 @@
+schema: archetype/v1
+id: angle_bracket_v1
+version: 1
+object_class: angle_bracket
+description: >
+  Universal L-bracket: two perpendicular mounting legs (equal or unequal)
+  sharing a corner, an optional full-width diagonal gusset web, and
+  clearance holes in both legs. Prints on its side — support-free by
+  construction. The generic ancestor of every shelf/lamp bracket:
+  reach for those when the arm must taper or carry a specific load path.
+
+provides_features:
+  - l_bracket_body
+
+parameters:
+  leg_a:
+    {type: length, default: 40mm, min: 20mm, max: 120mm, role: functional, exposed: true}
+  leg_b:
+    {type: length, default: 40mm, min: 20mm, max: 120mm, role: functional, exposed: true}
+  width:
+    {type: length, default: 30mm, min: 15mm, max: 80mm, role: structural, exposed: true}
+  t:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: structural}
+  gusset:
+    {type: length, default: 12mm, min: 0mm, max: "expr(min(leg_a, leg_b) - t - 2)", role: structural}
+  screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly, exposed: true}
+  holes_per_leg:
+    {type: count, default: 2, min: 1, max: 3, role: assembly}
+  hole_inset:
+    {type: length, default: 8mm, min: 6mm, max: 20mm, role: assembly}
+
+constraints:
+  - leg_a >= t + 10
+  - leg_b >= t + 10
+
+form:
+  type: recipe
+  section: recipe
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: angle_bracket_body
+      id: body
+      params: {leg_a: leg_a, leg_b: leg_b, width: width, t: t,
+               gusset: gusset, screw: screw,
+               holes_per_leg: holes_per_leg, hole_inset: hole_inset}
+
+regions:
+  - {id: leg_a_face, role: mounting_surface, editable: false,
+     label: horizontal leg, aliases: [leg a, base leg]}
+  - {id: leg_b_face, role: mounting_surface, editable: false,
+     label: vertical leg, aliases: [leg b, wall leg]}
+  - {id: corner, role: high_stress_region, editable: false,
+     label: corner web, aliases: [gusset, corner]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: workshop
+  modes: [workshop, engineering]
+  tags: [bracket, angle, corner, L]
+
+validators:
+  - form.holes_within_outline
+  - form.min_web_between_holes
+  - topology.bores_open
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - l_bracket_body
+  must_not_have: []
+  invariants:
+    - t >= 3

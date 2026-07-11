@@ -1,0 +1,20 @@
+schema: product/v1
+id: foot_m6_square_40
+archetype: furniture_foot_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - nut_traps
+
+params:
+  foot_l: 40mm
+  foot_w: 40mm
+  foot_t: 12mm
+  corner_r: 3mm
+  screw: M6
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

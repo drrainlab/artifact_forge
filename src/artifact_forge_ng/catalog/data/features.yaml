@@ -347,6 +347,21 @@ features:
       - topology.ribs_present
       - topology.pockets_present
 
+  # -- core expansion wave (Core-U/M/X) -----------------------------------------
+
+  - id: l_bracket_body
+    description: two perpendicular mounting legs sharing a corner, holes in both legs
+    verified_by:
+      - form.profile_closed
+      - topology.bores_open
+      - topology.single_connected_solid
+
+  - id: strap_slot_pair_cuts
+    description: paired through slots for webbing with a solid center bar between them
+    verified_by:
+      - form.cuts_respect_keepouts
+      - topology.cutout_present
+
   # -- wall tool mounts pack ---------------------------------------------------
 
   - id: tool_saddle_ring

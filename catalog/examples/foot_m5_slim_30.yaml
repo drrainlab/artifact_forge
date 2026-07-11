@@ -1,0 +1,20 @@
+schema: product/v1
+id: foot_m5_slim_30
+archetype: furniture_foot_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - nut_traps
+
+params:
+  foot_l: 30mm
+  foot_w: 30mm
+  foot_t: 8mm
+  corner_r: 6mm
+  screw: M5
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

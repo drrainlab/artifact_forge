@@ -1,0 +1,18 @@
+schema: product/v1
+id: strap_mount_20mm
+archetype: strap_mount_base_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - strap_slot_pair_cuts
+
+params:
+  base_l: 60mm
+  base_w: 35mm
+  strap_w: 20mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

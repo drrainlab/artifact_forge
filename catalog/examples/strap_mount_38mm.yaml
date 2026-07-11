@@ -1,0 +1,18 @@
+schema: product/v1
+id: strap_mount_38mm
+archetype: strap_mount_base_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - strap_slot_pair_cuts
+
+params:
+  base_l: 80mm
+  base_w: 52mm
+  strap_w: 38mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none
