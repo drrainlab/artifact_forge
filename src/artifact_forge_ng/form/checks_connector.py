@@ -172,3 +172,56 @@ def check_angled_arm_printable(form: PartForm) -> Finding:
 
 register_probe("form.angled_arm_printable")(
     lambda form, ctx: check_angled_arm_printable(form))
+
+
+def check_coupler_bores_ok(form: PartForm) -> Finding:
+    """Both shaft bores must fit, engage and stay separated."""
+    from .recipe_ops_connector import (
+        COUPLER_ENGAGE_K, COUPLER_FIT_BAND, COUPLER_MID_WEB_MIN)
+
+    check = "form.coupler_bores_ok"
+    f = form.frame
+    if "coupler_shaft_a" not in f:
+        return _finding(check, True, "n/a — not a shaft coupler",
+                        critical=False)
+    problems: list[str] = []
+    lo, hi = COUPLER_FIT_BAND
+    if not lo <= f["coupler_fit"] <= hi:
+        problems.append(f"fit {f['coupler_fit']:g} outside [{lo:g}, {hi:g}]")
+    for tag in ("a", "b"):
+        need = COUPLER_ENGAGE_K * f[f"coupler_shaft_{tag}"]
+        if f[f"coupler_depth_{tag}"] < need - 1e-6:
+            problems.append(
+                f"bore {tag}: engagement {f[f'coupler_depth_{tag}']:g} "
+                f"< {need:g}")
+    if f["coupler_mid_web"] < COUPLER_MID_WEB_MIN - 1e-6:
+        problems.append(
+            f"mid web {f['coupler_mid_web']:g} < {COUPLER_MID_WEB_MIN:g}")
+    if problems:
+        return _finding(check, False, "; ".join(problems))
+    return _finding(
+        check, True,
+        f"Ø{f['coupler_shaft_a']:g}→Ø{f['coupler_shaft_b']:g} at "
+        f"{f['coupler_fit']:g} fit, engagement "
+        f"{f['coupler_depth_a']:g}/{f['coupler_depth_b']:g}, web "
+        f"{f['coupler_mid_web']:g}")
+
+
+def check_coupler_torque_unverified(form: PartForm) -> Finding:
+    """Honesty note: the set screws and the plastic carry the torque —
+    hobby stepper duty, never a certified drive coupling."""
+    check = "form.coupler_torque_unverified"
+    if "coupler_shaft_a" not in form.frame:
+        return _finding(check, True, "n/a — not a shaft coupler",
+                        critical=False)
+    return _finding(
+        check, True,
+        "geometry verified; transmissible torque depends on set-screw "
+        "preload and plastic creep — hobby duty, stated not hidden",
+        critical=False)
+
+
+register_probe("form.coupler_bores_ok")(
+    lambda form, ctx: check_coupler_bores_ok(form))
+register_probe("form.coupler_torque_unverified")(
+    lambda form, ctx: check_coupler_torque_unverified(form))

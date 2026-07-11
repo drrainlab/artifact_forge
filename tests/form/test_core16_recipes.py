@@ -59,6 +59,8 @@ WAVE_EXAMPLES = [
     "clay_pattern_stamp",
     "logo_stamp_arrow",
     # deferral wave
+    "coupler_5_8_stepper",
+    "coupler_6_6_long",
     "card_case_blank_120",
     "glasses_pouch_blank_160",
     "rail_slider_camera_16",
@@ -175,6 +177,30 @@ def test_tight_pin_fails_fit_check():
     st = _leaf(pin_clearance=0.2)
     st.frame["hinge_bore_d"] = st.frame["hinge_pin_d"] + 0.1  # binds
     assert check_hinge_pin_fit_ok(st).status.value == "fail"
+
+
+# -- shaft coupler --------------------------------------------------------------------
+
+
+def test_coupler_measures_both_bores():
+    from artifact_forge_ng.form.checks_connector import check_coupler_bores_ok
+
+    state = run_pre_cad(EXAMPLES / "coupler_5_8_stepper.yaml", None)
+    f = state.form.frame
+    assert f["coupler_bore_a"] == pytest.approx(5.25)
+    assert f["coupler_bore_b"] == pytest.approx(8.25)
+    assert f["coupler_depth_a"] + f["coupler_depth_b"] + f["coupler_mid_web"]         == pytest.approx(25.0)
+    assert check_coupler_bores_ok(state.form).status.value == "pass"
+    assert {"shaft_a", "shaft_b"} <= set(state.form.datums)
+
+
+def test_coupler_short_engagement_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="engagement"):
+        RECIPE_OPS["shaft_coupler_body"].apply(
+            st, {"shaft_d_a": 8.0, "shaft_d_b": 8.0, "fit_clearance": 0.25,
+                 "body_d": 0.0, "length": 18.0, "mid_web": 3.0,
+                 "set_screw": "m4"}, "coupler")
 
 
 # -- living hinge --------------------------------------------------------------------

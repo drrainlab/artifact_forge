@@ -440,3 +440,110 @@ _register(RecipeOpDecl(
     description="diagonal rod socket on the hub (oriented kernel): "
                 "elevation banded to the printable 30–80°",
 ))
+
+# -- shaft_coupler_body (R2.14) ----------------------------------------------------
+
+#: Diametral clearance band for a shaft in its coupler bore — snug
+#: enough for the set screw to center it, loose enough to assemble.
+COUPLER_FIT_BAND = (0.15, 0.4)
+COUPLER_MID_WEB_MIN = 2.5
+COUPLER_ENGAGE_K = 1.2   # bore depth >= k * its shaft diameter
+
+
+def _shaft_coupler_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Rigid shaft coupler: a vertical cylinder with two coaxial BLIND
+    bores (a solid mid web keeps the shafts from butting) and one
+    teardrop set screw per section. Torque honesty: the set screws and
+    the plastic carry it — stepper-to-leadscrew duty, never certified
+    beyond hobby loads."""
+    if state.section is not None:
+        raise RecipeError("shaft_coupler_body must be the (single) base op")
+    d_a, d_b = p["shaft_d_a"], p["shaft_d_b"]
+    fit = p["fit_clearance"]
+    body_d = p["body_d"] if p["body_d"] > 1e-9 else max(d_a, d_b) + 8.0
+    length = p["length"]
+    mid_web = p["mid_web"]
+    set_screw = p["set_screw"]
+    lo, hi = COUPLER_FIT_BAND
+    if not lo <= fit <= hi:
+        raise RecipeError(
+            f"fit_clearance {fit:g} outside [{lo:g}, {hi:g}]")
+    if mid_web < COUPLER_MID_WEB_MIN:
+        raise RecipeError(
+            f"mid web {mid_web:g} < {COUPLER_MID_WEB_MIN:g} — the shafts "
+            "would butt through")
+    bore_a, bore_b = d_a + fit, d_b + fit
+    wall_a = (body_d - bore_a) / 2.0
+    wall_b = (body_d - bore_b) / 2.0
+    if min(wall_a, wall_b) < 3.0:
+        raise RecipeError(
+            f"body Ø{body_d:g} leaves {min(wall_a, wall_b):.1f} wall "
+            "around a bore (min 3)")
+    depth_a = (length - mid_web) / 2.0
+    depth_b = length - mid_web - depth_a
+    if depth_a < COUPLER_ENGAGE_K * d_a or depth_b < COUPLER_ENGAGE_K * d_b:
+        raise RecipeError(
+            f"length {length:g} gives {depth_a:g}/{depth_b:g} engagement — "
+            f"needs {COUPLER_ENGAGE_K:g}x each shaft "
+            f"({COUPLER_ENGAGE_K * d_a:g}/{COUPLER_ENGAGE_K * d_b:g})")
+    screw_spec(set_screw)  # unknown size fails loudly
+
+    r_body = body_d / 2.0
+    pts = [Pt(0.0, 0.0), Pt(r_body, 0.0), Pt(r_body, length), Pt(0.0, length)]
+    state.section = SectionProfile(
+        name="recipe_revolve", outer=loop_from_points(pts),
+        plane="XZ", width_axis="Y")
+    state.kind = "profile_revolve"
+    state.width = body_d
+
+    name = op_id or "coupler"
+    state.bores.append(BoreFeature(
+        name=f"{name}_bore_a", axis="Z", d=bore_a,
+        center=(0.0, 0.0, 0.0), span=(0.0, depth_a), overshoot=(1.0, 0.0)))
+    state.bores.append(BoreFeature(
+        name=f"{name}_bore_b", axis="Z", d=bore_b,
+        center=(0.0, 0.0, 0.0), span=(length - depth_b, length),
+        overshoot=(0.0, 1.0)))
+    spec = screw_spec(set_screw)
+    for tag, z in (("a", depth_a / 2.0), ("b", length - depth_b / 2.0)):
+        state.bores.append(BoreFeature(
+            name=f"{name}_set_screw_{tag}", axis="X", d=spec["tap"],
+            center=(0.0, 0.0, z), span=(0.0, r_body + 1.0),
+            overshoot=(1.0, 1.0), roof="teardrop"))
+    state.regions.append(Region(
+        f"{name}_body", RegionRole.MOUNTING_SURFACE,
+        Box3(-r_body, -r_body, 0.0, r_body, r_body, length)))
+    state.datums["shaft_a"] = {"at": [0.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0]}
+    state.datums["shaft_b"] = {"at": [0.0, 0.0, length], "rotate": [0.0, 0.0, 0.0]}
+    state.frame.update(
+        coupler_shaft_a=d_a, coupler_shaft_b=d_b,
+        coupler_bore_a=bore_a, coupler_bore_b=bore_b,
+        coupler_depth_a=depth_a, coupler_depth_b=depth_b,
+        coupler_mid_web=mid_web, coupler_wall=min(wall_a, wall_b),
+        coupler_fit=fit,
+    )
+
+
+_register(RecipeOpDecl(
+    name="shaft_coupler_body",
+    kind="base",
+    params={
+        "shaft_d_a": ("length", None),
+        "shaft_d_b": ("length", None),
+        "fit_clearance": ("length", 0.25),
+        "body_d": ("length", 0.0),
+        "length": ("length", 25.0),
+        "mid_web": ("length", 3.0),
+        "set_screw": ("choice", "m4"),
+    },
+    validators=(
+        "form.coupler_bores_ok",
+        "form.coupler_torque_unverified",
+        "topology.bores_open",
+        "topology.pockets_present",
+        "topology.single_connected_solid",
+    ),
+    apply=_shaft_coupler_body,
+    description="rigid shaft coupler: two blind coaxial bores over a "
+                "solid mid web + a teardrop set screw per section",
+))

@@ -1,0 +1,18 @@
+schema: product/v1
+id: coupler_6_6_long
+archetype: shaft_coupler_v1@1
+strict: true
+
+requested_features:
+  - coupler_shaft_bores
+
+params:
+  shaft_d_a: 6mm
+  shaft_d_b: 6mm
+  length: 32mm
+  set_screw: m3
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

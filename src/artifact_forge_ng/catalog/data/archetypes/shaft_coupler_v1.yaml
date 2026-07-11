@@ -1,0 +1,79 @@
+schema: archetype/v1
+id: shaft_coupler_v1
+version: 1
+object_class: shaft_coupler
+description: >
+  Rigid shaft coupler: two blind coaxial bores (a solid mid web keeps
+  the shafts from butting) with a teardrop set screw per section —
+  stepper-to-leadscrew, motor-to-spindle, any two round shafts. Torque
+  honesty out loud: set-screw preload and plastic creep set the limit —
+  hobby duty, never a certified drive coupling. D-shaft flats wait for
+  a partial-cut iteration.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - coupler_shaft_bores
+
+parameters:
+  shaft_d_a:
+    {type: length, default: 5mm, min: 2mm, max: 12mm, role: assembly, exposed: true,
+     description: "shaft A diameter (5 = NEMA17)"}
+  shaft_d_b:
+    {type: length, default: 8mm, min: 2mm, max: 12mm, role: assembly, exposed: true,
+     description: "shaft B diameter (8 = a common leadscrew)"}
+  fit_clearance:
+    {type: length, default: 0.25mm, min: 0.15mm, max: 0.4mm, role: manufacturing}
+  body_d:
+    {type: length, default: 0mm, min: 0mm, max: 30mm, role: structural,
+     description: "0 = auto (largest shaft + 8)"}
+  length:
+    {type: length, default: 25mm, min: 15mm, max: 50mm, role: functional, exposed: true}
+  mid_web:
+    {type: length, default: 3mm, min: 2.5mm, max: 8mm, role: structural}
+  set_screw:
+    {type: choice, choices: [m3, m4], default: m4, role: assembly}
+
+constraints:
+  - length > mid_web + 2.4 * shaft_d_a
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: shaft_coupler_body
+      id: coupler
+      params: {shaft_d_a: shaft_d_a, shaft_d_b: shaft_d_b,
+               fit_clearance: fit_clearance, body_d: body_d,
+               length: length, mid_web: mid_web, set_screw: set_screw}
+
+regions:
+  - {id: coupler_body, role: mounting_surface, editable: false,
+     label: coupler body, aliases: [coupler, body]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: workshop
+  modes: [engineering, workshop]
+  tags: [coupler, shaft, stepper, leadscrew]
+
+validators:
+  - form.coupler_bores_ok
+  - form.coupler_torque_unverified
+  - topology.bores_open
+  - topology.pockets_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - coupler_shaft_bores
+  must_not_have: []
+  invariants:
+    - mid_web >= 2.5

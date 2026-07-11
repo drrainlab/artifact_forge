@@ -530,6 +530,13 @@ features:
       - form.se_wall_ok
       - topology.single_connected_solid
 
+  - id: coupler_shaft_bores
+    description: two blind coaxial shaft bores over a solid mid web with set screws
+    verified_by:
+      - form.coupler_bores_ok
+      - topology.bores_open
+      - topology.pockets_present
+
   - id: living_hinge_web
     description: transverse thin flex web — the one-piece fold line, cycle life honestly unverified
     verified_by:
