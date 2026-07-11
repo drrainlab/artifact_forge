@@ -1,0 +1,93 @@
+schema: archetype/v1
+id: rail_slider_v1
+version: 1
+object_class: rail_slider
+description: >
+  Sliding shoe for the clamp family's dovetail rail: a constant section
+  (female dovetail slot opening downward) extruded along the travel —
+  sideprint, zero overhangs by construction. Enter the RAIL's own
+  numbers (top width, height, flank angle — the camera rod clamp's
+  defaults are pre-set) and the shoe slides it with a measured
+  clearance; the flat top face is the payload side. Axial retention is
+  friction-only, stated not hidden — an end stop is a future op.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - dovetail_slider_shoe
+
+parameters:
+  rail_top_w:
+    {type: length, default: 16mm, min: 10mm, max: 30mm, role: assembly, exposed: true,
+     description: the mating rail's top width (camera_rod_clamp_upper default = 16)}
+  rail_h:
+    {type: length, default: 5mm, min: 4mm, max: 10mm, role: assembly}
+  rail_angle:
+    {type: number, default: 10, min: 1, max: 25, role: assembly}
+  slide_clearance:
+    {type: length, default: 0.35mm, min: 0.2mm, max: 0.6mm, role: manufacturing}
+  vert_clearance:
+    {type: length, default: 0.3mm, min: 0.2mm, max: 0.5mm, role: manufacturing}
+  travel:
+    {type: length, default: 30mm, min: 15mm, max: 100mm, role: functional, exposed: true}
+  wall:
+    {type: length, default: 3mm, min: 2.4mm, max: 6mm, role: structural}
+  ceiling_t:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: structural}
+
+constraints:
+  - travel >= 1.2 * rail_top_w
+
+form:
+  type: recipe
+  section: recipe
+  plane: YZ
+  width_axis: X
+  ops:
+    - op: rail_slider_body
+      id: shoe
+      params: {rail_top_w: rail_top_w, rail_h: rail_h,
+               rail_angle: rail_angle, slide_clearance: slide_clearance,
+               vert_clearance: vert_clearance, travel: travel,
+               wall: wall, ceiling_t: ceiling_t}
+
+regions:
+  - {id: shoe_payload_face, role: mounting_surface, editable: false,
+     label: payload face, aliases: [top face, payload]}
+  - {id: shoe_rail_slot, role: soft_contact_surface, editable: false,
+     label: rail slot, aliases: [slot, groove]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: workshop
+  modes: [workshop, cinema_prop, utility]
+  tags: [slider, dovetail, rail, shoe]
+
+interfaces:
+  - id: rail_grip
+    type: dovetail_rail
+    gender: female
+    datum: rail_slot
+    frame: {normal: "-Z", up: "+X"}
+    accepts: [camera_rod_clamp, branch_clamp]
+
+validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
+  - form.rail_slider_fit_ok
+  - form.rail_slider_walls_ok
+  - form.constant_section
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - dovetail_slider_shoe
+  must_not_have: []
+  invariants:
+    - travel >= 1.2 * rail_top_w

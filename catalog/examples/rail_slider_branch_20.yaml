@@ -1,0 +1,17 @@
+schema: product/v1
+id: rail_slider_branch_20
+archetype: rail_slider_v1@1
+strict: true
+
+requested_features:
+  - dovetail_slider_shoe
+
+params:
+  rail_top_w: 20mm
+  rail_h: 6mm
+  travel: 40mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

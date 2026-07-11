@@ -530,6 +530,14 @@ features:
       - form.se_wall_ok
       - topology.single_connected_solid
 
+  - id: dovetail_slider_shoe
+    description: female dovetail shoe sliding the clamp-family rail, clearances measured
+    verified_by:
+      - form.rail_slider_fit_ok
+      - form.rail_slider_walls_ok
+      - form.constant_section
+      - topology.single_connected_solid
+
   - id: hinge_knuckle_barrel
     description: interleaved knuckle segments around one axial pin bore — the leaf half of a hinge
     verified_by:

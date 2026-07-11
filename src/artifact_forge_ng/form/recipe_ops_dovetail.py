@@ -107,3 +107,120 @@ _register(RecipeOpDecl(
     description="payload adapter: male dovetail foot + snap-C clip or "
                 "accessory plate (slides on the cuff socket along X)",
 ))
+
+
+# -- rail_slider_body (R2.12) ----------------------------------------------------
+
+#: Lateral / vertical sliding clearance bands for a printed shoe on a
+#: printed rail (friction slide, not a bearing).
+SLIDE_LAT_BAND = (0.2, 0.6)
+SLIDE_VERT_BAND = (0.2, 0.5)
+SLIDER_WALL_MIN = 2.4
+SLIDER_ENGAGE_K = 1.2   # travel >= k * rail top width (no yaw wobble)
+
+
+def _rail_slider_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """The sliding SHOE for the clamp family's dovetail rail: a constant
+    YZ section (block with a female dovetail slot opening downward)
+    extruded along the travel axis X — sideprint, zero overhangs by
+    construction. Parameterized by the RAIL's own numbers (top width,
+    height, flank angle) so one shoe slides every rail in the family."""
+    import math as _math
+
+    if state.section is not None:
+        raise RecipeError("rail_slider_body must be the (single) base op")
+    from .profiles_revolve import loop_from_points
+    from .section import Pt, SectionProfile
+
+    top_w = p["rail_top_w"]
+    rail_h = p["rail_h"]
+    angle = p["rail_angle"]
+    c_lat = p["slide_clearance"]
+    c_vert = p["vert_clearance"]
+    travel = p["travel"]
+    wall = p["wall"]
+    ceiling = p["ceiling_t"]
+    if not 0.0 < angle <= 25.0:
+        raise RecipeError(
+            f"rail_angle {angle:g} outside (0, 25] — 0 is a plain ridge, "
+            "no dovetail retention")
+    lo, hi = SLIDE_LAT_BAND
+    if not lo <= c_lat <= hi:
+        raise RecipeError(
+            f"slide_clearance {c_lat:g} outside [{lo:g}, {hi:g}]")
+    vlo, vhi = SLIDE_VERT_BAND
+    if not vlo <= c_vert <= vhi:
+        raise RecipeError(
+            f"vert_clearance {c_vert:g} outside [{vlo:g}, {vhi:g}]")
+    root_w = top_w - 2.0 * rail_h * _math.tan(_math.radians(angle))
+    if root_w < 4.0:
+        raise RecipeError(
+            f"rail root {root_w:.1f} < 4 — this rail cannot exist")
+    if travel < SLIDER_ENGAGE_K * top_w:
+        raise RecipeError(
+            f"travel {travel:g} shorter than {SLIDER_ENGAGE_K:g}x rail "
+            f"top ({SLIDER_ENGAGE_K * top_w:g}) — the shoe yaws")
+    g_neck = root_w + c_lat          # the bottom opening rides the neck
+    g_top = top_w + c_lat            # the inside width over the rail top
+    depth = rail_h + c_vert
+    body_w = g_top + 2.0 * wall
+    body_h = depth + ceiling
+
+    pts = [
+        Pt(-body_w / 2.0, 0.0),
+        Pt(-g_neck / 2.0, 0.0),
+        Pt(-g_top / 2.0, depth),
+        Pt(g_top / 2.0, depth),
+        Pt(g_neck / 2.0, 0.0),
+        Pt(body_w / 2.0, 0.0),
+        Pt(body_w / 2.0, body_h),
+        Pt(-body_w / 2.0, body_h),
+    ]
+    state.section = SectionProfile(
+        name="recipe", outer=loop_from_points(pts),
+        plane="YZ", width_axis="X",
+    )
+    state.width = travel
+    state.print_orientation = "side_profile"
+
+    name = op_id or "shoe"
+    state.regions.extend([
+        Region(f"{name}_payload_face", RegionRole.MOUNTING_SURFACE,
+               Box3(0.0, -body_w / 2.0, depth, travel, body_w / 2.0, body_h)),
+        Region(f"{name}_rail_slot", RegionRole.SOFT_CONTACT_SURFACE,
+               Box3(0.0, -g_top / 2.0, 0.0, travel, g_top / 2.0, depth)),
+    ])
+    state.datums["rail_slot"] = {
+        "at": [travel / 2.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0]}
+    state.frame.update(
+        # the dovetail_rail FEMALE frame keys (interfaces.py)
+        groove_top_w=g_top, groove_bottom_w=g_neck, groove_depth=depth,
+        slider_travel=travel, slider_wall=wall, slider_ceiling=ceiling,
+        slider_lat_clearance=c_lat, slider_vert_clearance=c_vert,
+        slider_rail_top_w=top_w, slider_rail_h=rail_h,
+    )
+
+
+_register(RecipeOpDecl(
+    name="rail_slider_body",
+    kind="base",
+    params={
+        "rail_top_w": ("length", None),
+        "rail_h": ("length", 5.0),
+        "rail_angle": ("number", 10.0),
+        "slide_clearance": ("length", 0.35),
+        "vert_clearance": ("length", 0.3),
+        "travel": ("length", 30.0),
+        "wall": ("length", 3.0),
+        "ceiling_t": ("length", 4.0),
+    },
+    validators=(
+        "form.rail_slider_fit_ok",
+        "form.rail_slider_walls_ok",
+        "form.constant_section",
+        "topology.single_connected_solid",
+    ),
+    apply=_rail_slider_body,
+    description="female dovetail shoe sliding the clamp family's rail — "
+                "constant section, sideprint, rail-parameterized",
+))

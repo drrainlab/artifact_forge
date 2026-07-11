@@ -89,3 +89,68 @@ register_probe("form.hinge_knuckle_geometry_ok")(
     lambda form, ctx: check_hinge_knuckle_geometry_ok(form))
 register_probe("form.hinge_motion_unverified")(
     lambda form, ctx: check_hinge_motion_unverified(form))
+
+
+# -- rail slider (R2.12 — mechanics family shares this module) -----------------
+
+
+def check_rail_slider_fit_ok(form: PartForm) -> Finding:
+    """The shoe must SLIDE its rail: lateral and vertical clearance in
+    band, and enough travel not to yaw."""
+    from .recipe_ops_dovetail import (
+        SLIDE_LAT_BAND, SLIDE_VERT_BAND, SLIDER_ENGAGE_K)
+
+    check = "form.rail_slider_fit_ok"
+    f = form.frame
+    if "slider_travel" not in f:
+        return _finding(check, True, "n/a — not a rail slider",
+                        critical=False)
+    problems: list[str] = []
+    lo, hi = SLIDE_LAT_BAND
+    if not lo <= f["slider_lat_clearance"] <= hi:
+        problems.append(
+            f"lateral {f['slider_lat_clearance']:g} outside [{lo:g}, {hi:g}]")
+    vlo, vhi = SLIDE_VERT_BAND
+    if not vlo <= f["slider_vert_clearance"] <= vhi:
+        problems.append(
+            f"vertical {f['slider_vert_clearance']:g} outside "
+            f"[{vlo:g}, {vhi:g}]")
+    need = SLIDER_ENGAGE_K * f["slider_rail_top_w"]
+    if f["slider_travel"] < need - 1e-6:
+        problems.append(
+            f"travel {f['slider_travel']:g} < {need:g} — the shoe yaws")
+    if problems:
+        return _finding(check, False, "; ".join(problems))
+    return _finding(
+        check, True,
+        f"slides at {f['slider_lat_clearance']:g}/"
+        f"{f['slider_vert_clearance']:g} clearance over "
+        f"{f['slider_travel']:g} travel")
+
+
+def check_rail_slider_walls_ok(form: PartForm) -> Finding:
+    """The shoe's side walls and ceiling must stay real — they carry
+    the payload moment across the slot."""
+    from .recipe_ops_dovetail import SLIDER_WALL_MIN
+
+    check = "form.rail_slider_walls_ok"
+    f = form.frame
+    if "slider_travel" not in f:
+        return _finding(check, True, "n/a — not a rail slider",
+                        critical=False)
+    problems: list[str] = []
+    if f["slider_wall"] < SLIDER_WALL_MIN - 1e-6:
+        problems.append(f"side wall {f['slider_wall']:g} < {SLIDER_WALL_MIN:g}")
+    if f["slider_ceiling"] < 3.0 - 1e-6:
+        problems.append(f"ceiling {f['slider_ceiling']:g} < 3")
+    if problems:
+        return _finding(check, False, "; ".join(problems))
+    return _finding(
+        check, True,
+        f"walls {f['slider_wall']:g}, ceiling {f['slider_ceiling']:g} real")
+
+
+register_probe("form.rail_slider_fit_ok")(
+    lambda form, ctx: check_rail_slider_fit_ok(form))
+register_probe("form.rail_slider_walls_ok")(
+    lambda form, ctx: check_rail_slider_walls_ok(form))

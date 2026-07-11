@@ -59,6 +59,8 @@ WAVE_EXAMPLES = [
     "clay_pattern_stamp",
     "logo_stamp_arrow",
     # deferral wave
+    "rail_slider_camera_16",
+    "rail_slider_branch_20",
     "hinge_leaf_a_60",
     "hinge_leaf_b_60",
     "friction_hinge_leaf_m5",
@@ -171,6 +173,38 @@ def test_tight_pin_fails_fit_check():
     st = _leaf(pin_clearance=0.2)
     st.frame["hinge_bore_d"] = st.frame["hinge_pin_d"] + 0.1  # binds
     assert check_hinge_pin_fit_ok(st).status.value == "fail"
+
+
+# -- rail slider ---------------------------------------------------------------------
+
+
+def test_slider_groove_mates_the_clamp_rail():
+    """The shoe's groove keys are the dovetail_rail FEMALE contract —
+    sized from the camera clamp's own rail numbers plus the clearance."""
+    state = run_pre_cad(EXAMPLES / "rail_slider_camera_16.yaml", None)
+    f = state.form.frame
+    assert f["groove_top_w"] == pytest.approx(16.35)
+    assert f["groove_bottom_w"] < f["groove_top_w"]  # a real dovetail
+    assert f["groove_depth"] == pytest.approx(5.3)
+    assert "rail_slot" in state.form.datums
+
+
+def test_slider_flat_angle_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="rail_angle"):
+        RECIPE_OPS["rail_slider_body"].apply(
+            st, {"rail_top_w": 16.0, "rail_h": 5.0, "rail_angle": 0.0,
+                 "slide_clearance": 0.35, "vert_clearance": 0.3,
+                 "travel": 30.0, "wall": 3.0, "ceiling_t": 4.0}, "shoe")
+
+
+def test_slider_short_travel_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="yaws"):
+        RECIPE_OPS["rail_slider_body"].apply(
+            st, {"rail_top_w": 16.0, "rail_h": 5.0, "rail_angle": 10.0,
+                 "slide_clearance": 0.35, "vert_clearance": 0.3,
+                 "travel": 15.0, "wall": 3.0, "ceiling_t": 4.0}, "shoe")
 
 
 # -- cup holder / square post sleeve ------------------------------------------------
