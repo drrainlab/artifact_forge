@@ -1,0 +1,15 @@
+schema: product/v1
+id: card_case_blank_120
+archetype: living_hinge_plate_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - living_hinge_web
+
+params: {}
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

@@ -530,6 +530,12 @@ features:
       - form.se_wall_ok
       - topology.single_connected_solid
 
+  - id: living_hinge_web
+    description: transverse thin flex web — the one-piece fold line, cycle life honestly unverified
+    verified_by:
+      - form.living_hinge_web_ok
+      - topology.cutout_present
+
   - id: dovetail_slider_shoe
     description: female dovetail shoe sliding the clamp-family rail, clearances measured
     verified_by:

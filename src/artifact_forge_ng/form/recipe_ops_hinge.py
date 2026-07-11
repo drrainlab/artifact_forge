@@ -143,3 +143,76 @@ _register(RecipeOpDecl(
                 "teardrop pin bore (side a/b mesh; mode bolt = friction "
                 "hinge via preload)",
 ))
+
+
+# -- living_hinge_groove (R2.13) --------------------------------------------------
+
+#: The flex web band: under it the web tears on the first fold, over it
+#: the "hinge" is just a stiff plate.
+LIVING_WEB_BAND = (0.3, 0.8)
+#: Groove width band — the fold needs room for its bend radius.
+LIVING_GROOVE_BAND = (1.5, 6.0)
+
+
+def _living_hinge_groove(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """A transverse groove across the full plate leaving a thin flex web
+    at the bottom — the classic one-piece lid hinge. The web thickness
+    is the whole mechanism: measured against the band, and the fatigue
+    honesty check says out loud that PETG/PLA webs are LIMITED-CYCLE
+    (polypropylene is the real living-hinge material)."""
+    state.require_base("living_hinge_groove")
+    f = state.frame
+    if "outline_u0" not in f:
+        raise RecipeError("living_hinge_groove needs a rounded_plate base")
+    web = p["web_t"]
+    gw = p["groove_w"]
+    hx = p["at_x"]
+    t = state.width
+    lo, hi = LIVING_WEB_BAND
+    if not lo <= web <= hi:
+        raise RecipeError(
+            f"web {web:g} outside [{lo:g}, {hi:g}] — thinner tears on the "
+            "first fold, thicker never folds")
+    glo, ghi = LIVING_GROOVE_BAND
+    if not glo <= gw <= ghi:
+        raise RecipeError(f"groove_w {gw:g} outside [{glo:g}, {ghi:g}]")
+    if web >= t - 0.4:
+        raise RecipeError(f"web {web:g} leaves no groove in a {t:g} plate")
+    u0, v0, u1, v1 = f["outline_u0"], f["outline_v0"], f["outline_u1"], f["outline_v1"]
+    if not u0 + 4.0 <= hx <= u1 - 4.0:
+        raise RecipeError(f"hinge line at x={hx:g} runs off the plate")
+    from .part import CutBoxFeature
+
+    name = op_id or "hinge"
+    state.cutboxes.append(CutBoxFeature(
+        name=f"{name}_groove",
+        box=Box3(hx - gw / 2.0, v0 - 1.0, web, hx + gw / 2.0, v1 + 1.0, t + 1.0)))
+    # the web line is sacred: no field or later cut may touch it
+    state.regions.append(Region(
+        f"{name}_web_keep", RegionRole.FASTENER_KEEPOUT,
+        Box3(hx - gw / 2.0 - 2.0, v0, 0.0, hx + gw / 2.0 + 2.0, v1, web)))
+    state.datums["fold_line"] = {
+        "at": [hx, 0.0, web], "rotate": [0.0, 0.0, 0.0]}
+    state.frame.update(
+        lh_web_t=web, lh_groove_w=gw, lh_x=hx, lh_plate_t=t,
+    )
+
+
+_register(RecipeOpDecl(
+    name="living_hinge_groove",
+    kind="feature",
+    params={
+        "web_t": ("length", 0.5),
+        "groove_w": ("length", 3.0),
+        "at_x": ("length", 0.0),
+    },
+    validators=(
+        "form.living_hinge_web_ok",
+        "form.living_hinge_fatigue_unverified",
+        "topology.cutout_present",
+        "topology.single_connected_solid",
+    ),
+    apply=_living_hinge_groove,
+    description="transverse groove leaving a thin flex web — the "
+                "one-piece lid hinge (cycle life honestly unverified)",
+))

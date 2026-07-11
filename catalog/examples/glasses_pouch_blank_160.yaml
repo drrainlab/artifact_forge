@@ -1,0 +1,20 @@
+schema: product/v1
+id: glasses_pouch_blank_160
+archetype: living_hinge_plate_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - living_hinge_web
+
+params:
+  plate_l: 160mm
+  plate_w: 80mm
+  t: 1.2mm
+  web_t: 0.4mm
+  groove_w: 4mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

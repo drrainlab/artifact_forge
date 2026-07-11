@@ -154,3 +154,54 @@ register_probe("form.rail_slider_fit_ok")(
     lambda form, ctx: check_rail_slider_fit_ok(form))
 register_probe("form.rail_slider_walls_ok")(
     lambda form, ctx: check_rail_slider_walls_ok(form))
+
+
+# -- living hinge (R2.13) -------------------------------------------------------
+
+
+def check_living_hinge_web_ok(form: PartForm) -> Finding:
+    """The flex web must sit in the band that folds without tearing."""
+    from .recipe_ops_hinge import LIVING_GROOVE_BAND, LIVING_WEB_BAND
+
+    check = "form.living_hinge_web_ok"
+    f = form.frame
+    if "lh_web_t" not in f:
+        return _finding(check, True, "n/a — no living hinge on this part",
+                        critical=False)
+    problems: list[str] = []
+    lo, hi = LIVING_WEB_BAND
+    if not lo <= f["lh_web_t"] <= hi:
+        problems.append(f"web {f['lh_web_t']:g} outside [{lo:g}, {hi:g}]")
+    glo, ghi = LIVING_GROOVE_BAND
+    if not glo <= f["lh_groove_w"] <= ghi:
+        problems.append(
+            f"groove {f['lh_groove_w']:g} outside [{glo:g}, {ghi:g}]")
+    if problems:
+        return _finding(check, False, "; ".join(problems))
+    return _finding(
+        check, True,
+        f"web {f['lh_web_t']:g} in the fold band, groove "
+        f"{f['lh_groove_w']:g} gives the bend its radius",
+        measured=f["lh_web_t"], limit=hi)
+
+
+def check_living_hinge_fatigue_unverified(form: PartForm) -> Finding:
+    """Honesty note: fold-cycle life is a MATERIAL property AF cannot
+    measure — PETG/PLA webs survive tens of folds, polypropylene
+    thousands. The geometry is verified; the fatigue is not."""
+    check = "form.living_hinge_fatigue_unverified"
+    f = form.frame
+    if "lh_web_t" not in f:
+        return _finding(check, True, "n/a — no living hinge on this part",
+                        critical=False)
+    return _finding(
+        check, True,
+        "web geometry verified; fold-cycle life is a material property "
+        "(PETG/PLA: tens of folds; PP: the real living hinge)",
+        critical=False)
+
+
+register_probe("form.living_hinge_web_ok")(
+    lambda form, ctx: check_living_hinge_web_ok(form))
+register_probe("form.living_hinge_fatigue_unverified")(
+    lambda form, ctx: check_living_hinge_fatigue_unverified(form))

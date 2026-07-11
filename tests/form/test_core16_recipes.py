@@ -59,6 +59,8 @@ WAVE_EXAMPLES = [
     "clay_pattern_stamp",
     "logo_stamp_arrow",
     # deferral wave
+    "card_case_blank_120",
+    "glasses_pouch_blank_160",
     "rail_slider_camera_16",
     "rail_slider_branch_20",
     "hinge_leaf_a_60",
@@ -173,6 +175,31 @@ def test_tight_pin_fails_fit_check():
     st = _leaf(pin_clearance=0.2)
     st.frame["hinge_bore_d"] = st.frame["hinge_pin_d"] + 0.1  # binds
     assert check_hinge_pin_fit_ok(st).status.value == "fail"
+
+
+# -- living hinge --------------------------------------------------------------------
+
+
+def test_living_hinge_web_measured():
+    from artifact_forge_ng.form.checks_hinge import check_living_hinge_web_ok
+
+    state = run_pre_cad(EXAMPLES / "card_case_blank_120.yaml", None)
+    f = state.form.frame
+    assert f["lh_web_t"] == pytest.approx(0.5)
+    assert check_living_hinge_web_ok(state.form).status.value == "pass"
+    assert "fold_line" in state.form.datums
+    # the groove starts exactly at the web — the keepout guards below it
+    groove = next(c for c in state.form.cutboxes if "groove" in c.name)
+    assert groove.box.z0 == pytest.approx(0.5)
+
+
+def test_living_hinge_torn_web_refused():
+    st = RecipeState()
+    RECIPE_OPS["rounded_plate"].apply(
+        st, {"l": 120.0, "w": 70.0, "t": 1.6, "corner_r": 4.0}, "blank")
+    with pytest.raises(RecipeError, match="web"):
+        RECIPE_OPS["living_hinge_groove"].apply(
+            st, {"web_t": 0.15, "groove_w": 3.0, "at_x": 0.0}, "fold")
 
 
 # -- rail slider ---------------------------------------------------------------------

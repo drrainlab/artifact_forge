@@ -1,0 +1,86 @@
+schema: archetype/v1
+id: living_hinge_plate_v1
+version: 1
+object_class: hinged_plate
+description: >
+  One-piece folding plate: a thin plate with a transverse living-hinge
+  groove — the blank for card cases, glasses pouches and snap wallets.
+  The flex web is the whole mechanism: its thickness is measured
+  against the fold-without-tearing band, and the honesty check states
+  what AF cannot measure — fold-cycle life is a material property
+  (PETG/PLA folds tens of times; polypropylene is the real living
+  hinge).
+
+maturity: sandbox_buildable
+
+provides_features:
+  - mounting_plate_body
+  - living_hinge_web
+
+parameters:
+  plate_l:
+    {type: length, default: 120mm, min: 40mm, max: 220mm, role: functional, exposed: true}
+  plate_w:
+    {type: length, default: 70mm, min: 25mm, max: 160mm, role: functional, exposed: true}
+  t:
+    {type: length, default: 1.6mm, min: 1.2mm, max: 3mm, role: structural,
+     description: plate thickness — living hinges live on THIN plates}
+  corner_r:
+    {type: length, default: 4mm, min: 1mm, max: 10mm, role: aesthetic}
+  web_t:
+    {type: length, default: 0.5mm, min: 0.3mm, max: 0.8mm, role: functional, exposed: true}
+  groove_w:
+    {type: length, default: 3mm, min: 1.5mm, max: 6mm, role: functional}
+  hinge_x:
+    {type: length, default: 0mm, min: -80mm, max: 80mm, role: functional,
+     description: fold line position (0 = the middle)}
+
+constraints:
+  - web_t < t - 0.4
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: blank
+      params: {l: plate_l, w: plate_w, t: t, corner_r: corner_r}
+    - op: living_hinge_groove
+      id: fold
+      params: {web_t: web_t, groove_w: groove_w, at_x: hinge_x}
+
+regions:
+  - {id: blank, role: mounting_surface, editable: false,
+     label: plate blank, aliases: [plate, blank]}
+  - {id: blank_lightening, role: aesthetic_lightening, editable: true,
+     label: plate canvas, aliases: [face]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: household
+  modes: [utility]
+  tags: [living hinge, fold, case, one-piece]
+
+validators:
+  - form.holes_within_outline
+  - form.living_hinge_web_ok
+  - form.living_hinge_fatigue_unverified
+  - form.cuts_respect_keepouts
+  - topology.cutout_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - living_hinge_web
+  must_not_have: []
+  invariants:
+    - web_t < t - 0.4
