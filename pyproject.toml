@@ -40,16 +40,19 @@ web = [
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    # official free showcase pack — ships in the public repo
+    "artifact-forge-showcase",
     # private dev monorepo: the VF pack rides in the dev venv so the full
     # (core + pack) suite runs; the public core never depends on it
     "artifact-forge-vf",
 ]
 
 [tool.uv.workspace]
-members = ["packs/artifact-forge-vf"]
+members = ["packs/artifact-forge-vf", "packs/official/artifact-forge-showcase"]
 
 [tool.uv.sources]
 artifact-forge-vf = { workspace = true }
+artifact-forge-showcase = { workspace = true }
 
 [project.scripts]
 forge = "artifact_forge_ng.cli:main"
@@ -62,7 +65,11 @@ build-backend = "hatchling.build"
 packages = ["src/artifact_forge_ng"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests", "packs/artifact-forge-vf/tests"]
+testpaths = [
+    "tests",
+    "packs/artifact-forge-vf/tests",
+    "packs/official/artifact-forge-showcase/tests",
+]
 markers = [
     "cad: tests that require the cadquery kernel (deselect with '-m \"not cad\"')",
 ]

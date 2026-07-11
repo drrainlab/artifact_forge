@@ -25,6 +25,9 @@ jobs:
           for y in catalog/examples/*.yaml; do
             uv run forge validate "$y"
           done
+          find packs/official -path '*/examples/*.yaml' | while read -r y; do
+            uv run forge validate "$y"
+          done
       - name: Fast IR tier
         run: uv run pytest -m "not cad" -q
 

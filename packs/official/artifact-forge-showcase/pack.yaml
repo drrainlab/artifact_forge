@@ -1,0 +1,32 @@
+id: artifact-forge-showcase
+name: Artifact Forge Showcase Pack
+version: 0.1.0
+tier: free
+license: Apache-2.0
+visibility: public
+author: Artifact Forge
+
+domains:
+  - studio
+  - repair
+  - jigs
+  - education
+
+# Honest non-claims — see docs/CLAIMS.md for the full wording.
+claims:
+  safety_certified: false
+  medical: false
+  food_safe: false
+  electrical_certified: false
+  pressure_rated: false
+
+requires:
+  artifact_forge_ng: ">=0.1.0"
+
+exports:
+  data_dirs:
+    - src/artifact_forge_showcase/data
+  checks:
+    - artifact_forge_showcase.checks.spare
+    - artifact_forge_showcase.checks.jig
+    - artifact_forge_showcase.checks.ladder

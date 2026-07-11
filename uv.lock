@@ -9,6 +9,7 @@ resolution-markers = [
 [manifest]
 members = [
     "artifact-forge-ng",
+    "artifact-forge-showcase",
     "artifact-forge-vf",
 ]
 
@@ -225,6 +226,7 @@ web = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "artifact-forge-showcase" },
     { name = "artifact-forge-vf" },
     { name = "pytest" },
 ]
@@ -244,9 +246,21 @@ provides-extras = ["cad", "web"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "artifact-forge-showcase", editable = "packs/official/artifact-forge-showcase" },
     { name = "artifact-forge-vf", editable = "packs/artifact-forge-vf" },
     { name = "pytest", specifier = ">=8.0" },
 ]
+
+[[package]]
+name = "artifact-forge-showcase"
+version = "0.1.0"
+source = { editable = "packs/official/artifact-forge-showcase" }
+dependencies = [
+    { name = "artifact-forge-ng" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "artifact-forge-ng", editable = "." }]
 
 [[package]]
 name = "artifact-forge-vf"

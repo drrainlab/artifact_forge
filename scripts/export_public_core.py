@@ -30,6 +30,8 @@ REPO = Path(__file__).resolve().parents[1]
 INCLUDE = [
     "src/artifact_forge_ng",
     "tests",
+    "packs/official/artifact-forge-showcase",
+    "community",
     "catalog/examples",
     "docs/ARCHITECTURE.md",
     "docs/VALIDATION.md",
@@ -49,7 +51,7 @@ INCLUDE = [
 
 #: Never exported, wherever they appear (glob against the relative path).
 EXCLUDE_PATTERNS = [
-    "packs/*",
+    "packs/artifact-forge-vf/*",   # the private pack; packs/official/ ships
     "baselines/*",          # private dev artifacts — always excluded
     "docs/ROADMAP.md",
     "docs/ECOSYSTEM.md",
@@ -73,7 +75,7 @@ ALLOW = {".env.example"}
 
 #: The private paths whose absence the smoke test asserts.
 MUST_NOT_EXIST = [
-    "packs",
+    "packs/artifact-forge-vf",
     "baselines",
     "docs/ROADMAP.md",
     "docs/ECOSYSTEM.md",
@@ -102,18 +104,21 @@ def _copy_tree(src: Path, dst: Path, rel_base: str, files: list[str]) -> None:
 
 
 def _transform_pyproject(target: Path) -> None:
-    """The public pyproject must not reference the private workspace."""
+    """The public pyproject keeps the official showcase workspace member
+    but must not reference the private VF pack."""
     p = target / "pyproject.toml"
     s = p.read_text()
     s = s.replace(
         '    # private dev monorepo: the VF pack rides in the dev venv so the full\n'
         '    # (core + pack) suite runs; the public core never depends on it\n'
         '    "artifact-forge-vf",\n', "")
-    s = re.sub(r"\n\[tool\.uv\.workspace\]\nmembers = \[[^\]]*\]\n", "\n", s)
-    s = re.sub(r"\n\[tool\.uv\.sources\]\nartifact-forge-vf = \{[^}]*\}\n", "\n", s)
-    s = s.replace('testpaths = ["tests", "packs/artifact-forge-vf/tests"]',
-                  'testpaths = ["tests"]')
-    assert "artifact-forge-vf" not in s and "packs/" not in s
+    s = s.replace(
+        'members = ["packs/artifact-forge-vf", "packs/official/artifact-forge-showcase"]',
+        'members = ["packs/official/artifact-forge-showcase"]')
+    s = s.replace("artifact-forge-vf = { workspace = true }\n", "")
+    s = s.replace('    "packs/artifact-forge-vf/tests",\n', "")
+    assert "artifact-forge-vf" not in s
+    assert "artifact-forge-showcase" in s
     p.write_text(s)
 
 
@@ -152,6 +157,9 @@ def main() -> int:
     for rel in MUST_NOT_EXIST:
         if (target / rel).exists():
             leaked.append(rel)
+    if not (target / "packs/official/artifact-forge-showcase/pack.yaml").exists():
+        print("EXPORT MISSING: showcase pack", file=sys.stderr)
+        return 5
     if leaked:
         print("EXPORT LEAK:", sorted(set(leaked)), file=sys.stderr)
         return 4

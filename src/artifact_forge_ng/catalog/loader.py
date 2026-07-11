@@ -255,9 +255,10 @@ def load_catalog(data_dir: Path | None = None) -> Catalog:
         (path, "builtin") for path in sorted((root / "archetypes").glob("*.yaml"))
     ]
     for pack_id, pack_dir in pack_dirs:
+        # recursive: packs may group archetypes in domain subdirectories
         archetype_files += [
             (path, f"pack:{pack_id}")
-            for path in sorted((pack_dir / "archetypes").glob("*.yaml"))
+            for path in sorted((pack_dir / "archetypes").rglob("*.yaml"))
         ]
     local_dir = _local_dir()
     if data_dir is None and local_dir.exists():
