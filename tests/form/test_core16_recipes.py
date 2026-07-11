@@ -383,8 +383,17 @@ def test_post_sleeve_short_engagement_refused():
 
 
 def test_post_too_wide_refused():
+    # needs a tall vessel: a wide post also demands a tall sleeve, and
+    # the height guard would fire first on the default cup
+    st = RecipeState()
+    RECIPE_OPS["pot_body"].apply(
+        st, {"top_d": 100.0, "bottom_d": 80.0, "h": 120.0, "wall": 2.4,
+             "floor_t": 3.0, "floor_raise": 6.0}, "cup")
     with pytest.raises(RecipeError, match="too wide"):
-        _cup_with_sleeve(post_w=70.0, sleeve_h=110.0)
+        RECIPE_OPS["square_post_sleeve"].apply(
+            st, {"post_w": 70.0, "fit_clearance": 0.5, "sleeve_h": 110.0,
+                 "z": 0.0, "wall": 3.0, "dir": "+x", "set_screw": "m4"},
+            "sleeve")
 
 
 # -- angle bracket ----------------------------------------------------------------
