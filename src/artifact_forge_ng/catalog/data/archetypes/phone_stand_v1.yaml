@@ -89,6 +89,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: studio
+  modes: [utility, engineering]
+  tags: [stand, desk]
+
 validators:
   - form.device_slot_fits
   - form.stability_footprint

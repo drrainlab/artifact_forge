@@ -144,6 +144,12 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: grow
+  modes: [fluid_grow, engineering]
+  tier: pro
+  tags: [cassette, sprout]
+
 interfaces:
   - id: seat
     type: removable_insert

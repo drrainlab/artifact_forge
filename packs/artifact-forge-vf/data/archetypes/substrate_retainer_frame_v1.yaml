@@ -97,6 +97,12 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: grow
+  modes: [fluid_grow]
+  tier: pro
+  tags: [retainer, frame]
+
 interfaces:
   - id: seat
     type: snap_joint

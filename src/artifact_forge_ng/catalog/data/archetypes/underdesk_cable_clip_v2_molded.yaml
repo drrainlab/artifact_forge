@@ -97,6 +97,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: studio
+  modes: [utility]
+  tags: [cable, clip]
+
 validators:
   - form.profile_closed
   - form.profile_smooth

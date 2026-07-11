@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+_PACK_YAML = Path(__file__).resolve().parents[2] / "pack.yaml"
 
 # The check vocabulary is declared the moment ANY pack module is imported —
 # the impl modules register probes against these names at import time.
@@ -33,6 +34,7 @@ def register(ctx) -> None:
         pass
 
     # 4. Catalog data: VF features + archetypes.
+    ctx.add_pack_manifest(_PACK_YAML)
     ctx.add_data_dir(_DATA_DIR)
 
     # 5. Pipeline hooks: carrier/row findings + report sections.

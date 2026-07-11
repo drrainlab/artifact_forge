@@ -59,6 +59,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: craft
+  modes: [utility]
+  tags: [ring, voronoi, revolve]
+
 validators:
   - form.revolve_profile_clear_of_axis
   - form.min_ligament_ok

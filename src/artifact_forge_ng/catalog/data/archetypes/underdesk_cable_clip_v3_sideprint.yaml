@@ -87,6 +87,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: studio
+  modes: [utility]
+  tags: [cable, clip, support-free]
+
 validators:
   - form.mouth_opens_sideways
   - form.mouth_gap_matches

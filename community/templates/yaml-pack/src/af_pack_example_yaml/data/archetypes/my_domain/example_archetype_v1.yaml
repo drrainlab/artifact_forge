@@ -1,0 +1,76 @@
+schema: archetype/v1
+id: example_archetype_v1
+version: 1
+object_class: example_plate
+description: >
+  Example L1 archetype: a rounded plate with two screws, built entirely
+  from core recipe ops. Replace with your real part.
+
+provides_features:
+  - mounting_plate_body
+  - hole_pattern
+
+parameters:
+  plate_l:
+    {type: length, default: 80mm, min: 40mm, max: 160mm, role: assembly}
+  plate_w:
+    {type: length, default: 40mm, min: 24mm, max: 80mm, role: assembly}
+  thickness:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: manufacturing}
+  corner_r:
+    {type: length, default: 5mm, min: 1mm, max: 12mm, role: aesthetic}
+  screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+  screw_spacing:
+    {type: length, default: 60mm, min: 20mm, max: expr(plate_l - 12), role: assembly}
+
+constraints: []
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params: {l: plate_l, w: plate_w, t: thickness, corner_r: corner_r}
+    - op: countersunk_hole_pattern
+      id: screws
+      params: {kind: line, screw: screw, count: 2, spacing: screw_spacing,
+               cs_face: top}
+
+regions:
+  - {id: plate, role: mounting_surface, editable: true}
+  - {id: plate_lightening, role: aesthetic_lightening, editable: true}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: my_domain
+  modes: [utility]
+  tier: free
+  kind: archetype
+  audience: general
+  tags: [example, plate]
+  use_cases: [first community pack]
+  hardware: [screws]
+  claims:
+    safety_critical: false
+
+validators:
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.single_connected_solid
+  - topology.screw_holes_open
+  - topology.countersinks_present
+
+forbidden_forms: []
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - hole_pattern
+  must_not_have: []
+  invariants: []

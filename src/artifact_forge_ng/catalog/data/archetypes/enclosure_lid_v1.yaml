@@ -84,6 +84,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: electronics
+  modes: [engineering]
+  tags: [enclosure, lid]
+
 validators:
   - form.min_web_between_holes
   - form.holes_within_outline

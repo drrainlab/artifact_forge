@@ -69,6 +69,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: studio
+  modes: [utility]
+  tags: [cable, desk]
+
 validators:
   - form.min_web_between_holes
   - form.holes_within_outline

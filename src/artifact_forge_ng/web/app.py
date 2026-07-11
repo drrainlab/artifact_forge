@@ -27,7 +27,7 @@ from ..form.recipe_ops import RECIPE_OPS
 from ..pipeline import PipelineFailure, pre_cad_from_instance
 from ..product.instance import ProductInstance
 from .jobs import ThreadJobRunner
-from .serialize import contract_vm, error_finding, validate_vm
+from .serialize import catalog_card_vm, contract_vm, error_finding, validate_vm
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXAMPLES_DIR = REPO_ROOT / "catalog" / "examples"
@@ -109,23 +109,41 @@ def api_status() -> dict[str, Any]:
 
 @app.get("/api/catalog")
 def api_catalog() -> dict[str, Any]:
+    from collections import Counter
+
+    from ..packs import pack_manifests
+
     catalog = load_catalog()
+    manifests = pack_manifests()
+    examples = _examples_index()
+    example_counts: Counter[str] = Counter()
+    for ex in examples:
+        arch = str(ex.get("archetype") or "")
+        example_counts[arch.split("@")[0]] += 1
+
+    def _pack_of(spec_id: str) -> tuple[str, str]:
+        origin = catalog.origins.get(spec_id, "builtin")
+        if origin.startswith("pack:"):
+            pid = origin.split(":", 1)[1]
+            return pid, str(manifests.get(pid, {}).get("name", pid))
+        return ("local", "Local catalog") if origin == "local" else \
+               ("core", "Artifact Forge Core")
+
     cards = []
     for spec in catalog.archetypes.values():
         status = "recipe" if spec.form.type == "recipe" else (
             "buildable" if builder_for(spec) is not None else "metadata_only"
         )
-        cards.append({
-            "id": spec.id,
-            "version": spec.version,
-            "object_class": spec.object_class,
-            "description": spec.description.strip(),
-            "status": status,
-            "maturity": spec.maturity,
-            "provides_features": list(spec.provides_features),
-            "validators": list(spec.validators),
-            "allowed_modifiers": list(spec.allowed_modifiers),
-            "regions": [
+        pack, pack_name = _pack_of(spec.id)
+        cards.append(catalog_card_vm(
+            spec,
+            status=status,
+            pack=pack,
+            pack_name=pack_name,
+            domain=catalog.domains.get(spec.id, "core"),
+            source_relpath=catalog.source_relpaths.get(spec.id, ""),
+            examples_count=example_counts.get(spec.id, 0),
+            regions=[
                 {"id": r.id, "role": r.role.value, "editable": r.editable,
                  "label": r.label, "aliases": list(r.aliases),
                  "compatible_modifiers": [
@@ -136,15 +154,38 @@ def api_catalog() -> dict[str, Any]:
                  ]}
                 for r in spec.regions
             ],
-            "contract": contract_vm(spec),
-            "parameters": [
-                {"name": n, "type": p.type, "role": p.role,
-                 "exposed": bool(p.exposed), "description": p.description,
-                 "choices": list(p.choices) if p.type == "choice" else None,
-                 "default": getattr(p.default, "literal", p.default)}
-                for n, p in spec.parameters.items()
-            ],
-        })
+        ))
+
+    # featured: pack manifests in load order; unknown ids are a warning,
+    # never a crash (a community typo must not kill the cockpit)
+    featured: list[str] = []
+    for pid, manifest in manifests.items():
+        for fid in (manifest.get("catalog") or {}).get("featured", []) or []:
+            if fid not in catalog.archetypes:
+                import logging
+
+                logging.getLogger(__name__).warning(
+                    "pack %r: featured id %r not in catalog — skipped",
+                    pid, fid)
+                continue
+            if fid not in featured:
+                featured.append(fid)
+
+    pack_names = {c["pack"]: c["pack_name"] for c in cards}
+    pack_tiers = {pid: str(m.get("tier", "free")) for pid, m in manifests.items()}
+    facets = {
+        "domains": [{"id": d, "count": n} for d, n in sorted(
+            Counter(c["domain"] for c in cards).items())],
+        "packs": [{"id": p, "name": pack_names[p],
+                   "tier": pack_tiers.get(p, "free"), "count": n,
+                   "installed": True}
+                  for p, n in sorted(Counter(c["pack"] for c in cards).items())],
+        "modes": [{"id": m, "count": n} for m, n in sorted(
+            Counter(m for c in cards for m in c["modes"]).items())],
+        "statuses": [{"id": s, "count": n} for s, n in sorted(
+            Counter(c["status"] for c in cards).items())],
+    }
+
     modifiers = [
         {"id": m.id, "category": m.category, "description": m.description.strip(),
          "applies_to": [getattr(r, "value", str(r)) for r in m.applies_to],
@@ -153,19 +194,26 @@ def api_catalog() -> dict[str, Any]:
     ]
     return {
         "archetypes": sorted(cards, key=lambda c: c["id"]),
+        "facets": facets,
+        "featured": featured,
         "modifiers": modifiers,
         "joints": [
             {"name": d.name, "description": d.description,
              "cad_checks": list(d.cad_checks)}
             for d in JOINT_TYPES.values()
         ],
-        "examples": _examples_index(),
+        "examples": examples,
     }
 
 
 def _examples_index() -> list[dict[str, Any]]:
+    from ..packs import pack_example_dirs
+
+    sources = [("core", p) for p in sorted(EXAMPLES_DIR.glob("*.yaml"))]
+    for pack_id, ex_dir in pack_example_dirs():
+        sources += [(pack_id, p) for p in sorted(ex_dir.rglob("*.yaml"))]
     out = []
-    for path in sorted(EXAMPLES_DIR.glob("*.yaml")):
+    for source, path in sources:
         try:
             doc = yaml.safe_load(path.read_text()) or {}
         except yaml.YAMLError:
@@ -175,6 +223,7 @@ def _examples_index() -> list[dict[str, Any]]:
             "file": path.name,
             "id": doc.get("id", path.stem),
             "kind": kind,
+            "pack": source,
             "archetype": doc.get("archetype"),
             "parts": [p.get("ref") for p in doc.get("parts", [])] or None,
         })

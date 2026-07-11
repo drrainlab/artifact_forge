@@ -108,6 +108,12 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: grow
+  modes: [fluid_grow]
+  tier: pro
+  tags: [strainer, drain]
+
 # The drop-in mate is DATUM-BASED, not a port (the saddle_hang / hose_port
 # precedent): the basket drops into a sump recess UNDER the collector arm,
 # where an interface normal cannot point cleanly outward. The mate is fully

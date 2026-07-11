@@ -55,6 +55,14 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: repair
+  modes: [utility, engineering]
+  tags: [knob, spare, revolve, square-shaft]
+  use_cases: [valve stem knob, appliance timer knob]
+  claims:
+    oem_equivalent: false
+
 validators:
   - form.shaft_fit_ok
   - form.knob_torque_wall_ok

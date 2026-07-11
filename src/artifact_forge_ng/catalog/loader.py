@@ -42,8 +42,13 @@ class Catalog:
     features: dict[str, FeatureDef] = field(default_factory=dict)
     modifiers: dict[str, ModifierDef] = field(default_factory=dict)
     archetypes: dict[str, ArchetypeSpec] = field(default_factory=dict)
-    #: archetype id -> "builtin" | "local" (Studio-promoted user catalog).
+    #: archetype id -> "builtin" | "local" | "pack:<id>".
     origins: dict[str, str] = field(default_factory=dict)
+    #: archetype id -> catalog domain: the explicit spec.catalog.domain, or
+    #: (for packs) the archetypes/<domain>/ subdirectory, or "core".
+    domains: dict[str, str] = field(default_factory=dict)
+    #: archetype id -> RELATIVE source path (never absolute) — dev aid.
+    source_relpaths: dict[str, str] = field(default_factory=dict)
 
     def archetype_for(self, instance: ProductInstance) -> ArchetypeSpec:
         spec = self.archetypes.get(instance.archetype_id)
@@ -251,28 +256,40 @@ def load_catalog(data_dir: Path | None = None) -> Catalog:
         modifiers[mod.id] = mod
     archetypes: dict[str, ArchetypeSpec] = {}
     origins: dict[str, str] = {}
+    domains: dict[str, str] = {}
+    source_relpaths: dict[str, str] = {}
     archetype_files = [
-        (path, "builtin") for path in sorted((root / "archetypes").glob("*.yaml"))
+        (path, "builtin", path.relative_to(root))
+        for path in sorted((root / "archetypes").glob("*.yaml"))
     ]
     for pack_id, pack_dir in pack_dirs:
         # recursive: packs may group archetypes in domain subdirectories
         archetype_files += [
-            (path, f"pack:{pack_id}")
+            (path, f"pack:{pack_id}", path.relative_to(pack_dir))
             for path in sorted((pack_dir / "archetypes").rglob("*.yaml"))
         ]
     local_dir = _local_dir()
     if data_dir is None and local_dir.exists():
         archetype_files += [
-            (path, "local") for path in sorted(local_dir.glob("*.yaml"))
+            (path, "local", Path("local") / path.name)
+            for path in sorted(local_dir.glob("*.yaml"))
         ]
-    for path, origin in archetype_files:
+    for path, origin, relpath in archetype_files:
         spec = _load_archetype(path, vocabulary, modifiers)
         if spec.id in archetypes:
             raise CatalogError(f"duplicate archetype id {spec.id!r}")
         archetypes[spec.id] = spec
         origins[spec.id] = origin
+        source_relpaths[spec.id] = relpath.as_posix()
+        # explicit YAML domain wins; a pack's archetypes/<domain>/ subdir
+        # is the fallback shelf; everything else is "core"
+        domain = spec.catalog.domain
+        if domain == "core" and origin.startswith("pack:") and len(relpath.parts) > 2:
+            domain = relpath.parts[1]
+        domains[spec.id] = domain
     return Catalog(features=vocabulary, modifiers=modifiers,
-                   archetypes=archetypes, origins=origins)
+                   archetypes=archetypes, origins=origins,
+                   domains=domains, source_relpaths=source_relpaths)
 
 
 def load_instance(path: Path) -> ProductInstance:

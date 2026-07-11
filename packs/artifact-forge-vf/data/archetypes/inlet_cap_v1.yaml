@@ -139,6 +139,12 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: grow
+  modes: [fluid_grow, engineering]
+  tier: pro
+  tags: [inlet, cap]
+
 interfaces:
   - id: rail_out
     type: fluid_outlet

@@ -48,6 +48,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: workshop
+  modes: [utility]
+  tags: [handle]
+
 validators:
   - topology.single_connected_solid
   - topology.bar_follows_arc

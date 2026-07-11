@@ -78,6 +78,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: electronics
+  modes: [engineering]
+  tags: [enclosure, box]
+
 validators:
   - form.shell_walls_ok
   - form.cuts_respect_keepouts

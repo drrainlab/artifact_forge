@@ -16,6 +16,13 @@ What a reviewer verifies before a community pack is listed:
       archetypes don't subscribe to.
 - [ ] `ARTIFACT_FORGE_DISABLE_PACKS=1` leaves core registries untouched.
 
+## Catalog metadata
+- [ ] Every archetype carries a `catalog:` block (domain, modes, tier,
+      tags); `pack.yaml` is registered via `add_pack_manifest`.
+- [ ] All `catalog.featured` ids exist in the pack.
+- [ ] Reference/primitive geometry is marked `kind`/`audience` so the
+      default view stays a product shelf, not a registry dump.
+
 ## Claims & safety
 - [ ] `docs/CLAIMS.md` states the non-claims; no medical /
       safety-critical / mains / pressure / IP / food-safe / animal-safe

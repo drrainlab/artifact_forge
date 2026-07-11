@@ -156,6 +156,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: workshop
+  modes: [workshop]
+  tags: [tool, wall, ring]
+
 validators:
   - form.tool_saddle_radius_ok
   - form.tool_clearance_ok

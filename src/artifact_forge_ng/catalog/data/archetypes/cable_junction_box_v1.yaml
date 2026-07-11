@@ -67,6 +67,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: electronics
+  modes: [utility]
+  tags: [junction, box]
+
 validators:
   - form.shell_walls_ok
   - form.cuts_respect_keepouts

@@ -15,6 +15,12 @@ Shapes (all plain JSON):
   ContractViewModel  {must_have, must_not_have, invariants}
   ValidateViewModel  {ok, product, archetype, strict, status, form_checks,
                       params, capability, contract, findings, form}
+  CatalogCardVM      {id, version, object_class, description, summary,
+                      status, maturity, pack, pack_name, domain, modes,
+                      tier, kind, audience, tags, use_cases, hardware,
+                      claims, source_relpath, examples_count,
+                      provides_features, validators, allowed_modifiers,
+                      regions, contract, parameters}
 
 Errors are ALWAYS FindingViewModels (level "schema"), never tracebacks.
 """
@@ -132,6 +138,51 @@ def form_vm(form: PartForm) -> dict[str, Any]:
             "min_rib_d": form.exoskeleton.min_rib_d,
             "seed": form.exoskeleton.seed,
         },
+    }
+
+
+def catalog_card_vm(spec: ArchetypeSpec, *, status: str, pack: str,
+                    pack_name: str, domain: str, source_relpath: str,
+                    examples_count: int,
+                    regions: list[dict[str, Any]]) -> dict[str, Any]:
+    """The catalog card — schema truth plus the loader-derived shelving
+    facts (pack/domain come from the LOADER, never from YAML claims)."""
+    meta = spec.catalog
+    description = spec.description.strip()
+    summary = description.split(". ")[0].strip().rstrip(".")
+    return {
+        "id": spec.id,
+        "version": spec.version,
+        "object_class": spec.object_class,
+        "description": description,
+        "summary": summary,
+        "status": status,
+        "maturity": spec.maturity,
+        "pack": pack,
+        "pack_name": pack_name,
+        "domain": domain,
+        "modes": list(meta.modes),
+        "tier": meta.tier,
+        "kind": meta.kind,
+        "audience": meta.audience,
+        "tags": list(meta.tags),
+        "use_cases": list(meta.use_cases),
+        "hardware": list(meta.hardware),
+        "claims": dict(meta.claims),
+        "source_relpath": source_relpath,
+        "examples_count": examples_count,
+        "provides_features": list(spec.provides_features),
+        "validators": list(spec.validators),
+        "allowed_modifiers": list(spec.allowed_modifiers),
+        "regions": regions,
+        "contract": contract_vm(spec),
+        "parameters": [
+            {"name": n, "type": p.type, "role": p.role,
+             "exposed": bool(p.exposed), "description": p.description,
+             "choices": list(p.choices) if p.type == "choice" else None,
+             "default": getattr(p.default, "literal", p.default)}
+            for n, p in spec.parameters.items()
+        ],
     }
 
 

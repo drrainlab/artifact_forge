@@ -60,6 +60,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: studio
+  modes: [utility]
+  tags: [cable, channel]
+
 validators:
   - form.wall_thickness
   - topology.pins_present

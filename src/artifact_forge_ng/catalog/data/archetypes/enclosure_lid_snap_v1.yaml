@@ -73,6 +73,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: electronics
+  modes: [engineering]
+  tags: [enclosure, snap]
+
 validators:
   - form.holes_within_outline
   - topology.single_connected_solid

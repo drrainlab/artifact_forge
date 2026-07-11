@@ -56,6 +56,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: workshop
+  modes: [utility]
+  tags: [zip-tie, anchor]
+
 validators:
   - form.tunnel_fits_tie
   - topology.single_connected_solid

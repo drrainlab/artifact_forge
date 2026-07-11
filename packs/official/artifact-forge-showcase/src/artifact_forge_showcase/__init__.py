@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 _DATA_DIR = Path(__file__).resolve().parent / "data"
+_PACK_YAML = Path(__file__).resolve().parents[2] / "pack.yaml"
 
 # The check vocabulary is declared the moment ANY pack module is imported —
 # the check modules register probes against these names at import time.
@@ -21,4 +22,5 @@ _declare()
 def register(ctx) -> None:
     from . import checks, ops  # noqa: F401  (self-registering modules)
 
+    ctx.add_pack_manifest(_PACK_YAML)
     ctx.add_data_dir(_DATA_DIR)

@@ -30,3 +30,10 @@ exports:
     - artifact_forge_showcase.checks.spare
     - artifact_forge_showcase.checks.jig
     - artifact_forge_showcase.checks.ladder
+
+catalog:
+  featured:
+    - underdesk_audio_interface_mount_v1
+    - hose_adapter_v1
+    - drilling_jig_v1
+    - tolerance_ladder_v1

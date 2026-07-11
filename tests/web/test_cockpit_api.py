@@ -114,3 +114,26 @@ def test_index_and_static_serve():
     assert client.get("/").status_code == 200
     assert client.get("/static/js/main.js").status_code == 200
     assert client.get("/static/vendor/three.module.js").status_code == 200
+
+
+def test_catalog_cards_carry_shelving_facts():
+    c = client.get("/api/catalog").json()
+    by_id = {a["id"]: a for a in c["archetypes"]}
+    comb = by_id["cable_comb_v1"]
+    assert comb["pack"] == "core" and comb["domain"] == "studio"
+    assert comb["tier"] == "free" and comb["summary"]
+    assert not comb["source_relpath"].startswith("/")
+
+
+def test_catalog_facets_and_featured():
+    c = client.get("/api/catalog").json()
+    facets = c["facets"]
+    assert all(d["count"] > 0 for d in facets["domains"])
+    packs = {p["id"]: p for p in facets["packs"]}
+    assert packs["core"]["count"] > 0 and packs["core"]["installed"]
+    ids = {a["id"] for a in c["archetypes"]}
+    assert all(f in ids for f in c["featured"])
+    import os
+
+    if os.environ.get("ARTIFACT_FORGE_DISABLE_PACKS", "") in ("", "0"):
+        assert c["featured"], "featured must not be empty with the showcase installed"

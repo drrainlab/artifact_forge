@@ -148,6 +148,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: biomorphic
+  modes: [engineering]
+  tags: [clamp, biomorphic]
+
 interfaces:
   - id: clamp_mate
     type: heatset_insert_pattern

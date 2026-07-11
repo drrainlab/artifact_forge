@@ -76,6 +76,15 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: jigs
+  modes: [workshop, engineering]
+  tags: [jig, drilling, fixture, registration]
+  use_cases: [repeatable edge-offset drilling]
+  hardware: [steel drill bushings]
+  claims:
+    certified_measuring_tool: false
+
 validators:
   - form.bushing_fit_ok
   - form.stop_registration_ok

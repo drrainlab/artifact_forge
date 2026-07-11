@@ -15,3 +15,7 @@ claims:
   food_safe: false
   electrical_certified: false
   pressure_rated: false
+
+catalog:
+  featured:
+    - example_archetype_v1

@@ -68,6 +68,15 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: education
+  modes: [utility, engineering]
+  tags: [tolerance, ladder, lesson, fit]
+  use_cases: [measure your printer's clearance band, classroom fit lesson]
+  claims:
+    en71_certified: false
+    certified_measuring_tool: false
+
 validators:
   - form.ladder_steps_ok
   - form.holes_within_outline

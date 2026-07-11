@@ -61,6 +61,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: workshop
+  modes: [utility]
+  tags: [pipe, clip, support-free]
+
 validators:
   - form.snap_arc_coverage
   - form.snap_mouth_retains

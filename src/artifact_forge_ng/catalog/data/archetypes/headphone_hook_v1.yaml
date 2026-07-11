@@ -70,6 +70,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: studio
+  modes: [utility]
+  tags: [hook, desk]
+
 validators:
   - form.tip_lip_present
   - form.bay_open_top

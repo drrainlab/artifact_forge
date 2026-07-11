@@ -55,6 +55,41 @@ main { flex: 1; overflow: auto; }
 
 /* catalog */
 .catalog { padding: 20px 24px; }
+
+/* catalog explorer */
+.catalog-layout { display: flex; gap: 18px; align-items: flex-start; }
+.catmain { flex: 1; min-width: 0; }
+.catmain h3.dim { margin: 18px 0 10px; }
+.subtabs { display: flex; gap: 6px; margin-bottom: 6px; }
+.subtab { font-family: var(--mono); font-size: 11px; padding: 4px 12px;
+  background: var(--bg2); color: var(--dim); border: 1px solid var(--line);
+  border-radius: 4px; cursor: pointer; }
+.subtab.active { color: var(--orange); border-color: var(--orange); }
+.filters { width: 210px; flex-shrink: 0; position: sticky; top: 0;
+  display: flex; flex-direction: column; gap: 12px; font-size: 11px; }
+.filters input[type="text"] { width: 100%; background: var(--bg3);
+  border: 1px solid var(--line); border-radius: 4px; color: var(--text);
+  font-family: var(--mono); font-size: 11px; padding: 6px 8px; }
+.fgroup { display: flex; flex-direction: column; gap: 3px; }
+.fgroup .dim { font-family: var(--mono); font-size: 10px; margin-bottom: 2px;
+  text-transform: uppercase; }
+.fgroup label, .fadv { display: flex; gap: 6px; align-items: center;
+  color: var(--dim); cursor: pointer; }
+.fgroup label .faint { margin-left: auto; font-family: var(--mono); font-size: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 2px; }
+.chip { font-family: var(--mono); font-size: 10px; padding: 1px 7px;
+  border-radius: 8px; border: 1px solid var(--line); color: var(--cyan); }
+.chip.dim2 { color: var(--dim); }
+.chip.tier { color: var(--yellow); border-color: var(--yellow); }
+.tags { font-family: var(--mono); font-size: 10px; color: var(--faint);
+  margin-top: 4px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px; }
+.tile { display: flex; flex-direction: column; gap: 4px; align-items: flex-start;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 6px;
+  padding: 14px; cursor: pointer; color: var(--text); }
+.tile b { font-family: var(--mono); font-size: 12px; }
+.tile:hover { border-color: var(--orange); }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
 .card { background: var(--bg2); border: 1px solid var(--line); border-radius: 6px; padding: 14px; }
 .card h3 { font-family: var(--mono); font-size: 12px; margin-bottom: 6px; }

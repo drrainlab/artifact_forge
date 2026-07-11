@@ -1,0 +1,19 @@
+schema: product/v1
+id: example_instance
+archetype: example_archetype_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+
+params:
+  plate_l: 80mm
+  plate_w: 40mm
+  screw: M4
+  screw_spacing: 60mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

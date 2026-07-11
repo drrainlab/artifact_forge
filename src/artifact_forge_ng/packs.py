@@ -49,6 +49,26 @@ class PackContext:
     pack_id: str
     data_dirs: list[Path] = field(default_factory=list)
     overrides: set[str] = field(default_factory=set)
+    manifest: dict = field(default_factory=dict)
+    pack_root: Path | None = None
+
+    def add_pack_manifest(self, path: Path | str) -> None:
+        """Read the pack's pack.yaml (name, tier, visibility, domains,
+        catalog.featured, ...) — presentation metadata only, the engine
+        attaches no build semantics to it. Fail-fast on a broken file."""
+        import yaml
+
+        p = Path(path)
+        try:
+            doc = yaml.safe_load(p.read_text())
+        except Exception as exc:
+            raise PackError(
+                f"pack {self.pack_id!r}: unreadable manifest {p}: {exc}") from exc
+        if not isinstance(doc, dict):
+            raise PackError(
+                f"pack {self.pack_id!r}: manifest {p} is not a mapping")
+        self.manifest = doc
+        self.pack_root = p.parent
 
     def add_data_dir(self, path: Path | str) -> None:
         """A catalog-data dir mirroring core's layout: optional
@@ -88,6 +108,12 @@ PART_REPORT_HOOKS: list = []
 
 #: pack_id -> its data dirs, in load order. None = not discovered yet.
 _loaded: dict[str, list[Path]] | None = None
+
+#: pack_id -> parsed pack.yaml (presentation metadata), in load order.
+_manifests: dict[str, dict] = {}
+
+#: pack_id -> the pack root (the manifest's directory), in load order.
+_roots: dict[str, Path] = {}
 
 
 def _discover():
@@ -152,9 +178,27 @@ def load_packs() -> dict[str, list[Path]]:
             raise PackError(f"pack {ep.name!r}: register() failed: {exc}") from exc
         _verify_no_clobber(ep.name, before, ctx.overrides)
         loaded[ep.name] = list(ctx.data_dirs)
+        if ctx.manifest:
+            _manifests[ep.name] = ctx.manifest
+        if ctx.pack_root is not None:
+            _roots[ep.name] = ctx.pack_root
 
     _loaded = loaded
     return _loaded
+
+
+def pack_manifests() -> dict[str, dict]:
+    """pack_id -> parsed pack.yaml metadata of every loaded pack that
+    contributed one, in load order."""
+    load_packs()
+    return dict(_manifests)
+
+
+def pack_example_dirs() -> list[tuple[str, Path]]:
+    """``(pack_id, examples dir)`` of every loaded pack that has one."""
+    load_packs()
+    return [(pid, root / "examples") for pid, root in _roots.items()
+            if (root / "examples").is_dir()]
 
 
 def pack_data_dirs() -> list[tuple[str, Path]]:

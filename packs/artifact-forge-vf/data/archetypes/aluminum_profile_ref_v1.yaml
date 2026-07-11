@@ -73,6 +73,14 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: grow
+  modes: [fluid_grow]
+  tier: pro
+  kind: reference
+  audience: advanced
+  tags: [2020 profile, reference]
+
 interfaces:
   - id: ridge_1
     type: profile_seat

@@ -181,6 +181,12 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: grow
+  modes: [fluid_grow, engineering]
+  tier: pro
+  tags: [collector, drain]
+
 interfaces:
   - id: rail_in
     type: fluid_inlet

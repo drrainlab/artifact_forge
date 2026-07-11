@@ -98,6 +98,11 @@ interfaces:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: wearable
+  modes: [wearable, utility]
+  tags: [adapter, dovetail]
+
 validators:
   - interface.frame_exists
   - interface.frame_orthonormal

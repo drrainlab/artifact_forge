@@ -207,6 +207,34 @@ class FormSpec(BaseModel):
         return self
 
 
+class CatalogMeta(BaseModel):
+    """Presentation-only catalog metadata — how the archetype is shelved
+    and faceted in the cockpit. NO build semantics live here: the pipeline
+    never reads this block, and the owning pack is always derived from the
+    loader's origin, never claimed by YAML.
+
+    ``domain`` is a free string so community packs can shelve new domains
+    without touching core; the recommended public registry lives in
+    community/PACK_AUTHORING.md. ``claims`` keys are deliberately open —
+    domains add their own honest non-claims (not_ip_rated, not_medical...).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    domain: str = "core"
+    modes: list[Literal[
+        "utility", "engineering", "workshop", "wearable",
+        "fluid_grow", "cinema_prop",
+    ]] = Field(default_factory=list)
+    tier: Literal["free", "certified", "pro", "private"] = "free"
+    kind: Literal["archetype", "primitive_archetype", "reference"] = "archetype"
+    audience: Literal["general", "advanced"] = "general"
+    tags: list[str] = Field(default_factory=list)
+    use_cases: list[str] = Field(default_factory=list)
+    hardware: list[str] = Field(default_factory=list)
+    claims: dict[str, bool] = Field(default_factory=dict)
+
+
 class ArchetypeSpec(VersionedModel):
     SCHEMA_KIND: ClassVar[str] = "archetype"
 
@@ -230,6 +258,8 @@ class ArchetypeSpec(VersionedModel):
         "sandbox_buildable", "production_buildable",
     ] | None = None
     surface_style: str = "molded_utility_part"
+    #: Presentation-only shelving/faceting metadata (see CatalogMeta).
+    catalog: CatalogMeta = Field(default_factory=CatalogMeta)
     validators: list[str] = []
     forbidden_forms: list[str] = []
     allowed_modifiers: list[str] = []

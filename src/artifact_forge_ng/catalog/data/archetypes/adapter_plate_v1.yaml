@@ -88,6 +88,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: workshop
+  modes: [utility, engineering]
+  tags: [adapter, plate]
+
 validators:
   - form.min_web_between_holes
   - form.holes_within_outline

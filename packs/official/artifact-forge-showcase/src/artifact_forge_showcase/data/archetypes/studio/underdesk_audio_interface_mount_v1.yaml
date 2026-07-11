@@ -96,6 +96,15 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: studio
+  modes: [utility]
+  tags: [desk, audio, mount, tray]
+  use_cases: [audio interface under-desk mount, MiniFuse mount, Scarlett mount]
+  hardware: [screws, hook-and-loop strap]
+  claims:
+    safety_critical: false
+
 validators:
   - form.min_web_between_holes
   - form.holes_within_outline

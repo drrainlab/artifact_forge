@@ -70,6 +70,16 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: repair
+  modes: [utility, engineering]
+  tags: [hose, adapter, revolve, barb]
+  use_cases: [vacuum hose adapter, drain hose adapter, garden hose adapter]
+  claims:
+    pressure_rated: false
+    food_safe: false
+    potable_water_certified: false
+
 validators:
   - form.barb_retention_ok
   - form.revolve_profile_clear_of_axis

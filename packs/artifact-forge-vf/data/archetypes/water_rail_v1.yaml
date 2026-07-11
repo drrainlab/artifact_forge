@@ -288,6 +288,12 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: grow
+  modes: [fluid_grow, engineering]
+  tier: pro
+  tags: [water, rail, hydroponic]
+
 interfaces:
   - id: cassette_seat
     type: removable_insert

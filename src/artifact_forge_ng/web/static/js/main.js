@@ -70,27 +70,143 @@ function renderHome() {
 }
 
 // --------------------------------------------------------------- catalog
+// Explorer view state (survives tab switches within the session).
+const catView = { tab: "featured", q: "", domains: new Set(), packs: new Set(),
+                  statuses: new Set(), advanced: false };
+
+function isAdvancedCard(a) {
+  return a.audience === "advanced" || a.kind !== "archetype" || a.tier === "private";
+}
+
+function cardMatches(a) {
+  if (!catView.advanced && isAdvancedCard(a)) return false;
+  if (catView.domains.size && !catView.domains.has(a.domain)) return false;
+  if (catView.packs.size && !catView.packs.has(a.pack)) return false;
+  if (catView.statuses.size && !catView.statuses.has(a.status)) return false;
+  if (catView.q) {
+    const hay = [a.id, a.summary, a.domain, a.pack_name,
+                 ...(a.tags || []), ...(a.use_cases || [])].join(" ").toLowerCase();
+    if (!hay.includes(catView.q.toLowerCase())) return false;
+  }
+  return true;
+}
+
+function catalogSort(cards, featured) {
+  const featRank = (a) => { const i = featured.indexOf(a.id); return i < 0 ? 99 : i; };
+  const packRank = (a) => a.pack === "core" ? 2 : (a.pack === "local" ? 3 : 1);
+  return [...cards].sort((x, y) =>
+    featRank(x) - featRank(y)
+    || (y.status === "buildable" || y.status === "recipe") - (x.status === "buildable" || x.status === "recipe")
+    || (y.examples_count > 0) - (x.examples_count > 0)
+    || packRank(x) - packRank(y)
+    || isAdvancedCard(x) - isAdvancedCard(y)
+    || x.id.localeCompare(y.id));
+}
+
+function catalogCard(a) {
+  const chips = [
+    `<span class="chip">${esc(a.domain)}</span>`,
+    `<span class="chip">${esc(a.pack_name)}</span>`,
+    ...(a.modes || []).map((m) => `<span class="chip dim2">${esc(m)}</span>`),
+    `<span class="chip ${a.tier === "free" ? "dim2" : "tier"}">${esc(a.tier)}</span>`,
+  ].join(" ");
+  const tags = (a.tags || []).length
+    ? `<div class="tags">${a.tags.map((t) => esc(t)).join(" · ")}</div>` : "";
+  return `<div class="card">
+    <h3>${esc(a.id)} <span class="badge ${a.status}">${a.status}</span>${a.maturity ? ` <span class="badge off" title="lifecycle stage (informational)">${esc(a.maturity)}</span>` : ""}</h3>
+    <div class="chips">${chips}</div>
+    <div class="desc">${esc(a.summary)}</div>
+    ${tags}
+    <div class="meta">features ${a.provides_features.length} ·
+      validators ${a.validators.length} · examples ${a.examples_count}
+      ${a.status === "metadata_only" ? "<br>can author YAML: yes · can build STL: no" : ""}</div>
+    <button class="ghost" data-arch="${esc(a.id)}">open in wizard</button>
+  </div>`;
+}
+
+function checkGroup(title, items, sel, key) {
+  return `<div class="fgroup"><div class="dim">${title}</div>${items.map((it) => `
+    <label><input type="checkbox" data-facet="${key}" value="${esc(it.id)}"
+      ${sel.has(it.id) ? "checked" : ""}> ${esc(it.name || it.id)}
+      <span class="faint">${it.count}</span></label>`).join("")}</div>`;
+}
+
 async function renderCatalog() {
   if (!state.catalog) state.catalog = await api.catalog();
   const c = state.catalog;
-  screenEl.innerHTML = `<div class="catalog">
-    <h3 class="dim" style="margin-bottom:12px">ARCHETYPES</h3>
-    <div class="cards">${c.archetypes.map((a) => `
-      <div class="card">
-        <h3>${esc(a.id)} <span class="badge ${a.status}">${a.status}</span>${a.maturity ? ` <span class="badge off" title="lifecycle stage (informational)">${esc(a.maturity)}</span>` : ""}</h3>
-        <div class="desc">${esc(a.description)}</div>
-        <div class="meta">features ${a.provides_features.length} ·
-          validators ${a.validators.length} · modifiers ${a.allowed_modifiers.length}
-          ${a.status === "metadata_only" ? "<br>can author YAML: yes · can build STL: no" : ""}</div>
-        <button class="ghost" data-arch="${esc(a.id)}">open in wizard</button>
-      </div>`).join("")}</div>
-    <h3 class="dim" style="margin:22px 0 12px">EXAMPLES</h3>
-    <div class="cards">${c.examples.map((e) => `
-      <div class="card"><h3>${esc(e.id)} <span class="badge recipe">${e.kind}</span></h3>
-        <div class="meta">${esc(e.archetype || (e.parts || []).join(" + "))}</div>
-        <button class="ghost" data-example="${esc(e.file)}">open in workspace</button>
-      </div>`).join("")}</div>
+  const featured = c.featured || [];
+  const visible = catalogSort(c.archetypes.filter(cardMatches), featured);
+  const hiddenCount = c.archetypes.length - c.archetypes.filter(
+    (a) => catView.advanced || !isAdvancedCard(a)).length;
+
+  const tabs = ["featured", "domains", "packs", "all"].map((t) =>
+    `<button class="subtab ${catView.tab === t ? "active" : ""}" data-cattab="${t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("");
+
+  let body = "";
+  if (catView.tab === "featured") {
+    const featCards = featured
+      .map((id) => visible.find((a) => a.id === id)).filter(Boolean);
+    const tiles = (c.facets?.domains || [])
+      .map((d) => `<button class="tile" data-domain="${esc(d.id)}">
+        <b>${esc(d.id)}</b><span class="faint">${d.count} archetype${d.count === 1 ? "" : "s"}</span></button>`).join("");
+    body = `<h3 class="dim">FEATURED STARTERS</h3>
+      <div class="cards">${featCards.map(catalogCard).join("")}</div>
+      <h3 class="dim" style="margin-top:22px">BROWSE BY DOMAIN</h3>
+      <div class="tiles">${tiles}</div>`;
+  } else if (catView.tab === "domains" || catView.tab === "packs") {
+    const key = catView.tab === "domains" ? "domain" : "pack_name";
+    const groups = new Map();
+    visible.forEach((a) => {
+      if (!groups.has(a[key])) groups.set(a[key], []);
+      groups.get(a[key]).push(a);
+    });
+    body = [...groups.keys()].sort().map((g) =>
+      `<h3 class="dim">${esc(g.toUpperCase())} <span class="faint">${groups.get(g).length}</span></h3>
+       <div class="cards">${groups.get(g).map(catalogCard).join("")}</div>`).join("");
+  } else {
+    body = `<div class="cards">${visible.map(catalogCard).join("")}</div>
+      <h3 class="dim" style="margin:22px 0 12px">EXAMPLES</h3>
+      <div class="cards">${c.examples.map((e) => `
+        <div class="card"><h3>${esc(e.id)} <span class="badge recipe">${e.kind}</span></h3>
+          <div class="meta">${esc(e.archetype || (e.parts || []).join(" + "))}</div>
+          <button class="ghost" data-example="${esc(e.file)}">open in workspace</button>
+        </div>`).join("")}</div>`;
+  }
+
+  screenEl.innerHTML = `<div class="catalog catalog-layout">
+    <aside class="filters">
+      <input id="catq" type="text" placeholder="search…" value="${esc(catView.q)}">
+      ${checkGroup("Domain", (c.facets?.domains || []), catView.domains, "domains")}
+      ${checkGroup("Pack", (c.facets?.packs || []), catView.packs, "packs")}
+      ${checkGroup("Status", (c.facets?.statuses || []), catView.statuses, "statuses")}
+      <label class="fadv"><input id="catadv" type="checkbox" ${catView.advanced ? "checked" : ""}>
+        show advanced <span class="faint">(+${hiddenCount} reference/private)</span></label>
+    </aside>
+    <div class="catmain">
+      <div class="subtabs">${tabs}</div>
+      ${body}
+    </div>
   </div>`;
+
+  screenEl.querySelectorAll("[data-cattab]").forEach((b) =>
+    b.addEventListener("click", () => { catView.tab = b.dataset.cattab; renderCatalog(); }));
+  screenEl.querySelectorAll("[data-domain]").forEach((b) =>
+    b.addEventListener("click", () => {
+      catView.tab = "domains";
+      catView.domains = new Set([b.dataset.domain]);
+      renderCatalog();
+    }));
+  const q = screenEl.querySelector("#catq");
+  q.addEventListener("input", () => { catView.q = q.value; renderCatalog(); });
+  screenEl.querySelector("#catadv").addEventListener("change", (e) => {
+    catView.advanced = e.target.checked; renderCatalog();
+  });
+  screenEl.querySelectorAll("[data-facet]").forEach((cb) =>
+    cb.addEventListener("change", () => {
+      const set = catView[cb.dataset.facet];
+      cb.checked ? set.add(cb.value) : set.delete(cb.value);
+      renderCatalog();
+    }));
   screenEl.querySelectorAll("[data-example]").forEach((b) =>
     b.addEventListener("click", async () => {
       const ex = await api.example(b.dataset.example);

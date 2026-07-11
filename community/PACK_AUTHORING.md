@@ -32,7 +32,44 @@ my_pack = "my_pack:register"
 - new check NAMES are declared first (see the showcase
   `declarations.py` pattern — idempotent `declare()` at import).
 
-## 3. The honesty rules (non-negotiable)
+## 3. Catalog metadata (how your parts are shelved)
+
+Every archetype should carry a presentation-only `catalog:` block — the
+cockpit's explorer facets are built from it:
+
+```yaml
+catalog:
+  domain: my_domain          # free string; see the registry below
+  modes: [utility]           # utility | engineering | workshop | wearable | fluid_grow | cinema_prop
+  tier: free                 # free | certified | pro | private
+  kind: archetype            # archetype | primitive_archetype | reference
+  audience: general          # general | advanced (advanced hides by default)
+  tags: [example, plate]
+  use_cases: [what a human types when searching]
+  hardware: [screws]
+  claims:
+    safety_critical: false   # open keys — add your honest non-claims
+```
+
+The owning pack is always derived by the loader — YAML cannot claim it.
+Recommended public domain registry (unknown domains render as custom):
+`studio, repair, jigs, education, electronics, workshop, wearable,
+biomorphic, grow, craft, core`.
+
+Pack-level metadata lives in `pack.yaml`; call
+`ctx.add_pack_manifest(<pack.yaml>)` in `register()` and optionally list
+starters:
+
+```yaml
+catalog:
+  featured:
+    - example_archetype_v1
+```
+
+A featured id that doesn't exist is skipped with a warning — but don't
+ship that; the review checklist checks it.
+
+## 4. The honesty rules (non-negotiable)
 
 - Every archetype ships at least one example that `forge validate`
   passes in strict mode. Geometry the validators don't measure is a
@@ -45,7 +82,7 @@ my_pack = "my_pack:register"
   your `docs/CLAIMS.md`.
 - A screenshot or render per archetype is strongly encouraged.
 
-## 4. Test locally
+## 5. Test locally
 
 ```bash
 uv pip install -e path/to/your-pack

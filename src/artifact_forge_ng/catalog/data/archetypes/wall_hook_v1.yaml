@@ -69,6 +69,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: workshop
+  modes: [utility]
+  tags: [hook, wall]
+
 validators:
   - form.tip_lip_present
   - form.bay_open_top

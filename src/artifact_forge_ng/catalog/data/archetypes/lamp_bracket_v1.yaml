@@ -90,6 +90,11 @@ regions:
 
 surface_style: molded_utility_part
 
+catalog:
+  domain: studio
+  modes: [utility, engineering]
+  tags: [lamp, bracket, wiring]
+
 interfaces:
   - id: cup_mount
     type: screw_pattern
