@@ -27,8 +27,6 @@ exports:
   data_dirs:
     - src/artifact_forge_showcase/data
   checks:
-    - artifact_forge_showcase.checks.spare
-    - artifact_forge_showcase.checks.jig
     - artifact_forge_showcase.checks.ladder
 
 catalog:

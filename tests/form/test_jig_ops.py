@@ -1,15 +1,15 @@
-"""Jig checks — PASS / FAIL / n-a branches on real op-built forms."""
+"""Jig checks — PASS / FAIL / n-a branches on real op-built forms.
+Promoted from the showcase pack together with the ops."""
 from __future__ import annotations
 
 import pytest
 
 from artifact_forge_ng.core.findings import Status
-from artifact_forge_ng.form.recipe_ops import RECIPE_OPS, RecipeError, RecipeState
-
-from artifact_forge_showcase.checks.jig import (
+from artifact_forge_ng.form.checks_jig import (
     check_bushing_fit_ok,
     check_stop_registration_ok,
 )
+from artifact_forge_ng.form.recipe_ops import RECIPE_OPS, RecipeError, RecipeState
 
 
 def _jig(*, plate=(120.0, 40.0, 6.0), bushing_od=8.0, press=0.1,

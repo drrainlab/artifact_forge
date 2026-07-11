@@ -20,6 +20,13 @@ SCREWS: dict[str, dict[str, float]] = {
            "nut_af": 7.0, "nut_h": 3.2},
     "m5": {"clear": 5.5, "tap": 4.2, "heatset": 6.4, "head": 8.5,
            "nut_af": 8.0, "nut_h": 4.0},
+    "m6": {"clear": 6.6, "tap": 5.0, "heatset": 8.0, "head": 10.0,
+           "nut_af": 10.0, "nut_h": 5.0},
+    "m8": {"clear": 9.0, "tap": 6.8, "heatset": 9.6, "head": 13.0,
+           "nut_af": 13.0, "nut_h": 6.5},
+    # imperial camera/tripod thread — heatset = brass 1/4-20 insert OD
+    "1/4-20": {"clear": 6.8, "tap": 5.1, "heatset": 8.0, "head": 11.0,
+               "nut_af": 11.2, "nut_h": 5.6},
 }
 
 

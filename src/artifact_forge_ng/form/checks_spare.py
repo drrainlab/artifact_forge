@@ -1,14 +1,14 @@
-"""Repair-domain form checks — the measuring half of the Spare Fit
-Standard. Every check reads the frame keys the spare ops publish; a part
-without those keys is honestly n/a, never a false PASS."""
+"""Spare-fit form checks — the measuring half of the Spare Fit Standard
+(promoted from the showcase pack). Every check reads the frame keys the
+spare ops publish; a part without those keys is honestly n/a, never a
+false PASS."""
 from __future__ import annotations
 
-from artifact_forge_ng.core.findings import Finding
-from artifact_forge_ng.form.checks_common import make_finding
-from artifact_forge_ng.form.part import PartForm
-from artifact_forge_ng.validators.probes import register_probe
-
-from ..ops.spare import BARB_H_BAND, SOCKET_DEPTH_K, SQ_FIT_BAND
+from ..core.findings import Finding
+from ..validators.probes import register_probe
+from .checks_common import make_finding
+from .part import PartForm
+from .recipe_ops_spare import BARB_H_BAND, SOCKET_DEPTH_K, SQ_FIT_BAND
 
 _finding = make_finding
 
@@ -74,7 +74,8 @@ def check_shaft_fit_ok(form: PartForm) -> Finding:
 
 def check_knob_torque_wall_ok(form: PartForm) -> Finding:
     """The wall between the socket corners and the grip surface carries
-    the hand torque — it must not thin below the material floor."""
+    the hand torque — it must not thin below the material floor. On a
+    lobed knob the wall is measured at the scallop root."""
     check = "form.knob_torque_wall_ok"
     f = form.frame
     if "torque_wall" not in f:

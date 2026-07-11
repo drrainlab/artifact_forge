@@ -1,17 +1,17 @@
 """Spare Fit Standard checks — PASS / FAIL / n-a branches, measured on
-real op-built forms (never on hand-typed frames)."""
+real op-built forms (never on hand-typed frames). Promoted from the
+showcase pack together with the ops."""
 from __future__ import annotations
 
 import pytest
 
 from artifact_forge_ng.core.findings import Status
-from artifact_forge_ng.form.recipe_ops import RECIPE_OPS, RecipeError, RecipeState
-
-from artifact_forge_showcase.checks.spare import (
+from artifact_forge_ng.form.checks_spare import (
     check_barb_retention_ok,
     check_knob_torque_wall_ok,
     check_shaft_fit_ok,
 )
+from artifact_forge_ng.form.recipe_ops import RECIPE_OPS, RecipeError, RecipeState
 
 
 def _adapter(**over) -> RecipeState:
@@ -28,7 +28,8 @@ def _adapter(**over) -> RecipeState:
 def _knob(**over) -> RecipeState:
     st = RecipeState()
     p = {"grip_d": 35.0, "grip_h": 18.0, "shaft_sq": 6.0,
-         "socket_depth": 10.0, "fit_clearance": 0.25, "top_chamfer": 2.0}
+         "socket_depth": 10.0, "fit_clearance": 0.25, "top_chamfer": 2.0,
+         "lobes": 0, "lobe_bite": 2.0}
     p.update(over)
     RECIPE_OPS["knob_body"].apply(st, p, "body")
     return st
@@ -114,3 +115,27 @@ def test_torque_check_na_on_adapter():
     f = check_knob_torque_wall_ok(_adapter())
     assert f.status is Status.PASS
     assert "n/a" in f.message
+
+
+# -- lobed grip (core extension) ----------------------------------------------
+
+def test_lobed_knob_cuts_coves_and_measures_wall_at_root():
+    st = _knob(grip_d=40.0, lobes=5, lobe_bite=2.0)
+    coves = [b for b in st.bores if "cove" in b.name]
+    assert len(coves) == 5
+    assert st.frame["knob_lobes"] == 5.0
+    # torque wall measured at the scallop root, not the untouched circle
+    plain = _knob(grip_d=40.0)
+    assert st.frame["torque_wall"] == pytest.approx(plain.frame["torque_wall"] - 2.0)
+    assert st.frame["outline_outer_r"] == pytest.approx(18.0)
+    assert check_knob_torque_wall_ok(st).status is Status.PASS
+
+
+def test_lobe_bite_into_socket_refused():
+    with pytest.raises(RecipeError, match="torque wall"):
+        _knob(grip_d=24.0, shaft_sq=8.0, lobes=5, lobe_bite=5.0)
+
+
+def test_too_few_lobes_refused():
+    with pytest.raises(RecipeError, match="at least 3"):
+        _knob(lobes=2)

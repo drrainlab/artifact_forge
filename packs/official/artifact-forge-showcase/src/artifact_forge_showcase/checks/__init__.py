@@ -1,5 +1,6 @@
 """Showcase form checks — importing this package registers every check.
-Wave modules (spare / jig / ladder) are added as their waves land."""
+The spare/jig checks were promoted to core (artifact_forge_ng.form
+.checks_spare / .checks_jig); only ladder remains pack-side."""
 from __future__ import annotations
 
-from . import jig, ladder, spare  # noqa: F401
+from . import ladder  # noqa: F401

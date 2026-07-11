@@ -1,21 +1,22 @@
-"""Repair-domain recipe ops — revolved spare bodies built from polyline
-half-sections on the core IR (``profile_revolve``): a barbed two-step
-hose adapter and a square-socket replacement knob. No new kernel
-geometry — the compiler revolves the section exactly like the core
-revolve_band / ring ops.
+"""Spare-part recipe ops — revolved bodies built from polyline half-sections
+on the core IR (``profile_revolve``): a barbed two-step hose adapter and a
+square-socket knob. Promoted from the showcase pack once the tube/knob
+family joined the core catalog.
 
-Spare Fit Standard frame keys published here are the measurement
-contract of the checks in :mod:`artifact_forge_showcase.checks.spare`.
+Spare Fit Standard frame keys published here are the measurement contract
+of the checks in :mod:`artifact_forge_ng.form.checks_spare`.
 """
 from __future__ import annotations
 
+import math
 from typing import Any
 
-from artifact_forge_ng.form.part import CutBoxFeature
-from artifact_forge_ng.form.recipe_ops_core import RecipeError, RecipeOpDecl, RecipeState, _register
-from artifact_forge_ng.form.regions import Box3, Region
-from artifact_forge_ng.form.section import LineSeg, ProfileLoop, Pt, SectionProfile
-from artifact_forge_ng.product.archetype import RegionRole
+from .part import BoreFeature, CutBoxFeature
+from .profiles_revolve import loop_from_points, sawtooth
+from .recipe_ops_core import RecipeError, RecipeOpDecl, RecipeState, _register
+from .regions import Box3, Region
+from .section import Pt, SectionProfile
+from ..product.archetype import RegionRole
 
 #: Diametral hose-fit band: the crest must exceed the hose bore by this
 #: much for real retention without splitting the hose.
@@ -23,45 +24,6 @@ BARB_H_BAND = (0.4, 1.5)          # per-side barb height over the root, mm
 MIN_BORE_R = 2.0                  # a drain adapter is useless as a capillary
 SQ_FIT_BAND = (0.1, 0.4)          # across-flats clearance band, mm
 SOCKET_DEPTH_K = 1.0              # socket depth >= k * shaft size
-
-
-def _sawtooth(points: list[Pt], r_root: float, r_crest: float,
-              v0: float, v1: float, count: int, toward_tip_at_v0: bool) -> None:
-    """Append barb sawtooth points between v0 and v1 (v0 < v1). The sharp
-    (vertical) face looks toward the flange so the hose slides on from the
-    tip and bites against pull-off."""
-    pitch = (v1 - v0) / count
-    ramp = 0.75 * pitch
-    if toward_tip_at_v0:
-        # tip at v0: each tooth ramps gently away from the tip, then drops
-        # vertically (the sharp face looks toward the flange at v1)
-        for k in range(count):
-            a = v0 + k * pitch
-            points.append(Pt(r_root, a))
-            points.append(Pt(r_crest, a + ramp))
-            points.append(Pt(r_root, a + ramp))
-        points.append(Pt(r_root, v1))
-    else:
-        # tip at v1: mirrored — flat toward the flange, vertical sharp face
-        # (looking toward v0), then a gentle ramp descending to the tip side
-        points.append(Pt(r_root, v0))
-        for k in range(count):
-            a = v0 + k * pitch
-            points.append(Pt(r_root, a + pitch - ramp))
-            points.append(Pt(r_crest, a + pitch - ramp))
-            points.append(Pt(r_root, a + pitch))
-
-
-def _loop_from_points(points: list[Pt]) -> ProfileLoop:
-    """Closed polyline loop. Every joint of a revolved spare is a
-    machined-style corner by design (barb teeth, flange steps, chamfers) —
-    tagged intentional so form.profile_smooth judges the styled parts, not
-    this deliberately technical silhouette."""
-    segs = []
-    for a, b in zip(points, points[1:] + points[:1]):
-        if a.dist(b) > 1e-6:
-            segs.append(LineSeg(a, b, tags=frozenset({"intentional_corner"})))
-    return ProfileLoop(segs)
 
 
 def _hose_adapter_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
@@ -91,15 +53,15 @@ def _hose_adapter_body(state: RecipeState, p: dict[str, Any], op_id: str) -> Non
     z_top = z_fl1 + len_b
 
     pts: list[Pt] = [Pt(r_bore, 0.0)]
-    _sawtooth(pts, r_root_a, r_crest_a, 0.0, z_fl0, n_a, toward_tip_at_v0=True)
+    sawtooth(pts, r_root_a, r_crest_a, 0.0, z_fl0, n_a, toward_tip_at_v0=True)
     pts.append(Pt(r_flange, z_fl0))
     pts.append(Pt(r_flange, z_fl1))
-    _sawtooth(pts, r_root_b, r_crest_b, z_fl1, z_top, n_b, toward_tip_at_v0=False)
+    sawtooth(pts, r_root_b, r_crest_b, z_fl1, z_top, n_b, toward_tip_at_v0=False)
     pts.append(Pt(r_bore, z_top))
 
     state.section = SectionProfile(
         name="recipe_revolve",
-        outer=_loop_from_points(pts),
+        outer=loop_from_points(pts),
         plane="XZ",
         width_axis="Y",
     )
@@ -144,16 +106,21 @@ _register(RecipeOpDecl(
 
 
 def _knob_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """Replacement knob: a revolved grip (cylinder + top chamfer) with a
-    blind SQUARE shaft socket cut from the underside. Square shafts cover
-    valve stems and appliance timers; a D-shaft variant needs a partial-cut
-    primitive and is deliberately out of this wave."""
+    """Knob body: a revolved grip (cylinder + top chamfer) with a blind
+    SQUARE shaft socket cut from the underside. Square shafts cover valve
+    stems, appliance timers, square nuts and carriage-bolt necks; a D-shaft
+    variant needs a partial-cut primitive and is deliberately out of this
+    wave. ``lobes`` > 0 scallops the grip with vertical finger coves cut
+    around the perimeter (a star/wing grip) — the torque wall is measured
+    at the scallop root, never at the untouched circle."""
     if state.section is not None:
         raise RecipeError("knob_body must be the (single) base op")
     grip_d, grip_h = p["grip_d"], p["grip_h"]
     shaft_sq, depth = p["shaft_sq"], p["socket_depth"]
     clearance = p["fit_clearance"]
     chamfer = min(p["top_chamfer"], grip_h * 0.3, grip_d * 0.25)
+    lobes = int(round(p["lobes"]))
+    bite = p["lobe_bite"]
 
     r_grip = grip_d / 2.0
     s_eff = shaft_sq + clearance
@@ -162,6 +129,30 @@ def _knob_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         raise RecipeError("socket depth leaves no top skin on the knob")
     if corner_reach >= r_grip - 1.5:
         raise RecipeError("shaft socket corners break out of the grip wall")
+
+    torque_wall = r_grip - corner_reach
+    name = op_id or "knob"
+    if lobes:
+        if lobes < 3:
+            raise RecipeError("a lobed knob needs at least 3 lobes")
+        torque_wall = r_grip - bite - corner_reach
+        if torque_wall < 1.5:
+            raise RecipeError(
+                f"lobe bite {bite:g} thins the torque wall to "
+                f"{torque_wall:.2f} — socket corners break into the coves")
+        # Finger coves: vertical cylinders tangent-bitten into the grip.
+        # Cove radius scales with the pitch arc so deep-cut small knobs
+        # keep real lobes between coves.
+        scallop_r = max(2.0 * bite, math.pi * r_grip / lobes * 0.35)
+        c_dist = r_grip + scallop_r - bite
+        for k in range(lobes):
+            ang = math.tau * k / lobes
+            state.bores.append(BoreFeature(
+                name=f"{name}_cove_{k}", axis="Z",
+                d=2.0 * scallop_r,
+                center=(c_dist * math.cos(ang), c_dist * math.sin(ang), 0.0),
+                span=(0.0, grip_h), overshoot=(1.0, 1.0),
+            ))
 
     pts = [
         Pt(0.0, 0.0),
@@ -172,14 +163,13 @@ def _knob_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     ]
     state.section = SectionProfile(
         name="recipe_revolve",
-        outer=_loop_from_points(pts),
+        outer=loop_from_points(pts),
         plane="XZ",
         width_axis="Y",
     )
     state.kind = "profile_revolve"
     state.width = grip_d
 
-    name = op_id or "knob"
     half = s_eff / 2.0
     state.cutboxes.append(CutBoxFeature(
         name=f"{name}_shaft_socket",
@@ -195,7 +185,11 @@ def _knob_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         fit_clearance=clearance,
         grip_d=grip_d,
         grip_top_z=grip_h,
-        torque_wall=r_grip - corner_reach,
+        torque_wall=torque_wall,
+        knob_lobes=float(lobes),
+        # circle outline: the hole checks measure webs on the knob's
+        # effective grip circle (scallop root when lobed)
+        outline_outer_r=r_grip - (bite if lobes else 0.0),
     )
 
 
@@ -206,6 +200,7 @@ _register(RecipeOpDecl(
         "grip_d": ("length", None), "grip_h": ("length", 18.0),
         "shaft_sq": ("length", None), "socket_depth": ("length", 10.0),
         "fit_clearance": ("length", 0.25), "top_chamfer": ("length", 2.0),
+        "lobes": ("count", 0), "lobe_bite": ("length", 2.0),
     },
     validators=(
         "form.shaft_fit_ok",
@@ -213,6 +208,6 @@ _register(RecipeOpDecl(
         "topology.single_connected_solid",
     ),
     apply=_knob_body,
-    description="revolved replacement knob with a blind square shaft "
-                "socket (measured fit + torque wall)",
+    description="revolved knob with a blind square shaft socket "
+                "(measured fit + torque wall; lobes>0 scallops the grip)",
 ))

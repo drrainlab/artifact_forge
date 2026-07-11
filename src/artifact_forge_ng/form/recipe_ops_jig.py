@@ -1,15 +1,16 @@
-"""Jig-domain recipe ops — production-aid features on the core plate IR:
-a press-fit line of steel drill-bushing seats and a hooked stop fence
-(the registration edge). Shop-probe tier: verify the first article —
-these are not certified measuring tools (docs/CLAIMS.md)."""
+"""Jig recipe ops — production-aid features on the core plate IR: a
+press-fit line of steel drill-bushing seats and a hooked stop fence (the
+registration edge). Promoted from the showcase pack once the drill-guide
+family joined the core catalog. Shop-probe tier: verify the first
+article — these are not certified measuring tools (docs/CLAIMS.md)."""
 from __future__ import annotations
 
 from typing import Any
 
-from artifact_forge_ng.form.part import BoreFeature, RibFeature
-from artifact_forge_ng.form.recipe_ops_core import RecipeError, RecipeOpDecl, RecipeState, _register
-from artifact_forge_ng.form.regions import Box3, Region
-from artifact_forge_ng.product.archetype import RegionRole
+from .part import BoreFeature, RibFeature
+from .recipe_ops_core import RecipeError, RecipeOpDecl, RecipeState, _register
+from .regions import Box3, Region
+from ..product.archetype import RegionRole
 
 PRESS_FIT_BAND = (0.05, 0.2)   # diametral steel-in-plastic press band, mm
 SEAT_ENGAGEMENT_K = 0.5        # plate thickness >= k * bushing OD

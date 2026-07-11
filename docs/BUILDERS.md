@@ -64,6 +64,8 @@ at runtime.
 | `loft_between_sections` | 🔶 | rect→rect exists (LoftFeature/tapered_beam); rect→circle when the first client arrives |
 | `tapered_beam` | ✅ | LoftFeature (taper by construction) + topology.arm_reaches_tip (shelf_bracket_v1) |
 | `truss_beam` | ✅ | truss_web_cutouts op: warren triangles, ligament = strut by construction (truss_beam_180) |
+| `hose_adapter_body` | ✅ | recipe op (promoted from showcase): barbed two-spigot revolve polyline + Spare Fit checks (recipe_ops_spare.py) |
+| `knob_body` | ✅ | recipe op (promoted from showcase): revolved grip + blind square socket + optional lobed scallops (recipe_ops_spare.py) |
 
 ### feature — fasteners, pockets, cutouts
 
@@ -80,6 +82,9 @@ at runtime.
 | `boss_pattern` | ✅ | recipe op: 4 bosses + blind pilot bores, keepout in the floor layer |
 | `standoff_pattern` | ✅ | recipe op: PCB standoffs on a plate + blind pilots |
 | `lid_seat` | ✅ | inset_plug op + lid_seat joint: dimensional chain + pose probe (esp32_box_with_lid) |
+| `bore_pattern` (line/grid/bolt-circle) | ✅ | recipe op: plain vertical bores, no screw semantics (drainage / finger holes / vents) |
+| `bushing_seat_line` | ✅ | recipe op (promoted from showcase): press-fit steel bushing seats + form.bushing_fit_ok (recipe_ops_jig.py); frame keys not op_id-namespaced yet — one row per part |
+| `stop_fence` | ✅ | recipe op (promoted from showcase): registration fence under a plate edge (recipe_ops_jig.py) |
 
 ### field — modifiers (already region-bound, composition via keepouts)
 

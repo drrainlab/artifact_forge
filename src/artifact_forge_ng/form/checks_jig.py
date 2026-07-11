@@ -1,13 +1,13 @@
-"""Jig-domain form checks — press-fit bushing seats and the registration
-fence, measured from the frame keys the jig ops publish."""
+"""Jig form checks — press-fit bushing seats and the registration fence,
+measured from the frame keys the jig ops publish (promoted from the
+showcase pack)."""
 from __future__ import annotations
 
-from artifact_forge_ng.core.findings import Finding
-from artifact_forge_ng.form.checks_common import make_finding
-from artifact_forge_ng.form.part import PartForm
-from artifact_forge_ng.validators.probes import register_probe
-
-from ..ops.jig import FENCE_DROP_BAND, PRESS_FIT_BAND, SEAT_ENGAGEMENT_K, SEAT_WALL_MIN
+from ..core.findings import Finding
+from ..validators.probes import register_probe
+from .checks_common import make_finding
+from .part import PartForm
+from .recipe_ops_jig import FENCE_DROP_BAND, PRESS_FIT_BAND, SEAT_ENGAGEMENT_K, SEAT_WALL_MIN
 
 _finding = make_finding
 

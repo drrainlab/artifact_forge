@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any
 from ..core.fasteners import screw_spec
-from .patterns import bolt_circle_centers, holes_from_centers, line_centers
+from .patterns import bolt_circle_centers, grid_centers, holes_from_centers, line_centers
 from .profiles_plate import rounded_rect_loop
 from .regions import Box3, Region
 from .section import SectionProfile
@@ -392,6 +392,73 @@ _register(RecipeOpDecl(
     validators=("form.cuts_respect_keepouts", "topology.cutout_present"),
     apply=_rounded_rect_cutout,
     description="through rectangular cutout (v1: square corners)",
+))
+
+
+def _bore_pattern(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Plain-diameter vertical bores in a line / grid / bolt circle —
+    the screwless cousin of hole_pattern (drainage, finger holes, vents).
+    ``z_top``/``through`` of 0 mean "the part top" / "all the way through
+    from z_top"; a partial ``through`` leaves a blind floor under the bore."""
+    state.require_base("bore_pattern")
+    kind = p["kind"]
+    d = p["d"]
+    if d <= 0.0:
+        raise RecipeError("bore_pattern needs a positive diameter")
+    center = (p["cx"], p["cy"])
+    count = int(round(p["count"]))
+    if kind == "line":
+        centers = line_centers(count, p["spacing"], center)
+    elif kind == "grid":
+        nx, ny = int(round(p["nx"])), int(round(p["ny"]))
+        dy = p["spacing_y"] if p["spacing_y"] > 1e-9 else p["spacing"]
+        centers = grid_centers(nx, ny, p["spacing"], dy, center)
+    elif kind == "bolt_circle":
+        centers = bolt_circle_centers(count, p["bc_d"], center)
+    else:
+        raise RecipeError(
+            f"bore pattern kind {kind!r} not in (line, grid, bolt_circle)")
+    t = state.width
+    z_top = p["z_top"] if p["z_top"] > 1e-9 else t
+    through = p["through"] if p["through"] > 1e-9 else z_top
+    pierces = through >= z_top - 1e-9
+    name = op_id or "bores"
+    for i, (bx, by) in enumerate(centers):
+        state.bores.append(
+            BoreFeature(
+                name=f"{name}_{i}", axis="Z", d=d, center=(bx, by, 0.0),
+                span=(z_top - through, z_top),
+                # a blind bore keeps its floor: no bottom overshoot
+                overshoot=(1.0 if pierces else 0.0, 1.0),
+            )
+        )
+        state.frame[f"{name}_{i}_x"] = bx
+        state.frame[f"{name}_{i}_y"] = by
+    state.frame[f"{name}_d"] = d
+    state.frame[f"{name}_count"] = float(len(centers))
+
+
+_register(RecipeOpDecl(
+    name="bore_pattern",
+    kind="feature",
+    params={
+        "kind": ("choice", "line"),
+        "d": ("length", 5.0),
+        "count": ("count", 2),
+        "nx": ("count", 2),
+        "ny": ("count", 2),
+        "spacing": ("length", 20.0),
+        "spacing_y": ("length", 0.0),
+        "bc_d": ("length", 40.0),
+        "cx": ("length", 0.0),
+        "cy": ("length", 0.0),
+        "z_top": ("length", 0.0),
+        "through": ("length", 0.0),
+    },
+    validators=("form.holes_within_outline", "topology.bores_open"),
+    apply=_bore_pattern,
+    description="plain vertical bores (line / grid / bolt circle) — "
+                "drainage, finger holes, vents; no screw semantics",
 ))
 
 

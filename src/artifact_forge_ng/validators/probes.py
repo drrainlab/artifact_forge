@@ -105,6 +105,18 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.strap_access_ok", Level.FORM, "each strap tab carries a through slot pair clear of the arm circle with a solid strap bar"),
         _decl("form.dovetail_socket_profile_ok", Level.FORM, "the payload socket groove is a measured female dovetail at the declared widths and depth"),
         _decl("form.dovetail_foot_profile_ok", Level.FORM, "the adapter foot is a measured male dovetail whose free end is the wide end"),
+        # -- spare/jig fit standard (promoted from the showcase pack;
+        #    impls in form/checks_spare.py / form/checks_jig.py) -------------
+        _decl("form.barb_retention_ok", Level.FORM,
+              "hose-barb height inside the retention band and >= 2 barbs per spigot"),
+        _decl("form.shaft_fit_ok", Level.FORM,
+              "square shaft socket clearance in the fit band with real engagement depth"),
+        _decl("form.knob_torque_wall_ok", Level.FORM,
+              "wall between socket corners and grip carries hand torque"),
+        _decl("form.bushing_fit_ok", Level.FORM,
+              "steel bushing press interference in band, engagement depth and seat walls real"),
+        _decl("form.stop_registration_ok", Level.FORM,
+              "the stop fence spans the full plate edge and hooks below the plate"),
         # -- interface level (wave A1, form-time) ------------------------------
         _decl("interface.frame_exists", Level.FORM, "every declared interface's datum is published on the form with its type's frame keys"),
         _decl("interface.keepouts_preserved", Level.FORM, "no cut touched a declared interface keepout region"),
