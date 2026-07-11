@@ -285,6 +285,31 @@ def seat_lips_present(geometry: Geometry, form: PartForm) -> Finding:
         not problems,
         "all bearing lips solid" if not problems else "; ".join(problems),
     )
+@register_probe("topology.thread_present")
+def thread_present(geometry: Geometry, form: PartForm) -> Finding:
+    """Sweep a thin probe ALONG each thread's mid-ridge helix: an
+    external ridge must be material, an internal groove must be void."""
+    if not form.threads:
+        return Finding(
+            check="topology.thread_present",
+            status=Status.PASS,
+            level=Level.TOPOLOGY,
+            message="no modeled threads declared",
+        )
+    problems = []
+    for tr in form.threads:
+        probe = channel_probe(tr.helix_points(), d=tr.depth * 0.5)
+        frac = solid_fraction(geometry.workplane, probe)
+        if tr.internal and frac > 0.3:
+            problems.append(f"{tr.name}: groove not cut (fill {frac:.2f})")
+        if not tr.internal and frac < 0.7:
+            problems.append(f"{tr.name}: ridge missing (fill {frac:.2f})")
+    return _finding(
+        "topology.thread_present",
+        not problems,
+        "all thread helices materialized" if not problems
+        else "; ".join(problems),
+    )
 @register_probe("topology.text_relief_present")
 def text_relief_present(geometry: Geometry, form: PartForm) -> Finding:
     """Every text relief left its mark on the solid: material above the

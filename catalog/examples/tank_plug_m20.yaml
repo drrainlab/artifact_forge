@@ -1,0 +1,15 @@
+schema: product/v1
+id: tank_plug_m20
+archetype: threaded_plug_v1@1
+strict: true
+
+requested_features:
+  - modeled_thread
+
+params: {}
+
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

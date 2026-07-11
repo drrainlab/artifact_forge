@@ -64,6 +64,7 @@ at runtime.
 | `loft_between_sections` | ✅ | rect→rect (LoftFeature/tapered_beam) + POLYGON sections (PolyLoftFeature, kind section_loft): additive body + subtractive cavities — superellipse_pot_body is the first client |
 | `tapered_beam` | ✅ | LoftFeature (taper by construction) + topology.arm_reaches_tip (shelf_bracket_v1) |
 | `truss_beam` | ✅ | truss_web_cutouts op: warren triangles, ligament = strut by construction (truss_beam_180) |
+| `threaded_plug_body` / `thread_internal_clearance` | ✅ | recipe ops (R2.16): MODELED helical threads (ThreadFeature + OCC helix sweep) — coarse metric table from M8, both sides fit-compensated, helix-swept presence probe |
 | `ratchet_wheel_body` | ✅ | recipe op (R2.15): asymmetric sawtooth ring in the section (steep face locks, ramp slips) + square/round socket; the sprung pawl is its own iteration, said out loud |
 | `shaft_coupler_body` | ✅ | recipe op (R2.14): two blind coaxial bores over a solid mid web + teardrop set screws; torque honesty (hobby duty) |
 | `living_hinge_groove` | ✅ | recipe op (R2.13): transverse groove leaving a measured flex web [0.3–0.8]; fold-cycle honesty check (material property, not printed) |
@@ -186,20 +187,25 @@ controlled passes, preserve by construction). Do not mix with recipe.
 
 ## The honest remainder (deep mechanics — one iteration per item)
 
-The wave leftovers are consolidated into a master plan: dovetail →
-wave A1 (ports/interfaces), rail_slider and hinges/threads/ratchet →
-later waves.
+R2.10–R2.16 landed every entry as a BOUNDED v1, each with measured
+checks and an out-loud honesty note where physics outruns geometry:
 
-`dovetail`/`tongue_groove` and `rail_slider` are sliding fits (friction,
-direction-of-travel tolerances); `pin_hinge` and `friction_hinge` are moving
-assemblies (axis clearance, torque); `living_hinge` is material fatigue;
-`thread_external/internal` is a helix sweep in OCC + a thread profile;
-`shaft_coupler`, `ratchet_teeth` are torque transmission;
-`space_colonization_branching` needs oriented additive geometry (diagonal
-branches; Box3 ribs are not enough). Each of these has its own physics and
-validators; a feature without them would be a hallucination, which is why they
-are not "finished off" but planned as separate iterations on the completed
-foundation (recipe + joints + pose probes).
+- ~~rail_slider~~ ✅ R2.12 — the dovetail shoe (clearance bands, yaw guard);
+- ~~pin_hinge / friction_hinge~~ ✅ R2.11 — one leaf grammar, side a/b
+  interleave by construction; torque/cycle-life honestly hardware-side;
+  printed-in-place refused (a fused pin is a broken hinge);
+- ~~living_hinge~~ ✅ R2.13 — the flex web measured [0.3, 0.8]; fatigue
+  is a MATERIAL property, said out loud;
+- ~~thread_external / thread_internal_clearance~~ ✅ R2.16 —
+  ThreadFeature + OCC helix sweep, coarse metric table from M8, both
+  sides fit-compensated, presence probed ALONG the helix;
+- ~~shaft_coupler~~ ✅ R2.14 — blind coaxial bores over a solid mid web,
+  torque honesty (hobby duty); D-shaft flats still want a partial cut;
+- ~~ratchet_teeth~~ ✅ R2.15 — the asymmetric wheel; the sprung pawl
+  (flexure + fatigue) remains its own iteration;
+- `space_colonization_branching` — still open: organic oriented additive
+  networks beyond single straight AngledPins (R2.9 gave the primitive,
+  the growth algorithm is the remaining work).
 
 Core-expansion wave (R2.x) deliberate deferrals — each is one bounded
 iteration, none is a bug. R2.5 closed the S/M half of this ledger:

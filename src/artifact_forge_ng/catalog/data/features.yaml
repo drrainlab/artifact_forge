@@ -530,6 +530,12 @@ features:
       - form.se_wall_ok
       - topology.single_connected_solid
 
+  - id: modeled_thread
+    description: helical printed thread (coarse metric table, fit-compensated pair)
+    verified_by:
+      - form.thread_spec_ok
+      - topology.thread_present
+
   - id: ratchet_tooth_ring
     description: asymmetric sawtooth ring — locks one way, ramps the other (pawl pending)
     verified_by:

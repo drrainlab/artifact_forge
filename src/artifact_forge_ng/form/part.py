@@ -484,6 +484,64 @@ class AngledPinFeature:
 
 
 @dataclass(frozen=True)
+class ThreadFeature:
+    """A MODELED helical thread on a vertical axis: an external ridge
+    welded around a stud core, or an internal groove cut out from a
+    bore wall. The profile is the printable truncated 60-degree form
+    (depth = 0.6 * pitch); print-fit compensation is already baked into
+    ``major_d`` by the op that declared it. Vertical axes only — a
+    printed thread is only worth printing standing up."""
+
+    name: str
+    at: tuple[float, float]     # axis position in XY
+    z0: float                   # thread start
+    length: float
+    major_d: float              # compensated major diameter
+    pitch: float
+    internal: bool = False
+    handed: str = "right"
+
+    def __post_init__(self) -> None:
+        if self.length <= 0 or self.pitch <= 0 or self.major_d <= 0:
+            raise ValueError(f"ThreadFeature {self.name!r} needs positive dims")
+        if self.handed not in ("right", "left"):
+            raise ValueError(f"ThreadFeature {self.name!r} handed must be right/left")
+        if self.length / self.pitch > 40:
+            raise ValueError(
+                f"ThreadFeature {self.name!r}: {self.length / self.pitch:.0f} "
+                "turns — OCC sweep territory ends around 40")
+
+    @property
+    def depth(self) -> float:
+        return 0.6 * self.pitch
+
+    @property
+    def core_r(self) -> float:
+        """External: the stud core the ridge welds onto. Internal: the
+        bore wall radius the groove cuts out from."""
+        if self.internal:
+            return self.major_d / 2.0 - self.depth
+        return self.major_d / 2.0 - self.depth
+
+    def helix_points(self, samples_per_turn: int = 24) -> list[tuple[float, float, float]]:
+        """The thread's mid-ridge helix polyline — the presence probe
+        sweeps a thin cylinder along it."""
+        import math
+
+        r = self.core_r + self.depth / 2.0
+        turns = self.length / self.pitch
+        n = max(8, int(turns * samples_per_turn))
+        sign = 1.0 if self.handed == "right" else -1.0
+        pts = []
+        for k in range(n + 1):
+            th = sign * math.tau * turns * k / n
+            z = self.z0 + self.length * k / n
+            pts.append((self.at[0] + r * math.cos(th),
+                        self.at[1] + r * math.sin(th), z))
+        return pts
+
+
+@dataclass(frozen=True)
 class PolyLoftFeature:
     """A ruled loft between two horizontal polygon sections — the
     section_loft kernel (a superellipse pot's wall cannot revolve). Both
@@ -597,6 +655,7 @@ class PartForm:
     fields: list[FieldFeature] = field(default_factory=list)
     text_reliefs: list[TextReliefFeature] = field(default_factory=list)
     poly_lofts: list[PolyLoftFeature] = field(default_factory=list)
+    threads: list[ThreadFeature] = field(default_factory=list)
     #: Oriented modifier canvases, keyed by the region name they serve.
     windows: dict[str, FaceWindow] = field(default_factory=dict)
     regions: list[Region] = field(default_factory=list)

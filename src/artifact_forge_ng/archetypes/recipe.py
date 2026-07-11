@@ -99,6 +99,7 @@ def build_form(
         fields=state.fields,
         text_reliefs=state.text_reliefs,
         poly_lofts=state.poly_lofts,
+        threads=state.threads,
         regions=state.regions,
         windows=state.windows,
         datums=state.datums,

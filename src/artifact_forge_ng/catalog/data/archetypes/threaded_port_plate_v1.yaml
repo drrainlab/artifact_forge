@@ -1,0 +1,100 @@
+schema: archetype/v1
+id: threaded_port_plate_v1
+version: 1
+object_class: threaded_port
+description: >
+  Internally threaded port plate: a mounting plate with a through
+  threaded bore — the receiving half of the printed thread pair (the
+  matching plug is threaded_plug_v1 at the same nominal size; both
+  sides carry their own fit compensation, so the pair actually mates).
+  Corner screws bolt the plate to the tank/panel; sealing waits for the
+  gasket iteration.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - mounting_plate_body
+  - modeled_thread
+  - countersunk_screw_holes
+
+parameters:
+  thread:
+    {type: choice, choices: [m8, m10, m12, m16, m20, m24, m30],
+     default: m20, role: assembly, exposed: true}
+  plate_l:
+    {type: length, default: 60mm, min: 30mm, max: 140mm, role: functional, exposed: true}
+  plate_w:
+    {type: length, default: 60mm, min: 30mm, max: 140mm, role: functional}
+  t:
+    {type: length, default: 10mm, min: 8mm, max: 24mm, role: structural,
+     description: plate thickness = thread engagement depth}
+  corner_r:
+    {type: length, default: 5mm, min: 2mm, max: 12mm, role: aesthetic}
+  fit_compensation:
+    {type: length, default: 0.2mm, min: 0.1mm, max: 0.5mm, role: manufacturing}
+  screw:
+    {type: choice, choices: [M3, M4], default: M4, role: assembly}
+  screw_spacing:
+    {type: length, default: "expr(plate_l - 16)", min: 14mm, max: 124mm, role: assembly}
+  screw_row_cy:
+    {type: length, default: "expr(plate_w / 2 - 8)", min: 4mm, max: 62mm, role: assembly}
+
+constraints:
+  - t >= 8
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params: {l: plate_l, w: plate_w, t: t, corner_r: corner_r}
+    - op: thread_internal_clearance
+      id: port
+      params: {thread: thread, fit_compensation: fit_compensation}
+    - op: countersunk_hole_pattern
+      id: screws_a
+      params: {kind: line, screw: screw, count: 2, spacing: screw_spacing,
+               cy: screw_row_cy, cs_face: top}
+    - op: countersunk_hole_pattern
+      id: screws_b
+      params: {kind: line, screw: screw, count: 2, spacing: screw_spacing,
+               cy: "expr(-screw_row_cy)", cs_face: top}
+
+regions:
+  - {id: plate, role: mounting_surface, editable: false,
+     label: port plate, aliases: [plate]}
+  - {id: plate_lightening, role: aesthetic_lightening, editable: true,
+     label: plate canvas, aliases: [face]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: workshop
+  modes: [engineering, utility]
+  tags: [thread, port, plate, metric]
+
+validators:
+  - form.thread_spec_ok
+  - form.holes_within_outline
+  - form.min_web_between_holes
+  - topology.thread_present
+  - topology.bores_open
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - modeled_thread
+    - countersunk_screw_holes
+  must_not_have: []
+  invariants:
+    - t >= 8

@@ -272,6 +272,25 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
                     log.notes.append(
                         f"text relief {tr.name!r} engrave reverted (would fragment)")
 
+    # Modeled threads: external ridges weld, internal grooves cut —
+    # the helix solid comes from cad/threads.py.
+    if form.threads:
+        from ..cad.threads import build_thread_solid
+
+        for tr in form.threads:
+            try:
+                helix = build_thread_solid(tr)
+            except Exception as exc:  # noqa: BLE001 — a note, not a crash
+                log.notes.append(f"thread {tr.name!r} failed to sweep: {exc}")
+                continue
+            if tr.internal:
+                mass, cut = cut_keep_solid(mass, helix)
+                if not cut:
+                    log.notes.append(
+                        f"thread {tr.name!r} groove reverted (would fragment)")
+            else:
+                mass = weld(mass, helix, what=tr.name)
+
     exo_solids = build_exoskeleton_solid(form)
     if form.exoskeleton is not None and exo_solids is None:
         log.notes.append(

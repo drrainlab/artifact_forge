@@ -59,6 +59,9 @@ WAVE_EXAMPLES = [
     "clay_pattern_stamp",
     "logo_stamp_arrow",
     # deferral wave
+    "tank_plug_m20",
+    "tank_plug_m12",
+    "tank_port_plate_m20",
     "ratchet_wheel_40_24t",
     "ratchet_wheel_60_36t_round",
     "coupler_5_8_stepper",
@@ -179,6 +182,42 @@ def test_tight_pin_fails_fit_check():
     st = _leaf(pin_clearance=0.2)
     st.frame["hinge_bore_d"] = st.frame["hinge_pin_d"] + 0.1  # binds
     assert check_hinge_pin_fit_ok(st).status.value == "fail"
+
+
+# -- modeled threads ------------------------------------------------------------------
+
+
+def test_thread_pair_compensates_both_sides():
+    from artifact_forge_ng.form.checks_thread import check_thread_spec_ok
+
+    plug = run_pre_cad(EXAMPLES / "tank_plug_m20.yaml", None)
+    port = run_pre_cad(EXAMPLES / "tank_port_plate_m20.yaml", None)
+    fp, fo = plug.form.frame, port.form.frame
+    assert fp["plug_thread_major"] == pytest.approx(19.8)   # M20 - 0.2
+    assert fo["port_thread_major"] == pytest.approx(20.2)   # M20 + 0.2
+    assert fp["plug_thread_turns"] >= 4.0
+    assert check_thread_spec_ok(plug.form).status.value == "pass"
+    tr = plug.form.threads[0]
+    assert not tr.internal and port.form.threads[0].internal
+    # the presence probe walks the mid-ridge helix
+    pts = tr.helix_points()
+    assert len(pts) > 50 and pts[0][2] == pytest.approx(tr.z0)
+
+
+def test_thread_too_few_turns_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="turns"):
+        RECIPE_OPS["threaded_plug_body"].apply(
+            st, {"thread": "m20", "fit_compensation": 0.2, "stud_l": 7.0,
+                 "grip_d": 36.0, "grip_h": 8.0}, "plug")
+
+
+def test_unknown_thread_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="printable coarse table"):
+        RECIPE_OPS["threaded_plug_body"].apply(
+            st, {"thread": "m3", "fit_compensation": 0.2, "stud_l": 12.0,
+                 "grip_d": 36.0, "grip_h": 8.0}, "plug")
 
 
 # -- ratchet wheel --------------------------------------------------------------------

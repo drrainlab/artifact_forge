@@ -1,0 +1,71 @@
+schema: archetype/v1
+id: threaded_plug_v1
+version: 1
+object_class: threaded_plug
+description: >
+  Threaded plug: a grip disc with an externally threaded stud —
+  tank/jar/port stopper printed standing up (the only orientation a
+  thread is worth printing in). Coarse metric table from M8 up (a
+  printed M3 is a fantasy); the major is REDUCED by the per-side fit
+  compensation so it mates the matching internally threaded port.
+  Sealing honesty: this is a mechanical plug — add an O-ring groove
+  iteration before promising water-tight.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - modeled_thread
+
+parameters:
+  thread:
+    {type: choice, choices: [m8, m10, m12, m16, m20, m24, m30],
+     default: m20, role: assembly, exposed: true}
+  stud_l:
+    {type: length, default: 12mm, min: 6mm, max: 40mm, role: functional, exposed: true}
+  grip_d:
+    {type: length, default: 36mm, min: 16mm, max: 80mm, role: functional, exposed: true}
+  grip_h:
+    {type: length, default: 8mm, min: 5mm, max: 20mm, role: structural}
+  fit_compensation:
+    {type: length, default: 0.2mm, min: 0.1mm, max: 0.5mm, role: manufacturing}
+
+constraints:
+  - grip_d > stud_l
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: threaded_plug_body
+      id: plug
+      params: {thread: thread, stud_l: stud_l, grip_d: grip_d,
+               grip_h: grip_h, fit_compensation: fit_compensation}
+
+regions:
+  - {id: plug_grip, role: mounting_surface, editable: false,
+     label: grip disc, aliases: [grip, knob]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: workshop
+  modes: [engineering, utility]
+  tags: [thread, plug, stopper, metric]
+
+validators:
+  - form.thread_spec_ok
+  - topology.thread_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - modeled_thread
+  must_not_have: []
+  invariants:
+    - stud_l >= 6
