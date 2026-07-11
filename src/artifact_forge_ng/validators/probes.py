@@ -135,6 +135,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
               "a drainage bore spans the raised floor into the air gap beneath"),
         _decl("form.floor_open_area_ok", Level.FORM,
               "mesh floor open-area ratio sits inside the working band"),
+        _decl("form.se_wall_ok", Level.FORM,
+              "a superellipse vessel's MEASURED minimum wall stays inside tolerance"),
         _decl("form.foot_press_fit_ok", Level.FORM,
               "the foot spigot presses into the tube: interference, engagement and shoulder measured"),
         _decl("form.wall_slots_ok", Level.FORM,

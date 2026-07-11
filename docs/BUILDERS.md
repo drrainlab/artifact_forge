@@ -61,7 +61,7 @@ at runtime.
 | `device_cradle` | 🔶 | covered by device_slot_profile (parametric phone_stand) |
 | `rounded_box_shell` | ✅ | recipe op: outer body + interior cut, form.shell_walls_ok |
 | `sweep_profile_along_path` | ✅ | kind section_sweep: arc through 3 points + topology.bar_follows_arc (grab_handle_v1) |
-| `loft_between_sections` | 🔶 | rect→rect exists (LoftFeature/tapered_beam); rect→circle when the first client arrives |
+| `loft_between_sections` | ✅ | rect→rect (LoftFeature/tapered_beam) + POLYGON sections (PolyLoftFeature, kind section_loft): additive body + subtractive cavities — superellipse_pot_body is the first client |
 | `tapered_beam` | ✅ | LoftFeature (taper by construction) + topology.arm_reaches_tip (shelf_bracket_v1) |
 | `truss_beam` | ✅ | truss_web_cutouts op: warren triangles, ligament = strut by construction (truss_beam_180) |
 | `hose_adapter_body` | ✅ | recipe op (promoted from showcase): barbed two-spigot revolve polyline + Spare Fit checks (recipe_ops_spare.py) |
@@ -71,6 +71,7 @@ at runtime.
 | `pot_body` | ✅ | recipe op: tapered vessel + RAISED drainage floor over a foot ring; superellipse plan waits on loft (recipe_ops_revolve.py) |
 | `net_pot_body` | ✅ | recipe op: thin tapered cup + hanging rim flange (recipe_ops_revolve.py) |
 | `multi_socket_hub` | ✅ | recipe op: revolved connector hub the socket arms weld into (recipe_ops_connector.py) |
+| `superellipse_pot_body` | ✅ | recipe op on the section_loft kernel: squircle vessel, raised drainage floor, MEASURED min wall (an offset superellipse is not a superellipse) |
 | `tee_body` | ✅ | recipe op: barbed tube tee/cross/ELBOW — wraps hose_adapter_body (through) or builds a capped-run profile (elbow, form.tube_run_open); smooth X branch spigots rooted in the flange |
 
 ### feature — fasteners, pockets, cutouts

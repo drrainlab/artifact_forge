@@ -576,3 +576,145 @@ _register(RecipeOpDecl(
     description="press-fit furniture foot: pad + chamfered spigot into a "
                 "tube leg + TPU disc recess in the underside",
 ))
+
+# -- superellipse_pot_body (section_loft kernel) -----------------------------------
+
+SE_SAMPLES = 96          # points per superellipse section
+SE_WALL_TOLERANCE = 0.9  # measured min wall >= this fraction of declared
+
+
+def _superellipse(a: float, b: float, n: float,
+                  samples: int = SE_SAMPLES) -> tuple[tuple[float, float], ...]:
+    """CCW superellipse |x/a|^n + |y/b|^n = 1 sampled by parameter angle."""
+    pts = []
+    for k in range(samples):
+        th = math.tau * k / samples
+        c, s = math.cos(th), math.sin(th)
+        pts.append((
+            a * math.copysign(abs(c) ** (2.0 / n), c),
+            b * math.copysign(abs(s) ** (2.0 / n), s),
+        ))
+    return tuple(pts)
+
+
+def _min_poly_gap(inner, outer) -> float:
+    """Min distance from any inner sample to the outer polyline — the
+    measured wall (sampling both curves at the same density keeps the
+    segment-vs-point error far below the tolerance band)."""
+    best = math.inf
+    for ix, iy in inner:
+        for ox, oy in outer:
+            d = math.hypot(ix - ox, iy - oy)
+            if d < best:
+                best = d
+    return best
+
+
+def _superellipse_pot_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Squircle/superellipse plant pot on the section_loft kernel: an
+    outer loft, a cavity loft down to a RAISED floor, and a foot-void
+    loft beneath it — same honest drainage story as pot_body, without
+    the circular-plan limit. The inner sections shrink the semi-axes by
+    the wall; because an offset superellipse is NOT a superellipse, the
+    real minimum wall is MEASURED between the sampled curves and
+    published for the wall check."""
+    from .part import PolyLoftFeature
+
+    if state.section is not None:
+        raise RecipeError("superellipse_pot_body must be the (single) base op")
+    aw, al = p["top_w"] / 2.0, p["top_l"] / 2.0
+    bw, bl = p["bottom_w"] / 2.0, p["bottom_l"] / 2.0
+    h, wall, floor_t = p["h"], p["wall"], p["floor_t"]
+    raise_z = p["floor_raise"]
+    n = p["exponent"]
+    if n < 2.0 or n > 6.0:
+        raise RecipeError(f"exponent {n:g} outside [2, 6] — 2 is an "
+                          "ellipse, 6 is already almost a box")
+    if aw < bw or al < bl:
+        raise RecipeError(
+            "a pot must open upward (top >= bottom on both axes) — an "
+            "undercut vessel traps its root ball and its printed overhang")
+    if wall < 1.6 or floor_t < 2.0:
+        raise RecipeError("pot wall under 1.6 / floor under 2.0")
+    if raise_z < 2.0:
+        raise RecipeError("floor_raise under 2 mm leaves no air gap for drainage")
+    floor_top = raise_z + floor_t
+    if floor_top + 10.0 > h:
+        raise RecipeError("raised floor leaves under 10 mm of root volume")
+    if min(bw, bl) - wall < 8.0:
+        raise RecipeError("foot ring too small — no floor to drain through")
+    taper = max(_taper_deg(bw, aw, h), _taper_deg(bl, al, h))
+
+    def _axes(z: float) -> tuple[float, float]:
+        t = z / h
+        return bw + (aw - bw) * t, bl + (al - bl) * t
+
+    def outer(z: float):
+        a, b = _axes(z)
+        return _superellipse(a, b, n)
+
+    def inner(z: float):
+        a, b = _axes(z)
+        return _superellipse(a - wall, b - wall, n)
+
+    name = op_id or "pot"
+    state.poly_lofts.extend([
+        PolyLoftFeature(name=f"{name}_body", z0=0.0, z1=h,
+                        bottom=outer(0.0), top=outer(h)),
+        PolyLoftFeature(name=f"{name}_cavity", z0=floor_top, z1=h + 1.0,
+                        bottom=inner(floor_top), top=inner(h), cut=True),
+        PolyLoftFeature(name=f"{name}_foot_void", z0=-1.0, z1=raise_z,
+                        bottom=inner(0.0), top=inner(raise_z), cut=True),
+    ])
+    # the universal profile checks measure the TOP section
+    state.section = SectionProfile(
+        name="recipe", outer=loop_from_points(
+            [Pt(x, y) for x, y in outer(h)]),
+        plane="XY", width_axis="Z",
+    )
+    state.kind = "section_loft"
+    state.width = h
+
+    # measured minimum wall at the tightest section (the top has the
+    # gentlest curvature; the BOTTOM corners squeeze hardest)
+    min_wall = min(_min_poly_gap(inner(0.0), outer(0.0)),
+                   _min_poly_gap(inner(h), outer(h)))
+    a_fl, b_fl = _axes(floor_top)
+    state.regions.extend([
+        Region(f"{name}_cavity", RegionRole.SOFT_CONTACT_SURFACE,
+               Box3(-aw, -al, floor_top, aw, al, h)),
+        Region(f"{name}_outer_shell", RegionRole.AESTHETIC_LIGHTENING,
+               Box3(-aw, -al, 0.0, aw, al, h)),
+    ])
+    state.datums["axis"] = {"at": [0.0, 0.0, h / 2.0],
+                            "rotate": [0.0, 0.0, 0.0]}
+    state.frame.update(
+        pot_taper_deg=taper,
+        pot_floor_z0=raise_z, pot_floor_top=floor_top,
+        pot_inner_r_floor=min(a_fl, b_fl) - wall,
+        pot_wall=wall, pot_h=h,
+        se_exponent=n, se_min_wall=min_wall,
+        outline_outer_r=min(a_fl, b_fl) - wall,
+    )
+
+
+_register(RecipeOpDecl(
+    name="superellipse_pot_body",
+    kind="base",
+    params={
+        "top_w": ("length", None), "top_l": ("length", None),
+        "bottom_w": ("length", None), "bottom_l": ("length", None),
+        "h": ("length", None), "wall": ("length", 2.4),
+        "floor_t": ("length", 3.0), "floor_raise": ("length", 6.0),
+        "exponent": ("number", 4.0),
+    },
+    validators=(
+        "form.pot_taper_ok",
+        "form.pot_floor_drains",
+        "form.se_wall_ok",
+        "topology.single_connected_solid",
+    ),
+    apply=_superellipse_pot_body,
+    description="squircle/superellipse plant pot on the section_loft "
+                "kernel — raised drainage floor, measured minimum wall",
+))

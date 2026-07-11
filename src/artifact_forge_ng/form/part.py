@@ -397,6 +397,32 @@ class TextReliefFeature:
 
 
 @dataclass(frozen=True)
+class PolyLoftFeature:
+    """A ruled loft between two horizontal polygon sections — the
+    section_loft kernel (a superellipse pot's wall cannot revolve). Both
+    polygons must share the point count so the ruling is deterministic;
+    ``cut=True`` subtracts (a cavity) instead of adding. Additive lofts
+    form the base body when ``PartForm.kind == "section_loft"``."""
+
+    name: str
+    z0: float
+    z1: float
+    bottom: tuple[tuple[float, float], ...]
+    top: tuple[tuple[float, float], ...]
+    cut: bool = False
+
+    def __post_init__(self) -> None:
+        if self.z1 <= self.z0 + 1e-9:
+            raise ValueError(f"PolyLoftFeature {self.name!r}: z1 must sit above z0")
+        if len(self.bottom) < 3 or len(self.top) < 3:
+            raise ValueError(f"PolyLoftFeature {self.name!r} needs real polygons")
+        if len(self.bottom) != len(self.top):
+            raise ValueError(
+                f"PolyLoftFeature {self.name!r}: sections must share the "
+                "point count (deterministic ruling)")
+
+
+@dataclass(frozen=True)
 class BlendDirective:
     """A 3D-only blend: edges inside ``zone`` get ``radius``, with the
     safe-fillet ladder as fallback."""
@@ -483,6 +509,7 @@ class PartForm:
     pins: list[PinFeature] = field(default_factory=list)
     fields: list[FieldFeature] = field(default_factory=list)
     text_reliefs: list[TextReliefFeature] = field(default_factory=list)
+    poly_lofts: list[PolyLoftFeature] = field(default_factory=list)
     #: Oriented modifier canvases, keyed by the region name they serve.
     windows: dict[str, FaceWindow] = field(default_factory=dict)
     regions: list[Region] = field(default_factory=list)

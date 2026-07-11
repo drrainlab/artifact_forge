@@ -167,3 +167,28 @@ def check_foot_press_fit_ok(form: PartForm) -> Finding:
 
 register_probe("form.foot_press_fit_ok")(
     lambda form, ctx: check_foot_press_fit_ok(form))
+
+
+def check_se_wall_ok(form: PartForm) -> Finding:
+    """An offset superellipse is not a superellipse — the inner section
+    only APPROXIMATES the declared wall, so the real minimum (measured
+    between the sampled curves) must stay inside tolerance."""
+    from .recipe_ops_revolve import SE_WALL_TOLERANCE
+
+    check = "form.se_wall_ok"
+    f = form.frame
+    if "se_min_wall" not in f:
+        return _finding(check, True, "n/a — not a superellipse vessel",
+                        critical=False)
+    need = f["pot_wall"] * SE_WALL_TOLERANCE
+    ok = f["se_min_wall"] >= need - 1e-9
+    return _finding(
+        check, ok,
+        f"measured min wall {f['se_min_wall']:.2f} "
+        f"({'≥' if ok else '<'} {SE_WALL_TOLERANCE:g}x declared "
+        f"{f['pot_wall']:g})",
+        measured=f["se_min_wall"], limit=need)
+
+
+register_probe("form.se_wall_ok")(
+    lambda form, ctx: check_se_wall_ok(form))

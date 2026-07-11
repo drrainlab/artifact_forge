@@ -1,0 +1,98 @@
+schema: archetype/v1
+id: plant_pot_squircle_v1
+version: 1
+object_class: plant_pot
+description: >
+  Squircle / superellipse plant pot on the section_loft kernel — the
+  plan shape sweeps from ellipse (exponent 2) to near-box (6) while the
+  drainage story stays honest: a RAISED floor over a standing foot
+  ring, bores exiting into the air gap. The inner wall only
+  approximates the declared thickness (an offset superellipse is not a
+  superellipse), so the real minimum wall is MEASURED, never hoped.
+  The circular sibling is plant_pot_v1.
+
+provides_features:
+  - superellipse_vessel
+  - drainage_bores
+
+parameters:
+  top_w:
+    {type: length, default: 110mm, min: 40mm, max: 240mm, role: functional, exposed: true}
+  top_l:
+    {type: length, default: 90mm, min: 40mm, max: 240mm, role: functional, exposed: true}
+  bottom_w:
+    {type: length, default: 90mm, min: 35mm, max: 220mm, role: functional}
+  bottom_l:
+    {type: length, default: 72mm, min: 35mm, max: 220mm, role: functional}
+  pot_h:
+    {type: length, default: 85mm, min: 30mm, max: 220mm, role: functional, exposed: true}
+  exponent:
+    {type: number, default: 4, min: 2, max: 6, role: aesthetic, exposed: true,
+     description: "2 = ellipse, 4 = squircle, 6 = nearly a box"}
+  wall:
+    {type: length, default: 2.4mm, min: 1.6mm, max: 5mm, role: structural}
+  floor_t:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: structural}
+  floor_raise:
+    {type: length, default: 6mm, min: 2mm, max: 20mm, role: functional}
+  drain_count:
+    {type: count, default: 4, min: 1, max: 9, role: functional}
+  drain_d:
+    {type: length, default: 7mm, min: 4mm, max: 14mm, role: functional}
+  drain_bc_d:
+    {type: length, default: "expr(min(bottom_w, bottom_l) / 2)", min: 0mm, max: 180mm, role: functional}
+
+constraints:
+  - top_w >= bottom_w
+  - top_l >= bottom_l
+  - pot_h > floor_raise + floor_t + 10
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: superellipse_pot_body
+      id: pot
+      params: {top_w: top_w, top_l: top_l, bottom_w: bottom_w,
+               bottom_l: bottom_l, h: pot_h, wall: wall, floor_t: floor_t,
+               floor_raise: floor_raise, exponent: exponent}
+    - op: bore_pattern
+      id: drains
+      params: {kind: bolt_circle, d: drain_d, count: drain_count,
+               bc_d: drain_bc_d,
+               z_top: "expr(floor_raise + floor_t)", through: floor_t}
+
+regions:
+  - {id: pot_cavity, role: soft_contact_surface, editable: false,
+     label: root cavity, aliases: [cavity, soil volume]}
+  - {id: pot_outer_shell, role: aesthetic_lightening, editable: false,
+     label: outer wall, aliases: [outer surface, pot wall]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: grow
+  modes: [utility, fluid_grow]
+  tags: [pot, planter, squircle, superellipse, drainage]
+
+validators:
+  - form.pot_taper_ok
+  - form.pot_floor_drains
+  - form.se_wall_ok
+  - form.holes_within_outline
+  - topology.bores_open
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - superellipse_vessel
+    - drainage_bores
+  must_not_have: []
+  invariants:
+    - top_w >= bottom_w

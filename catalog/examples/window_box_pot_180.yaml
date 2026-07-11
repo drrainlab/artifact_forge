@@ -1,0 +1,22 @@
+schema: product/v1
+id: window_box_pot_180
+archetype: plant_pot_squircle_v1@1
+strict: true
+
+requested_features:
+  - superellipse_vessel
+  - drainage_bores
+
+params:
+  top_w: 180mm
+  top_l: 100mm
+  bottom_w: 160mm
+  bottom_l: 84mm
+  pot_h: 95mm
+  exponent: 5
+  drain_count: 6
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

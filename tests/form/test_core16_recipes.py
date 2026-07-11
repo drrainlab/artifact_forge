@@ -37,6 +37,8 @@ WAVE_EXAMPLES = [
     "net_pot_50",
     "net_pot_75",
     "net_pot_100",
+    "squircle_pot_110",
+    "window_box_pot_180",
     # stage 3
     "star_knob_m5_40",
     "jig_knob_m6_50",
@@ -300,6 +302,38 @@ def test_pot_without_drains_fails_check():
              "nx": 2, "ny": 2, "spacing": 20.0, "spacing_y": 0.0,
              "cx": 0.0, "cy": 0.0, "z_top": 9.0, "through": 3.0}, "drains")
     assert check_pot_floor_drains(st).status.value == "pass"
+
+
+def test_squircle_pot_measures_its_wall():
+    from artifact_forge_ng.form.checks_pots import check_se_wall_ok
+
+    state = run_pre_cad(EXAMPLES / "squircle_pot_110.yaml", None)
+    f = state.form.frame
+    assert f["se_exponent"] == 4.0
+    assert f["se_min_wall"] >= 0.9 * f["pot_wall"]
+    assert check_se_wall_ok(state.form).status.value == "pass"
+    lofts = {pl.name: pl for pl in state.form.poly_lofts}
+    assert set(lofts) == {"pot_body", "pot_cavity", "pot_foot_void"}
+    assert lofts["pot_cavity"].cut and lofts["pot_foot_void"].cut
+    assert len(lofts["pot_body"].bottom) == len(lofts["pot_body"].top)
+
+
+def test_squircle_pot_undercut_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="open upward"):
+        RECIPE_OPS["superellipse_pot_body"].apply(
+            st, {"top_w": 80.0, "top_l": 80.0, "bottom_w": 100.0,
+                 "bottom_l": 80.0, "h": 80.0, "wall": 2.4, "floor_t": 3.0,
+                 "floor_raise": 6.0, "exponent": 4.0}, "pot")
+
+
+def test_squircle_exponent_band_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="exponent"):
+        RECIPE_OPS["superellipse_pot_body"].apply(
+            st, {"top_w": 100.0, "top_l": 80.0, "bottom_w": 90.0,
+                 "bottom_l": 70.0, "h": 80.0, "wall": 2.4, "floor_t": 3.0,
+                 "floor_raise": 6.0, "exponent": 9.0}, "pot")
 
 
 def test_net_pot_slots_stay_inside_band():

@@ -523,6 +523,13 @@ features:
       - form.svg_relief_printable
       - topology.text_relief_present
 
+  - id: superellipse_vessel
+    description: squircle/superellipse vessel — printable taper, measured minimum wall
+    verified_by:
+      - form.pot_taper_ok
+      - form.se_wall_ok
+      - topology.single_connected_solid
+
   # -- wall tool mounts pack ---------------------------------------------------
 
   - id: tool_saddle_ring

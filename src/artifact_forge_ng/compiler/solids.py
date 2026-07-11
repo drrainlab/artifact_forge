@@ -90,6 +90,35 @@ def _sweep_arc_bar(form: PartForm) -> cq.Workplane:
     )
 
 
+def _loft_polygons(bottom, z0: float, top, z1: float) -> cq.Workplane:
+    """Ruled loft between two horizontal polygon sections (equal point
+    counts — PolyLoftFeature enforces it)."""
+    wp = cq.Workplane("XY", origin=(0.0, 0.0, z0)).polyline(list(bottom)).close()
+    wp = wp.workplane(offset=z1 - z0).polyline(list(top)).close()
+    return wp.loft(ruled=True, combine=False)
+
+
+def _loft_body(form: PartForm, log: CompileLog) -> cq.Workplane:
+    """section_loft kernel: additive PolyLofts fuse into the base body,
+    subtractive ones carve it (a superellipse pot's cavity/foot void)."""
+    mass: cq.Workplane | None = None
+    for pl in form.poly_lofts:
+        if pl.cut:
+            continue
+        piece = _loft_polygons(pl.bottom, pl.z0, pl.top, pl.z1)
+        mass = piece if mass is None else weld(mass, piece, what=pl.name)
+    if mass is None:
+        raise ValueError("section_loft body declares no additive poly loft")
+    for pl in form.poly_lofts:
+        if not pl.cut:
+            continue
+        cutter = _loft_polygons(pl.bottom, pl.z0, pl.top, pl.z1)
+        mass, cut = cut_keep_solid(mass, cutter)
+        if not cut:
+            log.notes.append(f"poly loft cut {pl.name!r} could not be applied")
+    return mass
+
+
 def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
     log = CompileLog()
 
@@ -97,6 +126,8 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
         mass = revolve_section_profile(form.section)
     elif form.kind == "section_sweep":
         mass = _sweep_arc_bar(form)
+    elif form.kind == "section_loft":
+        mass = _loft_body(form, log)
     else:
         mass = extrude_section_profile(form.section, form.width)
 
