@@ -1,0 +1,19 @@
+schema: product/v1
+id: logo_stamp_arrow
+archetype: custom_stamp_svg_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - mirrored_svg_die
+
+params:
+  svg_path: "M 0 8 L 12 8 L 12 2 L 24 10 L 12 18 L 12 12 L 0 12 Z"
+  motif_w: 32mm
+  die_l: 60mm
+  die_w: 36mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

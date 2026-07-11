@@ -162,6 +162,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
               "the thinnest glyph stem survives the nozzle (analytic per the bundled font)"),
         _decl("form.stamp_mirrored_ok", Level.FORM,
               "a stamp die is mirrored relief — its impression reads forwards"),
+        _decl("form.svg_relief_printable", Level.FORM,
+              "the svg relief's true narrowest polygon feature survives the nozzle"),
         # -- interface level (wave A1, form-time) ------------------------------
         _decl("interface.frame_exists", Level.FORM, "every declared interface's datum is published on the form with its type's frame keys"),
         _decl("interface.keepouts_preserved", Level.FORM, "no cut touched a declared interface keepout region"),

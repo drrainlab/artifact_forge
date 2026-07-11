@@ -39,14 +39,25 @@ def build_text_solid(tr: TextReliefFeature) -> cq.Workplane:
         else:
             z0 = tr.plane_z - 1.0
             height = tr.depth + 1.0
-    glyphs = (
-        cq.Workplane("XY")
-        .text(
-            tr.text, tr.size, height,
-            font=FONT_NAME, fontPath=str(FONT_PATH),
-            combine=False, halign="center", valign="center",
+    if tr.polygons:
+        # explicit relief polygons (a flattened SVG path) — one prism per
+        # polygon, fused into a compound like the field cutters
+        pieces = []
+        for poly in tr.polygons:
+            wp = cq.Workplane("XY", origin=(0, 0, 0)).moveTo(*poly[0])
+            for px, py in poly[1:]:
+                wp = wp.lineTo(px, py)
+            pieces.extend(wp.close().extrude(height).solids().vals())
+        glyphs = cq.Workplane(obj=cq.Compound.makeCompound(pieces))
+    else:
+        glyphs = (
+            cq.Workplane("XY")
+            .text(
+                tr.text, tr.size, height,
+                font=FONT_NAME, fontPath=str(FONT_PATH),
+                combine=False, halign="center", valign="center",
+            )
         )
-    )
     if tr.mirror:
         glyphs = glyphs.mirror(mirrorPlane="YZ")
     if abs(tr.rotate_deg) > 1e-9:

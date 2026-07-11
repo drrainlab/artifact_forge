@@ -510,6 +510,19 @@ features:
       - topology.bores_open
       - topology.pockets_present
 
+  - id: svg_relief_geometry
+    description: SVG path as relief — closed hole-free subpaths, narrowest feature measured
+    verified_by:
+      - form.svg_relief_printable
+      - topology.text_relief_present
+
+  - id: mirrored_svg_die
+    description: mirrored SVG relief die whose impression reads forwards
+    verified_by:
+      - form.stamp_mirrored_ok
+      - form.svg_relief_printable
+      - topology.text_relief_present
+
   # -- wall tool mounts pack ---------------------------------------------------
 
   - id: tool_saddle_ring

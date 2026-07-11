@@ -369,9 +369,13 @@ class TextReliefFeature:
     #: a stamp die carries its glyphs under the body and PRINTS face-down
     #: on the bed — the crispest first-layer text there is.
     direction: str = "up"
+    #: Explicit relief polygons in LOCAL mm around the anchor (an SVG
+    #: path already flattened at the IR level). When non-empty they ARE
+    #: the relief and ``text`` is just the display label.
+    polygons: tuple[tuple[tuple[float, float], ...], ...] = ()
 
     def __post_init__(self) -> None:
-        if not self.text.strip():
+        if not self.polygons and not self.text.strip():
             raise ValueError(f"TextReliefFeature {self.name!r} needs text")
         if self.size <= 0 or self.depth <= 0:
             raise ValueError(f"TextReliefFeature {self.name!r} needs positive size/depth")
@@ -381,8 +385,13 @@ class TextReliefFeature:
             raise ValueError(f"TextReliefFeature {self.name!r} direction must be up/down")
 
     def footprint(self) -> tuple[float, float]:
-        """Conservative (w, h) of the rendered line — the keepout/probe
-        band. DejaVu Sans averages ~0.6 cap heights per glyph advance."""
+        """Conservative (w, h) of the rendered relief — the keepout/probe
+        band. Polygons measure their own bbox; text estimates from the
+        bundled font (~0.6 cap heights per glyph advance)."""
+        if self.polygons:
+            xs = [x for poly in self.polygons for x, _ in poly]
+            ys = [y for poly in self.polygons for _, y in poly]
+            return (max(xs) - min(xs) + 2.0, max(ys) - min(ys) + 2.0)
         return (max(1, len(self.text)) * self.size * 0.72 + self.size,
                 self.size * 1.5)
 

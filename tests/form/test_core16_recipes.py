@@ -54,6 +54,7 @@ WAVE_EXAMPLES = [
     "maker_initials_stamp",
     "leather_stamp_gb",
     "clay_pattern_stamp",
+    "logo_stamp_arrow",
     # deferral wave
     "step_drill_guide_8_5",
     "chair_foot_press_25x2",
