@@ -1,0 +1,24 @@
+schema: product/v1
+id: minifuse_underdesk_mount
+archetype: underdesk_audio_interface_mount_v1@1
+strict: true
+
+# Nominal MiniFuse 2 footprint — measure your unit and verify fit.
+requested_features:
+  - mounting_plate_body
+  - hole_pattern
+  - pass_through_cutout
+  - tie_slots
+
+params:
+  device_l: 200mm
+  device_w: 104mm
+  strap_w: 25mm
+  vent_w: 110mm
+  vent_h: 56mm
+  screw: M4
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

@@ -1,0 +1,122 @@
+schema: archetype/v1
+id: underdesk_audio_interface_mount_v1
+version: 1
+object_class: underdesk_device_tray
+description: >
+  Under-desk tray for a desktop audio interface: a rounded plate that
+  screws flat under the desk, a central vent/cable window, and a through
+  strap-slot pair — a hook-and-loop strap wraps the device against the
+  tray. Pure recipe YAML on core ops; device presets (MiniFuse, Scarlett)
+  are examples that change one parameter block.
+
+provides_features:
+  - mounting_plate_body
+  - hole_pattern
+  - pass_through_cutout
+  - tie_slots
+
+parameters:
+  device_l:
+    {type: length, default: 200mm, min: 120mm, max: 320mm,
+     role: functional, exposed: true,
+     description: device length along the tray (X)}
+  device_w:
+    {type: length, default: 110mm, min: 70mm, max: 220mm,
+     role: functional, exposed: true,
+     description: device depth across the tray (Y)}
+  thickness:
+    {type: length, default: 5mm, min: 4mm, max: 8mm, role: manufacturing}
+  corner_r:
+    {type: length, default: 6mm, min: 2mm, max: 14mm, role: aesthetic}
+  end_margin:
+    {type: length, default: 16mm, min: 12mm, max: 30mm, role: assembly,
+     description: plate margin past the device at each end — the desk-screw zone}
+  strap_w:
+    {type: length, default: 25mm, min: 15mm, max: 50mm,
+     role: functional, exposed: true,
+     description: strap width the slots must pass}
+  strap_slot_t:
+    {type: length, default: 4mm, min: 3mm, max: 6mm, role: functional,
+     description: slot thickness — strap plus working slack}
+  vent_w:
+    {type: length, default: 120mm, min: 40mm, max: expr(device_l - 40),
+     role: functional, description: central vent/cable window width}
+  vent_h:
+    {type: length, default: 60mm, min: 24mm, max: expr(device_w - 24),
+     role: functional, description: central vent/cable window height}
+  screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly}
+  min_web:
+    {type: length, default: 4mm, min: 3mm, max: 10mm, role: manufacturing}
+
+constraints:
+  - vent_w < device_l - 2 * min_web - 2 * strap_w
+  - vent_h < device_w - 2 * min_web
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params:
+        l: expr(device_l + 2 * end_margin)
+        w: expr(device_w + 2 * (strap_slot_t + 2 * min_web))
+        t: thickness
+        corner_r: corner_r
+    - op: rounded_rect_cutout
+      id: vent_window
+      params: {w: vent_w, h: vent_h}
+    - op: rounded_rect_cutout
+      id: strap_slot_front
+      params:
+        w: strap_w
+        h: strap_slot_t
+        cy: expr(device_w / 2 + min_web + strap_slot_t / 2)
+    - op: rounded_rect_cutout
+      id: strap_slot_back
+      params:
+        w: strap_w
+        h: strap_slot_t
+        cy: expr(-(device_w / 2 + min_web + strap_slot_t / 2))
+    - op: countersunk_hole_pattern
+      id: desk_screws
+      params:
+        kind: line
+        screw: screw
+        count: 2
+        spacing: expr(device_l + end_margin)
+        cs_face: top
+
+regions:
+  - {id: plate, role: mounting_surface, editable: true}
+  - {id: plate_lightening, role: aesthetic_lightening, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - form.cuts_respect_keepouts
+  - topology.single_connected_solid
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.cutout_present
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_hex_perforation
+  - add_vein_ribs
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - hole_pattern
+    - tie_slots
+  must_not_have: []
+  invariants:
+    - vent_h < device_w - 2 * min_web

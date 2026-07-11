@@ -1,0 +1,23 @@
+schema: product/v1
+id: patch_cable_comb
+archetype: cable_comb_v1@1
+strict: true
+
+# Studio preset of the core cable comb: 6.5 mm patch/instrument cables,
+# eight lanes — a pedalboard or desk patch organizer.
+requested_features:
+  - cable_slots
+  - slot_retention_throats
+  - rounded_contact_edges
+
+params:
+  cable_d: 6.5mm
+  slot_count: 8
+  depth: 14mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: avoid
