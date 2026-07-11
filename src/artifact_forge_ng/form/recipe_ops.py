@@ -23,3 +23,4 @@ from . import recipe_ops_pegboard  # noqa: E402,F401
 from . import recipe_ops_connector  # noqa: E402,F401
 from . import recipe_ops_text  # noqa: E402,F401
 from . import recipe_ops_hinge  # noqa: E402,F401
+from . import recipe_ops_ratchet  # noqa: E402,F401

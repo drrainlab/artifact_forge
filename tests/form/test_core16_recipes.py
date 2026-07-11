@@ -59,6 +59,8 @@ WAVE_EXAMPLES = [
     "clay_pattern_stamp",
     "logo_stamp_arrow",
     # deferral wave
+    "ratchet_wheel_40_24t",
+    "ratchet_wheel_60_36t_round",
     "coupler_5_8_stepper",
     "coupler_6_6_long",
     "card_case_blank_120",
@@ -177,6 +179,40 @@ def test_tight_pin_fails_fit_check():
     st = _leaf(pin_clearance=0.2)
     st.frame["hinge_bore_d"] = st.frame["hinge_pin_d"] + 0.1  # binds
     assert check_hinge_pin_fit_ok(st).status.value == "fail"
+
+
+# -- ratchet wheel --------------------------------------------------------------------
+
+
+def test_ratchet_teeth_asymmetric_and_measured():
+    from artifact_forge_ng.form.checks_ratchet import check_ratchet_teeth_ok
+
+    state = run_pre_cad(EXAMPLES / "ratchet_wheel_40_24t.yaml", None)
+    f = state.form.frame
+    assert f["ratchet_teeth"] == 24.0
+    assert f["ratchet_r_tip"] - f["ratchet_r_root"] == pytest.approx(2.5)
+    assert f["ratchet_steep_frac"] <= 0.15
+    assert check_ratchet_teeth_ok(state.form).status.value == "pass"
+    # the section carries 2 points per tooth
+    assert len(state.form.section.outer.segments) == 48
+
+
+def test_ratchet_worm_ramp_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="steep_frac"):
+        RECIPE_OPS["ratchet_wheel_body"].apply(
+            st, {"wheel_d": 40.0, "teeth": 24, "tooth_depth": 2.5,
+                 "steep_frac": 0.4, "t": 6.0, "socket": "square",
+                 "shaft_sq": 8.0, "fit_clearance": 0.25}, "wheel")
+
+
+def test_ratchet_serration_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="pitch"):
+        RECIPE_OPS["ratchet_wheel_body"].apply(
+            st, {"wheel_d": 22.0, "teeth": 40, "tooth_depth": 1.5,
+                 "steep_frac": 0.08, "t": 6.0, "socket": "square",
+                 "shaft_sq": 6.0, "fit_clearance": 0.25}, "wheel")
 
 
 # -- shaft coupler --------------------------------------------------------------------

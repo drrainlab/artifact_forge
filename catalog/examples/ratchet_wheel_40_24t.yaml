@@ -1,0 +1,15 @@
+schema: product/v1
+id: ratchet_wheel_40_24t
+archetype: ratchet_wheel_v1@1
+strict: true
+
+requested_features:
+  - ratchet_tooth_ring
+  - square_shaft_socket
+
+params: {}
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

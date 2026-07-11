@@ -64,6 +64,7 @@ at runtime.
 | `loft_between_sections` | ✅ | rect→rect (LoftFeature/tapered_beam) + POLYGON sections (PolyLoftFeature, kind section_loft): additive body + subtractive cavities — superellipse_pot_body is the first client |
 | `tapered_beam` | ✅ | LoftFeature (taper by construction) + topology.arm_reaches_tip (shelf_bracket_v1) |
 | `truss_beam` | ✅ | truss_web_cutouts op: warren triangles, ligament = strut by construction (truss_beam_180) |
+| `ratchet_wheel_body` | ✅ | recipe op (R2.15): asymmetric sawtooth ring in the section (steep face locks, ramp slips) + square/round socket; the sprung pawl is its own iteration, said out loud |
 | `shaft_coupler_body` | ✅ | recipe op (R2.14): two blind coaxial bores over a solid mid web + teardrop set screws; torque honesty (hobby duty) |
 | `living_hinge_groove` | ✅ | recipe op (R2.13): transverse groove leaving a measured flex web [0.3–0.8]; fold-cycle honesty check (material property, not printed) |
 | `rail_slider_body` | ✅ | recipe op (R2.12): female dovetail shoe on the clamp-family rail — constant section sideprint, rail-parameterized, dovetail_rail female port |

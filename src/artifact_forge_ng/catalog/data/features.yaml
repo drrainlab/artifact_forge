@@ -530,6 +530,12 @@ features:
       - form.se_wall_ok
       - topology.single_connected_solid
 
+  - id: ratchet_tooth_ring
+    description: asymmetric sawtooth ring — locks one way, ramps the other (pawl pending)
+    verified_by:
+      - form.ratchet_teeth_ok
+      - topology.single_connected_solid
+
   - id: coupler_shaft_bores
     description: two blind coaxial shaft bores over a solid mid web with set screws
     verified_by:

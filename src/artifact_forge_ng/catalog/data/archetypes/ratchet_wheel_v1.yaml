@@ -1,0 +1,81 @@
+schema: archetype/v1
+id: ratchet_wheel_v1
+version: 1
+object_class: ratchet_wheel
+description: >
+  Ratchet wheel: an asymmetric sawtooth ring in the section itself —
+  the steep face locks, the ramp slips — extruded flat with a square
+  (or round) shaft socket. Honesty out loud: this is the WHEEL; the
+  sprung pawl (flexure + fatigue) is its own iteration — pair with a
+  hardware pawl meanwhile.
+
+maturity: sandbox_buildable
+
+provides_features:
+  - ratchet_tooth_ring
+  - square_shaft_socket
+
+parameters:
+  wheel_d:
+    {type: length, default: 40mm, min: 20mm, max: 100mm, role: functional, exposed: true}
+  teeth:
+    {type: count, default: 24, min: 8, max: 60, role: functional, exposed: true}
+  tooth_depth:
+    {type: length, default: 2.5mm, min: 1.5mm, max: 8mm, role: functional}
+  steep_frac:
+    {type: number, default: 0.08, min: 0.02, max: 0.15, role: functional,
+     description: locking-face fraction of the tooth pitch (nearly radial)}
+  t:
+    {type: length, default: 6mm, min: 3mm, max: 15mm, role: structural}
+  socket:
+    {type: choice, choices: [square, round], default: square, role: assembly}
+  shaft_sq:
+    {type: length, default: 8mm, min: 4mm, max: 15mm, role: assembly, exposed: true,
+     description: square across-flats (or round diameter) of the shaft}
+  fit_clearance:
+    {type: length, default: 0.25mm, min: 0.1mm, max: 0.4mm, role: manufacturing}
+
+constraints:
+  - tooth_depth < wheel_d / 8
+  - shaft_sq < wheel_d / 2 - 2 * tooth_depth
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: ratchet_wheel_body
+      id: wheel
+      params: {wheel_d: wheel_d, teeth: teeth, tooth_depth: tooth_depth,
+               steep_frac: steep_frac, t: t, socket: socket,
+               shaft_sq: shaft_sq, fit_clearance: fit_clearance}
+
+regions:
+  - {id: wheel_teeth, role: high_stress_region, editable: false,
+     label: tooth ring, aliases: [teeth, ring]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: workshop
+  modes: [engineering, workshop]
+  tags: [ratchet, teeth, wheel, mechanism]
+
+validators:
+  - form.ratchet_teeth_ok
+  - form.shaft_fit_ok
+  - form.knob_torque_wall_ok
+  - form.ratchet_pawl_unverified
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - ratchet_tooth_ring
+  must_not_have: []
+  invariants:
+    - tooth_depth < wheel_d / 8

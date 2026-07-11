@@ -1,0 +1,19 @@
+schema: product/v1
+id: ratchet_wheel_60_36t_round
+archetype: ratchet_wheel_v1@1
+strict: true
+
+requested_features:
+  - ratchet_tooth_ring
+
+params:
+  wheel_d: 60mm
+  teeth: 36
+  tooth_depth: 3mm
+  socket: round
+  shaft_sq: 10mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none
