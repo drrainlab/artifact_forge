@@ -424,6 +424,28 @@ def test_socket_isolation_check_fails_on_merged_ends():
     assert check_socket_bores_isolated(st).status.value == "fail"
 
 
+def test_toggled_off_arm_port_is_honestly_unbuilt():
+    """The rod_socket ports ride the optional+absent-datum mechanism: an
+    elbow's two missing arms leave their ports un-built with a note,
+    never a frame_exists FAIL; the full cross anchors all four."""
+    from artifact_forge_ng.form.checks_interfaces import (
+        check_interface_frame_exists)
+
+    class _Ctx:
+        pass
+
+    elbow = run_pre_cad(EXAMPLES / "trellis_elbow_6mm.yaml", None)
+    cross = run_pre_cad(EXAMPLES / "trellis_cross_10mm.yaml", None)
+    finding_e = [f for f in elbow.report.findings
+                 if f.check == "interface.frame_exists"][0]
+    finding_c = [f for f in cross.report.findings
+                 if f.check == "interface.frame_exists"][0]
+    assert finding_e.status.value == "pass"
+    assert "not built on this instance" in finding_e.message
+    assert finding_c.status.value == "pass"
+    assert "4 interface(s)" in finding_c.message
+
+
 def test_disabled_arm_is_a_noop():
     st = RecipeState()
     RECIPE_OPS["multi_socket_hub"].apply(st, {"hub_d": 22.0, "hub_h": 24.0}, "hub")

@@ -20,6 +20,8 @@ USER_VOCABULARY = {
     "profile_seat",
     # pegboard hole-grid engagement (the board is external hardware)
     "pegboard_peg",
+    # blind rod seat on connector arms (toggled-off arms = un-built port)
+    "rod_socket",
 }
 
 

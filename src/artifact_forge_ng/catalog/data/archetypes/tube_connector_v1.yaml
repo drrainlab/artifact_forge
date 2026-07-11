@@ -67,12 +67,28 @@ regions:
 
 surface_style: molded_utility_part
 
+# The +X branch exists in every config; the -X one only on a cross —
+# its optional port stays un-built otherwise. Hose ends mate HARDWARE.
+interfaces:
+  - id: branch_a
+    type: hose_port
+    gender: neutral
+    datum: branch_px
+    frame: {normal: "+X", up: "+Z"}
+  - id: branch_b
+    type: hose_port
+    gender: neutral
+    datum: branch_mx
+    frame: {normal: "-X", up: "+Z"}
+
 catalog:
   domain: repair
   modes: [utility]
   tags: [hose, tee, cross, barb, tube]
 
 validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
   - form.barb_retention_ok
   - form.tube_wall_ok
   - form.tube_run_open

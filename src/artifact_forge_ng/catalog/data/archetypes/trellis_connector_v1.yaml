@@ -70,12 +70,39 @@ regions:
 
 surface_style: molded_utility_part
 
+# One port per possible arm — a toggled-off arm publishes no datum and
+# its optional port stays honestly un-built (never a frame_exists FAIL).
+interfaces:
+  - id: east_rod
+    type: rod_socket
+    gender: female
+    datum: "socket_+x"
+    frame: {normal: "+X", up: "+Z"}
+  - id: west_rod
+    type: rod_socket
+    gender: female
+    datum: "socket_-x"
+    frame: {normal: "-X", up: "+Z"}
+  - id: north_rod
+    type: rod_socket
+    gender: female
+    datum: "socket_+y"
+    frame: {normal: "+Y", up: "+Z"}
+  - id: riser_rod
+    type: rod_socket
+    gender: female
+    datum: "socket_+z"
+    frame: {normal: "+Z", up: "+Y"}
+
 catalog:
   domain: grow
   modes: [utility, fluid_grow]
   tags: [trellis, connector, rod, frame, tee]
 
 validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
+  - interface.normal_points_outward
   - form.socket_engagement_ok
   - form.socket_bores_isolated
   - topology.pins_present

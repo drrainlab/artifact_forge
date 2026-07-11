@@ -186,6 +186,12 @@ INTERFACE_TYPES: dict[str, InterfaceTypeDecl] = dict([
           (), genders=("male",), orientation_sensitive=True,
           frame_keys={"male": ("peg_pitch", "peg_d", "peg_len",
                                "peg_count", "board_t")}),
+    _decl("rod_socket",
+          "blind axis-aligned rod seat (female = the printed socket; the "
+          "rod may be hardware or a printed shaft) — per-arm dimensions "
+          "live in namespaced frame keys, toggled-off arms leave the "
+          "port honestly un-built (optional + absent datum)",
+          (), clearance_band=(0.1, 0.8)),
 ])
 
 
