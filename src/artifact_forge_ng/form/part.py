@@ -396,6 +396,93 @@ class TextReliefFeature:
                 self.size * 1.5)
 
 
+def _normalize(v: tuple[float, float, float]) -> tuple[float, float, float]:
+    import math
+
+    n = math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2])
+    if n < 1e-9:
+        raise ValueError("direction must be a non-zero vector")
+    return (v[0] / n, v[1] / n, v[2] / n)
+
+
+@dataclass(frozen=True)
+class AngledBoreFeature:
+    """A cylindrical cut along an ARBITRARY direction — the oriented
+    kernel's first half. ``start`` is the OPEN end (the mouth); the far
+    end is blind. Probed by the same swept-cylinder path machinery as
+    the axis-aligned BoreFeature (duck-typed: name / d / path())."""
+
+    name: str
+    start: tuple[float, float, float]   # the mouth (open end)
+    direction: tuple[float, float, float]  # into the material; normalized
+    d: float
+    length: float
+
+    def __post_init__(self) -> None:
+        if self.d <= 0 or self.length <= 0:
+            raise ValueError(f"AngledBoreFeature {self.name!r} needs positive d/length")
+        object.__setattr__(self, "direction", _normalize(self.direction))
+
+    @property
+    def axis(self) -> str:
+        # foreign iterators (hole webs, keepout math) filter on axis —
+        # an angled bore is never one of X/Y/Z
+        return "ANGLED"
+
+    def bbox(self) -> Box3:
+        sx, sy, sz = self.start
+        ex, ey, ez = (sx + self.direction[0] * self.length,
+                      sy + self.direction[1] * self.length,
+                      sz + self.direction[2] * self.length)
+        r = self.d / 2.0
+        return Box3(min(sx, ex) - r, min(sy, ey) - r, min(sz, ez) - r,
+                    max(sx, ex) + r, max(sy, ey) + r, max(sz, ez) + r)
+
+    def path(self, probe_overshoot: float = 1.0) -> list[tuple[float, float, float]]:
+        sx, sy, sz = self.start
+        dx, dy, dz = self.direction
+        # open at the mouth (overshoot out), inset before the blind end
+        lo = -probe_overshoot
+        hi = self.length - 0.4
+        return [
+            (sx + dx * lo, sy + dy * lo, sz + dz * lo),
+            (sx + dx * hi, sy + dy * hi, sz + dz * hi),
+        ]
+
+
+@dataclass(frozen=True)
+class AngledPinFeature:
+    """An ADDITIVE cylinder along an ARBITRARY direction (a connector's
+    diagonal arm barrel). Duck-typed against PinFeature for the presence
+    probe: start_point / end_point / length / d / bore_d."""
+
+    name: str
+    start: tuple[float, float, float]
+    direction: tuple[float, float, float]
+    d: float
+    length: float
+    bore_d: float = 0.0
+
+    def __post_init__(self) -> None:
+        if self.d <= 0 or self.length <= 0:
+            raise ValueError(f"AngledPinFeature {self.name!r} needs positive d/length")
+        if self.bore_d < 0 or self.bore_d >= self.d:
+            raise ValueError(f"AngledPinFeature {self.name!r} bore_d must stay inside d")
+        object.__setattr__(self, "direction", _normalize(self.direction))
+
+    @property
+    def axis(self) -> str:
+        return "ANGLED"
+
+    def start_point(self) -> tuple[float, float, float]:
+        return self.start
+
+    def end_point(self) -> tuple[float, float, float]:
+        sx, sy, sz = self.start
+        dx, dy, dz = self.direction
+        return (sx + dx * self.length, sy + dy * self.length, sz + dz * self.length)
+
+
 @dataclass(frozen=True)
 class PolyLoftFeature:
     """A ruled loft between two horizontal polygon sections — the

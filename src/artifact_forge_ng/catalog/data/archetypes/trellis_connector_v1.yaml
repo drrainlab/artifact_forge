@@ -33,6 +33,16 @@ parameters:
     {type: count, default: 0, min: 0, max: 1, role: functional, exposed: true}
   arm_pz:
     {type: count, default: 1, min: 0, max: 1, role: functional, exposed: true}
+  brace:
+    {type: count, default: 0, min: 0, max: 1, role: functional, exposed: true,
+     description: diagonal brace socket (oriented kernel)}
+  brace_azimuth:
+    {type: number, default: 180, min: 0, max: 360, role: functional}
+  brace_elevation:
+    {type: number, default: 45, min: 30, max: 80, role: functional,
+     description: degrees above horizon — banded to the printable diagonal}
+  rod_d_brace:
+    {type: length, default: 8mm, min: 4mm, max: 20mm, role: assembly}
 
 constraints:
   - hub_d > rod_d + 4
@@ -63,6 +73,11 @@ form:
       id: riser
       params: {dir: "+z", enabled: arm_pz, rod_d: rod_d_up, wall: wall,
                clearance: clearance}
+    - op: angled_socket_arm
+      id: diag
+      params: {enabled: brace, azimuth_deg: brace_azimuth,
+               elevation_deg: brace_elevation, rod_d: rod_d_brace,
+               wall: wall, clearance: clearance}
 
 regions:
   - {id: hub_body, role: mounting_surface, editable: false,
@@ -105,6 +120,7 @@ validators:
   - interface.normal_points_outward
   - form.socket_engagement_ok
   - form.socket_bores_isolated
+  - form.angled_arm_printable
   - topology.pins_present
   - topology.bores_open
   - topology.single_connected_solid

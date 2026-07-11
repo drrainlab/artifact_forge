@@ -192,11 +192,29 @@ def pins_present(geometry: Geometry, form: PartForm) -> Finding:
             half = min(0.5, (pin.d - pin.bore_d) / 4.0 * 0.8)
             # horizontal tubes skip the +Z station: their bore prints with
             # a teardrop roof that legitimately reaches into that band
-            offsets = {
-                "Z": ((r_wall, 0, 0), (-r_wall, 0, 0), (0, r_wall, 0), (0, -r_wall, 0)),
-                "X": ((0, r_wall, 0), (0, -r_wall, 0), (0, 0, -r_wall)),
-                "Y": ((r_wall, 0, 0), (-r_wall, 0, 0), (0, 0, -r_wall)),
-            }[pin.axis]
+            if pin.axis == "ANGLED":
+                dx, dy, dz = pin.direction
+                # any perpendicular pair around the arm axis
+                ref = (0.0, 0.0, 1.0) if abs(dz) < 0.9 else (1.0, 0.0, 0.0)
+                ux = dy * ref[2] - dz * ref[1]
+                uy = dz * ref[0] - dx * ref[2]
+                uz = dx * ref[1] - dy * ref[0]
+                import math as _m
+                un = _m.sqrt(ux * ux + uy * uy + uz * uz)
+                u = (ux / un, uy / un, uz / un)
+                v = (dy * u[2] - dz * u[1],
+                     dz * u[0] - dx * u[2],
+                     dx * u[1] - dy * u[0])
+                offsets = tuple(
+                    (a[0] * r_wall, a[1] * r_wall, a[2] * r_wall)
+                    for a in (u, (-u[0], -u[1], -u[2]), v, (-v[0], -v[1], -v[2]))
+                )
+            else:
+                offsets = {
+                    "Z": ((r_wall, 0, 0), (-r_wall, 0, 0), (0, r_wall, 0), (0, -r_wall, 0)),
+                    "X": ((0, r_wall, 0), (0, -r_wall, 0), (0, 0, -r_wall)),
+                    "Y": ((r_wall, 0, 0), (-r_wall, 0, 0), (0, 0, -r_wall)),
+                }[pin.axis]
             broken = False
             for dx, dy, dz in offsets:
                 probe = box_probe(

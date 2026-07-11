@@ -53,6 +53,7 @@ WAVE_EXAMPLES = [
     "trellis_tee_8mm",
     "trellis_cross_10mm",
     "trellis_elbow_6mm",
+    "trellis_a_frame_8mm",
     "maker_initials_stamp",
     "leather_stamp_gb",
     "clay_pattern_stamp",
@@ -478,6 +479,42 @@ def test_toggled_off_arm_port_is_honestly_unbuilt():
     assert "not built on this instance" in finding_e.message
     assert finding_c.status.value == "pass"
     assert "4 interface(s)" in finding_c.message
+
+
+def test_diagonal_brace_builds_oriented_features():
+    import math
+
+    state = run_pre_cad(EXAMPLES / "trellis_a_frame_8mm.yaml", None)
+    form = state.form
+    brace_pins = [p for p in form.pins if p.axis == "ANGLED"]
+    brace_bores = [b for b in form.bores if b.axis == "ANGLED"]
+    assert len(brace_pins) == 1 and len(brace_bores) == 1
+    dx, dy, dz = brace_pins[0].direction
+    assert math.hypot(dx, dy, dz) == pytest.approx(1.0)
+    assert dz == pytest.approx(math.sin(math.radians(45)))
+    assert "socket_diag" in form.datums
+    assert form.frame["diag_elevation_deg"] == 45.0
+
+
+def test_flat_diagonal_refused():
+    st = RecipeState()
+    RECIPE_OPS["multi_socket_hub"].apply(st, {"hub_d": 24.0, "hub_h": 30.0}, "hub")
+    with pytest.raises(RecipeError, match="elevation"):
+        RECIPE_OPS["angled_socket_arm"].apply(
+            st, {"azimuth_deg": 0.0, "elevation_deg": 15.0, "enabled": 1,
+                 "rod_d": 8.0, "depth": 0.0, "wall": 3.0, "clearance": 0.3,
+                 "fit": "slip", "z": 0.0}, "diag")
+
+
+def test_angled_printable_check_measures_frame():
+    from artifact_forge_ng.form.checks_connector import (
+        check_angled_arm_printable)
+
+    st = RecipeState()
+    st.frame["diag_elevation_deg"] = 12.0
+    assert check_angled_arm_printable(st).status.value == "fail"
+    st.frame["diag_elevation_deg"] = 45.0
+    assert check_angled_arm_printable(st).status.value == "pass"
 
 
 def test_disabled_arm_is_a_noop():

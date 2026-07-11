@@ -209,16 +209,23 @@ iteration, none is a bug. R2.5 closed the S/M half of this ledger:
 - ~~TPU pad recess + revolved press-fit body~~ ✅ R2.5 — `foot_body` op +
   furniture_foot_press_v1 (spigot presses INTO the tube, TPU disc recess);
 
-Still open (each needs a kernel/dependency decision first):
+R2.6–R2.9 closed the rest of the ledger:
 
-- superellipse plant pot plan (needs `loft_between_sections` rect→superellipse);
-- non-90° connector/tube branches (needs an oriented kernel primitive:
-  angled Bore/Pin + swept probes + non-axis-aligned interface frames);
-- SVG relief on `text_emboss` (path→polygon needs a new dependency, e.g.
-  svgelements; text-only in v1);
-- a `rod_socket` interface type for trellis/tube limb mates — blocked on
-  CONDITIONAL interface declarations (a toggled-off arm's port must not
-  fail interface.frame_exists), a schema feature, not an op.
+- ~~SVG relief~~ ✅ R2.6 — svgelements (core dep), svg_relief op, TRUE
+  narrowest-feature measurement (inward-normal ray casting), holes
+  (nested subpaths) refused loudly until the hole-subtraction iteration;
+- ~~rod_socket interface type~~ ✅ R2.7 — the "conditional declarations"
+  blocker dissolved: interface.frame_exists already treats an OPTIONAL
+  port with an absent datum as honestly un-built; trellis declares all
+  four arm ports, tube_connector its hose branches;
+- ~~superellipse plant pot~~ ✅ R2.8 — PolyLoftFeature + kind
+  section_loft (additive body + subtractive cavities), min wall MEASURED
+  (an offset superellipse is not a superellipse);
+- ~~non-90° branches~~ ✅ R2.9 (bounded) — AngledPin/AngledBore
+  (cylinders along an arbitrary unit vector) + path-based probes;
+  angled_socket_arm banded to the printable 30–80° elevation. Still
+  axis-aligned by contract: interface FRAMES (diagonal ports publish a
+  datum, no port declaration) and barbs (a barb is a revolve).
 
 ## Print orientation — a cross-cutting concern
 

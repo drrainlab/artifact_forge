@@ -26,7 +26,19 @@ _AXIS_INDEX = {"X": 0, "Y": 1, "Z": 2}
 _AXIS_SIGN = {"X": 1.0, "Y": -1.0, "Z": 1.0}
 
 
-def cut_bore(body: cq.Workplane, bore: BoreFeature) -> tuple[cq.Workplane, bool]:
+def cut_bore(body: cq.Workplane, bore) -> tuple[cq.Workplane, bool]:
+    from ..form.part import AngledBoreFeature
+
+    if isinstance(bore, AngledBoreFeature):
+        # oriented cutter: a cylinder along the declared direction, open
+        # 1 mm past the mouth, ending exactly at the blind depth
+        sx, sy, sz = bore.start
+        dx, dy, dz = bore.direction
+        origin = (sx - dx, sy - dy, sz - dz)
+        plane = cq.Plane(origin=origin, normal=(dx, dy, dz))
+        cutter = cq.Workplane(plane).circle(bore.d / 2.0).extrude(bore.length + 1.0)
+        return cut_keep_solid(body, cutter)
+
     idx = _AXIS_INDEX[bore.axis]
     origin = list(bore.center)
     lo = bore.span[0] - bore.overshoot[0]

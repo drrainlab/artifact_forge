@@ -142,3 +142,33 @@ def check_tube_run_open(form: PartForm) -> Finding:
 
 register_probe("form.tube_run_open")(
     lambda form, ctx: check_tube_run_open(form))
+
+
+def check_angled_arm_printable(form: PartForm) -> Finding:
+    """Every diagonal arm's elevation must sit in the printable band —
+    measured from the published frame, never assumed."""
+    from .recipe_ops_connector import ANGLED_ELEV_BAND
+
+    check = "form.angled_arm_printable"
+    f = form.frame
+    rows = [k[: -len("_elevation_deg")] for k in f
+            if k.endswith("_elevation_deg")]
+    if not rows:
+        return _finding(check, True, "n/a — no diagonal arms on this part",
+                        critical=False)
+    lo, hi = ANGLED_ELEV_BAND
+    problems = [
+        f"{n}: elevation {f[f'{n}_elevation_deg']:g} outside [{lo:g}, {hi:g}]"
+        for n in rows
+        if not lo <= f[f"{n}_elevation_deg"] <= hi
+    ]
+    if problems:
+        return _finding(check, False, "; ".join(problems))
+    return _finding(
+        check, True,
+        f"{len(rows)} diagonal arm(s) inside the printable "
+        f"[{lo:g}, {hi:g}]° band")
+
+
+register_probe("form.angled_arm_printable")(
+    lambda form, ctx: check_angled_arm_printable(form))

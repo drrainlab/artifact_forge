@@ -20,6 +20,8 @@ _finding = make_finding
 
 
 def _bore_aabb(bore: BoreFeature) -> Box3:
+    if bore.axis == "ANGLED":
+        return bore.bbox()
     x, y, z = bore.center
     r = bore.d / 2.0
     lo, hi = bore.span

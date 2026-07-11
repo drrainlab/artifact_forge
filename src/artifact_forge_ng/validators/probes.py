@@ -157,6 +157,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
               "every limb of a branched tube keeps a real wall"),
         _decl("form.branch_path_connected", Level.FORM,
               "each branch bore's inner end lands inside the main run bore"),
+        _decl("form.angled_arm_printable", Level.FORM,
+              "every diagonal arm's elevation sits in the printable 30-80 degree band"),
         _decl("form.tube_run_open", Level.FORM,
               "a through run is open end to end; a capped (elbow) run swallows the branch junction"),
         # -- text relief (impls in form/checks_text.py) ------------------------

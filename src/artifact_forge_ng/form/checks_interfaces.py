@@ -107,16 +107,19 @@ def check_interface_keepouts_preserved(form: PartForm, ctx=None) -> Finding:
                 problems.append(
                     f"{spec.id}: cut {cut.name!r} enters keepout {keep!r}")
         for bore in form.bores:
-            x, y, z = bore.center
-            r = bore.d / 2.0
-            lo, hi = bore.span
-            bb = (
-                Box3(lo, y - r, z - r, hi, y + r, z + r)
-                if bore.axis == "X" else
-                Box3(x - r, lo, z - r, x + r, hi, z + r)
-                if bore.axis == "Y" else
-                Box3(x - r, y - r, lo, x + r, y + r, hi)
-            )
+            if bore.axis == "ANGLED":
+                bb = bore.bbox()
+            else:
+                x, y, z = bore.center
+                r = bore.d / 2.0
+                lo, hi = bore.span
+                bb = (
+                    Box3(lo, y - r, z - r, hi, y + r, z + r)
+                    if bore.axis == "X" else
+                    Box3(x - r, lo, z - r, x + r, hi, z + r)
+                    if bore.axis == "Y" else
+                    Box3(x - r, y - r, lo, x + r, y + r, hi)
+                )
             if _boxes_intersect(bb, region.box):
                 problems.append(
                     f"{spec.id}: bore {bore.name!r} enters keepout {keep!r}")

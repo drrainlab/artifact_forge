@@ -338,3 +338,105 @@ _register(RecipeOpDecl(
     description="barbed tube tee/cross: hose-adapter Z-run + smooth X "
                 "branch spigots rooted in the stop flange",
 ))
+
+# -- angled_socket_arm (oriented kernel, first client) ------------------------------
+
+ANGLED_ELEV_BAND = (30.0, 80.0)  # printable diagonal band, degrees above horizon
+
+
+def _angled_socket_arm(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """A DIAGONAL rod socket on the hub — the oriented kernel's first
+    client (AngledPin/AngledBore: cylinders along an arbitrary unit
+    vector). Elevation is banded to the printable diagonal: below 30°
+    the socket's ceiling flattens toward an unsupported bridge, above
+    80° it is just a worse +z arm. Ports stay undeclared — interface
+    frames are axis-aligned by contract; the datum is published."""
+    import math
+
+    from .part import AngledBoreFeature, AngledPinFeature
+
+    state.require_base("angled_socket_arm")
+    if int(round(p["enabled"])) == 0:
+        return
+    f = state.frame
+    if "hub_r" not in f:
+        raise RecipeError("angled_socket_arm needs a multi_socket_hub base")
+    el = p["elevation_deg"]
+    lo, hi = ANGLED_ELEV_BAND
+    if not lo <= el <= hi:
+        raise RecipeError(
+            f"elevation {el:g} outside [{lo:g}, {hi:g}] — flatter needs a "
+            "teardrop 90° arm, steeper IS the +z arm")
+    az = math.radians(p["azimuth_deg"])
+    elr = math.radians(el)
+    direction = (math.cos(elr) * math.cos(az),
+                 math.cos(elr) * math.sin(az),
+                 math.sin(elr))
+    rod_d = p["rod_d"]
+    clearance = p["clearance"]
+    wall = p["wall"]
+    fit = p["fit"]
+    if fit == "slip":
+        bore_d = rod_d + clearance
+    elif fit == "press":
+        bore_d = rod_d - PRESS_INTERFERENCE
+    else:
+        raise RecipeError(f"fit {fit!r} not in (slip, press)")
+    depth = p["depth"] if p["depth"] > 1e-9 else SOCKET_ENGAGE_K * rod_d
+    outer_d = rod_d + 2.0 * clearance + 2.0 * wall
+    r_hub, hub_h = f["hub_r"], f["hub_h"]
+    z_root = p["z"] if p["z"] > 1e-9 else hub_h * 0.4
+    if z_root - outer_d / 2.0 < 0.5:
+        raise RecipeError(
+            f"diagonal arm root at z={z_root:g} dips under the hub floor")
+    arm_len = depth + wall
+    name = op_id or "brace"
+
+    start = (0.0, 0.0, z_root)
+    state.pins.append(AngledPinFeature(
+        name=f"{name}_barrel", start=start, direction=direction,
+        d=outer_d, length=r_hub + arm_len, bore_d=bore_d))
+    mouth = (direction[0] * (r_hub + arm_len),
+             direction[1] * (r_hub + arm_len),
+             z_root + direction[2] * (r_hub + arm_len))
+    state.bores.append(AngledBoreFeature(
+        name=f"{name}_socket", start=mouth,
+        direction=(-direction[0], -direction[1], -direction[2]),
+        d=bore_d, length=depth))
+    state.datums[f"socket_{name}"] = {
+        "at": [mouth[0], mouth[1], mouth[2]], "rotate": [0.0, 0.0, 0.0]}
+    state.frame[f"{name}_rod_d"] = rod_d
+    state.frame[f"{name}_socket_depth"] = depth
+    state.frame[f"{name}_socket_bore_d"] = bore_d
+    state.frame[f"{name}_wall_eff"] = (outer_d - bore_d) / 2.0
+    state.frame[f"{name}_inner_dist"] = r_hub + arm_len - depth
+    state.frame[f"{name}_elevation_deg"] = el
+    state.frame["socket_count"] = f.get("socket_count", 0.0) + 1.0
+
+
+_register(RecipeOpDecl(
+    name="angled_socket_arm",
+    kind="feature",
+    params={
+        "azimuth_deg": ("number", 0.0),
+        "elevation_deg": ("number", 45.0),
+        "enabled": ("count", 1),
+        "rod_d": ("length", None),
+        "depth": ("length", 0.0),
+        "wall": ("length", 3.0),
+        "clearance": ("length", 0.3),
+        "fit": ("choice", "slip"),
+        "z": ("length", 0.0),
+    },
+    validators=(
+        "form.socket_engagement_ok",
+        "form.socket_bores_isolated",
+        "form.angled_arm_printable",
+        "topology.pins_present",
+        "topology.bores_open",
+        "topology.single_connected_solid",
+    ),
+    apply=_angled_socket_arm,
+    description="diagonal rod socket on the hub (oriented kernel): "
+                "elevation banded to the printable 30–80°",
+))

@@ -136,12 +136,16 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
 
     for pin in form.pins:
         sx, sy, sz = pin.start_point()
-        plane = {"Z": "XY", "X": "YZ", "Y": "XZ"}[pin.axis]
-        post = (
-            cq.Workplane(plane, origin=(sx, sy, sz))
-            .circle(pin.d / 2.0)
-            .extrude(pin.length if pin.axis != "Y" else -pin.length)
-        )
+        if pin.axis == "ANGLED":
+            plane_obj = cq.Plane(origin=(sx, sy, sz), normal=pin.direction)
+            post = cq.Workplane(plane_obj).circle(pin.d / 2.0).extrude(pin.length)
+        else:
+            plane = {"Z": "XY", "X": "YZ", "Y": "XZ"}[pin.axis]
+            post = (
+                cq.Workplane(plane, origin=(sx, sy, sz))
+                .circle(pin.d / 2.0)
+                .extrude(pin.length if pin.axis != "Y" else -pin.length)
+            )
         mass = weld(mass, post, what=pin.name)
 
     for loft in form.lofts:

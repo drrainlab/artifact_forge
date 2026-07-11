@@ -1,0 +1,26 @@
+schema: product/v1
+id: trellis_a_frame_8mm
+archetype: trellis_connector_v1@1
+strict: true
+
+requested_features:
+  - rod_sockets
+
+params:
+  hub_d: 24mm
+  hub_h: 30mm
+  rod_d: 8mm
+  rod_d_up: 8mm
+  arm_px: 1
+  arm_mx: 0
+  arm_py: 0
+  arm_pz: 1
+  brace: 1
+  brace_azimuth: 180
+  brace_elevation: 45
+  rod_d_brace: 8mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none
