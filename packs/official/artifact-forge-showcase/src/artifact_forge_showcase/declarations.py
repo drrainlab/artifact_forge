@@ -25,6 +25,9 @@ SHOWCASE_CHECKS: dict[str, CheckDecl] = dict(
               "steel bushing press interference in band, engagement depth and seat walls real"),
         _decl("form.stop_registration_ok", Level.FORM,
               "the stop fence spans the full plate edge and hooks below the plate"),
+        # -- education: the shared fit-ladder capability (checks/ladder.py) --
+        _decl("form.ladder_steps_ok", Level.FORM,
+              "ladder bores strictly increasing at constant pitch, clearances in the printable band"),
     ]
 )
 

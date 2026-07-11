@@ -1,0 +1,88 @@
+schema: archetype/v1
+id: tolerance_ladder_v1
+version: 1
+object_class: tolerance_ladder
+description: >
+  The lesson object no STL site can teach with: a row of test bores of
+  monotonically growing clearance around a reference pin printed on the
+  same plate. Predict which step your pin will fit, print, measure your
+  prediction against reality — the divergence IS the lesson. Classroom
+  caveats apply: not EN71, not a certified gauge (docs/CLAIMS.md).
+
+provides_features:
+  - mounting_plate_body
+  - tolerance_ladder_row
+
+parameters:
+  pin_d:
+    {type: length, default: 6mm, min: 3mm, max: 12mm,
+     role: functional, exposed: true,
+     description: reference pin Ø — the ladder measures clearance around it}
+  clearance_start:
+    {type: length, default: 0.05mm, min: 0.05mm, max: 0.3mm, role: functional}
+  clearance_step:
+    {type: length, default: 0.05mm, min: 0.05mm, max: 0.2mm,
+     role: functional, exposed: true}
+  step_count:
+    {type: count, default: 8, min: 4, max: 12, role: functional, exposed: true}
+  step_spacing:
+    {type: length, default: 12mm, min: 9mm, max: 20mm, role: functional}
+  thickness:
+    {type: length, default: 5mm, min: 4mm, max: 8mm, role: manufacturing}
+  plate_w:
+    {type: length, default: 24mm, min: 18mm, max: 40mm, role: functional}
+  corner_r:
+    {type: length, default: 4mm, min: 1mm, max: 8mm, role: aesthetic}
+  pin_len:
+    {type: length, default: 12mm, min: 8mm, max: 20mm, role: functional}
+
+constraints:
+  - step_spacing > pin_d + 4
+  - plate_w > pin_d + 8
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params:
+        l: expr(step_spacing * (step_count + 2) + pin_d + 8)
+        w: plate_w
+        t: thickness
+        corner_r: corner_r
+    - op: tolerance_ladder
+      id: ladder
+      params:
+        pin_d: pin_d
+        clearance_start: clearance_start
+        clearance_step: clearance_step
+        count: step_count
+        spacing: step_spacing
+        pin_len: pin_len
+
+regions:
+  - {id: plate, role: mounting_surface, editable: true}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.ladder_steps_ok
+  - form.holes_within_outline
+  - form.min_web_between_holes
+  - topology.single_connected_solid
+  - topology.bores_open
+  - topology.pins_present
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - tolerance_ladder_row
+  must_not_have: []
+  invariants:
+    - step_spacing > pin_d + 4

@@ -1,0 +1,24 @@
+schema: product/v1
+id: tolerance_ladder_005_060
+archetype: tolerance_ladder_v1@1
+strict: true
+
+# Eight steps, 0.05..0.40 mm clearance around a 6 mm pin. Write your
+# prediction down BEFORE printing — the divergence is the lesson.
+requested_features:
+  - mounting_plate_body
+  - tolerance_ladder_row
+
+params:
+  pin_d: 6mm
+  clearance_start: 0.05mm
+  clearance_step: 0.05mm
+  step_count: 8
+  step_spacing: 12mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  nozzle: 0.4mm
+  layer_height: 0.2mm
+  support_policy: none

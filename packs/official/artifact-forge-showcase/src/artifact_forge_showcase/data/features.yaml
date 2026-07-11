@@ -36,3 +36,11 @@ features:
     verified_by:
       - form.stop_registration_ok
       - topology.ribs_present
+
+  # -- education ---------------------------------------------------------------
+  - id: tolerance_ladder_row
+    description: row of test bores of monotonically growing clearance around a printed reference pin
+    verified_by:
+      - form.ladder_steps_ok
+      - topology.bores_open
+      - topology.pins_present
