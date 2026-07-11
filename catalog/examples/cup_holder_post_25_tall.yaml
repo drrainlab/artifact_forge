@@ -10,12 +10,11 @@ requested_features:
 
 params:
   cup_d: 100mm
-  bottom_d: 82mm
-  cup_h: 90mm
-  post_w: 25mm
-  sleeve_h: 45mm
-  sleeve_z: 20mm
-  set_screw: m5
+  bottom_d: 86mm
+  cup_h: 44mm
+  post_w: 24mm
+  clip_h: 42mm
+  snap_bite: 1.0mm
 
 manufacturing:
   process: fdm

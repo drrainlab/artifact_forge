@@ -96,7 +96,7 @@ at runtime.
 | `standoff_pattern` | ✅ | recipe op: PCB standoffs on a plate + blind pilots |
 | `lid_seat` | ✅ | inset_plug op + lid_seat joint: dimensional chain + pose probe (esp32_box_with_lid) |
 | `bore_pattern` (line/grid/bolt-circle) | ✅ | recipe op: plain vertical bores, no screw semantics (drainage / finger holes / vents) |
-| `square_post_sleeve` | ✅ | recipe op (R2.10): collar on a square post welded to a vessel wall — arc-front PolyLoft rides the taper, channel opens toward the vessel, teardrop set screw |
+| `square_post_snap` | ✅ | recipe op (R2.10, screwless rev): snap C-clip on a square post welded to a vessel wall — arc-front PolyLoft, flat seat toward the vessel, flexing walls + chamfered corner lips (bite + flex strain measured) |
 | `bin_dividers` | ✅ | recipe op: interior walls welded wall-to-wall + floor, cells measured (recipe_ops_organizer.py) |
 | `finger_scoop` | ✅ | recipe op: rounded cove through a shell wall, open through the rim by construction |
 | `stacking_lip` | ✅ | recipe op: inner-rim lip + bottom rebate plug — the classic stacking-box joint; lip_h bounded by floor_t |

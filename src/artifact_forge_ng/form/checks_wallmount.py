@@ -297,3 +297,33 @@ register_probe("form.post_sleeve_engagement_ok")(
     lambda form, ctx: check_post_sleeve_engagement_ok(form))
 register_probe("form.post_sleeve_walls_ok")(
     lambda form, ctx: check_post_sleeve_walls_ok(form))
+
+
+def check_post_snap_retention_ok(form) -> "Finding":
+    """The lips must bite enough to retain AND flex without cracking."""
+    from .recipe_ops_mount import SNAP_BITE_BAND, SNAP_STRAIN_MAX
+
+    check = "form.post_snap_retention_ok"
+    f = form.frame
+    if "snap_bite" not in f:
+        return _finding(check, True, "n/a — no snap post clip on this part",
+                        critical=False)
+    problems = []
+    lo, hi = SNAP_BITE_BAND
+    if not lo <= f["snap_bite"] <= hi:
+        problems.append(f"bite {f['snap_bite']:g} outside [{lo:g}, {hi:g}]")
+    if f["snap_strain"] > SNAP_STRAIN_MAX + 1e-9:
+        problems.append(
+            f"flex strain {f['snap_strain'] * 100:.1f}% > "
+            f"{SNAP_STRAIN_MAX * 100:g}%")
+    if problems:
+        return _finding(check, False, "; ".join(problems))
+    return _finding(
+        check, True,
+        f"lips bite {f['snap_bite']:g} per side at "
+        f"{f['snap_strain'] * 100:.1f}% flex strain — snaps on, stays on",
+        measured=f["snap_strain"], limit=SNAP_STRAIN_MAX)
+
+
+register_probe("form.post_snap_retention_ok")(
+    lambda form, ctx: check_post_snap_retention_ok(form))

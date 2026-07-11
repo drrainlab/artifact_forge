@@ -572,12 +572,12 @@ features:
       - topology.bores_open
 
   - id: square_post_clamp
-    description: collar sleeve on a square post — sliding channel, anti-rock height, set-screw press
+    description: screwless snap clip on a square post — flat seat, flexing walls, corner lips
     verified_by:
       - form.post_sleeve_fit_ok
       - form.post_sleeve_engagement_ok
       - form.post_sleeve_walls_ok
-      - topology.cutout_present
+      - form.post_snap_retention_ok
       - topology.single_connected_solid
 
   # -- wall tool mounts pack ---------------------------------------------------

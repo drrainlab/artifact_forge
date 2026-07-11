@@ -335,65 +335,72 @@ def test_slider_short_travel_refused():
                  "travel": 15.0, "wall": 3.0, "ceiling_t": 4.0}, "shoe")
 
 
-# -- cup holder / square post sleeve ------------------------------------------------
+# -- cup holder / square post snap clip ----------------------------------------------
 
 
-def _cup_with_sleeve(**over) -> RecipeState:
+def _cup_with_clip(**over) -> RecipeState:
     st = RecipeState()
     RECIPE_OPS["pot_body"].apply(
-        st, {"top_d": 88.0, "bottom_d": 74.0, "h": 70.0, "wall": 2.4,
-             "floor_t": 3.0, "floor_raise": 6.0}, "cup")
-    p = {"post_w": 20.0, "fit_clearance": 0.5, "sleeve_h": 40.0, "z": 10.0,
-         "wall": 3.0, "dir": "+x", "set_screw": "m4"}
+        st, {"top_d": 92.0, "bottom_d": 80.0, "h": 38.0, "wall": 2.4,
+             "floor_t": 3.0, "floor_raise": 4.0}, "cup")
+    p = {"post_w": 20.0, "fit_clearance": 0.5, "clip_h": 36.0, "z": 1.0,
+         "wall": 2.8, "snap_bite": 1.2, "lip_len": 4.0, "dir": "+x"}
     p.update(over)
-    RECIPE_OPS["square_post_sleeve"].apply(st, p, "sleeve")
+    RECIPE_OPS["square_post_snap"].apply(st, p, "clip")
     return st
 
 
-def test_post_sleeve_publishes_measured_frame():
+def test_post_snap_publishes_measured_frame():
     from artifact_forge_ng.form.checks_wallmount import (
         check_post_sleeve_engagement_ok, check_post_sleeve_fit_ok,
-        check_post_sleeve_walls_ok)
+        check_post_sleeve_walls_ok, check_post_snap_retention_ok)
 
-    st = _cup_with_sleeve()
+    st = _cup_with_clip()
     assert st.frame["sleeve_channel_w_eff"] == pytest.approx(20.5)
+    # the lips close the opening but keep well over 60% of the post
+    assert st.frame["snap_gap"] == pytest.approx(18.1)
+    assert st.frame["snap_strain"] < 0.015
     assert check_post_sleeve_fit_ok(st).status.value == "pass"
     assert check_post_sleeve_engagement_ok(st).status.value == "pass"
     assert check_post_sleeve_walls_ok(st).status.value == "pass"
+    assert check_post_snap_retention_ok(st).status.value == "pass"
     assert "post_axis" in st.datums
-    # the arc-front collar: one additive poly loft riding the wall
-    lofts = [pl for pl in st.poly_lofts if not pl.cut]
-    assert len(lofts) == 1
-    assert len(lofts[0].bottom) == len(lofts[0].top)
+    # ONE additive poly loft, screwless: no bores from the clip
+    assert len([pl for pl in st.poly_lofts if not pl.cut]) == 1
+    assert not [b for b in st.bores if "clip" in b.name]
 
 
-def test_post_sleeve_loose_clearance_refused():
-    with pytest.raises(RecipeError, match="fit_clearance"):
-        _cup_with_sleeve(fit_clearance=1.5)
+def test_snap_bite_band_refused():
+    with pytest.raises(RecipeError, match="snap_bite"):
+        _cup_with_clip(snap_bite=3.0)
 
 
-def test_post_sleeve_past_the_pot_refused():
-    with pytest.raises(RecipeError, match="runs past the pot"):
-        _cup_with_sleeve(z=45.0, sleeve_h=40.0)
+def test_snap_stiff_wall_refused():
+    with pytest.raises(RecipeError, match="never flexes"):
+        _cup_with_clip(wall=4.5)
 
 
-def test_post_sleeve_short_engagement_refused():
-    with pytest.raises(RecipeError, match="rocks on the post"):
-        _cup_with_sleeve(sleeve_h=25.0)
+def test_snap_overstrained_lips_refused():
+    # a huge bite on a short arm cracks instead of flexing
+    with pytest.raises(RecipeError, match="strain"):
+        _cup_with_clip(post_w=12.0, clip_h=36.0, snap_bite=2.0, lip_len=0.5)
+
+
+def test_clip_past_the_vessel_refused():
+    with pytest.raises(RecipeError, match="runs past the vessel"):
+        _cup_with_clip(z=10.0, clip_h=36.0)
 
 
 def test_post_too_wide_refused():
-    # needs a tall vessel: a wide post also demands a tall sleeve, and
-    # the height guard would fire first on the default cup
     st = RecipeState()
     RECIPE_OPS["pot_body"].apply(
         st, {"top_d": 100.0, "bottom_d": 80.0, "h": 120.0, "wall": 2.4,
              "floor_t": 3.0, "floor_raise": 6.0}, "cup")
     with pytest.raises(RecipeError, match="too wide"):
-        RECIPE_OPS["square_post_sleeve"].apply(
-            st, {"post_w": 70.0, "fit_clearance": 0.5, "sleeve_h": 110.0,
-                 "z": 0.0, "wall": 3.0, "dir": "+x", "set_screw": "m4"},
-            "sleeve")
+        RECIPE_OPS["square_post_snap"].apply(
+            st, {"post_w": 70.0, "fit_clearance": 0.5, "clip_h": 110.0,
+                 "z": 0.0, "wall": 2.8, "snap_bite": 1.2, "lip_len": 4.0,
+                 "dir": "+x"}, "clip")
 
 
 # -- angle bracket ----------------------------------------------------------------

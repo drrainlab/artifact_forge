@@ -187,6 +187,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
               "the sleeve is tall enough not to rock on the post"),
         _decl("form.post_sleeve_walls_ok", Level.FORM,
               "the collar walls and the vessel-side web stay real"),
+        _decl("form.post_snap_retention_ok", Level.FORM,
+              "the snap lips bite enough to retain and flex without cracking"),
         _decl("form.angled_arm_printable", Level.FORM,
               "every diagonal arm's elevation sits in the printable 30-80 degree band"),
         _decl("form.tube_run_open", Level.FORM,
