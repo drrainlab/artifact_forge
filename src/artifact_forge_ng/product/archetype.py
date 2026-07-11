@@ -73,7 +73,7 @@ class RegionRole(StrEnum):
 class ParamSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    type: Literal["length", "angle", "number", "count", "bool", "choice"]
+    type: Literal["length", "angle", "number", "count", "bool", "choice", "string"]
     default: ValueSpec | str | None = None
     min: ValueSpec | None = None
     max: ValueSpec | None = None
@@ -95,6 +95,15 @@ class ParamSpec(BaseModel):
         if not isinstance(data, dict):
             return data
         ptype = data.get("type")
+        if ptype == "string":
+            if data.get("min") is not None or data.get("max") is not None:
+                raise ValueError("string parameters cannot have min/max")
+            if data.get("choices"):
+                raise ValueError("string parameters take free text, not choices")
+            default = data.get("default")
+            if default is not None and not isinstance(default, str):
+                raise ValueError(f"string default must be text, got {default!r}")
+            return data
         if ptype == "choice":
             if data.get("min") is not None or data.get("max") is not None:
                 raise ValueError("choice parameters cannot have min/max")

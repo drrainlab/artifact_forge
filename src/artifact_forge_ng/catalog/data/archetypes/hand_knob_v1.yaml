@@ -1,0 +1,87 @@
+schema: archetype/v1
+id: hand_knob_v1
+version: 1
+object_class: hand_knob
+description: >
+  Threaded-fastener hand knob: a revolved grip (plain or star-scalloped
+  via lobes) with a captive square-nut / carriage-neck socket under a
+  full through bolt bore — thumbscrews, jig clamps, fence locks. The
+  sibling replacement_knob_v1 (showcase pack) presses onto a bare shaft
+  instead; this one turns a bolt.
+
+provides_features:
+  - knob_grip_body
+  - captive_nut_socket
+
+parameters:
+  grip_d:
+    {type: length, default: 40mm, min: 24mm, max: 80mm, role: functional, exposed: true}
+  grip_h:
+    {type: length, default: 20mm, min: 12mm, max: 40mm, role: functional, exposed: true}
+  lobes:
+    {type: count, default: 5, min: 0, max: 8, role: aesthetic, exposed: true}
+  lobe_bite:
+    {type: length, default: 2mm, min: 1mm, max: 6mm, role: aesthetic}
+  nut_af:
+    {type: length, default: 8mm, min: 5mm, max: 14mm, role: assembly, exposed: true}
+  socket_depth:
+    {type: length, default: 8mm, min: 3mm, max: 14mm, role: assembly}
+  fit_clearance:
+    {type: length, default: 0.25mm, min: 0.1mm, max: 0.4mm, role: manufacturing}
+  top_chamfer:
+    {type: length, default: 2mm, min: 0.5mm, max: 4mm, role: aesthetic}
+  screw:
+    {type: choice, choices: [M4, M5, M6, 1/4-20], default: M5, role: assembly, exposed: true}
+
+constraints:
+  - socket_depth < grip_h - 2
+  - socket_depth >= nut_af
+  - grip_d > 2 * nut_af
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: knob_body
+      id: body
+      params: {grip_d: grip_d, grip_h: grip_h, shaft_sq: nut_af,
+               socket_depth: socket_depth, fit_clearance: fit_clearance,
+               top_chamfer: top_chamfer, lobes: lobes, lobe_bite: lobe_bite}
+    - op: hole_pattern
+      id: bolt_bore
+      params: {kind: line, screw: screw, count: 1, cx: 0mm, cy: 0mm,
+               z_top: grip_h, through: grip_h}
+
+regions:
+  - {id: body_grip, role: mounting_surface, editable: false,
+     label: knob grip, aliases: [grip, knob]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: workshop
+  modes: [workshop, utility]
+  tags: [knob, star knob, fastener, jig, thumbscrew]
+
+validators:
+  - form.shaft_fit_ok
+  - form.knob_torque_wall_ok
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.screw_holes_open
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - knob_grip_body
+    - captive_nut_socket
+  must_not_have: []
+  invariants:
+    - grip_d > 2 * nut_af

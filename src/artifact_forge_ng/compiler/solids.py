@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 
 import cadquery as cq
 
-from ..cad.booleans import keep_largest, weld
+from ..cad.booleans import cut_keep_solid, keep_largest, weld
 from ..cad.bores import cut_bore, cut_box, cut_channel, cut_funnel
 from ..cad.fillets import safe_fillet_edges, safe_fillet_ladder
 from ..cad.geometry import Geometry
@@ -47,6 +47,7 @@ class CompileLog:
     #: Bio-3: rib/node solids of the exoskeleton graph welded onto the body.
     exoskeleton_ribs_welded: int = 0
     field_cut: bool = False
+    text_reliefs_built: int = 0
     blends_applied: list[float] = field(default_factory=list)
     blends_skipped: int = 0
     notes: list[str] = field(default_factory=list)
@@ -199,6 +200,29 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
     # then ribs. The IR clearance guarantee means they never fight, but
     # this order makes the rib material immune to the window cutters by
     # construction, not by luck.
+    # Text reliefs land after the field cuts: raised glyphs weld on,
+    # engraved ones cut in — either way the glyph solid comes from ONE
+    # bundled font (cad/text.py), never a machine-dependent lookup.
+    if form.text_reliefs:
+        from ..cad.text import build_text_solid
+
+        for tr in form.text_reliefs:
+            try:
+                glyphs = build_text_solid(tr)
+            except Exception as exc:  # noqa: BLE001 — a note, not a crash
+                log.notes.append(f"text relief {tr.name!r} failed to render: {exc}")
+                continue
+            if tr.mode == "emboss":
+                mass = weld(mass, glyphs, what=tr.name)
+                log.text_reliefs_built += 1
+            else:
+                mass, cut = cut_keep_solid(mass, glyphs)
+                if cut:
+                    log.text_reliefs_built += 1
+                else:
+                    log.notes.append(
+                        f"text relief {tr.name!r} engrave reverted (would fragment)")
+
     exo_solids = build_exoskeleton_solid(form)
     if form.exoskeleton is not None and exo_solids is None:
         log.notes.append(

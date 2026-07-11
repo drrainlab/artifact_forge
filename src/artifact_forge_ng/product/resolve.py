@@ -67,6 +67,19 @@ def _seed_context(
                 )
             )
             continue
+        if spec.type == "string":
+            if not isinstance(raw_value, str) or not raw_value.strip():
+                findings.append(
+                    Finding(
+                        check=f"param:{name}",
+                        status=Status.FAIL,
+                        level=Level.SCHEMA,
+                        message=f"{name!r} must be non-empty text, got {raw_value!r}",
+                    )
+                )
+                continue
+            choices[name] = raw_value
+            continue
         if spec.type == "choice":
             if not isinstance(raw_value, str) or raw_value not in spec.choices:
                 findings.append(
@@ -115,7 +128,7 @@ def resolve_params(
         ctx.update(instance.body_fit.env_context())
 
     for name, spec in archetype.parameters.items():
-        if spec.type == "choice":
+        if spec.type in ("choice", "string"):
             if name not in choices and isinstance(spec.default, str):
                 choices[name] = spec.default
             continue

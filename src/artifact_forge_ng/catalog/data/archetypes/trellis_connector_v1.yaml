@@ -1,0 +1,94 @@
+schema: archetype/v1
+id: trellis_connector_v1
+version: 1
+object_class: trellis_connector
+description: >
+  Plant support / light-frame connector: a cylindrical hub with blind
+  rod sockets on the frame axes — elbow, tee, cross and vertical riser
+  come from which arms the recipe turns on (arm diameters are set per
+  socket). Deliberate v1 scope: 90-degree branches only; engagement
+  depth and blind-end isolation are measured, never hoped.
+
+provides_features:
+  - rod_sockets
+
+parameters:
+  hub_d:
+    {type: length, default: 22mm, min: 14mm, max: 50mm, role: structural, exposed: true}
+  hub_h:
+    {type: length, default: 24mm, min: 14mm, max: 60mm, role: structural}
+  rod_d:
+    {type: length, default: 8mm, min: 4mm, max: 20mm, role: assembly, exposed: true}
+  rod_d_up:
+    {type: length, default: 8mm, min: 4mm, max: 20mm, role: assembly}
+  wall:
+    {type: length, default: 3mm, min: 2mm, max: 6mm, role: structural}
+  clearance:
+    {type: length, default: 0.3mm, min: 0.15mm, max: 0.6mm, role: manufacturing}
+  arm_px:
+    {type: count, default: 1, min: 0, max: 1, role: functional, exposed: true}
+  arm_mx:
+    {type: count, default: 1, min: 0, max: 1, role: functional, exposed: true}
+  arm_py:
+    {type: count, default: 0, min: 0, max: 1, role: functional, exposed: true}
+  arm_pz:
+    {type: count, default: 1, min: 0, max: 1, role: functional, exposed: true}
+
+constraints:
+  - hub_d > rod_d + 4
+  - arm_px + arm_mx + arm_py + arm_pz >= 2
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: multi_socket_hub
+      id: hub
+      params: {hub_d: hub_d, hub_h: hub_h}
+    - op: socket_arm
+      id: east
+      params: {dir: "+x", enabled: arm_px, rod_d: rod_d, wall: wall,
+               clearance: clearance}
+    - op: socket_arm
+      id: west
+      params: {dir: "-x", enabled: arm_mx, rod_d: rod_d, wall: wall,
+               clearance: clearance}
+    - op: socket_arm
+      id: north
+      params: {dir: "+y", enabled: arm_py, rod_d: rod_d, wall: wall,
+               clearance: clearance}
+    - op: socket_arm
+      id: riser
+      params: {dir: "+z", enabled: arm_pz, rod_d: rod_d_up, wall: wall,
+               clearance: clearance}
+
+regions:
+  - {id: hub_body, role: mounting_surface, editable: false,
+     label: connector hub, aliases: [hub, body]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: grow
+  modes: [utility, fluid_grow]
+  tags: [trellis, connector, rod, frame, tee]
+
+validators:
+  - form.socket_engagement_ok
+  - form.socket_bores_isolated
+  - topology.pins_present
+  - topology.bores_open
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - rod_sockets
+  must_not_have: []
+  invariants:
+    - hub_d > rod_d + 4

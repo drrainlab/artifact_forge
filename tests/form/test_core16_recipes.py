@@ -37,6 +37,23 @@ WAVE_EXAMPLES = [
     "net_pot_50",
     "net_pot_75",
     "net_pot_100",
+    # stage 3
+    "star_knob_m5_40",
+    "jig_knob_m6_50",
+    "camera_knob_quarter20",
+    "dowel_guide_8mm_3hole",
+    "shelf_pin_guide_5mm",
+    "cell_holder_18650_2x2",
+    "cell_holder_aa_1x4",
+    "cell_holder_21700_1x3",
+    "pegboard_base_single_hook",
+    "pegboard_base_metric_plate",
+    "trellis_tee_8mm",
+    "trellis_cross_10mm",
+    "trellis_elbow_6mm",
+    "maker_initials_stamp",
+    "leather_stamp_gb",
+    "clay_pattern_stamp",
 ]
 
 
@@ -245,3 +262,151 @@ def test_net_pot_slots_stay_inside_band():
     assert f["wall_slot_z0"] >= f["net_floor_t"] + 1.5
     assert f["wall_slot_z1"] <= f["net_rim_z"] - f["net_flange_t"] - 1.5
     assert f["floor_open_ratio"] > 0.2
+
+
+# -- battery cell holder ------------------------------------------------------------
+
+
+def test_cell_lip_bite_band_enforced():
+    st = RecipeState()
+    RECIPE_OPS["rounded_plate"].apply(
+        st, {"l": 60.0, "w": 60.0, "t": 16.0, "corner_r": 4.0}, "block")
+    with pytest.raises(RecipeError, match="lip bite"):
+        RECIPE_OPS["cell_pocket_grid"].apply(
+            st, {"cell": "18650", "nx": 1, "ny": 1, "pitch": 0.0,
+                 "fit_clearance": 0.4, "lip_w": 2.0, "lip_h": 1.2,
+                 "pocket_depth": 12.0, "slot_w": 4.0, "slot_l": 10.0,
+                 "cx": 0.0, "cy": 0.0}, "cells")
+
+
+def test_cell_holder_publishes_lip_keys():
+    state = run_pre_cad(EXAMPLES / "cell_holder_18650_2x2.yaml", None)
+    f = state.form.frame
+    assert f["cell_grid_nx"] == 2.0 and f["cell_grid_ny"] == 2.0
+    assert 0.6 <= f["cell_lip_bite"] <= 2.5
+    assert f["cells_0_lip_r"] > 0
+
+
+# -- pegboard -----------------------------------------------------------------------
+
+
+def test_peg_too_short_refused():
+    st = RecipeState()
+    RECIPE_OPS["rounded_plate"].apply(
+        st, {"l": 60.0, "w": 60.0, "t": 5.0, "corner_r": 4.0}, "plate")
+    with pytest.raises(RecipeError, match="never passes"):
+        RECIPE_OPS["peg_pattern"].apply(
+            st, {"board": "imperial_quarter", "cols": 1, "rows": 1,
+                 "peg_len": 4.0, "hook": "up", "hook_len": 8.0,
+                 "anti_lift": 1, "cx": 0.0, "cy": 0.0}, "pegs")
+
+
+def test_hooked_pattern_without_antilift_fails_check():
+    from artifact_forge_ng.form.checks_pegboard import check_peg_engagement_ok
+
+    st = RecipeState()
+    RECIPE_OPS["rounded_plate"].apply(
+        st, {"l": 60.0, "w": 60.0, "t": 5.0, "corner_r": 4.0}, "plate")
+    RECIPE_OPS["peg_pattern"].apply(
+        st, {"board": "imperial_quarter", "cols": 1, "rows": 1,
+             "peg_len": 0.0, "hook": "up", "hook_len": 8.0,
+             "anti_lift": 0, "cx": 0.0, "cy": 0.0}, "pegs")
+    finding = check_peg_engagement_ok(st)
+    assert finding.status.value == "fail"
+    assert "anti-lift" in finding.message
+
+
+# -- connectors ---------------------------------------------------------------------
+
+
+def test_duplicate_socket_dir_refused():
+    st = RecipeState()
+    RECIPE_OPS["multi_socket_hub"].apply(st, {"hub_d": 22.0, "hub_h": 24.0}, "hub")
+    arm = {"dir": "+x", "enabled": 1, "rod_d": 8.0, "depth": 0.0,
+           "wall": 3.0, "clearance": 0.3, "fit": "slip",
+           "set_screw": "none", "z": 0.0}
+    RECIPE_OPS["socket_arm"].apply(st, arm, "east")
+    with pytest.raises(RecipeError, match="already occupies"):
+        RECIPE_OPS["socket_arm"].apply(st, dict(arm), "east2")
+
+
+def test_socket_arm_isolated_by_construction():
+    """socket_arm bores from the OUTER mouth inward — its blind end sits
+    at r_hub + wall, never near the center. The isolation check must
+    PASS here; its FAIL branch guards future center-reaching ops (the
+    tube tee), measured below on a bare frame."""
+    from artifact_forge_ng.form.checks_connector import check_socket_bores_isolated
+
+    st = RecipeState()
+    RECIPE_OPS["multi_socket_hub"].apply(st, {"hub_d": 22.0, "hub_h": 24.0}, "hub")
+    for d, op_id in (("+x", "east"), ("-x", "west")):
+        RECIPE_OPS["socket_arm"].apply(
+            st, {"dir": d, "enabled": 1, "rod_d": 8.0, "depth": 16.0,
+                 "wall": 3.0, "clearance": 0.3, "fit": "slip",
+                 "set_screw": "none", "z": 0.0}, op_id)
+    assert check_socket_bores_isolated(st).status.value == "pass"
+    assert st.frame["east_inner_dist"] == pytest.approx(14.0)
+
+
+def test_socket_isolation_check_fails_on_merged_ends():
+    from artifact_forge_ng.form.checks_connector import check_socket_bores_isolated
+
+    st = RecipeState()
+    st.frame.update({
+        "east_socket_depth": 16.0, "east_rod_d": 8.0,
+        "east_socket_bore_d": 8.3, "east_wall_eff": 3.0,
+        "east_inner_dist": 2.0,
+        "west_socket_depth": 16.0, "west_rod_d": 8.0,
+        "west_socket_bore_d": 8.3, "west_wall_eff": 3.0,
+        "west_inner_dist": 2.0,
+    })
+    assert check_socket_bores_isolated(st).status.value == "fail"
+
+
+def test_disabled_arm_is_a_noop():
+    st = RecipeState()
+    RECIPE_OPS["multi_socket_hub"].apply(st, {"hub_d": 22.0, "hub_h": 24.0}, "hub")
+    RECIPE_OPS["socket_arm"].apply(
+        st, {"dir": "+y", "enabled": 0, "rod_d": 8.0, "depth": 0.0,
+             "wall": 3.0, "clearance": 0.3, "fit": "slip",
+             "set_screw": "none", "z": 0.0}, "north")
+    assert st.frame["socket_count"] == 0.0
+    assert not st.pins
+
+
+# -- text relief / stamp ------------------------------------------------------------
+
+
+def test_unmirrored_stamp_refused():
+    st = RecipeState()
+    RECIPE_OPS["rounded_plate"].apply(
+        st, {"l": 60.0, "w": 25.0, "t": 6.0, "corner_r": 4.0}, "die")
+    with pytest.raises(RecipeError, match="MIRRORED"):
+        RECIPE_OPS["text_emboss"].apply(
+            st, {"text": "FORGE", "size": 10.0, "depth": 1.6,
+                 "mode": "emboss", "mirror": "no", "duty": "stamp",
+                 "face": "bottom", "cx": 0.0, "cy": 0.0, "z": 0.0,
+                 "rotate": 0.0}, "legend")
+
+
+def test_tiny_text_fails_stroke_check():
+    from artifact_forge_ng.form.checks_text import check_min_stroke_width_ok
+
+    st = RecipeState()
+    RECIPE_OPS["rounded_plate"].apply(
+        st, {"l": 60.0, "w": 25.0, "t": 6.0, "corner_r": 4.0}, "die")
+    RECIPE_OPS["text_emboss"].apply(
+        st, {"text": "tiny", "size": 5.0, "depth": 1.0,
+             "mode": "emboss", "mirror": "no", "duty": "label",
+             "face": "top", "cx": 0.0, "cy": 0.0, "z": 0.0,
+             "rotate": 0.0}, "legend")
+    assert check_min_stroke_width_ok(st).status.value == "fail"
+
+
+def test_stamp_example_resolves_string_param():
+    state = run_pre_cad(EXAMPLES / "leather_stamp_gb.yaml", None)
+    tr = state.form.text_reliefs[0]
+    assert tr.text == "GB"
+    assert tr.mirror is True
+    assert tr.direction == "down"
+    assert tr.plane_z == 0.0

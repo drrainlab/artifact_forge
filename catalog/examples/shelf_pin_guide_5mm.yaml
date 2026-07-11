@@ -1,0 +1,22 @@
+schema: product/v1
+id: shelf_pin_guide_5mm
+archetype: drill_guide_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - drill_bushing_seats
+  - countersunk_screw_holes
+
+params:
+  guide_l: 180mm
+  bushing_od: 7mm
+  seat_count: 6
+  seat_spacing: 32mm
+  guide_w: 44mm
+  t: 8mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

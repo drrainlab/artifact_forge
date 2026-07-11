@@ -12,6 +12,7 @@ from ..validators.probes import register_probe
 from .part import PartForm
 from .patterns import CircleOutline, Outline, RectOutline, min_web_violations
 from .regions import Rect2D
+from .section import Pt
 
 DEFAULT_MIN_WEB = 3.0
 
@@ -43,9 +44,14 @@ def _violations(form: PartForm) -> tuple[list[str], list[str]] | None:
     min_web = form.params.get("min_web", DEFAULT_MIN_WEB)
     # COAXIAL Z-bores are one stepped bore (a bearing seat's pocket over
     # its through hole), not a hole pair — keep only the widest per axis.
+    # A bore CENTERED OUTSIDE the outline is a perimeter-sculpting cutter
+    # (a lobed knob's finger cove) — it redefines the boundary instead of
+    # weakening a web, so it stays out of the web math.
     by_axis: dict[tuple[float, float], float] = {}
     for b in form.bores:
         if b.axis != "Z":
+            continue
+        if outline.edge_distance(Pt(b.center[0], b.center[1])) < 0.0:
             continue
         key = (round(b.center[0], 3), round(b.center[1], 3))
         by_axis[key] = max(by_axis.get(key, 0.0), b.d / 2.0)

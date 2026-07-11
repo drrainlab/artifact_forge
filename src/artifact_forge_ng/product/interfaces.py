@@ -180,6 +180,12 @@ INTERFACE_TYPES: dict[str, InterfaceTypeDecl] = dict([
           "(male = the profile's support line, female = the groove)",
           ("profile_perch",), orientation_sensitive=True,
           clearance_band=(0.1, 0.5)),
+    _decl("pegboard_peg",
+          "pegboard hole-grid engagement (male = the printed pegs; the "
+          "board itself is external hardware, never a printed part)",
+          (), genders=("male",), orientation_sensitive=True,
+          frame_keys={"male": ("peg_pitch", "peg_d", "peg_len",
+                               "peg_count", "board_t")}),
 ])
 
 

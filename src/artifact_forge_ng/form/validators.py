@@ -502,6 +502,10 @@ from . import (  # noqa: E402,F401
     checks_jig,
     checks_organizer,
     checks_pots,
+    checks_cells,
+    checks_pegboard,
+    checks_connector,
+    checks_text,
 )
 
 #: Structural sanity every archetype gets whether it asks or not — mirrors

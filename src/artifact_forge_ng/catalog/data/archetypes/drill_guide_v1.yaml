@@ -1,0 +1,100 @@
+schema: archetype/v1
+id: drill_guide_v1
+version: 1
+object_class: drill_guide
+description: >
+  Fenceless top drill guide: a plate with a press-fit line of steel
+  bushing seats (the steel guides the drill, never the plastic) and two
+  countersunk hold-down screws beside the row — clamp or screw it onto
+  layout marks. The sibling drilling_jig_v1 (showcase pack) hooks a stop
+  fence over the workpiece edge instead; this one goes where the fence
+  can't reach. One bushing diameter per guide in v1; angled channels are
+  outside the axis-aligned kernel — not promised.
+
+provides_features:
+  - mounting_plate_body
+  - drill_bushing_seats
+  - countersunk_screw_holes
+
+parameters:
+  guide_l:
+    {type: length, default: 100mm, min: 50mm, max: 200mm, role: functional, exposed: true}
+  guide_w:
+    {type: length, default: 36mm, min: 24mm, max: 70mm, role: functional}
+  t:
+    {type: length, default: 8mm, min: 5mm, max: 12mm, role: structural}
+  corner_r:
+    {type: length, default: 4mm, min: 2mm, max: 10mm, role: aesthetic}
+  bushing_od:
+    {type: length, default: 8mm, min: 5mm, max: 14mm, role: assembly, exposed: true}
+  press_fit:
+    {type: length, default: 0.1mm, min: 0.05mm, max: 0.2mm, role: manufacturing}
+  seat_count:
+    {type: count, default: 3, min: 1, max: 8, role: functional, exposed: true}
+  seat_spacing:
+    {type: length, default: 25mm, min: 12mm, max: 60mm, role: functional, exposed: true}
+  screw:
+    {type: choice, choices: [M4, M5], default: M4, role: assembly}
+  screw_row_cy:
+    {type: length, default: "expr(guide_w / 2 - 8)", min: 4mm, max: 30mm, role: assembly}
+
+derived:
+  screw_spacing: expr(guide_l - 20)
+
+constraints:
+  - seat_spacing > bushing_od + 3
+  - t >= bushing_od / 2
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params: {l: guide_l, w: guide_w, t: t, corner_r: corner_r}
+    - op: bushing_seat_line
+      id: bushings
+      params: {bushing_od: bushing_od, press_fit: press_fit,
+               count: seat_count, spacing: seat_spacing, cx: 0mm, cy: 0mm}
+    - op: countersunk_hole_pattern
+      id: holds
+      params: {kind: line, screw: screw, count: 2, spacing: screw_spacing,
+               cy: screw_row_cy, cs_face: top}
+
+regions:
+  - {id: plate, role: mounting_surface, editable: false,
+     label: guide plate, aliases: [plate, guide]}
+  - {id: plate_lightening, role: aesthetic_lightening, editable: true,
+     label: plate canvas, aliases: [top face]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: jigs
+  modes: [workshop, engineering]
+  tags: [drill, guide, bushing, dowel, jig]
+
+validators:
+  - form.bushing_fit_ok
+  - form.holes_within_outline
+  - form.min_web_between_holes
+  - topology.bores_open
+  - topology.screw_holes_open
+  - topology.countersinks_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - drill_bushing_seats
+    - countersunk_screw_holes
+  must_not_have: []
+  invariants:
+    - t >= bushing_od / 2

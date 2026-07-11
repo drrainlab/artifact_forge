@@ -18,6 +18,8 @@ USER_VOCABULARY = {
     "hose_port",
     # rail groove seated on an aluminum profile carrier
     "profile_seat",
+    # pegboard hole-grid engagement (the board is external hardware)
+    "pegboard_peg",
 }
 
 

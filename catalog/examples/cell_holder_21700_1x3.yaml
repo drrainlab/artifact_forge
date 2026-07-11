@@ -1,0 +1,20 @@
+schema: product/v1
+id: cell_holder_21700_1x3
+archetype: battery_cell_holder_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - cell_pocket_grid
+
+params:
+  cell: "21700"
+  nx: 3
+  ny: 1
+  block_t: 20mm
+  pocket_depth: 16mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

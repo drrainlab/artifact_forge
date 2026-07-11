@@ -1,0 +1,21 @@
+schema: product/v1
+id: camera_knob_quarter20
+archetype: hand_knob_v1@1
+strict: true
+
+requested_features:
+  - knob_grip_body
+  - captive_nut_socket
+
+params:
+  grip_d: 32mm
+  grip_h: 16mm
+  lobes: 5
+  nut_af: 11.2mm
+  socket_depth: 11.5mm
+  screw: 1/4-20
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

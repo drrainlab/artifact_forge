@@ -70,6 +70,7 @@ at runtime.
 | `spool_body` | ✅ | recipe op: H-profile flanged spool + axial bore (recipe_ops_revolve.py) |
 | `pot_body` | ✅ | recipe op: tapered vessel + RAISED drainage floor over a foot ring; superellipse plan waits on loft (recipe_ops_revolve.py) |
 | `net_pot_body` | ✅ | recipe op: thin tapered cup + hanging rim flange (recipe_ops_revolve.py) |
+| `multi_socket_hub` | ✅ | recipe op: revolved connector hub the socket arms weld into (recipe_ops_connector.py) |
 
 ### feature — fasteners, pockets, cutouts
 
@@ -93,6 +94,10 @@ at runtime.
 | `flange_slot_pattern` | ✅ | recipe op: radial tie slots as rotated field polygons (probe measures true cell width, not bbox) |
 | `grid_floor` | ✅ | recipe op: square through-mesh across a circular floor disc, open-area ratio measured |
 | `wall_slot_ring` | ✅ | recipe op: vertical slot ring on a TAPERED wall via cylindrical field mapping (radial cutters overshoot the taper) |
+| `cell_pocket_grid` | ✅ | recipe op: blind battery pockets (CELLS table) + retaining mouth lips + floor contact slots — the bearing-seat inset-span pattern |
+| `peg_pattern` | ✅ | recipe op: board-standard pegs, L-hook = two axis-aligned pins, anti-lift row; `pegboard_peg` interface type (recipe_ops_pegboard.py) |
+| `socket_arm` | ✅ | recipe op: blind rod socket on a hub, ±X/±Y/+Z only; barrel = PinFeature with declared `bore_d` (the tube-wall probe) |
+| `text_emboss` | ✅ | recipe op: TextReliefFeature — glyphs from ONE bundled font (cad/text.py, DejaVu Sans), emboss/engrave, mirrored stamp duty, top/bottom faces; first `string` op param |
 | `bushing_seat_line` | ✅ | recipe op (promoted from showcase): press-fit steel bushing seats + form.bushing_fit_ok (recipe_ops_jig.py); frame keys not op_id-namespaced yet — one row per part |
 | `stop_fence` | ✅ | recipe op (promoted from showcase): registration fence under a plate edge (recipe_ops_jig.py) |
 

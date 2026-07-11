@@ -1,0 +1,20 @@
+schema: product/v1
+id: cell_holder_aa_1x4
+archetype: battery_cell_holder_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - cell_pocket_grid
+
+params:
+  cell: aa
+  nx: 4
+  ny: 1
+  block_t: 14mm
+  pocket_depth: 10mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

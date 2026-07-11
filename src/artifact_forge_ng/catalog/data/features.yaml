@@ -420,6 +420,81 @@ features:
       - form.min_ligament_ok
       - topology.hex_field_present
 
+  - id: knob_grip_body
+    description: revolved knob grip body (plain or lobed) with a measured torque wall
+    verified_by:
+      - form.knob_torque_wall_ok
+      - topology.single_connected_solid
+
+  - id: square_shaft_socket
+    description: blind square shaft socket with a measured across-flats fit and torque wall
+    verified_by:
+      - form.shaft_fit_ok
+      - form.knob_torque_wall_ok
+
+  - id: hose_barb_spigots
+    description: two barbed hose spigots with a through bore — barb height and count measured for real retention
+    verified_by:
+      - form.barb_retention_ok
+      - topology.single_connected_solid
+
+  - id: adapter_stop_flange
+    description: the mid flange that stops both hoses and gives a wrench/grip surface
+    verified_by:
+      - topology.single_connected_solid
+
+  - id: registration_stop_fence
+    description: fence under one plate edge hooking the workpiece — every hole repeats from that edge
+    verified_by:
+      - form.stop_registration_ok
+      - topology.ribs_present
+
+  - id: captive_nut_socket
+    description: square nut / carriage-neck socket with clearance in the fit band
+    verified_by:
+      - form.shaft_fit_ok
+
+  - id: drill_bushing_seats
+    description: press-fit seats for steel drill bushings with real engagement
+    verified_by:
+      - form.bushing_fit_ok
+      - topology.bores_open
+
+  - id: cell_pocket_grid
+    description: blind battery pockets with retaining mouth lips and contact slots
+    verified_by:
+      - form.cell_lip_retains
+      - form.cell_grid_webs_ok
+      - topology.bores_open
+      - topology.seat_lips_present
+
+  - id: pegboard_pegs
+    description: board-standard pegs (straight or hooked with anti-lift) on the plate back
+    verified_by:
+      - form.peg_engagement_ok
+      - topology.pins_present
+
+  - id: rod_sockets
+    description: blind axis-aligned rod sockets with measured engagement and isolation
+    verified_by:
+      - form.socket_engagement_ok
+      - form.socket_bores_isolated
+      - topology.bores_open
+      - topology.pins_present
+
+  - id: text_relief
+    description: text as geometry — printable stroke width, glyph band kept sacred
+    verified_by:
+      - form.min_stroke_width_ok
+      - topology.text_relief_present
+
+  - id: mirrored_stamp_die
+    description: mirrored relief die whose impression reads forwards
+    verified_by:
+      - form.stamp_mirrored_ok
+      - form.min_stroke_width_ok
+      - topology.text_relief_present
+
   # -- wall tool mounts pack ---------------------------------------------------
 
   - id: tool_saddle_ring

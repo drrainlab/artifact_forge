@@ -1,0 +1,21 @@
+schema: product/v1
+id: jig_knob_m6_50
+archetype: hand_knob_v1@1
+strict: true
+
+requested_features:
+  - knob_grip_body
+  - captive_nut_socket
+
+params:
+  grip_d: 50mm
+  grip_h: 24mm
+  lobes: 6
+  nut_af: 10mm
+  socket_depth: 10mm
+  screw: M6
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

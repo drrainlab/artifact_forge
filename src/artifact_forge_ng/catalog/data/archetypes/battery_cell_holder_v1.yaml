@@ -1,0 +1,94 @@
+schema: archetype/v1
+id: battery_cell_holder_v1
+version: 1
+object_class: battery_cell_holder
+description: >
+  Battery cell holder: an N x M grid of blind pockets sized from the
+  cell table (18650 / 21700 / AA / AAA / CR123), each with a retaining
+  mouth lip the cell snaps past and a contact slot through the floor
+  (tab access, spot-weld, spring seat). Electrical contacts stay
+  external hardware — the holder owns the honest mechanics.
+
+provides_features:
+  - mounting_plate_body
+  - cell_pocket_grid
+
+parameters:
+  cell:
+    {type: choice, choices: ["18650", "21700", aa, aaa, cr123],
+     default: "18650", role: functional, exposed: true}
+  nx:
+    {type: count, default: 2, min: 1, max: 6, role: functional, exposed: true}
+  ny:
+    {type: count, default: 2, min: 1, max: 6, role: functional, exposed: true}
+  block_t:
+    {type: length, default: 16mm, min: 10mm, max: 40mm, role: structural}
+  pocket_depth:
+    {type: length, default: 12mm, min: 6mm, max: 36mm, role: functional, exposed: true}
+  margin:
+    {type: length, default: 5mm, min: 3mm, max: 14mm, role: structural}
+  fit_clearance:
+    {type: length, default: 0.4mm, min: 0.2mm, max: 0.7mm, role: manufacturing}
+  lip_w:
+    {type: length, default: 0.8mm, min: 0.5mm, max: 1.4mm, role: assembly}
+  lip_h:
+    {type: length, default: 1.2mm, min: 0.8mm, max: 2.5mm, role: assembly}
+  pitch:
+    {type: length, default: 0mm, min: 0mm, max: 60mm, role: functional}
+  corner_r:
+    {type: length, default: 4mm, min: 2mm, max: 10mm, role: aesthetic}
+
+constraints:
+  - pocket_depth < block_t - 1.2
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: block
+      params: {l: "expr(nx * 24 + 2 * margin)", w: "expr(ny * 24 + 2 * margin)",
+               t: block_t, corner_r: corner_r}
+    - op: cell_pocket_grid
+      id: cells
+      params: {cell: cell, nx: nx, ny: ny, pitch: pitch,
+               fit_clearance: fit_clearance, lip_w: lip_w, lip_h: lip_h,
+               pocket_depth: pocket_depth}
+
+regions:
+  - {id: block, role: mounting_surface, editable: false,
+     label: holder block, aliases: [block, holder]}
+  - {id: block_lightening, role: aesthetic_lightening, editable: true,
+     label: block canvas, aliases: [top face]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: electronics
+  modes: [engineering, utility]
+  tags: [battery, cell, "18650", holder]
+
+validators:
+  - form.cell_lip_retains
+  - form.cell_grid_webs_ok
+  - form.cuts_respect_keepouts
+  - form.holes_within_outline
+  - topology.bores_open
+  - topology.seat_lips_present
+  - topology.cutout_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - cell_pocket_grid
+  must_not_have: []
+  invariants:
+    - pocket_depth < block_t - 1.2

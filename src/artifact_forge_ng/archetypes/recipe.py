@@ -33,9 +33,9 @@ def _eval_param(
             return resolved.choices[raw]
         if raw in resolved.context:
             return resolved.context[raw]
-    if value_type == "choice":
+    if value_type in ("choice", "string"):
         if not isinstance(raw, str):
-            raise RecipeError(f"{where}: choice param must be a string, got {raw!r}")
+            raise RecipeError(f"{where}: {value_type} param must be a string, got {raw!r}")
         return raw
     if value_type == "count":
         if isinstance(raw, str):
@@ -97,6 +97,7 @@ def build_form(
         plates=state.plates,
         pins=state.pins,
         fields=state.fields,
+        text_reliefs=state.text_reliefs,
         regions=state.regions,
         windows=state.windows,
         datums=state.datums,

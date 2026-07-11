@@ -1,0 +1,18 @@
+schema: product/v1
+id: maker_initials_stamp
+archetype: custom_stamp_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - mirrored_stamp_die
+
+params:
+  stamp_text: "FORGE"
+  text_size: 10mm
+  relief_depth: 1.6mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

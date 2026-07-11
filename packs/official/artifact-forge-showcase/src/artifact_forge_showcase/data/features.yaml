@@ -1,43 +1,8 @@
 schema: features/v1
-# Showcase feature vocabulary.
+# Showcase feature vocabulary. The spare/jig feature ids moved to core
+# together with their ops (core data/features.yaml); only the education
+# wave's vocabulary remains pack-side.
 features:
-  # -- repair: Spare Fit Standard --------------------------------------------
-  - id: hose_barb_spigots
-    description: two barbed hose spigots with a through bore — barb height and count measured for real retention
-    verified_by:
-      - form.barb_retention_ok
-      - topology.single_connected_solid
-
-  - id: adapter_stop_flange
-    description: the mid flange that stops both hoses and gives a wrench/grip surface
-    verified_by:
-      - topology.single_connected_solid
-
-  - id: square_shaft_socket
-    description: blind square shaft socket with a measured across-flats fit and torque wall
-    verified_by:
-      - form.shaft_fit_ok
-      - form.knob_torque_wall_ok
-
-  - id: knob_grip_body
-    description: revolved replacement-knob grip body
-    verified_by:
-      - topology.single_connected_solid
-
-  # -- jigs -------------------------------------------------------------------
-  - id: drill_bushing_seats
-    description: press-fit through seats for steel drill bushings — interference, engagement and walls measured
-    verified_by:
-      - form.bushing_fit_ok
-      - topology.bores_open
-
-  - id: registration_stop_fence
-    description: fence under one plate edge hooking the workpiece — every hole repeats from that edge
-    verified_by:
-      - form.stop_registration_ok
-      - topology.ribs_present
-
-  # -- education ---------------------------------------------------------------
   - id: tolerance_ladder_row
     description: row of test bores of monotonically growing clearance around a printed reference pin
     verified_by:

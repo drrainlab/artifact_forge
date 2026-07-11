@@ -1,0 +1,15 @@
+schema: product/v1
+id: cell_holder_18650_2x2
+archetype: battery_cell_holder_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - cell_pocket_grid
+
+params: {}
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

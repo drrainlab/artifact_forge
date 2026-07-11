@@ -1,0 +1,20 @@
+schema: product/v1
+id: clay_pattern_stamp
+archetype: custom_stamp_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - mirrored_stamp_die
+
+params:
+  stamp_text: "MADE BY HAND"
+  text_size: 9mm
+  relief_depth: 2.4mm
+  die_l: 110mm
+  die_w: 30mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

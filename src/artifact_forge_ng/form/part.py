@@ -289,12 +289,18 @@ class PinFeature:
     z0: float  # weld start along the axis (should overlap the host)
     length: float
     axis: str = "Z"
+    #: Declared coaxial bore INSIDE the pin (a socket arm's barrel): the
+    #: pin is a tube by design, so the presence probe measures its WALL
+    #: instead of a solid core. The bore itself is a separate BoreFeature.
+    bore_d: float = 0.0
 
     def __post_init__(self) -> None:
         if self.d <= 0 or self.length <= 0:
             raise ValueError(f"PinFeature {self.name!r} needs positive d/length")
         if self.axis not in ("X", "Y", "Z"):
             raise ValueError(f"PinFeature {self.name!r} axis must be X/Y/Z")
+        if self.bore_d < 0 or self.bore_d >= self.d:
+            raise ValueError(f"PinFeature {self.name!r} bore_d must stay inside d")
 
     def start_point(self) -> tuple[float, float, float]:
         """Axis-start in world coords: `at` holds the two off-axis coords
@@ -338,6 +344,47 @@ class LoftFeature:
                 f"LoftFeature {self.name!r} must taper (tip <= root) so the "
                 "printed arm is self-supporting"
             )
+
+
+@dataclass(frozen=True)
+class TextReliefFeature:
+    """Text rendered as geometry on a HORIZONTAL face: raised (emboss)
+    or sunk (engrave) glyphs, optionally mirrored — a stamp die must
+    read backwards so its impression reads forwards. v1 scope: one
+    bundled font, horizontal faces only, in-plane rotation allowed.
+    Glyph outlines come from OCC's font engine at compile time; the IR
+    carries the text plus a conservative footprint estimate so the
+    analytic checks stay CAD-free."""
+
+    name: str
+    text: str
+    at: tuple[float, float]      # anchor (center) on the face, world XY
+    plane_z: float               # the host face the relief grows from / sinks into
+    size: float                  # cap height, mm
+    depth: float                 # relief height (emboss) / cut depth (engrave)
+    mode: str = "emboss"         # "emboss" | "engrave"
+    mirror: bool = False         # stamps: mirrored so the impression reads
+    rotate_deg: float = 0.0      # in-plane rotation about the anchor
+    #: "up" = relief on a top face (+Z), "down" = on a bottom face (-Z):
+    #: a stamp die carries its glyphs under the body and PRINTS face-down
+    #: on the bed — the crispest first-layer text there is.
+    direction: str = "up"
+
+    def __post_init__(self) -> None:
+        if not self.text.strip():
+            raise ValueError(f"TextReliefFeature {self.name!r} needs text")
+        if self.size <= 0 or self.depth <= 0:
+            raise ValueError(f"TextReliefFeature {self.name!r} needs positive size/depth")
+        if self.mode not in ("emboss", "engrave"):
+            raise ValueError(f"TextReliefFeature {self.name!r} mode must be emboss/engrave")
+        if self.direction not in ("up", "down"):
+            raise ValueError(f"TextReliefFeature {self.name!r} direction must be up/down")
+
+    def footprint(self) -> tuple[float, float]:
+        """Conservative (w, h) of the rendered line — the keepout/probe
+        band. DejaVu Sans averages ~0.6 cap heights per glyph advance."""
+        return (max(1, len(self.text)) * self.size * 0.72 + self.size,
+                self.size * 1.5)
 
 
 @dataclass(frozen=True)
@@ -426,6 +473,7 @@ class PartForm:
     lofts: list[LoftFeature] = field(default_factory=list)
     pins: list[PinFeature] = field(default_factory=list)
     fields: list[FieldFeature] = field(default_factory=list)
+    text_reliefs: list[TextReliefFeature] = field(default_factory=list)
     #: Oriented modifier canvases, keyed by the region name they serve.
     windows: dict[str, FaceWindow] = field(default_factory=dict)
     regions: list[Region] = field(default_factory=list)

@@ -1,0 +1,22 @@
+schema: product/v1
+id: trellis_cross_10mm
+archetype: trellis_connector_v1@1
+strict: true
+
+requested_features:
+  - rod_sockets
+
+params:
+  hub_d: 26mm
+  hub_h: 28mm
+  rod_d: 10mm
+  rod_d_up: 10mm
+  arm_px: 1
+  arm_mx: 1
+  arm_py: 1
+  arm_pz: 1
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

@@ -184,6 +184,30 @@ def pins_present(geometry: Geometry, form: PartForm) -> Finding:
         t0, t1 = 0.4 / pin.length, 1.0 - 0.3 / pin.length
         a = (sx + (ex - sx) * t0, sy + (ey - sy) * t0, sz + (ez - sz) * t0)
         b = (sx + (ex - sx) * t1, sy + (ey - sy) * t1, sz + (ez - sz) * t1)
+        if pin.bore_d > 0.0:
+            # a declared tube: probe the WALL at mid-length, four radial
+            # stations on the mid-wall circle (the core is void by design)
+            mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
+            r_wall = (pin.d / 2.0 + pin.bore_d / 2.0) / 2.0
+            half = min(0.5, (pin.d - pin.bore_d) / 4.0 * 0.8)
+            # horizontal tubes skip the +Z station: their bore prints with
+            # a teardrop roof that legitimately reaches into that band
+            offsets = {
+                "Z": ((r_wall, 0, 0), (-r_wall, 0, 0), (0, r_wall, 0), (0, -r_wall, 0)),
+                "X": ((0, r_wall, 0), (0, -r_wall, 0), (0, 0, -r_wall)),
+                "Y": ((r_wall, 0, 0), (-r_wall, 0, 0), (0, 0, -r_wall)),
+            }[pin.axis]
+            broken = False
+            for dx, dy, dz in offsets:
+                probe = box_probe(
+                    mid[0] + dx - half, mid[1] + dy - half, mid[2] + dz - half,
+                    mid[0] + dx + half, mid[1] + dy + half, mid[2] + dz + half)
+                if solid_fraction(geometry.workplane, probe) < 0.9:
+                    broken = True
+                    break
+            if broken:
+                missing.append(f"{pin.name} (tube wall broken)")
+            continue
         probe = channel_probe([a, b], d=pin.d * 0.7)
         frac = solid_fraction(geometry.workplane, probe)
         if frac < 0.9:
@@ -242,6 +266,38 @@ def seat_lips_present(geometry: Geometry, form: PartForm) -> Finding:
         "topology.seat_lips_present",
         not problems,
         "all bearing lips solid" if not problems else "; ".join(problems),
+    )
+@register_probe("topology.text_relief_present")
+def text_relief_present(geometry: Geometry, form: PartForm) -> Finding:
+    """Every text relief left its mark on the solid: material above the
+    face for emboss (glyphs are sparse — any real fill counts), material
+    removed inside the band for engrave."""
+    if not form.text_reliefs:
+        return Finding(
+            check="topology.text_relief_present",
+            status=Status.PASS,
+            level=Level.TOPOLOGY,
+            message="no text reliefs declared",
+        )
+    problems = []
+    for tr in form.text_reliefs:
+        w, h = tr.footprint()
+        cx, cy = tr.at
+        sign = 1.0 if tr.direction == "up" else -1.0
+        outside = tr.mode == "emboss"  # emboss band sits outside the face
+        lo = tr.plane_z + (0.1 if outside else -tr.depth + 0.1) * sign
+        hi = tr.plane_z + (tr.depth - 0.1 if outside else -0.1) * sign
+        band = box_probe(cx - w / 2, cy - h / 2, min(lo, hi),
+                         cx + w / 2, cy + h / 2, max(lo, hi))
+        frac = solid_fraction(geometry.workplane, band)
+        if tr.mode == "emboss" and frac < 0.02:
+            problems.append(f"{tr.name}: no raised glyph material (fill {frac:.3f})")
+        if tr.mode == "engrave" and frac > 0.98:
+            problems.append(f"{tr.name}: nothing engraved (fill {frac:.3f})")
+    return _finding(
+        "topology.text_relief_present",
+        not problems,
+        "all text reliefs materialized" if not problems else "; ".join(problems),
     )
 @register_probe("topology.pockets_present")
 def pockets_present(geometry: Geometry, form: PartForm) -> Finding:

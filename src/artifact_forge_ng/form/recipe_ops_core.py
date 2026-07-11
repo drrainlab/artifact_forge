@@ -81,6 +81,7 @@ class RecipeState:
     plates: list[PlateFeature] = field(default_factory=list)
     pins: list[PinFeature] = field(default_factory=list)
     fields: list[Any] = field(default_factory=list)
+    text_reliefs: list[Any] = field(default_factory=list)
     regions: list[Region] = field(default_factory=list)
     frame: dict[str, float] = field(default_factory=dict)
     datums: dict[str, dict[str, Any]] = field(default_factory=dict)

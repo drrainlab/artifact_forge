@@ -1,0 +1,14 @@
+schema: product/v1
+id: trellis_tee_8mm
+archetype: trellis_connector_v1@1
+strict: true
+
+requested_features:
+  - rod_sockets
+
+params: {}
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

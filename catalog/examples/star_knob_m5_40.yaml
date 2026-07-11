@@ -1,0 +1,15 @@
+schema: product/v1
+id: star_knob_m5_40
+archetype: hand_knob_v1@1
+strict: true
+
+requested_features:
+  - knob_grip_body
+  - captive_nut_socket
+
+params: {}
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

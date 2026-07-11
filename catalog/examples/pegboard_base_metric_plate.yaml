@@ -1,0 +1,20 @@
+schema: product/v1
+id: pegboard_base_metric_plate
+archetype: pegboard_mount_base_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - pegboard_pegs
+
+params:
+  board: metric_25
+  plate_l: 110mm
+  plate_w: 80mm
+  cols: 4
+  rows: 1
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

@@ -438,6 +438,129 @@ def _bore_pattern(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     state.frame[f"{name}_count"] = float(len(centers))
 
 
+#: Battery cell nominal MAX diameters and lengths (mm) — the pocket adds
+#: fit_clearance on top; the length is reference data for holder sizing.
+CELLS: dict[str, tuple[float, float]] = {
+    "18650": (18.6, 65.0),
+    "21700": (21.4, 70.0),
+    "aa": (14.5, 50.5),
+    "aaa": (10.5, 44.5),
+    "cr123": (17.0, 34.5),
+}
+
+#: Retention bite band: mouth must be this much narrower than the cell —
+#: less slips, more won't snap in without cracking the lip.
+CELL_LIP_BITE_BAND = (0.6, 2.5)
+CELL_WEB_MIN = 2.5
+
+
+def _cell_pocket_grid(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """N x M grid of blind cylindrical battery pockets with a retaining
+    mouth lip (the cell snaps past it) and a contact slot through the
+    floor under each cell (tab access / spot-weld / spring contact).
+    Electrical contacts stay external hardware — this op owns the honest
+    mechanics of holding the cell."""
+    state.require_base("cell_pocket_grid")
+    cell = p["cell"]
+    if cell not in CELLS:
+        raise RecipeError(f"unknown cell {cell!r}; known: {sorted(CELLS)}")
+    cell_d, cell_len = CELLS[cell]
+    nx, ny = int(round(p["nx"])), int(round(p["ny"]))
+    fit = p["fit_clearance"]
+    lip_w, lip_h = p["lip_w"], p["lip_h"]
+    depth = p["pocket_depth"]
+    slot_w, slot_l = p["slot_w"], p["slot_l"]
+    t = state.width
+    if nx < 1 or ny < 1:
+        raise RecipeError("cell_pocket_grid needs nx, ny >= 1")
+    d_pocket = cell_d + fit
+    d_mouth = d_pocket - 2.0 * lip_w
+    bite = cell_d - d_mouth
+    lo, hi = CELL_LIP_BITE_BAND
+    if not lo <= bite <= hi:
+        raise RecipeError(
+            f"lip bite {bite:.2f} outside [{lo:g}, {hi:g}] — the cell "
+            "either slips out or cracks the lip going in")
+    if depth >= t - 1.2:
+        raise RecipeError(f"pocket {depth:g} pierces the {t:g} block")
+    if depth < lip_h + 4.0:
+        raise RecipeError("pocket too shallow to hold a cell under its lip")
+    if depth > cell_len:
+        raise RecipeError(
+            f"pocket {depth:g} deeper than the {cell} cell ({cell_len:g})")
+    pitch = p["pitch"] if p["pitch"] > 1e-9 else d_pocket + CELL_WEB_MIN
+    if pitch - d_pocket < CELL_WEB_MIN - 1e-9:
+        raise RecipeError(
+            f"pitch {pitch:g} leaves {pitch - d_pocket:.2f} web between "
+            f"pockets (min {CELL_WEB_MIN:g})")
+    if slot_w >= d_mouth:
+        raise RecipeError("contact slot wider than the pocket mouth")
+
+    name = op_id or "cells"
+    centers = grid_centers(nx, ny, pitch, pitch, (p["cx"], p["cy"]))
+    for i, (bx, by) in enumerate(centers):
+        # The bearing-seat inset-span trick: both cutters declare OPEN
+        # overshoots (the pocket opens into the mouth, the mouth into the
+        # air — no false 'blind skin' expectations for the pocket probe),
+        # and each span is inset by the overshoot so the ACTUAL cut lands
+        # exactly on the intended band and never nibbles the lip ring.
+        state.bores.append(BoreFeature(
+            name=f"{name}_{i}", axis="Z", d=d_pocket,
+            center=(bx, by, 0.0), span=(t - depth + 1.0, t - lip_h - 1.0),
+            overshoot=(1.0, 1.0)))
+        state.bores.append(BoreFeature(
+            name=f"{name}_{i}_mouth", axis="Z", d=d_mouth,
+            center=(bx, by, 0.0), span=(t - lip_h + 0.5, t),
+            overshoot=(1.0, 1.0)))
+        # contact slot through the floor under the cell
+        state.cutboxes.append(CutBoxFeature(
+            name=f"{name}_{i}_contact",
+            box=Box3(bx - slot_w / 2.0, by - slot_l / 2.0, -1.0,
+                     bx + slot_w / 2.0, by + slot_l / 2.0,
+                     t - depth + 0.5)))
+        state.frame[f"{name}_{i}_x"] = bx
+        state.frame[f"{name}_{i}_y"] = by
+        # the mouth lip ring, probed like a bearing-seat lip
+        state.frame[f"{name}_{i}_cx"] = bx
+        state.frame[f"{name}_{i}_cy"] = by
+        state.frame[f"{name}_{i}_lip_r"] = (d_mouth + d_pocket) / 4.0
+        state.frame[f"{name}_{i}_lip_z0"] = t - lip_h
+        state.frame[f"{name}_{i}_lip_z1"] = t
+    state.frame.update(
+        cell_grid_nx=float(nx), cell_grid_ny=float(ny),
+        cell_pitch=pitch, cell_d=cell_d, cell_pocket_d=d_pocket,
+        cell_mouth_d=d_mouth, cell_lip_bite=bite, cell_lip_h=lip_h,
+        cell_pocket_depth=depth, cell_len_ref=cell_len,
+    )
+
+
+_register(RecipeOpDecl(
+    name="cell_pocket_grid",
+    kind="feature",
+    params={
+        "cell": ("choice", "18650"),
+        "nx": ("count", 2), "ny": ("count", 2),
+        "pitch": ("length", 0.0),
+        "fit_clearance": ("length", 0.4),
+        "lip_w": ("length", 0.8), "lip_h": ("length", 1.2),
+        "pocket_depth": ("length", 12.0),
+        "slot_w": ("length", 4.0), "slot_l": ("length", 10.0),
+        "cx": ("length", 0.0), "cy": ("length", 0.0),
+    },
+    validators=(
+        "form.cell_lip_retains",
+        "form.cell_grid_webs_ok",
+        "form.cuts_respect_keepouts",
+        "topology.bores_open",
+        "topology.seat_lips_present",
+        "topology.cutout_present",
+    ),
+    apply=_cell_pocket_grid,
+    description="grid of blind battery pockets with retaining mouth lips "
+                "and floor contact slots (cells from the CELLS table)",
+))
+
+
 _register(RecipeOpDecl(
     name="bore_pattern",
     kind="feature",

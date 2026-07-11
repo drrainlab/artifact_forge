@@ -1,0 +1,99 @@
+schema: archetype/v1
+id: pegboard_mount_base_v1
+version: 1
+object_class: pegboard_mount_base
+description: >
+  Pegboard interface base — not one holder per tool: a face plate whose
+  back grows board-standard pegs (L-hooked top row + anti-lift row, fit
+  measured against the board table). Tool-specific holders compose
+  payload features on the face; the peg side stays one verified
+  standard. Boards: 1"/Ø6.35 imperial, 25 mm/Ø6 metric.
+
+provides_features:
+  - mounting_plate_body
+  - pegboard_pegs
+
+parameters:
+  plate_l:
+    {type: length, default: 60mm, min: 30mm, max: 160mm, role: functional, exposed: true}
+  plate_w:
+    {type: length, default: 60mm, min: 30mm, max: 160mm, role: functional, exposed: true}
+  t:
+    {type: length, default: 5mm, min: 4mm, max: 10mm, role: structural}
+  corner_r:
+    {type: length, default: 5mm, min: 2mm, max: 12mm, role: aesthetic}
+  board:
+    {type: choice, choices: [imperial_quarter, metric_25],
+     default: imperial_quarter, role: assembly, exposed: true}
+  cols:
+    {type: count, default: 2, min: 1, max: 5, role: assembly, exposed: true}
+  rows:
+    {type: count, default: 1, min: 1, max: 4, role: assembly}
+  hook:
+    {type: choice, choices: [up, none], default: up, role: assembly}
+  hook_len:
+    {type: length, default: 8mm, min: 4mm, max: 14mm, role: assembly}
+  anti_lift:
+    {type: count, default: 1, min: 0, max: 1, role: assembly}
+  peg_row_cy:
+    {type: length, default: "expr(plate_w / 2 - 14)", min: 0mm, max: 70mm, role: assembly}
+
+constraints:
+  - plate_l >= cols * 26
+  - plate_w >= 30
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params: {l: plate_l, w: plate_w, t: t, corner_r: corner_r}
+    - op: peg_pattern
+      id: pegs
+      params: {board: board, cols: cols, rows: rows, hook: hook,
+               hook_len: hook_len, anti_lift: anti_lift, cy: peg_row_cy}
+
+regions:
+  - {id: plate, role: mounting_surface, editable: false,
+     label: payload face, aliases: [face, plate]}
+  - {id: plate_lightening, role: aesthetic_lightening, editable: true,
+     label: face canvas, aliases: [front face]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: workshop
+  modes: [workshop, utility]
+  tags: [pegboard, mount, hook, interface]
+
+interfaces:
+  - id: board_pegs
+    type: pegboard_peg
+    gender: male
+    datum: board_face
+    frame: {normal: "-Z", up: "+Y"}
+
+validators:
+  - form.peg_engagement_ok
+  - form.holes_within_outline
+  - interface.frame_exists
+  - interface.frame_orthonormal
+  - topology.pins_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers:
+  - add_hex_perforation
+  - fillet_soften
+
+contract:
+  must_have:
+    - mounting_plate_body
+    - pegboard_pegs
+  must_not_have: []
+  invariants:
+    - plate_l >= cols * 26

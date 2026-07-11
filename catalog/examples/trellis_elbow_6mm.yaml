@@ -1,0 +1,22 @@
+schema: product/v1
+id: trellis_elbow_6mm
+archetype: trellis_connector_v1@1
+strict: true
+
+requested_features:
+  - rod_sockets
+
+params:
+  hub_d: 18mm
+  hub_h: 20mm
+  rod_d: 6mm
+  rod_d_up: 6mm
+  arm_px: 1
+  arm_mx: 0
+  arm_py: 0
+  arm_pz: 1
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none
