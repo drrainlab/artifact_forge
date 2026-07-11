@@ -1,0 +1,3 @@
+schema: features/v1
+# New feature ids (if any) with verified_by bindings.
+features: []

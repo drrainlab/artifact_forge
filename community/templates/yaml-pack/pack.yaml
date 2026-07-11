@@ -1,0 +1,17 @@
+id: af-pack-example-yaml
+name: Example YAML Pack
+version: 0.1.0
+tier: free
+license: Apache-2.0
+visibility: public
+author: Your Name
+
+domains:
+  - your-domain
+
+claims:
+  safety_certified: false
+  medical: false
+  food_safe: false
+  electrical_certified: false
+  pressure_rated: false

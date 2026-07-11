@@ -41,10 +41,28 @@ uv run pytest                       # full suite including CAD probes
 - New archetypes should come with a working example under
   `catalog/examples/` that builds at grade pass.
 
-## Domain packs
+## Contributing a pack
 
-Domain-specific families (ops + checks + archetypes + tests) can live
-outside this repository entirely — the engine loads packs through the
-`artifact_forge_ng.packs` entry-point group. See
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). If your contribution is a
-whole domain, a pack is usually the right shape for it.
+Domain-specific families (archetypes + checks + examples) are usually a
+**pack**, not a core change — the engine loads packs through the
+`artifact_forge_ng.packs` entry-point group (see
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). The rules:
+
+1. Start from [community/templates/yaml-pack](community/templates/yaml-pack)
+   (presets / YAML archetypes) or
+   [community/templates/python-pack](community/templates/python-pack)
+   (adds checks) — contribution levels L0–L3 are described in
+   [community/README.md](community/README.md).
+2. Every pack includes a `pack.yaml`.
+3. Every public archetype needs: one example YAML, one validate test,
+   clear claims / non-claims (`docs/CLAIMS.md`), a license, and a
+   screenshot or render where possible.
+4. **No** medical, safety-critical, mains-voltage, pressure-rated,
+   IP-rated, food-safe or animal-safe claims unless explicitly
+   certified.
+5. New Python checks require PASS/FAIL/n-a tests on op-built forms.
+6. New geometry builders (L3) require maintainer discussion first.
+
+The official [showcase pack](packs/official/artifact-forge-showcase) is
+the reference implementation; the review bar is
+[community/PACK_REVIEW_CHECKLIST.md](community/PACK_REVIEW_CHECKLIST.md).

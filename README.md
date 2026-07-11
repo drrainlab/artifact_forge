@@ -205,6 +205,15 @@ catalog data and pipeline report hooks (see
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). Commercial packs may define
 additional terms for outputs produced from those packs.
 
+The **official showcase pack**
+([packs/official/artifact-forge-showcase](packs/official/artifact-forge-showcase),
+free, Apache-2.0) ships parts across four domains — an under-desk audio
+interface mount, barbed hose adapters (vacuum / drain / garden), an
+edge-registered drilling jig with steel bushings, and a tolerance
+ladder — every one validator-backed with honest non-claims. The path for
+your own: download → run the showcase → copy a
+[community template](community/) → build your pack → send a PR.
+
 ## Licensing
 
 The core engine is **Apache-2.0** ([LICENSE](LICENSE)). Models you
