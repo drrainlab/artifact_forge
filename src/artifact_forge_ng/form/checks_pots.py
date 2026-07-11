@@ -132,3 +132,38 @@ register_probe("form.floor_open_area_ok")(
     lambda form, ctx: check_floor_open_area_ok(form))
 register_probe("form.wall_slots_ok")(
     lambda form, ctx: check_wall_slots_ok(form))
+
+
+def check_foot_press_fit_ok(form: PartForm) -> Finding:
+    """The press spigot must hold in the tube: interference inside the
+    band, real engagement, and a shoulder around the spigot."""
+    from .recipe_ops_revolve import FOOT_ENGAGE_K, FOOT_PRESS_BAND
+
+    check = "form.foot_press_fit_ok"
+    f = form.frame
+    if "foot_spigot_d" not in f:
+        return _finding(check, True, "n/a — no press-fit foot spigot",
+                        critical=False)
+    lo, hi = FOOT_PRESS_BAND
+    problems: list[str] = []
+    if not lo <= f["foot_press"] <= hi:
+        problems.append(
+            f"press {f['foot_press']:g} outside [{lo:g}, {hi:g}]")
+    need = FOOT_ENGAGE_K * f["foot_tube_id"]
+    if f["foot_spigot_l"] < need - 1e-6:
+        problems.append(
+            f"spigot {f['foot_spigot_l']:g} < {need:g} "
+            f"({FOOT_ENGAGE_K:g}x tube bore)")
+    if f["foot_spigot_d"] / 2.0 + 2.0 > f["foot_pad_r"] + 1e-6:
+        problems.append("no pad shoulder around the spigot")
+    if problems:
+        return _finding(check, False, "; ".join(problems))
+    return _finding(
+        check, True,
+        f"spigot Ø{f['foot_spigot_d']:g} presses {f['foot_press']:g} into "
+        f"the tube, engagement {f['foot_spigot_l']:g}",
+        measured=f["foot_press"], limit=hi)
+
+
+register_probe("form.foot_press_fit_ok")(
+    lambda form, ctx: check_foot_press_fit_ok(form))

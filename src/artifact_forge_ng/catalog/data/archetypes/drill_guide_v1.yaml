@@ -8,8 +8,9 @@ description: >
   countersunk hold-down screws beside the row — clamp or screw it onto
   layout marks. The sibling drilling_jig_v1 (showcase pack) hooks a stop
   fence over the workpiece edge instead; this one goes where the fence
-  can't reach. One bushing diameter per guide in v1; angled channels are
-  outside the axis-aligned kernel — not promised.
+  can't reach. Two independent bushing rows (each its own diameter)
+  cover stepped drilling — pilot + clearance in one guide; angled
+  channels are outside the axis-aligned kernel — not promised.
 
 provides_features:
   - mounting_plate_body
@@ -33,6 +34,20 @@ parameters:
     {type: count, default: 3, min: 1, max: 8, role: functional, exposed: true}
   seat_spacing:
     {type: length, default: 25mm, min: 12mm, max: 60mm, role: functional, exposed: true}
+  row_a_cy:
+    {type: length, default: 0mm, min: 0mm, max: 30mm, role: functional}
+  row_b:
+    {type: count, default: 0, min: 0, max: 1, role: functional, exposed: true,
+     description: enable the second bushing row (its own diameter)}
+  row_b_od:
+    {type: length, default: 5mm, min: 3mm, max: 14mm, role: assembly}
+  row_b_count:
+    {type: count, default: 3, min: 1, max: 8, role: functional}
+  row_b_spacing:
+    {type: length, default: 25mm, min: 12mm, max: 60mm, role: functional}
+  row_b_cy:
+    {type: length, default: 11mm, min: 6mm, max: 30mm, role: functional,
+     description: second row offset BELOW the centerline (row A stays on it)}
   screw:
     {type: choice, choices: [M4, M5], default: M4, role: assembly}
   screw_row_cy:
@@ -57,7 +72,12 @@ form:
     - op: bushing_seat_line
       id: bushings
       params: {bushing_od: bushing_od, press_fit: press_fit,
-               count: seat_count, spacing: seat_spacing, cx: 0mm, cy: 0mm}
+               count: seat_count, spacing: seat_spacing, cx: 0mm, cy: row_a_cy}
+    - op: bushing_seat_line
+      id: bushings_b
+      params: {enabled: row_b, bushing_od: row_b_od, press_fit: press_fit,
+               count: row_b_count, spacing: row_b_spacing, cx: 0mm,
+               cy: "expr(-row_b_cy)"}
     - op: countersunk_hole_pattern
       id: holds
       params: {kind: line, screw: screw, count: 2, spacing: screw_spacing,

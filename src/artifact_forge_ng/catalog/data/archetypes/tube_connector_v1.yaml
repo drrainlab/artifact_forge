@@ -3,13 +3,14 @@ id: tube_connector_v1
 version: 1
 object_class: tube_connector
 description: >
-  Branched hose connector: a barbed two-spigot run (the hose_adapter
-  grammar) with one (tee) or two (cross) smooth branch spigots rooted
-  in the stop flange — X-branch barbs are a revolve the axis-aligned
-  kernel cannot make, so branches take a hose clip. Straight runs and
-  reducers ARE hose_adapter_v1 (showcase pack); elbows wait on a
-  capped-run op. Pressure honesty: gravity/siphon duty, never certified
-  for pressurized lines (docs/CLAIMS.md).
+  Branched hose connector: a barbed run with smooth branch spigots
+  rooted in the stop flange — tee (one branch), cross (two) or ELBOW
+  (one barbed bottom spigot, a capped crown, the water turns the
+  corner; the blind run bore provably swallows the branch junction).
+  X-branch barbs are a revolve the axis-aligned kernel cannot make, so
+  branches take a hose clip. Straight runs and reducers ARE
+  hose_adapter_v1 (showcase pack). Pressure honesty: gravity/siphon
+  duty, never certified for pressurized lines (docs/CLAIMS.md).
 
 provides_features:
   - hose_barb_spigots
@@ -18,7 +19,7 @@ provides_features:
 
 parameters:
   config:
-    {type: choice, choices: [tee, cross], default: tee, role: functional, exposed: true}
+    {type: choice, choices: [tee, cross, elbow], default: tee, role: functional, exposed: true}
   run_d_a:
     {type: length, default: 12mm, min: 8mm, max: 40mm, role: functional, exposed: true,
      description: "run spigot Ø = barb crest = nominal hose bore (end A)"}
@@ -74,8 +75,8 @@ catalog:
 validators:
   - form.barb_retention_ok
   - form.tube_wall_ok
+  - form.tube_run_open
   - form.branch_path_connected
-  - form.revolve_profile_clear_of_axis
   - topology.pins_present
   - topology.bores_open
   - topology.single_connected_solid

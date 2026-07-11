@@ -8,7 +8,7 @@ from __future__ import annotations
 import math
 from typing import Any
 
-from .part import FieldFeature
+from .part import BoreFeature, FieldFeature
 from .profiles_revolve import loop_from_points
 from .recipe_ops_core import RecipeError, RecipeOpDecl, RecipeState, _register
 from .regions import Box3, Region
@@ -477,4 +477,102 @@ _register(RecipeOpDecl(
     apply=_wall_slot_ring,
     description="vertical aeration/root slots around the tapered net pot "
                 "wall (cylindrical field mapping)",
+))
+
+# -- foot_body -------------------------------------------------------------------
+
+FOOT_PRESS_BAND = (0.1, 0.5)   # diametral spigot-into-tube interference, mm
+FOOT_ENGAGE_K = 0.6            # spigot length >= k * tube inner diameter
+
+
+def _foot_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Press-fit furniture foot: a revolved pad with a chamfered spigot
+    that presses INTO a tube leg (the user measures the tube's inner
+    diameter — the spigot adds the interference), and a shallow recess
+    in the pad underside for a glued TPU disc. Prints pad-down: spigot
+    up, recess rings the first layer — support-free by construction."""
+    if state.section is not None:
+        raise RecipeError("foot_body must be the (single) base op")
+    r_pad = p["pad_d"] / 2.0
+    pad_t = p["pad_t"]
+    tube_id = p["tube_id"]
+    press = p["press"]
+    spigot_l = (p["spigot_l"] if p["spigot_l"] > 1e-9
+                else FOOT_ENGAGE_K * tube_id + 4.0)
+    recess_t = p["pad_recess_t"]
+    lo, hi = FOOT_PRESS_BAND
+    if not lo <= press <= hi:
+        raise RecipeError(
+            f"press {press:g} outside [{lo:g}, {hi:g}] — a loose spigot "
+            "drops out, an over-pressed one splits the tube or the print")
+    spigot_d = tube_id + press
+    r_spigot = spigot_d / 2.0
+    if r_spigot + 2.0 > r_pad:
+        raise RecipeError(
+            f"pad Ø{2 * r_pad:g} leaves no shoulder around the "
+            f"Ø{spigot_d:g} spigot (needs 2 mm per side)")
+    if spigot_l < FOOT_ENGAGE_K * tube_id:
+        raise RecipeError(
+            f"spigot {spigot_l:g} shorter than {FOOT_ENGAGE_K:g}x tube "
+            f"bore ({FOOT_ENGAGE_K * tube_id:g}) — the foot rocks out")
+    if recess_t >= pad_t - 1.2:
+        raise RecipeError("TPU recess leaves no pad skin")
+    r_recess = (p["pad_recess_d"] if p["pad_recess_d"] > 1e-9
+                else p["pad_d"] - 8.0) / 2.0
+    if r_recess + 2.0 > r_pad:
+        raise RecipeError("TPU recess runs into the pad rim")
+    ch = min(1.2, spigot_l * 0.2)
+    top = pad_t + spigot_l
+
+    pts = [
+        Pt(0.0, 0.0), Pt(r_pad, 0.0),                # pad underside
+        Pt(r_pad, pad_t),                              # pad rim
+        Pt(r_spigot, pad_t),                           # shoulder
+        Pt(r_spigot, top - ch), Pt(r_spigot - ch, top),  # spigot + lead-in
+        Pt(0.0, top),
+    ]
+    state.section = _revolve_section(pts)
+    state.kind = "profile_revolve"
+    state.width = 2.0 * r_pad
+
+    name = op_id or "foot"
+    # the glued TPU disc's land — a shallow blind recess in the underside
+    state.bores.append(BoreFeature(
+        name=f"{name}_pad_recess", axis="Z", d=2.0 * r_recess,
+        center=(0.0, 0.0, 0.0), span=(0.0, recess_t), overshoot=(1.0, 0.0)))
+    state.regions.append(Region(
+        f"{name}_pad", RegionRole.SOFT_CONTACT_SURFACE,
+        Box3(-r_pad, -r_pad, 0.0, r_pad, r_pad, pad_t)))
+    state.datums["tube_axis"] = {
+        "at": [0.0, 0.0, top], "rotate": [0.0, 0.0, 0.0]}
+    state.frame.update(
+        foot_pad_r=r_pad, foot_pad_t=pad_t,
+        foot_spigot_d=spigot_d, foot_spigot_l=spigot_l,
+        foot_tube_id=tube_id, foot_press=press,
+        foot_recess_r=r_recess, foot_recess_t=recess_t,
+        outline_outer_r=r_pad,
+    )
+
+
+_register(RecipeOpDecl(
+    name="foot_body",
+    kind="base",
+    params={
+        "pad_d": ("length", None),
+        "pad_t": ("length", 8.0),
+        "tube_id": ("length", None),
+        "press": ("length", 0.25),
+        "spigot_l": ("length", 0.0),
+        "pad_recess_d": ("length", 0.0),
+        "pad_recess_t": ("length", 0.8),
+    },
+    validators=(
+        "form.foot_press_fit_ok",
+        "topology.bores_open",
+        "topology.pockets_present",
+        "topology.single_connected_solid",
+    ),
+    apply=_foot_body,
+    description="press-fit furniture foot: pad + chamfered spigot into a "
+                "tube leg + TPU disc recess in the underside",
 ))

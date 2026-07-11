@@ -1,0 +1,27 @@
+schema: product/v1
+id: step_drill_guide_8_5
+archetype: drill_guide_v1@1
+strict: true
+
+requested_features:
+  - mounting_plate_body
+  - drill_bushing_seats
+  - countersunk_screw_holes
+
+params:
+  guide_l: 120mm
+  guide_w: 52mm
+  t: 8mm
+  bushing_od: 8mm
+  seat_count: 3
+  row_a_cy: 6mm
+  row_b: 1
+  row_b_od: 5mm
+  row_b_count: 3
+  row_b_cy: 12mm
+  screw_row_cy: 18mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

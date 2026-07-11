@@ -135,6 +135,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
               "a drainage bore spans the raised floor into the air gap beneath"),
         _decl("form.floor_open_area_ok", Level.FORM,
               "mesh floor open-area ratio sits inside the working band"),
+        _decl("form.foot_press_fit_ok", Level.FORM,
+              "the foot spigot presses into the tube: interference, engagement and shoulder measured"),
         _decl("form.wall_slots_ok", Level.FORM,
               "wall slot ring keeps ligaments and stays between floor and flange"),
         # -- cell / pegboard / connector families (impls in form/checks_cells.py,
@@ -153,6 +155,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
               "every limb of a branched tube keeps a real wall"),
         _decl("form.branch_path_connected", Level.FORM,
               "each branch bore's inner end lands inside the main run bore"),
+        _decl("form.tube_run_open", Level.FORM,
+              "a through run is open end to end; a capped (elbow) run swallows the branch junction"),
         # -- text relief (impls in form/checks_text.py) ------------------------
         _decl("form.min_stroke_width_ok", Level.FORM,
               "the thinnest glyph stem survives the nozzle (analytic per the bundled font)"),

@@ -1,0 +1,16 @@
+schema: product/v1
+id: table_foot_press_30x2
+archetype: furniture_foot_press_v1@1
+strict: true
+
+requested_features:
+  - press_fit_foot
+
+params:
+  tube_id: 26mm
+  pad_d: 48mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

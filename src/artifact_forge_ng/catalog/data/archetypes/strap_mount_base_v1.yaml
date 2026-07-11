@@ -48,14 +48,10 @@ form:
     - op: rounded_plate
       id: plate
       params: {l: base_l, w: base_w, t: t, corner_r: corner_r}
-    - op: rounded_rect_cutout
-      id: slot_a
-      params: {w: slot_gap, h: "expr(strap_w + 2)",
-               cx: "expr(-(bridge_w + slot_gap) / 2)", cy: 0mm}
-    - op: rounded_rect_cutout
-      id: slot_b
-      params: {w: slot_gap, h: "expr(strap_w + 2)",
-               cx: "expr((bridge_w + slot_gap) / 2)", cy: 0mm}
+    - op: strap_slot_pair_plate
+      id: strap
+      params: {strap_w: strap_w, slot_gap: slot_gap, bridge_w: bridge_w,
+               cx: 0mm, cy: 0mm}
     - op: countersunk_hole_pattern
       id: screws
       params: {kind: line, screw: screw, count: 2,
@@ -69,12 +65,21 @@ regions:
 
 surface_style: molded_utility_part
 
+interfaces:
+  - id: webbing
+    type: strap_slot_pair
+    gender: neutral
+    datum: strap_center
+    frame: {normal: "+Z", up: "+Y"}
+
 catalog:
   domain: wearable
   modes: [utility, wearable]
   tags: [strap, webbing, mount, molle]
 
 validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
   - form.cuts_respect_keepouts
   - form.holes_within_outline
   - form.min_web_between_holes

@@ -116,3 +116,29 @@ register_probe("form.tube_wall_ok")(
     lambda form, ctx: check_tube_wall_ok(form))
 register_probe("form.branch_path_connected")(
     lambda form, ctx: check_branch_path_connected(form))
+
+
+def check_tube_run_open(form: PartForm) -> Finding:
+    """The run bore must serve every limb: a THROUGH run is open by
+    construction (the wrapped adapter profile carries its own guards); a
+    CAPPED run (elbow) must swallow the whole branch junction, or the
+    corner never turns."""
+    check = "form.tube_run_open"
+    f = form.frame
+    if "run_capped" not in f:
+        return _finding(check, True, "n/a — not a branched tube",
+                        critical=False)
+    if f["run_capped"] < 1.0:
+        return _finding(check, True, "through run — open end to end by "
+                                     "construction")
+    need = f["tee_branch_z"] + f["tee_branch_bore_d"] / 2.0 + 1.5
+    ok = f["run_bore_top"] >= need - 1e-6
+    return _finding(
+        check, ok,
+        f"blind run bore tops at {f['run_bore_top']:g} "
+        f"({'≥' if ok else '<'} branch junction + margin {need:g})",
+        measured=f["run_bore_top"], limit=need)
+
+
+register_probe("form.tube_run_open")(
+    lambda form, ctx: check_tube_run_open(form))

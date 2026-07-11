@@ -19,12 +19,15 @@ def check_barb_retention_ok(form: PartForm) -> Finding:
     hose) and at least two barbs per spigot."""
     check = "form.barb_retention_ok"
     f = form.frame
-    if "spigot_d_a" not in f:
+    # sides are discovered from the frame — an elbow carries ONE spigot,
+    # a straight adapter two; absent sides are not failures
+    sides = [s for s in ("a", "b") if f"spigot_d_{s}" in f]
+    if not sides:
         return _finding(check, True, "n/a — no hose spigots on this part",
                         critical=False)
     lo, hi = BARB_H_BAND
     problems: list[str] = []
-    for side in ("a", "b"):
+    for side in sides:
         h = f.get(f"barb_h_{side}", 0.0)
         n = f.get(f"barb_count_{side}", 0.0)
         if not lo <= h <= hi:
@@ -34,11 +37,11 @@ def check_barb_retention_ok(form: PartForm) -> Finding:
             problems.append(f"spigot {side}: {n:g} barbs < 2")
     if problems:
         return _finding(check, False, "; ".join(problems))
+    teeth = " + ".join(f"{f[f'barb_count_{s}']:g}" for s in sides)
     return _finding(
         check, True,
-        f"barbs {f['barb_h_a']:g} mm on both spigots "
-        f"({f['barb_count_a']:g} + {f['barb_count_b']:g} teeth), "
-        f"inside the [{lo:g}, {hi:g}] retention band",
+        f"barbs {f['barb_h_a']:g} mm on {len(sides)} spigot(s) "
+        f"({teeth} teeth), inside the [{lo:g}, {hi:g}] retention band",
         measured=f["barb_h_a"], limit=hi)
 
 

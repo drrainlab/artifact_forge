@@ -54,8 +54,14 @@ WAVE_EXAMPLES = [
     "maker_initials_stamp",
     "leather_stamp_gb",
     "clay_pattern_stamp",
+    # deferral wave
+    "step_drill_guide_8_5",
+    "chair_foot_press_25x2",
+    "stool_foot_press_19x1.5",
+    "table_foot_press_30x2",
     # stage 4
     "hose_tee_12mm",
+    "hose_elbow_12mm",
     "hose_cross_10mm",
     "reducing_tee_16_12",
     "rod_clamp_15mm_lower",
@@ -88,6 +94,34 @@ def test_foot_example_publishes_nut_af():
     state = run_pre_cad(EXAMPLES / "foot_m8_round_50.yaml", None)
     # m8 across-flats 13 + 2 * 0.25 clearance
     assert state.form.frame["leg_nut_af"] == pytest.approx(13.5)
+
+
+def test_press_foot_fit_measured():
+    from artifact_forge_ng.form.checks_pots import check_foot_press_fit_ok
+
+    state = run_pre_cad(EXAMPLES / "chair_foot_press_25x2.yaml", None)
+    f = state.form.frame
+    assert f["foot_spigot_d"] == pytest.approx(21.25)  # tube_id + press
+    assert check_foot_press_fit_ok(state.form).status.value == "pass"
+    assert "tube_axis" in state.form.datums
+
+
+def test_press_foot_loose_spigot_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="press"):
+        RECIPE_OPS["foot_body"].apply(
+            st, {"pad_d": 40.0, "pad_t": 8.0, "tube_id": 21.0, "press": 0.02,
+                 "spigot_l": 0.0, "pad_recess_d": 0.0, "pad_recess_t": 0.8},
+            "foot")
+
+
+def test_press_foot_short_spigot_refused():
+    st = RecipeState()
+    with pytest.raises(RecipeError, match="rocks out"):
+        RECIPE_OPS["foot_body"].apply(
+            st, {"pad_d": 40.0, "pad_t": 8.0, "tube_id": 21.0, "press": 0.25,
+                 "spigot_l": 6.0, "pad_recess_d": 0.0, "pad_recess_t": 0.8},
+            "foot")
 
 
 # -- angle bracket ----------------------------------------------------------------
@@ -168,8 +202,11 @@ def test_strap_slot_into_screw_keepout_fails():
 def test_strap_mount_keeps_center_bar():
     state = run_pre_cad(EXAMPLES / "strap_mount_50mm.yaml", None)
     cuts = {c.name: c.box for c in state.form.cutboxes}
-    assert cuts["slot_a"].x1 < cuts["slot_b"].x0  # solid bar between slots
-    assert cuts["slot_b"].x0 - cuts["slot_a"].x1 == pytest.approx(10.0)
+    # solid bar between the paired slots
+    assert cuts["strap_slot_a"].x1 < cuts["strap_slot_b"].x0
+    assert cuts["strap_slot_b"].x0 - cuts["strap_slot_a"].x1 == pytest.approx(10.0)
+    # the interface datum the strap_slot_pair port binds to
+    assert "strap_center" in state.form.datums
 
 
 # -- organizer bin ----------------------------------------------------------------
@@ -270,6 +307,21 @@ def test_net_pot_slots_stay_inside_band():
     assert f["wall_slot_z0"] >= f["net_floor_t"] + 1.5
     assert f["wall_slot_z1"] <= f["net_rim_z"] - f["net_flange_t"] - 1.5
     assert f["floor_open_ratio"] > 0.2
+
+
+# -- drill guide: namespaced rows -----------------------------------------------------
+
+
+def test_two_row_guide_measures_both_rows():
+    from artifact_forge_ng.form.checks_jig import check_bushing_fit_ok
+
+    state = run_pre_cad(EXAMPLES / "step_drill_guide_8_5.yaml", None)
+    f = state.form.frame
+    assert f["bushings_bushing_od"] == 8.0
+    assert f["bushings_b_bushing_od"] == 5.0
+    finding = check_bushing_fit_ok(state.form)
+    assert finding.status.value == "pass"
+    assert "2 row(s)" in finding.message
 
 
 # -- battery cell holder ------------------------------------------------------------
@@ -456,9 +508,27 @@ def test_tee_tiny_branch_refused():
         _tee(branch_d=8.0, wall=2.4)
 
 
-def test_tee_elbow_config_honestly_refused():
-    with pytest.raises(RecipeError, match="TODO"):
-        _tee(config="elbow")
+def test_elbow_caps_the_run_past_the_branch():
+    from artifact_forge_ng.form.checks_connector import check_tube_run_open
+
+    st = _tee(config="elbow")
+    f = st.frame
+    assert f["run_capped"] == 1.0
+    # the blind bore tops above the branch junction + margin
+    assert f["run_bore_top"] >= f["tee_branch_z"] + f["tee_branch_bore_d"] / 2 + 1.5
+    assert check_tube_run_open(st).status.value == "pass"
+    # one spigot only — the barb check judges the sides that exist
+    assert "spigot_d_b" not in f
+    from artifact_forge_ng.form.checks_spare import check_barb_retention_ok
+    assert check_barb_retention_ok(st).status.value == "pass"
+
+
+def test_shallow_elbow_cap_fails_run_open():
+    from artifact_forge_ng.form.checks_connector import check_tube_run_open
+
+    st = _tee(config="elbow")
+    st.frame["run_bore_top"] = st.frame["tee_branch_z"]  # junction sticks out
+    assert check_tube_run_open(st).status.value == "fail"
 
 
 # -- camera rod clamp ---------------------------------------------------------------

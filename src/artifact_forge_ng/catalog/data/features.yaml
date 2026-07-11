@@ -503,6 +503,13 @@ features:
       - topology.bores_open
       - topology.pins_present
 
+  - id: press_fit_foot
+    description: chamfered spigot pressing into a tube leg with a TPU pad recess underneath
+    verified_by:
+      - form.foot_press_fit_ok
+      - topology.bores_open
+      - topology.pockets_present
+
   # -- wall tool mounts pack ---------------------------------------------------
 
   - id: tool_saddle_ring

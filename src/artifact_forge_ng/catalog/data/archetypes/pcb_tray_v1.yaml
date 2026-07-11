@@ -83,12 +83,21 @@ regions:
 
 surface_style: molded_utility_part
 
+interfaces:
+  - id: pcb_mount
+    type: heatset_insert_pattern
+    gender: female
+    datum: standoffs_top
+    frame: {normal: "+Z", up: "+Y"}
+
 catalog:
   domain: electronics
   modes: [engineering, utility]
   tags: [pcb, tray, standoffs, arduino, esp32]
 
 validators:
+  - interface.frame_exists
+  - interface.frame_orthonormal
   - form.shell_walls_ok
   - form.cuts_respect_keepouts
   - form.min_web_between_holes

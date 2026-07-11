@@ -71,7 +71,7 @@ at runtime.
 | `pot_body` | ✅ | recipe op: tapered vessel + RAISED drainage floor over a foot ring; superellipse plan waits on loft (recipe_ops_revolve.py) |
 | `net_pot_body` | ✅ | recipe op: thin tapered cup + hanging rim flange (recipe_ops_revolve.py) |
 | `multi_socket_hub` | ✅ | recipe op: revolved connector hub the socket arms weld into (recipe_ops_connector.py) |
-| `tee_body` | ✅ | recipe op: barbed tube tee/cross — wraps hose_adapter_body + smooth X branch spigots rooted in the flange; elbows (capped run) TODO |
+| `tee_body` | ✅ | recipe op: barbed tube tee/cross/ELBOW — wraps hose_adapter_body (through) or builds a capped-run profile (elbow, form.tube_run_open); smooth X branch spigots rooted in the flange |
 
 ### feature — fasteners, pockets, cutouts
 
@@ -99,7 +99,7 @@ at runtime.
 | `peg_pattern` | ✅ | recipe op: board-standard pegs, L-hook = two axis-aligned pins, anti-lift row; `pegboard_peg` interface type (recipe_ops_pegboard.py) |
 | `socket_arm` | ✅ | recipe op: blind rod socket on a hub, ±X/±Y/+Z only; barrel = PinFeature with declared `bore_d` (the tube-wall probe) |
 | `text_emboss` | ✅ | recipe op: TextReliefFeature — glyphs from ONE bundled font (cad/text.py, DejaVu Sans), emboss/engrave, mirrored stamp duty, top/bottom faces; first `string` op param |
-| `bushing_seat_line` | ✅ | recipe op (promoted from showcase): press-fit steel bushing seats + form.bushing_fit_ok (recipe_ops_jig.py); frame keys not op_id-namespaced yet — one row per part |
+| `bushing_seat_line` | ✅ | recipe op (promoted from showcase): press-fit steel bushing seats, frame keys NAMESPACED per op id — several rows/diameters per guide, the fit check measures every row (recipe_ops_jig.py) |
 | `stop_fence` | ✅ | recipe op (promoted from showcase): registration fence under a plate edge (recipe_ops_jig.py) |
 
 ### field — modifiers (already region-bound, composition via keepouts)
@@ -115,7 +115,7 @@ measured `manufacturing.max_opening_span`, not a promise).
 | `grid_slot_field` | ✅ add_grid_slot_field |
 | `voronoi_field` | ✅ add_voronoi_field (stable seed, Lloyd, Chaikin, ligament guaranteed) |
 | `magnet_pocket_pattern` | ✅ add_magnet_pockets (blind, skin is verified) |
-| `strap_slot_pair` | ✅ add_zip_tie_slots (zip ties ≤10mm) + add_strap_slots (straps 15–40mm, skin-guard; wearable P2) |
+| `strap_slot_pair` | ✅ add_zip_tie_slots (zip ties ≤10mm) + add_strap_slots (straps 15–40mm, skin-guard; wearable P2) + strap_slot_pair_plate recipe op (plate slots + strap_center datum/port) |
 | `rib_field` | ✅ add_ribs (additive, topology.ribs_present) |
 | `phyllotaxis_field` | ✅ add_phyllotaxis_field (Vogel spiral, ligament by construction + measured) |
 | `vein_rib_field` | ✅ | add_vein_ribs (standalone, seeded rhythm, additive) + biomorphic veins in style |
@@ -195,23 +195,29 @@ are not "finished off" but planned as separate iterations on the completed
 foundation (recipe + joints + pose probes).
 
 Core-expansion wave (R2.x) deliberate deferrals — each is one bounded
-iteration, none is a bug:
+iteration, none is a bug. R2.5 closed the S/M half of this ledger:
+
+- ~~tube ELBOW config on `tee_body`~~ ✅ R2.5 — capped-run profile, the
+  blind run bore provably swallows the branch junction (form.tube_run_open);
+- ~~multiple bushing rows on one `drill_guide_v1`~~ ✅ R2.5 —
+  bushing_seat_line frame keys namespaced by op id, `enabled` row toggle,
+  the fit check discovers and measures every row;
+- ~~interfaces for `pcb_tray_v1` / `strap_mount_base_v1`~~ ✅ R2.5 —
+  boss_pattern publishes the boss-top datum (heatset_insert_pattern port);
+  new `strap_slot_pair_plate` op publishes strap_center (strap_slot_pair port);
+- ~~TPU pad recess + revolved press-fit body~~ ✅ R2.5 — `foot_body` op +
+  furniture_foot_press_v1 (spigot presses INTO the tube, TPU disc recess);
+
+Still open (each needs a kernel/dependency decision first):
 
 - superellipse plant pot plan (needs `loft_between_sections` rect→superellipse);
 - non-90° connector/tube branches (needs an oriented kernel primitive:
   angled Bore/Pin + swept probes + non-axis-aligned interface frames);
-- tube ELBOW config on `tee_body` (a capped-run revolve profile);
 - SVG relief on `text_emboss` (path→polygon needs a new dependency, e.g.
   svgelements; text-only in v1);
-- TPU pad recess + revolved press-fit body for `furniture_foot_v1`
-  (`foot_body` op; today's v1 is the screw-on captive-nut pad);
-- multiple bushing rows on one `drill_guide_v1` (bushing_seat_line frame
-  keys are not op_id-namespaced — one row per part until they are);
-- interfaces for `pcb_tray_v1` / `strap_mount_base_v1` (boss_pattern and
-  the slot ops publish no datum yet — add datums, then declare
-  screw_pattern / strap_slot_pair ports);
-- a `rod_socket` interface type for trellis/tube limb mates (today the
-  sockets publish datums only).
+- a `rod_socket` interface type for trellis/tube limb mates — blocked on
+  CONDITIONAL interface declarations (a toggled-off arm's port must not
+  fail interface.frame_exists), a schema feature, not an op.
 
 ## Print orientation — a cross-cutting concern
 

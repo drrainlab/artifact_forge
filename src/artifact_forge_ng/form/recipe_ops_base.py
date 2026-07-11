@@ -153,6 +153,9 @@ def _boss_pattern(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         state.frame[f"{name}_{i}_x"] = bx
         state.frame[f"{name}_{i}_y"] = by
     state.frame[f"{name}_top"] = top
+    # the boss-top mating plane — a heatset_insert_pattern port lands here
+    state.datums[f"{name}_top"] = {
+        "at": [cx, cy, top], "rotate": [0.0, 0.0, 0.0]}
 
 
 _register(RecipeOpDecl(
@@ -392,6 +395,60 @@ _register(RecipeOpDecl(
     validators=("form.cuts_respect_keepouts", "topology.cutout_present"),
     apply=_rounded_rect_cutout,
     description="through rectangular cutout (v1: square corners)",
+))
+
+
+def _strap_slot_pair_plate(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """A paired webbing slot through a plate — the strap threads down one
+    slot, under the center bar, up the other. Publishes the strap_center
+    datum a strap_slot_pair interface binds to (the plate cousin of the
+    clamp-only cord_slot_pair)."""
+    state.require_base("strap_slot_pair_plate")
+    f = state.frame
+    if "outline_u0" not in f:
+        raise RecipeError("strap_slot_pair_plate needs a rounded_plate base")
+    strap_w = p["strap_w"]
+    slot_gap = p["slot_gap"]
+    bridge_w = p["bridge_w"]
+    cx, cy = p["cx"], p["cy"]
+    t = state.width
+    if bridge_w < 6.0:
+        raise RecipeError(f"bridge {bridge_w:g} under 6 mm snaps under load")
+    slot_h = strap_w + 2.0
+    if cy - slot_h / 2.0 < f["outline_v0"] + 2.0 or \
+            cy + slot_h / 2.0 > f["outline_v1"] - 2.0:
+        raise RecipeError(
+            f"strap slots ({slot_h:g} tall) run past the plate edge")
+    name = op_id or "strap"
+    off = (bridge_w + slot_gap) / 2.0
+    for tag, sx in (("a", cx - off), ("b", cx + off)):
+        state.cutboxes.append(CutBoxFeature(
+            name=f"{name}_slot_{tag}",
+            box=Box3(sx - slot_gap / 2.0, cy - slot_h / 2.0, -1.0,
+                     sx + slot_gap / 2.0, cy + slot_h / 2.0, t + 1.0)))
+    state.datums[f"{name}_center"] = {
+        "at": [cx, cy, t], "rotate": [0.0, 0.0, 0.0]}
+    state.frame.update({
+        f"{name}_w": strap_w,
+        f"{name}_slot_gap": slot_gap,
+        f"{name}_bridge_w": bridge_w,
+    })
+
+
+_register(RecipeOpDecl(
+    name="strap_slot_pair_plate",
+    kind="feature",
+    params={
+        "strap_w": ("length", 25.0),
+        "slot_gap": ("length", 4.0),
+        "bridge_w": ("length", 10.0),
+        "cx": ("length", 0.0),
+        "cy": ("length", 0.0),
+    },
+    validators=("form.cuts_respect_keepouts", "topology.cutout_present"),
+    apply=_strap_slot_pair_plate,
+    description="paired webbing slots through a plate + the strap_center "
+                "datum a strap_slot_pair port binds to",
 ))
 
 

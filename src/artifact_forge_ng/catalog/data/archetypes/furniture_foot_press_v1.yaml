@@ -1,0 +1,76 @@
+schema: archetype/v1
+id: furniture_foot_press_v1
+version: 1
+object_class: furniture_foot
+description: >
+  Press-fit furniture foot: a revolved pad whose chamfered spigot
+  presses INTO a tube leg — measure the tube's inner diameter, the
+  spigot adds the interference (measured against the press band, never
+  hoped). The pad underside carries a shallow recess for a glued TPU
+  disc — the quiet, floor-safe contact. The screw-on captive-nut
+  sibling is furniture_foot_v1.
+
+provides_features:
+  - press_fit_foot
+
+parameters:
+  pad_d:
+    {type: length, default: 40mm, min: 22mm, max: 90mm, role: functional, exposed: true}
+  pad_t:
+    {type: length, default: 8mm, min: 5mm, max: 16mm, role: structural}
+  tube_id:
+    {type: length, default: 21mm, min: 8mm, max: 60mm, role: assembly, exposed: true,
+     description: "the tube leg's measured INNER diameter — the spigot adds the press"}
+  press:
+    {type: length, default: 0.25mm, min: 0.1mm, max: 0.5mm, role: manufacturing}
+  spigot_l:
+    {type: length, default: 0mm, min: 0mm, max: 50mm, role: assembly,
+     description: "0 = auto (0.6 x tube bore + 4)"}
+  pad_recess_d:
+    {type: length, default: 0mm, min: 0mm, max: 80mm, role: functional,
+     description: "TPU disc recess Ø; 0 = pad_d - 8"}
+  pad_recess_t:
+    {type: length, default: 0.8mm, min: 0.5mm, max: 2mm, role: functional}
+
+constraints:
+  - tube_id + 4 < pad_d
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: foot_body
+      id: foot
+      params: {pad_d: pad_d, pad_t: pad_t, tube_id: tube_id, press: press,
+               spigot_l: spigot_l, pad_recess_d: pad_recess_d,
+               pad_recess_t: pad_recess_t}
+
+regions:
+  - {id: foot_pad, role: soft_contact_surface, editable: false,
+     label: floor pad, aliases: [pad, foot]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: household
+  modes: [utility]
+  tags: [foot, furniture, press fit, tube, TPU]
+
+validators:
+  - form.foot_press_fit_ok
+  - topology.bores_open
+  - topology.pockets_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - press_fit_foot
+  must_not_have: []
+  invariants:
+    - tube_id + 4 < pad_d

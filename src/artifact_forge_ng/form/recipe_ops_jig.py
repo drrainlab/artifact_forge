@@ -21,8 +21,12 @@ FENCE_DROP_BAND = (4.0, 25.0)  # fence reach below the plate, mm
 def _bushing_seat_line(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     """N press-fit through seats for steel drill bushings along a line at
     (cx, cy). The seat bore is bushing OD minus the press interference —
-    the steel bushing, not the plastic, guides the drill."""
+    the steel bushing, not the plastic, guides the drill. Frame keys are
+    NAMESPACED by op id, so one guide carries several rows of different
+    diameters and the fit check measures every row."""
     state.require_base("bushing_seat_line")
+    if int(round(p.get("enabled", 1))) == 0:  # .get: direct callers predate the param
+        return  # recipe-level row toggle
     od, press = p["bushing_od"], p["press_fit"]
     count, spacing = int(p["count"]), p["spacing"]
     cx, cy = p["cx"], p["cy"]
@@ -46,15 +50,15 @@ def _bushing_seat_line(state: RecipeState, p: dict[str, Any], op_id: str) -> Non
             f"{name}_{i}_keepout", RegionRole.FASTENER_KEEPOUT,
             Box3(x - od / 2 - SEAT_WALL_MIN, cy - od / 2 - SEAT_WALL_MIN, 0.0,
                  x + od / 2 + SEAT_WALL_MIN, cy + od / 2 + SEAT_WALL_MIN, t)))
-    state.frame.update(
-        bushing_od=od,
-        bushing_seat_d=seat_d,
-        bushing_press_fit=press,
-        bushing_count=float(count),
-        bushing_spacing=spacing,
-        bushing_row_cy=cy,
-        seat_engagement=t,
-    )
+    state.frame.update({
+        f"{name}_bushing_od": od,
+        f"{name}_seat_d": seat_d,
+        f"{name}_press_fit": press,
+        f"{name}_bushing_count": float(count),
+        f"{name}_spacing": spacing,
+        f"{name}_row_cy": cy,
+        f"{name}_seat_engagement": t,
+    })
 
 
 _register(RecipeOpDecl(
@@ -64,11 +68,13 @@ _register(RecipeOpDecl(
         "bushing_od": ("length", None), "press_fit": ("length", 0.1),
         "count": ("count", 2), "spacing": ("length", 25.0),
         "cx": ("length", 0.0), "cy": ("length", 0.0),
+        "enabled": ("count", 1),
     },
     validators=("form.bushing_fit_ok", "topology.bores_open"),
     apply=_bushing_seat_line,
     description="press-fit through seats for steel drill bushings along "
-                "a line (seat Ø = bushing OD - press interference)",
+                "a line (seat Ø = bushing OD - press interference); "
+                "namespaced rows — several diameters per guide",
 ))
 
 

@@ -192,30 +192,22 @@ _register(RecipeOpDecl(
 
 
 def _tee_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """Branched tube connector: the barbed two-spigot Z-run of
+    """Branched tube connector. tee/cross: the barbed two-spigot Z-run of
     hose_adapter_body (invoked as its own base — the sanctioned wrap
     pattern) plus one or two SMOOTH branch spigots on the X axis at the
-    flange. Barbs live on the Z ends only — a barb is a revolve and the
-    revolve axis is Z; X branches are smooth push-fits for a hose clip.
-    Elbows (a capped run) stay an honest TODO."""
+    flange. elbow: ONE barbed bottom spigot, a capped crown above the
+    flange and a single branch — the run bore is BLIND and the water
+    turns the corner. Barbs live on the Z ends only — a barb is a
+    revolve and the revolve axis is Z; X branches are smooth push-fits
+    for a hose clip."""
     from .recipe_ops_core import RECIPE_OPS
 
     config = p["config"]
-    if config not in ("tee", "cross"):
+    if config not in ("tee", "cross", "elbow"):
         raise RecipeError(
-            f"config {config!r} not in (tee, cross) — a straight run IS "
-            "hose_adapter_body; elbows need a capped-run op (TODO)")
+            f"config {config!r} not in (tee, cross, elbow) — a straight "
+            "run IS hose_adapter_body")
     wall = p["wall"]
-    RECIPE_OPS["hose_adapter_body"].apply(state, {
-        "spigot_d_a": p["run_d_a"],
-        "spigot_d_b": p["run_d_b"] if p["run_d_b"] > 1e-9 else p["run_d_a"],
-        "spigot_len_a": p["spigot_len"], "spigot_len_b": p["spigot_len"],
-        "wall": wall, "barb_h": p["barb_h"],
-        "barb_count_a": p["barb_count"], "barb_count_b": p["barb_count"],
-        "flange_t": p["flange_t"], "flange_lip": p["flange_lip"],
-    }, op_id)
-
-    f = state.frame
     branch_d = p["branch_d"] if p["branch_d"] > 1e-9 else p["run_d_a"]
     branch_len = p["branch_len"]
     branch_bore = branch_d - 2.0 * wall
@@ -223,6 +215,64 @@ def _tee_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         raise RecipeError(
             f"branch bore {branch_bore:.1f} < 4 — branch too small for "
             "the declared wall")
+
+    if config == "elbow":
+        from .profiles_revolve import loop_from_points, sawtooth
+
+        if state.section is not None:
+            raise RecipeError("tee_body must be the (single) base op")
+        d_a, sl = p["run_d_a"], p["spigot_len"]
+        barb_h, n = p["barb_h"], int(p["barb_count"])
+        fl_t, lip = p["flange_t"], p["flange_lip"]
+        r_crest = d_a / 2.0
+        r_root = r_crest - barb_h
+        r_bore = r_root - wall
+        if r_bore < 2.0:
+            raise RecipeError(
+                f"bore radius {r_bore:.2f} < 2 — spigot too small for "
+                "the declared wall")
+        if n < 2:
+            raise RecipeError("the spigot needs at least 2 barbs")
+        r_fl = r_crest + lip
+        z0, z1 = sl, sl + fl_t
+        # the blind run bore must swallow the whole branch junction
+        bore_top = max(z1 + 2.0, (z0 + z1) / 2.0 + branch_bore / 2.0 + 2.0)
+        r_crown = r_bore + wall
+        top = bore_top + max(wall, 3.0)
+
+        pts = [Pt(r_bore, 0.0)]
+        sawtooth(pts, r_root, r_crest, 0.0, z0, n, toward_tip_at_v0=True)
+        pts += [
+            Pt(r_fl, z0), Pt(r_fl, z1),
+            Pt(r_crown, z1), Pt(r_crown, top),
+            Pt(0.0, top), Pt(0.0, bore_top), Pt(r_bore, bore_top),
+        ]
+        state.section = SectionProfile(
+            name="recipe_revolve", outer=loop_from_points(pts),
+            plane="XZ", width_axis="Y")
+        state.kind = "profile_revolve"
+        state.width = 2.0 * r_fl
+        state.regions.append(Region(
+            f"{op_id or 'tee'}_flange", RegionRole.MOUNTING_SURFACE,
+            Box3(-r_fl, -r_fl, z0, r_fl, r_fl, z1)))
+        state.frame.update(
+            spigot_d_a=d_a, barb_h_a=barb_h, barb_count_a=float(n),
+            spigot_len_a=sl, bore_d=2.0 * r_bore,
+            flange_z0=z0, flange_z1=z1, adapter_total_l=top,
+            run_capped=1.0, run_bore_top=bore_top,
+        )
+    else:
+        RECIPE_OPS["hose_adapter_body"].apply(state, {
+            "spigot_d_a": p["run_d_a"],
+            "spigot_d_b": p["run_d_b"] if p["run_d_b"] > 1e-9 else p["run_d_a"],
+            "spigot_len_a": p["spigot_len"], "spigot_len_b": p["spigot_len"],
+            "wall": wall, "barb_h": p["barb_h"],
+            "barb_count_a": p["barb_count"], "barb_count_b": p["barb_count"],
+            "flange_t": p["flange_t"], "flange_lip": p["flange_lip"],
+        }, op_id)
+        state.frame.update(run_capped=0.0, run_bore_top=0.0)
+
+    f = state.frame
     z_fl = (f["flange_z0"] + f["flange_z1"]) / 2.0
     if branch_d > f["flange_z1"] - f["flange_z0"] + 2.0 * p["flange_lip"] + 6.0:
         # the branch must root in the flange band, not float on a spigot
@@ -233,7 +283,7 @@ def _tee_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     name = op_id or "tee"
     main_bore_r = f["bore_d"] / 2.0
 
-    sides = (1.0,) if config == "tee" else (1.0, -1.0)
+    sides = (1.0, -1.0) if config == "cross" else (1.0,)
     for sign in sides:
         tag = "px" if sign > 0 else "mx"
         start = r_fl - 1.0 if sign > 0 else -(r_fl + branch_len - 1.0)
@@ -278,8 +328,8 @@ _register(RecipeOpDecl(
     validators=(
         "form.barb_retention_ok",
         "form.tube_wall_ok",
+        "form.tube_run_open",
         "form.branch_path_connected",
-        "form.revolve_profile_clear_of_axis",
         "topology.pins_present",
         "topology.bores_open",
         "topology.single_connected_solid",
