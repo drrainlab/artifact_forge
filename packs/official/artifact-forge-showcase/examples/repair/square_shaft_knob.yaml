@@ -1,0 +1,22 @@
+schema: product/v1
+id: square_shaft_knob
+archetype: replacement_knob_v1@1
+strict: true
+
+# Replacement knob for a 6 mm square valve/timer stem.
+# Measure the shaft across flats; verify fit before use.
+requested_features:
+  - knob_grip_body
+  - square_shaft_socket
+
+params:
+  grip_d: 35mm
+  grip_h: 18mm
+  shaft_sq: 6mm
+  socket_depth: 10mm
+  fit_clearance: 0.25mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

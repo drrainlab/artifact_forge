@@ -19,6 +19,6 @@ _declare()
 
 
 def register(ctx) -> None:
-    from . import checks  # noqa: F401  (self-registering check modules)
+    from . import checks, ops  # noqa: F401  (self-registering modules)
 
     ctx.add_data_dir(_DATA_DIR)

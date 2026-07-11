@@ -13,6 +13,13 @@ def _decl(name: str, level: Level, description: str):
 
 SHOWCASE_CHECKS: dict[str, CheckDecl] = dict(
     [
+        # -- repair: Spare Fit Standard (impls in checks/spare.py) ----------
+        _decl("form.barb_retention_ok", Level.FORM,
+              "hose-barb height inside the retention band and >= 2 barbs per spigot"),
+        _decl("form.shaft_fit_ok", Level.FORM,
+              "square shaft socket clearance in the fit band with real engagement depth"),
+        _decl("form.knob_torque_wall_ok", Level.FORM,
+              "wall between socket corners and grip carries hand torque"),
     ]
 )
 

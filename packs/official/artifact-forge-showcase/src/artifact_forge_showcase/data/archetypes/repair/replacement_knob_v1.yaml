@@ -1,0 +1,73 @@
+schema: archetype/v1
+id: replacement_knob_v1
+version: 1
+object_class: replacement_knob
+description: >
+  Measurement-driven replacement knob for a SQUARE shaft (valve stems,
+  appliance timers): a revolved grip with a blind square socket, fit and
+  torque wall measured. Not an OEM part — verify fit, see docs/CLAIMS.md.
+  A D-shaft variant needs a partial-cut primitive and is a later wave.
+
+provides_features:
+  - knob_grip_body
+  - square_shaft_socket
+
+parameters:
+  grip_d:
+    {type: length, default: 35mm, min: 18mm, max: 80mm,
+     role: functional, exposed: true}
+  grip_h:
+    {type: length, default: 18mm, min: 10mm, max: 40mm, role: functional}
+  shaft_sq:
+    {type: length, default: 6mm, min: 3mm, max: 12mm,
+     role: functional, exposed: true,
+     description: measured shaft square across flats}
+  socket_depth:
+    {type: length, default: 10mm, min: 5mm, max: 30mm, role: functional}
+  fit_clearance:
+    {type: length, default: 0.25mm, min: 0.1mm, max: 0.4mm, role: functional,
+     description: across-flats clearance added to the socket}
+  top_chamfer:
+    {type: length, default: 2mm, min: 0.5mm, max: 5mm, role: aesthetic}
+
+constraints:
+  - socket_depth < grip_h - 2
+  - grip_d > 2 * shaft_sq
+
+form:
+  type: recipe
+  section: recipe
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: knob_body
+      id: body
+      params:
+        grip_d: grip_d
+        grip_h: grip_h
+        shaft_sq: shaft_sq
+        socket_depth: socket_depth
+        fit_clearance: fit_clearance
+        top_chamfer: top_chamfer
+
+regions:
+  - {id: body_grip, role: mounting_surface, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.shaft_fit_ok
+  - form.knob_torque_wall_ok
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - knob_grip_body
+    - square_shaft_socket
+  must_not_have: []
+  invariants:
+    - socket_depth < grip_h - 2

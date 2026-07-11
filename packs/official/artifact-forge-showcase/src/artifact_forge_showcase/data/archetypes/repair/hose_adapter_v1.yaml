@@ -1,0 +1,88 @@
+schema: archetype/v1
+id: hose_adapter_v1
+version: 1
+object_class: hose_adapter
+description: >
+  Measurement-driven generic spare: a two-step barbed hose adapter.
+  Spigot Ø = barb crest = the nominal hose bore you measured; a hose
+  pushes on from each tip and bites against the sawtooth. The mid flange
+  stops both hoses. For LOW-RISK household/workshop lines only — not
+  pressure-rated, not potable-water certified (docs/CLAIMS.md).
+
+provides_features:
+  - hose_barb_spigots
+  - adapter_stop_flange
+
+parameters:
+  spigot_d_a:
+    {type: length, default: 32mm, min: 10mm, max: 60mm,
+     role: functional, exposed: true,
+     description: barb crest Ø of side A — the measured hose bore}
+  spigot_d_b:
+    {type: length, default: 35mm, min: 10mm, max: 60mm,
+     role: functional, exposed: true,
+     description: barb crest Ø of side B}
+  spigot_len_a:
+    {type: length, default: 30mm, min: 18mm, max: 60mm, role: functional}
+  spigot_len_b:
+    {type: length, default: 30mm, min: 18mm, max: 60mm, role: functional}
+  wall:
+    {type: length, default: 2.4mm, min: 1.8mm, max: 5mm, role: manufacturing}
+  barb_h:
+    {type: length, default: 0.8mm, min: 0.4mm, max: 1.5mm, role: functional,
+     description: per-side barb height over the root}
+  barb_count_a:
+    {type: count, default: 3, min: 2, max: 6, role: functional}
+  barb_count_b:
+    {type: count, default: 3, min: 2, max: 6, role: functional}
+  flange_t:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: functional}
+  flange_lip:
+    {type: length, default: 2.5mm, min: 1.5mm, max: 6mm, role: functional,
+     description: flange radius past the larger crest}
+
+constraints:
+  - spigot_d_a > 2 * wall + 2 * barb_h + 4
+  - spigot_d_b > 2 * wall + 2 * barb_h + 4
+
+form:
+  type: recipe
+  section: recipe
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: hose_adapter_body
+      id: body
+      params:
+        spigot_d_a: spigot_d_a
+        spigot_d_b: spigot_d_b
+        spigot_len_a: spigot_len_a
+        spigot_len_b: spigot_len_b
+        wall: wall
+        barb_h: barb_h
+        barb_count_a: barb_count_a
+        barb_count_b: barb_count_b
+        flange_t: flange_t
+        flange_lip: flange_lip
+
+regions:
+  - {id: body_flange, role: mounting_surface, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.barb_retention_ok
+  - form.revolve_profile_clear_of_axis
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - hose_barb_spigots
+    - adapter_stop_flange
+  must_not_have: []
+  invariants:
+    - spigot_d_a > 2 * wall + 2 * barb_h + 4

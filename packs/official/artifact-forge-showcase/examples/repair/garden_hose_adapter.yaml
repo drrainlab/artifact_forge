@@ -1,0 +1,25 @@
+schema: product/v1
+id: garden_hose_adapter
+archetype: hose_adapter_v1@1
+strict: true
+
+# Garden watering: 13 mm (1/2") hose to a 19 mm (3/4") hose.
+# Low-pressure watering only — not rated for mains pressure.
+requested_features:
+  - hose_barb_spigots
+  - adapter_stop_flange
+
+params:
+  spigot_d_a: 13mm
+  spigot_d_b: 19mm
+  spigot_len_a: 24mm
+  spigot_len_b: 26mm
+  wall: 1.8mm
+  barb_h: 0.7mm
+  barb_count_a: 4
+  barb_count_b: 4
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

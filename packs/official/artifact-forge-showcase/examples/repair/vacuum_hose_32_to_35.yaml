@@ -1,0 +1,24 @@
+schema: product/v1
+id: vacuum_hose_32_to_35
+archetype: hose_adapter_v1@1
+strict: true
+
+# Vacuum hose step adapter: 32 mm bore hose onto a 35 mm bore hose.
+# Measure YOUR hoses' inner diameters — the crest must equal the bore.
+requested_features:
+  - hose_barb_spigots
+  - adapter_stop_flange
+
+params:
+  spigot_d_a: 32mm
+  spigot_d_b: 35mm
+  spigot_len_a: 34mm
+  spigot_len_b: 34mm
+  barb_h: 1.0mm
+  barb_count_a: 3
+  barb_count_b: 3
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

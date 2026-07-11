@@ -1,0 +1,25 @@
+schema: product/v1
+id: washing_machine_drain_adapter
+archetype: hose_adapter_v1@1
+strict: true
+
+# Drain-hose step: 19 mm outlet hose to a 24 mm standpipe hose.
+# Gravity drain only — never a pressurized supply line (docs/CLAIMS.md).
+requested_features:
+  - hose_barb_spigots
+  - adapter_stop_flange
+
+params:
+  spigot_d_a: 19mm
+  spigot_d_b: 24mm
+  spigot_len_a: 28mm
+  spigot_len_b: 28mm
+  wall: 2.0mm
+  barb_h: 0.8mm
+  barb_count_a: 3
+  barb_count_b: 3
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none
