@@ -26,7 +26,8 @@ parameters:
     {type: number, default: 0.08, min: 0.02, max: 0.15, role: functional,
      description: locking-face fraction of the tooth pitch (nearly radial)}
   t:
-    {type: length, default: 6mm, min: 3mm, max: 15mm, role: structural}
+    {type: length, default: 8mm, min: 3mm, max: 15mm, role: structural,
+     description: wheel thickness — a square socket wants t >= shaft_sq}
   socket:
     {type: choice, choices: [square, round], default: square, role: assembly}
   shaft_sq:
@@ -37,6 +38,7 @@ parameters:
 
 constraints:
   - tooth_depth < wheel_d / 8
+  - t >= shaft_sq
   - shaft_sq < wheel_d / 2 - 2 * tooth_depth
 
 form:

@@ -12,6 +12,7 @@ params:
   tooth_depth: 3mm
   socket: round
   shaft_sq: 10mm
+  t: 10mm
 
 manufacturing:
   process: fdm
