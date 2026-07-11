@@ -387,3 +387,166 @@ _register(RecipeOpDecl(
     description="L-bracket: two perpendicular legs + optional diagonal "
                 "gusset web, clearance holes in both legs (side-profile print)",
 ))
+
+# -- square_post_sleeve ----------------------------------------------------------
+
+#: Sliding square-post fit band (diametral-ish, per side pair) — wider
+#: than the torsion-driving SQ_FIT_BAND of the knob's end socket: the
+#: sleeve slides ON and a set screw takes the slack.
+POST_FIT_BAND = (0.3, 0.9)
+SLEEVE_ENGAGE_K = 1.5     # sleeve height >= k * post width (anti-rock)
+SLEEVE_WALL_MIN = 2.4
+SLEEVE_WELD_BITE = 1.2
+
+
+def _square_post_sleeve(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """A collar sleeve welded to a vessel's OUTER wall with a vertical
+    square through-channel — hangs a cup/pot on a 2x2 cm balcony post.
+    The collar is a PolyLoft whose FRONT FACE IS THE WALL ARC at each
+    height (constant weld bite regardless of taper — a flat face either
+    gaps at the bottom or pierces the cavity at the top of a cone). The
+    channel opens TOWARD the vessel, so the post presses directly
+    against the wall and the teardrop set screw locks it there — the
+    stiffest of the clamp schemes."""
+    import math as _math
+
+    state.require_base("square_post_sleeve")
+    f = state.frame
+    if "pot_r_top" not in f or "pot_h" not in f:
+        raise RecipeError("square_post_sleeve needs a pot_body base")
+    post_w = p["post_w"]
+    clearance = p["fit_clearance"]
+    sleeve_h = p["sleeve_h"]
+    z_lo = p["z"]
+    wall = p["wall"]
+    direction = p["dir"]
+    set_screw = p["set_screw"]
+    lo, hi = POST_FIT_BAND
+    if not lo <= clearance <= hi:
+        raise RecipeError(
+            f"fit_clearance {clearance:g} outside [{lo:g}, {hi:g}] — "
+            "tighter binds on FDM swell, looser rocks on the post")
+    if sleeve_h < SLEEVE_ENGAGE_K * post_w:
+        raise RecipeError(
+            f"sleeve {sleeve_h:g} shorter than {SLEEVE_ENGAGE_K:g}x post "
+            f"({SLEEVE_ENGAGE_K * post_w:g}) — the cup rocks on the post")
+    if direction not in ("+x", "-x", "+y", "-y"):
+        raise RecipeError(f"dir {direction!r} not in (+x, -x, +y, -y)")
+    if set_screw != "none":
+        screw_spec(set_screw)  # unknown size fails loudly here
+    if wall < SLEEVE_WALL_MIN:
+        raise RecipeError(f"sleeve wall {wall:g} < {SLEEVE_WALL_MIN:g}")
+    z_hi = z_lo + sleeve_h
+    r_top, r_bot, pot_h = f["pot_r_top"], f["pot_r_bottom"], f["pot_h"]
+    if z_lo < 0.0 or z_hi > pot_h + 1e-9:
+        raise RecipeError(
+            f"sleeve z {z_lo:g}..{z_hi:g} runs past the pot (0..{pot_h:g})")
+
+    def r_out(z: float) -> float:
+        return r_bot + (r_top - r_bot) * z / pot_h
+
+    s_eff = post_w + clearance
+    w_box = s_eff + 2.0 * wall
+    if w_box / 2.0 >= r_out(z_lo) - 2.0:
+        raise RecipeError(
+            f"post {post_w:g} too wide for this vessel — the collar "
+            "out-spans the wall chord")
+    # the post rides the wall; its far face + clearance sets the channel
+    x_post_front = r_out(z_hi)
+    x_back = x_post_front + post_w + clearance
+    u1 = x_back + wall
+
+    def _map(u: float, v: float) -> tuple[float, float]:
+        if direction == "+x":
+            return (u, v)
+        if direction == "-x":
+            return (-u, v)
+        if direction == "+y":
+            return (v, u)
+        return (v, -u)
+
+    # -- the collar: front face = the wall arc minus the weld bite --------
+    def _section(z: float) -> tuple[tuple[float, float], ...]:
+        r = r_out(z)
+        pts: list[tuple[float, float]] = [
+            _map(u1, -w_box / 2.0), _map(u1, w_box / 2.0)]
+        arc_n = 16
+        for k in range(arc_n + 1):
+            v = w_box / 2.0 - w_box * k / arc_n
+            u = _math.sqrt(max(r * r - v * v, 0.0)) - SLEEVE_WELD_BITE
+            pts.append(_map(u, v))
+        return tuple(pts)
+
+    from .part import CutBoxFeature, PolyLoftFeature
+
+    name = op_id or "sleeve"
+    state.poly_lofts.append(PolyLoftFeature(
+        name=f"{name}_collar", z0=z_lo, z1=z_hi,
+        bottom=_section(z_lo), top=_section(z_hi)))
+
+    # -- the channel: opens toward the vessel (the post presses the wall) -
+    x_cut0 = _math.sqrt(max(r_out(z_lo) ** 2 - (s_eff / 2.0) ** 2, 0.0)) - 2.0
+
+    def _box(ua: float, ub: float, va: float, vb: float,
+             za: float, zb: float) -> Box3:
+        xa, ya = _map(ua, va)
+        xb, yb = _map(ub, vb)
+        return Box3(min(xa, xb), min(ya, yb), za,
+                    max(xa, xb), max(ya, yb), zb)
+
+    state.cutboxes.append(CutBoxFeature(
+        name=f"{name}_post_channel",
+        box=_box(x_cut0, x_back, -s_eff / 2.0, s_eff / 2.0,
+                 z_lo - 1.0, z_hi + 1.0)))
+    if set_screw != "none":
+        spec = screw_spec(set_screw)
+        axis = "X" if direction in ("+x", "-x") else "Y"
+        z_mid = z_lo + sleeve_h / 2.0
+        sign = 1.0 if direction.startswith("+") else -1.0
+        span = tuple(sorted((sign * (x_back - 1.0), sign * (u1 + 1.0))))
+        state.bores.append(BoreFeature(
+            name=f"{name}_set_screw", axis=axis, d=spec["tap"],
+            center=(0.0, 0.0, z_mid), span=span,
+            overshoot=(1.0, 1.0), roof="teardrop"))
+    cx, cy = _map((x_post_front + x_back) / 2.0, 0.0)
+    state.regions.append(Region(
+        f"{name}_post_channel", RegionRole.MOUNTING_SURFACE,
+        _box(x_cut0, x_back, -s_eff / 2.0, s_eff / 2.0, z_lo, z_hi)))
+    state.datums["post_axis"] = {
+        "at": [cx, cy, z_hi], "rotate": [0.0, 0.0, 0.0]}
+    state.frame.update(
+        sleeve_post_w=post_w,
+        sleeve_channel_w_eff=s_eff,
+        sleeve_fit_clearance=clearance,
+        sleeve_h_eff=sleeve_h,
+        sleeve_wall=wall,
+        sleeve_inner_web_eff=wall,  # the side pillars ARE the vessel web
+        sleeve_dir=float(("+x", "-x", "+y", "-y").index(direction)),
+    )
+
+
+_register(RecipeOpDecl(
+    name="square_post_sleeve",
+    kind="feature",
+    params={
+        "post_w": ("length", None),
+        "fit_clearance": ("length", 0.5),
+        "sleeve_h": ("length", 40.0),
+        "z": ("length", 0.0),
+        "wall": ("length", 3.0),
+        "dir": ("choice", "+x"),
+        "set_screw": ("choice", "m4"),
+    },
+    validators=(
+        "form.post_sleeve_fit_ok",
+        "form.post_sleeve_engagement_ok",
+        "form.post_sleeve_walls_ok",
+        "topology.cutout_present",
+        "topology.bores_open",
+        "topology.single_connected_solid",
+    ),
+    apply=_square_post_sleeve,
+    description="square-post collar welded to a vessel wall: vertical "
+                "through-channel + teardrop set-screw bore (the cup "
+                "holder on a 2x2 balcony post)",
+))

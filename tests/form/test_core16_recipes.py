@@ -59,6 +59,8 @@ WAVE_EXAMPLES = [
     "clay_pattern_stamp",
     "logo_stamp_arrow",
     # deferral wave
+    "cup_holder_post_20",
+    "cup_holder_post_25_tall",
     "step_drill_guide_8_5",
     "chair_foot_press_25x2",
     "stool_foot_press_19x1.5",
@@ -126,6 +128,58 @@ def test_press_foot_short_spigot_refused():
             st, {"pad_d": 40.0, "pad_t": 8.0, "tube_id": 21.0, "press": 0.25,
                  "spigot_l": 6.0, "pad_recess_d": 0.0, "pad_recess_t": 0.8},
             "foot")
+
+
+# -- cup holder / square post sleeve ------------------------------------------------
+
+
+def _cup_with_sleeve(**over) -> RecipeState:
+    st = RecipeState()
+    RECIPE_OPS["pot_body"].apply(
+        st, {"top_d": 88.0, "bottom_d": 74.0, "h": 70.0, "wall": 2.4,
+             "floor_t": 3.0, "floor_raise": 6.0}, "cup")
+    p = {"post_w": 20.0, "fit_clearance": 0.5, "sleeve_h": 40.0, "z": 10.0,
+         "wall": 3.0, "dir": "+x", "set_screw": "m4"}
+    p.update(over)
+    RECIPE_OPS["square_post_sleeve"].apply(st, p, "sleeve")
+    return st
+
+
+def test_post_sleeve_publishes_measured_frame():
+    from artifact_forge_ng.form.checks_wallmount import (
+        check_post_sleeve_engagement_ok, check_post_sleeve_fit_ok,
+        check_post_sleeve_walls_ok)
+
+    st = _cup_with_sleeve()
+    assert st.frame["sleeve_channel_w_eff"] == pytest.approx(20.5)
+    assert check_post_sleeve_fit_ok(st).status.value == "pass"
+    assert check_post_sleeve_engagement_ok(st).status.value == "pass"
+    assert check_post_sleeve_walls_ok(st).status.value == "pass"
+    assert "post_axis" in st.datums
+    # the arc-front collar: one additive poly loft riding the wall
+    lofts = [pl for pl in st.poly_lofts if not pl.cut]
+    assert len(lofts) == 1
+    assert len(lofts[0].bottom) == len(lofts[0].top)
+
+
+def test_post_sleeve_loose_clearance_refused():
+    with pytest.raises(RecipeError, match="fit_clearance"):
+        _cup_with_sleeve(fit_clearance=1.5)
+
+
+def test_post_sleeve_past_the_pot_refused():
+    with pytest.raises(RecipeError, match="runs past the pot"):
+        _cup_with_sleeve(z=45.0, sleeve_h=40.0)
+
+
+def test_post_sleeve_short_engagement_refused():
+    with pytest.raises(RecipeError, match="rocks on the post"):
+        _cup_with_sleeve(sleeve_h=25.0)
+
+
+def test_post_too_wide_refused():
+    with pytest.raises(RecipeError, match="too wide"):
+        _cup_with_sleeve(post_w=70.0, sleeve_h=110.0)
 
 
 # -- angle bracket ----------------------------------------------------------------

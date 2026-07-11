@@ -1,0 +1,110 @@
+schema: archetype/v1
+id: cup_holder_post_v1
+version: 1
+object_class: cup_holder
+description: >
+  Cup holder for a square balcony/fence post: a tapered cup (raised
+  floor — spills drain into the air gap, never pool) with a collar
+  sleeve welded to its outer wall. The sleeve's vertical square channel
+  slides over a 2x2 cm post (any 12-30 mm square by parameter), a
+  teardrop set-screw bore lets an m4 grub press the post AGAINST the
+  cup — the stiffest clamp scheme. Pure composition on pot_body.
+
+provides_features:
+  - pot_vessel
+  - drainage_bores
+  - square_post_clamp
+
+parameters:
+  cup_d:
+    {type: length, default: 88mm, min: 60mm, max: 130mm, role: functional, exposed: true}
+  bottom_d:
+    {type: length, default: 74mm, min: 50mm, max: 120mm, role: functional}
+  cup_h:
+    {type: length, default: 70mm, min: 45mm, max: 130mm, role: functional, exposed: true}
+  wall:
+    {type: length, default: 2.4mm, min: 1.8mm, max: 4mm, role: structural}
+  floor_t:
+    {type: length, default: 3mm, min: 2mm, max: 5mm, role: structural}
+  floor_raise:
+    {type: length, default: 6mm, min: 2mm, max: 14mm, role: functional}
+  drain_count:
+    {type: count, default: 3, min: 1, max: 6, role: functional}
+  drain_d:
+    {type: length, default: 6mm, min: 4mm, max: 10mm, role: functional}
+  post_w:
+    {type: length, default: 20mm, min: 12mm, max: 30mm, role: assembly, exposed: true,
+     description: "the square post's measured side (20 = the 2x2 cm standard)"}
+  fit_clearance:
+    {type: length, default: 0.5mm, min: 0.3mm, max: 0.9mm, role: manufacturing}
+  sleeve_h:
+    {type: length, default: 40mm, min: 20mm, max: 70mm, role: assembly, exposed: true}
+  sleeve_z:
+    {type: length, default: 10mm, min: 0mm, max: 60mm, role: assembly}
+  set_screw:
+    {type: choice, choices: [m4, m5, none], default: m4, role: assembly}
+
+constraints:
+  - cup_d >= bottom_d
+  - cup_h > floor_raise + floor_t + 10
+  - sleeve_z + sleeve_h <= cup_h
+
+form:
+  type: recipe
+  section: recipe_revolve
+  plane: XZ
+  width_axis: Y
+  ops:
+    - op: pot_body
+      id: cup
+      params: {top_d: cup_d, bottom_d: bottom_d, h: cup_h, wall: wall,
+               floor_t: floor_t, floor_raise: floor_raise}
+    - op: bore_pattern
+      id: drains
+      params: {kind: bolt_circle, d: drain_d, count: drain_count,
+               bc_d: "expr(bottom_d / 2)",
+               z_top: "expr(floor_raise + floor_t)", through: floor_t}
+    - op: square_post_sleeve
+      id: sleeve
+      params: {post_w: post_w, fit_clearance: fit_clearance,
+               sleeve_h: sleeve_h, z: sleeve_z, dir: "+x",
+               set_screw: set_screw}
+
+regions:
+  - {id: cup_cavity, role: soft_contact_surface, editable: false,
+     label: cup cavity, aliases: [cavity, cup]}
+  - {id: cup_outer_shell, role: aesthetic_lightening, editable: false,
+     label: outer wall, aliases: [outer surface]}
+  - {id: sleeve_post_channel, role: mounting_surface, editable: false,
+     label: post channel, aliases: [post channel, sleeve]}
+
+surface_style: molded_utility_part
+
+catalog:
+  domain: household
+  modes: [utility]
+  tags: [cup holder, post, balcony, sleeve, square]
+
+validators:
+  - form.pot_taper_ok
+  - form.pot_floor_drains
+  - form.post_sleeve_fit_ok
+  - form.post_sleeve_engagement_ok
+  - form.post_sleeve_walls_ok
+  - form.holes_within_outline
+  - topology.bores_open
+  - topology.cutout_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - pot_vessel
+    - drainage_bores
+    - square_post_clamp
+  must_not_have: []
+  invariants:
+    - sleeve_z + sleeve_h <= cup_h

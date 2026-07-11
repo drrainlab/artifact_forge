@@ -134,6 +134,20 @@ def compile_part(form: PartForm) -> tuple[Geometry, CompileLog]:
     for plate in form.plates:
         mass = weld(mass, _build_plate(plate), what=plate.name)
 
+    # PolyLofts as FEATURES on a non-loft base (a conical vessel's collar
+    # whose front face follows the wall arc): additive lofts weld like
+    # plates — before the box cuts, so a channel can pierce them.
+    if form.kind != "section_loft":
+        for pl in form.poly_lofts:
+            piece = _loft_polygons(pl.bottom, pl.z0, pl.top, pl.z1)
+            if pl.cut:
+                mass, applied_cut = cut_keep_solid(mass, piece)
+                if not applied_cut:
+                    log.notes.append(
+                        f"poly loft cut {pl.name!r} could not be applied")
+            else:
+                mass = weld(mass, piece, what=pl.name)
+
     for pin in form.pins:
         sx, sy, sz = pin.start_point()
         if pin.axis == "ANGLED":

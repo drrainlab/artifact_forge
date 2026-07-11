@@ -225,3 +225,75 @@ register_probe("form.ribs_connect_saddle_to_flange")(
     lambda form, ctx: check_ribs_connect_saddle_to_flange(form))
 register_probe("form.anchor_wall_strength_unverified")(
     lambda form, ctx: check_anchor_wall_strength_unverified(form))
+
+
+# -- square post sleeve (R2.10) -----------------------------------------------
+
+
+def check_post_sleeve_fit_ok(form) -> "Finding":
+    """The post channel must slide on the post: clearance in band."""
+    from .recipe_ops_mount import POST_FIT_BAND
+
+    check = "form.post_sleeve_fit_ok"
+    f = form.frame
+    if "sleeve_post_w" not in f:
+        return _finding(check, True, "n/a — no post sleeve on this part",
+                        critical=False)
+    lo, hi = POST_FIT_BAND
+    gap = f["sleeve_channel_w_eff"] - f["sleeve_post_w"]
+    ok = lo <= gap <= hi
+    return _finding(
+        check, ok,
+        f"channel clears the post by {gap:.2f} "
+        f"({'inside' if ok else 'outside'} [{lo:g}, {hi:g}])",
+        measured=gap, limit=hi)
+
+
+def check_post_sleeve_engagement_ok(form) -> "Finding":
+    """The sleeve must be tall enough not to rock on the post."""
+    from .recipe_ops_mount import SLEEVE_ENGAGE_K
+
+    check = "form.post_sleeve_engagement_ok"
+    f = form.frame
+    if "sleeve_post_w" not in f:
+        return _finding(check, True, "n/a — no post sleeve on this part",
+                        critical=False)
+    need = SLEEVE_ENGAGE_K * f["sleeve_post_w"]
+    ok = f["sleeve_h_eff"] >= need - 1e-6
+    return _finding(
+        check, ok,
+        f"sleeve {f['sleeve_h_eff']:g} {'≥' if ok else '<'} "
+        f"{SLEEVE_ENGAGE_K:g}x post ({need:g})",
+        measured=f["sleeve_h_eff"], limit=need)
+
+
+def check_post_sleeve_walls_ok(form) -> "Finding":
+    """The collar walls and the vessel-side web must stay real."""
+    from .recipe_ops_mount import SLEEVE_WALL_MIN
+
+    check = "form.post_sleeve_walls_ok"
+    f = form.frame
+    if "sleeve_post_w" not in f:
+        return _finding(check, True, "n/a — no post sleeve on this part",
+                        critical=False)
+    problems = []
+    if f["sleeve_wall"] < SLEEVE_WALL_MIN - 1e-6:
+        problems.append(
+            f"collar wall {f['sleeve_wall']:g} < {SLEEVE_WALL_MIN:g}")
+    if f["sleeve_inner_web_eff"] < SLEEVE_WALL_MIN - 1e-6:
+        problems.append(
+            f"vessel web {f['sleeve_inner_web_eff']:g} < {SLEEVE_WALL_MIN:g}")
+    if problems:
+        return _finding(check, False, "; ".join(problems))
+    return _finding(
+        check, True,
+        f"collar wall {f['sleeve_wall']:g} and vessel web "
+        f"{f['sleeve_inner_web_eff']:g} >= {SLEEVE_WALL_MIN:g}")
+
+
+register_probe("form.post_sleeve_fit_ok")(
+    lambda form, ctx: check_post_sleeve_fit_ok(form))
+register_probe("form.post_sleeve_engagement_ok")(
+    lambda form, ctx: check_post_sleeve_engagement_ok(form))
+register_probe("form.post_sleeve_walls_ok")(
+    lambda form, ctx: check_post_sleeve_walls_ok(form))

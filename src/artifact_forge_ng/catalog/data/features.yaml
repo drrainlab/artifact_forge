@@ -530,6 +530,15 @@ features:
       - form.se_wall_ok
       - topology.single_connected_solid
 
+  - id: square_post_clamp
+    description: collar sleeve on a square post — sliding channel, anti-rock height, set-screw press
+    verified_by:
+      - form.post_sleeve_fit_ok
+      - form.post_sleeve_engagement_ok
+      - form.post_sleeve_walls_ok
+      - topology.cutout_present
+      - topology.single_connected_solid
+
   # -- wall tool mounts pack ---------------------------------------------------
 
   - id: tool_saddle_ring
