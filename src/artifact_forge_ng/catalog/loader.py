@@ -211,7 +211,15 @@ def _bind_recipe_ops(spec: ArchetypeSpec, where: str) -> None:
 
 #: Repo-level user catalog: full-status archetypes outside the package
 #: (the Archetype Studio's promote target). Merged by load_catalog.
-LOCAL_DIR = Path(__file__).resolve().parents[3] / "catalog" / "local"
+#: Overridable via ARTIFACT_FORGE_LOCAL_CATALOG (tests, alternate roots).
+_DEFAULT_LOCAL_DIR = Path(__file__).resolve().parents[3] / "catalog" / "local"
+
+
+def _local_dir() -> Path:
+    import os
+
+    override = os.environ.get("ARTIFACT_FORGE_LOCAL_CATALOG")
+    return Path(override) if override else _DEFAULT_LOCAL_DIR
 
 
 def load_catalog(data_dir: Path | None = None) -> Catalog:
@@ -251,9 +259,10 @@ def load_catalog(data_dir: Path | None = None) -> Catalog:
             (path, f"pack:{pack_id}")
             for path in sorted((pack_dir / "archetypes").glob("*.yaml"))
         ]
-    if data_dir is None and LOCAL_DIR.exists():
+    local_dir = _local_dir()
+    if data_dir is None and local_dir.exists():
         archetype_files += [
-            (path, "local") for path in sorted(LOCAL_DIR.glob("*.yaml"))
+            (path, "local") for path in sorted(local_dir.glob("*.yaml"))
         ]
     for path, origin in archetype_files:
         spec = _load_archetype(path, vocabulary, modifiers)

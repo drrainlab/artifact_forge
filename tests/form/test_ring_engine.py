@@ -97,6 +97,7 @@ def test_ligament_and_arc_bound(ring_state):
 
 def test_local_catalog_merged():
     catalog = load_catalog()
-    assert "finger_ring_v1" in catalog.archetypes
-    assert catalog.origins["finger_ring_v1"] == "local"
+    assert "test_local_ring_v1" in catalog.archetypes
+    assert catalog.origins["test_local_ring_v1"] == "local"
+    assert catalog.origins["finger_ring_v1"] == "builtin"
     assert catalog.origins["underdesk_cable_clip_v2_molded"] == "builtin"

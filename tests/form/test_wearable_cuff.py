@@ -59,7 +59,7 @@ def test_golden_cuff_pre_cad_passes():
 
 
 def test_sizes_S_and_L_build_with_zero_hand_edits(tmp_path):
-    """The ROADMAP P2 criterion: same YAML, different bodies."""
+    """The wave P2 criterion: same YAML, different bodies."""
     for circ in ("220mm", "320mm"):
         state = run_pre_cad(_write_variant(tmp_path, circumference=circ), None)
         assert _fails(state) == [], f"size {circ} failed"

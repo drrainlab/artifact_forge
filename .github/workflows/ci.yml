@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  fast-tier:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Sync (no CAD extra — the fast tier is cadquery-free)
+        run: uv sync
+      - name: Import smoke (no CAD kernel, no API keys)
+        run: uv run python -c "import artifact_forge_ng; print(artifact_forge_ng.__version__)"
+      - name: Golden gate over the examples (pre-CAD)
+        run: |
+          for y in catalog/examples/*.yaml; do
+            uv run forge validate "$y"
+          done
+      - name: Fast IR tier
+        run: uv run pytest -m "not cad" -q
+
+# The CAD tier (pytest -m cad) needs the cadquery/OCC stack and runs
+# locally: uv sync --extra cad && uv run pytest

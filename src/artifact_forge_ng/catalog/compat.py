@@ -25,7 +25,7 @@ def compat_matrix(catalog: Catalog | None = None) -> dict[str, Any]:
     ]
     mates: list[dict[str, Any]] = []
     # Same-archetype pairs stay in: two INSTANCES of one part may mate
-    # (water_rail line_east <-> line_west is the two-rail line).
+    # (e.g. a rail's line_east <-> line_west across two instances).
     for i, (aid, aclass, ai) in enumerate(ports):
         for bid, bclass, bi in ports[i + 1:]:
             if not types_mate(ai.type, bi.type):
