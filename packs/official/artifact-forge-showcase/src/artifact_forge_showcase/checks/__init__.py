@@ -2,4 +2,4 @@
 Wave modules (spare / jig / ladder) are added as their waves land."""
 from __future__ import annotations
 
-from . import spare  # noqa: F401
+from . import jig, spare  # noqa: F401

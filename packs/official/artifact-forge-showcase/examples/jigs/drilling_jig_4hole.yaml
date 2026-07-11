@@ -1,0 +1,25 @@
+schema: product/v1
+id: drilling_jig_4hole
+archetype: drilling_jig_v1@1
+strict: true
+
+# Four 8 mm steel bushings, 25 mm pitch, 15 mm from the workpiece edge.
+# Shop probe — verify the first article before the batch.
+requested_features:
+  - mounting_plate_body
+  - drill_bushing_seats
+  - registration_stop_fence
+
+params:
+  jig_l: 120mm
+  jig_w: 40mm
+  thickness: 6mm
+  bushing_od: 8mm
+  hole_count: 4
+  hole_spacing: 25mm
+  edge_offset: 15mm
+
+manufacturing:
+  process: fdm
+  material: PETG
+  support_policy: none

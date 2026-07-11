@@ -1,0 +1,97 @@
+schema: archetype/v1
+id: drilling_jig_v1
+version: 1
+object_class: drilling_jig
+description: >
+  Edge-registered drilling jig: a plate that hooks over the workpiece
+  edge with a full-length stop fence; steel drill bushings press into a
+  measured line of seats, so every hole repeats at the same offset from
+  the edge. A shop probe, not a certified measuring tool — verify the
+  first article (docs/CLAIMS.md).
+
+provides_features:
+  - mounting_plate_body
+  - drill_bushing_seats
+  - registration_stop_fence
+
+parameters:
+  jig_l:
+    {type: length, default: 120mm, min: 60mm, max: 240mm,
+     role: functional, exposed: true}
+  jig_w:
+    {type: length, default: 40mm, min: 24mm, max: 80mm, role: functional}
+  thickness:
+    {type: length, default: 6mm, min: 4mm, max: 12mm, role: manufacturing}
+  corner_r:
+    {type: length, default: 4mm, min: 1mm, max: 8mm, role: aesthetic}
+  bushing_od:
+    {type: length, default: 8mm, min: 5mm, max: 14mm,
+     role: functional, exposed: true,
+     description: steel bushing outer Ø — the seat presses on this}
+  press_fit:
+    {type: length, default: 0.1mm, min: 0.05mm, max: 0.2mm, role: functional}
+  hole_count:
+    {type: count, default: 4, min: 1, max: 8, role: functional, exposed: true}
+  hole_spacing:
+    {type: length, default: 25mm, min: 12mm, max: 60mm,
+     role: functional, exposed: true}
+  edge_offset:
+    {type: length, default: 15mm, min: 8mm, max: expr(jig_w - 12),
+     role: functional, exposed: true,
+     description: hole-line distance from the fence face — the number the
+       jig exists to repeat}
+  fence_t:
+    {type: length, default: 5mm, min: 4mm, max: 10mm, role: functional}
+  fence_drop:
+    {type: length, default: 8mm, min: 4mm, max: 25mm, role: functional}
+
+constraints:
+  - hole_spacing > bushing_od + 3
+  - edge_offset < jig_w - bushing_od / 2 - 3
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    - op: rounded_plate
+      id: plate
+      params: {l: jig_l, w: jig_w, t: thickness, corner_r: corner_r}
+    - op: bushing_seat_line
+      id: bushings
+      params:
+        bushing_od: bushing_od
+        press_fit: press_fit
+        count: hole_count
+        spacing: hole_spacing
+        cy: expr(-(jig_w / 2) + fence_t + edge_offset)
+    - op: stop_fence
+      id: fence
+      params: {fence_t: fence_t, fence_drop: fence_drop}
+
+regions:
+  - {id: plate, role: mounting_surface, editable: true}
+  - {id: fence_face, role: mounting_surface, editable: false}
+
+surface_style: molded_utility_part
+
+validators:
+  - form.bushing_fit_ok
+  - form.stop_registration_ok
+  - form.holes_within_outline
+  - topology.single_connected_solid
+  - topology.bores_open
+  - topology.ribs_present
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - drill_bushing_seats
+    - registration_stop_fence
+  must_not_have: []
+  invariants:
+    - hole_spacing > bushing_od + 3

@@ -20,6 +20,11 @@ SHOWCASE_CHECKS: dict[str, CheckDecl] = dict(
               "square shaft socket clearance in the fit band with real engagement depth"),
         _decl("form.knob_torque_wall_ok", Level.FORM,
               "wall between socket corners and grip carries hand torque"),
+        # -- jigs: shop probes (impls in checks/jig.py) ----------------------
+        _decl("form.bushing_fit_ok", Level.FORM,
+              "steel bushing press interference in band, engagement depth and seat walls real"),
+        _decl("form.stop_registration_ok", Level.FORM,
+              "the stop fence spans the full plate edge and hooks below the plate"),
     ]
 )
 

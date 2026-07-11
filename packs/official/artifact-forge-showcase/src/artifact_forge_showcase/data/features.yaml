@@ -23,3 +23,16 @@ features:
     description: revolved replacement-knob grip body
     verified_by:
       - topology.single_connected_solid
+
+  # -- jigs -------------------------------------------------------------------
+  - id: drill_bushing_seats
+    description: press-fit through seats for steel drill bushings — interference, engagement and walls measured
+    verified_by:
+      - form.bushing_fit_ok
+      - topology.bores_open
+
+  - id: registration_stop_fence
+    description: fence under one plate edge hooking the workpiece — every hole repeats from that edge
+    verified_by:
+      - form.stop_registration_ok
+      - topology.ribs_present
