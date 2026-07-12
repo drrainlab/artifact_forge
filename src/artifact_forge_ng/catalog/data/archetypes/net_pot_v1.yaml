@@ -62,6 +62,10 @@ regions:
   - {id: cup_flange, role: mounting_surface, editable: false,
      label: hanging flange, aliases: [flange, rim]}
 
+datums:
+  - id: axis
+    description: pot axis
+
 surface_style: molded_utility_part
 
 catalog:

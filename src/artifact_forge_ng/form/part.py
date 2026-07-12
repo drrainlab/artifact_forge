@@ -373,6 +373,15 @@ class TextReliefFeature:
     #: path already flattened at the IR level). When non-empty they ARE
     #: the relief and ``text`` is just the display label.
     polygons: tuple[tuple[tuple[float, float], ...], ...] = ()
+    #: Holes cut from the relief polygons (an O's counter): each entry is
+    #: ``(outline_index, polygon)`` — subtracted from exactly that
+    #: outline's prism at compile time.
+    holes: tuple[tuple[int, tuple[tuple[float, float], ...]], ...] = ()
+    #: Stencil bridges for THROUGH cuts: rectangles subtracted from the
+    #: CUTTER (``(outline_index, rect polygon)``) so each enclosed hole
+    #: region stays attached to the plate instead of falling out. Empty
+    #: for emboss/engrave — a blind relief cannot orphan material.
+    bridges: tuple[tuple[int, tuple[tuple[float, float], ...]], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.polygons and not self.text.strip():

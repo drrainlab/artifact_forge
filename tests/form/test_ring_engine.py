@@ -95,6 +95,33 @@ def test_ligament_and_arc_bound(ring_state):
         assert width <= 0.6 * r + 1e-6, "cell too wide for tangent-plane cut"
 
 
+def test_field_covers_whole_band(ring_state):
+    """The 'make a whole ring with voronoi' regression: most sites must
+    survive the filters and the surviving cells must wrap the full
+    circumference — the only allowed bald arc is the honest seam column."""
+    from artifact_forge_ng.form.voronoi import voronoi_cells
+
+    field = ring_state.form.fields[0]
+    w = ring_state.form.windows["band_outer_surface"].window
+    assert len(field.polygons) >= 0.7 * 22  # 22 sites in the example yaml
+    spans = sorted(
+        (min(p[0] for p in poly), max(p[0] for p in poly))
+        for poly in field.polygons
+    )
+    # cells reach both window ends (seam gap aside) with no bald arc wider
+    # than one mean cell
+    mean_w = (w.u1 - w.u0) / 22
+    assert spans[0][0] - w.u0 < 2 * mean_w
+    assert w.u1 - spans[-1][1] < 2 * mean_w
+    for (_, a1), (b0, _) in zip(spans, spans[1:]):
+        assert b0 - a1 < mean_w, f"bald arc {b0 - a1:.1f}mm on the band"
+    # 'more voronoi' must mean denser, never sparser (the old fixed
+    # min_cell_area killed narrow cells, so more sites -> fewer holes)
+    dense = voronoi_cells(w, [], seed=42, sites=30,
+                          min_ligament=1.2, edge_margin=0.5)
+    assert len(dense) > len(field.polygons)
+
+
 def test_local_catalog_merged():
     catalog = load_catalog()
     assert "test_local_ring_v1" in catalog.archetypes

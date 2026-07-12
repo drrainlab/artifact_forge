@@ -66,9 +66,12 @@ export class ThreeView {
     });
     const mesh = new THREE.Mesh(geo, mat);
     if (pose) {
-      // quarter-turn Euler XYZ + translate, exactly as reported
+      // quarter-turn Euler + translate, exactly as reported. The engine
+      // convention is EXTRINSIC X then Y then Z (fixed world axes) —
+      // in Three.js that is intrinsic order "ZYX" with the same angles.
+      // ("XYZ" only agreed by accident while poses were single-axis.)
       const [rx, ry, rz] = (pose.rotate || [0, 0, 0]).map((d) => (d * Math.PI) / 180);
-      mesh.rotation.set(rx, ry, rz, "XYZ");
+      mesh.rotation.set(rx, ry, rz, "ZYX");
       const [tx, ty, tz] = pose.translate || [0, 0, 0];
       mesh.position.set(tx, ty, tz);
     }

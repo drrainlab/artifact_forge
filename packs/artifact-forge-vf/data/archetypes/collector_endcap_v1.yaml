@@ -179,6 +179,12 @@ regions:
   - {id: saddle, role: interface_keepout, editable: false,
      label: "Hanging arm"}
 
+datums:
+  - id: catch
+    description: water catch mouth
+  - id: drain_out
+    description: drain outlet
+
 surface_style: molded_utility_part
 
 catalog:

@@ -13,8 +13,9 @@ from artifact_forge_ng.core.fasteners import screw_spec
 from artifact_forge_ng.core.findings import Finding, Level, Status
 from artifact_forge_ng.form.part import PartForm
 from artifact_forge_ng.product.assembly import JointUse
-from artifact_forge_ng.assembly.joints_core import (JointDecl, Pose, _finding, _register, compute_pose,
-                          rotate_point)
+from artifact_forge_ng.assembly.joints_core import (JointDecl, JointParamDecl,
+                          JointSideDecl, Pose, _finding, _register,
+                          compute_pose, rotate_point)
 
 
 # -- removable_insert (vertical farm: cassette into rail seat) ------------------
@@ -141,6 +142,22 @@ _register(JointDecl(
                 "pulse-only reach and a guaranteed drain gap",
     ir_check=_removable_insert_ir,
     cad_checks=("assembly.no_interference",),
+    params=(
+        JointParamDecl("lift_margin", "length", 3.0,
+                       "rim must stand this far above the rail top "
+                       "(tool-free grip)"),
+    ),
+    side_a=JointSideDecl(
+        role="rail with a cassette seat",
+        frame_keys=_INSERT_A_KEYS,
+        datum_hint="seat datum of the rail",
+    ),
+    side_b=JointSideDecl(
+        role="drop-in cassette",
+        frame_keys=_INSERT_B_KEYS,
+        datum_hint="cassette body datum",
+    ),
+    pose_mode="either",
 ))
 
 
@@ -272,6 +289,22 @@ _register(JointDecl(
                 "tool-free, zero-bypass fail-safe unless allow_emergency_bypass",
     ir_check=_drop_in_screen_ir,
     cad_checks=("assembly.no_interference",),
+    params=(
+        JointParamDecl("allow_emergency_bypass", "number", False,
+                       "explicitly allow the emergency overflow bypass "
+                       "(default: zero unfiltered bypass)"),
+    ),
+    side_a=JointSideDecl(
+        role="collector with the sump ledge",
+        frame_keys=_SCREEN_A_KEYS,
+        datum_hint="sump datum of the collector",
+    ),
+    side_b=JointSideDecl(
+        role="strainer basket",
+        frame_keys=_SCREEN_B_KEYS,
+        datum_hint="basket body datum",
+    ),
+    pose_mode="either",
 ))
 
 
@@ -366,6 +399,17 @@ _register(JointDecl(
                 "level, and same-facing across the joint",
     ir_check=_tongue_groove_ir,
     cad_checks=("assembly.no_interference",),
+    side_a=JointSideDecl(
+        role="module with the groove end",
+        frame_keys=_TG_KEYS,
+        datum_hint="line datum of the upstream module",
+    ),
+    side_b=JointSideDecl(
+        role="module with the tongue end",
+        frame_keys=_TG_KEYS,
+        datum_hint="line datum of the downstream module",
+    ),
+    pose_mode="either",
 ))
 
 
@@ -428,6 +472,17 @@ _register(JointDecl(
                 "the first client; the physics is ready)",
     ir_check=_fluid_joint_ir,
     cad_checks=("assembly.no_interference",),
+    side_a=JointSideDecl(
+        role="upstream module (outlet)",
+        frame_keys=_FLUID_A_KEYS,
+        datum_hint="outlet datum / fluid_outlet port",
+    ),
+    side_b=JointSideDecl(
+        role="downstream module (inlet)",
+        frame_keys=_FLUID_B_KEYS,
+        datum_hint="inlet datum / fluid_inlet port",
+    ),
+    pose_mode="establish",
 ))
 
 
@@ -545,6 +600,17 @@ _register(JointDecl(
                 "tip slot, no downward leak (closed below)",
     ir_check=_lap_flow_ir,
     cad_checks=("assembly.no_interference",),
+    side_a=JointSideDecl(
+        role="upstream module with the lap lip",
+        frame_keys=_LAP_A_KEYS,
+        datum_hint="lap-lip datum of the upstream module",
+    ),
+    side_b=JointSideDecl(
+        role="downstream module with the floored lip-seat",
+        frame_keys=_LAP_B_KEYS,
+        datum_hint="lip-seat datum of the downstream module",
+    ),
+    pose_mode="establish",
 ))
 
 
@@ -685,6 +751,17 @@ _register(JointDecl(
                 "fluid joint set — never realizes a fluid port",
     ir_check=_saddle_hang_ir,
     cad_checks=("assembly.no_interference",),
+    side_a=JointSideDecl(
+        role="rail wall being straddled",
+        frame_keys=_SADDLE_A_KEYS,
+        datum_hint="rail wall datum",
+    ),
+    side_b=JointSideDecl(
+        role="adapter with the saddle slot",
+        frame_keys=_SADDLE_B_KEYS,
+        datum_hint="saddle datum of the adapter",
+    ),
+    pose_mode="verify",
 ))
 
 
@@ -745,4 +822,15 @@ _register(JointDecl(
                 "row-level truth in assembly.profile_support_full_length",
     ir_check=_profile_perch_ir,
     cad_checks=("assembly.no_interference",),
+    side_a=JointSideDecl(
+        role="rail with the bottom profile groove",
+        frame_keys=_PERCH_A_KEYS,
+        datum_hint="profile-slot datum of the rail",
+    ),
+    side_b=JointSideDecl(
+        role="aluminum profile carrier (reference part)",
+        frame_keys=_PERCH_B_KEYS,
+        datum_hint="profile axis datum",
+    ),
+    pose_mode="either",
 ))

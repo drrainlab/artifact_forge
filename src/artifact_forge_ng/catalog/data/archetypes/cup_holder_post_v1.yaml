@@ -85,6 +85,12 @@ regions:
   - {id: clip_post_channel, role: mounting_surface, editable: false,
      label: post channel, aliases: [post channel, clip]}
 
+datums:
+  - id: axis
+    description: cup axis
+  - id: post_axis
+    description: clamped post axis
+
 surface_style: molded_utility_part
 
 catalog:

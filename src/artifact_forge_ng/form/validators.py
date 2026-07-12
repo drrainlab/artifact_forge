@@ -394,10 +394,19 @@ def check_constant_section(form: PartForm) -> Finding:
     # sockets) keep every layer self-similar — they are vertical posts and
     # holes in the side-print orientation, still zero overhang.
     axis = form.section.width_axis
-    off_axis_bores = [b for b in form.bores if b.axis != axis]
+    # A DECLARED payload mount stack (payload_* bosses + pilots, the
+    # slider carriage's opt-in) narrows the claim instead of breaking it:
+    # the stack's printability is judged by the build-level supportless
+    # probes, and the SECTION itself stays constant — the honest message
+    # says so below.
+    payload_ribs = [r for r in form.ribs if "payload" in r.name]
+    payload_bores = [b for b in form.bores if b.name.startswith("payload_")]
+    plain_ribs = [r for r in form.ribs if r not in payload_ribs]
+    off_axis_bores = [b for b in form.bores
+                      if b.axis != axis and b not in payload_bores]
     off_axis_pins = [p for p in form.pins if p.axis != axis]
     for label, items in (
-        ("plates", form.plates), ("ribs", form.ribs),
+        ("plates", form.plates), ("ribs", plain_ribs),
         ("cutboxes", form.cutboxes), ("bores", off_axis_bores),
         ("pins", off_axis_pins), ("fields", form.fields),
     ):
@@ -409,11 +418,19 @@ def check_constant_section(form: PartForm) -> Finding:
     ]
     if wide:
         breakers.append(f"holes too wide to bridge sideways: {wide}")
+    payload_note = (
+        f"; payload mount stack present ({len(payload_ribs)} boss(es)) — "
+        "the zero-overhang claim covers the SECTION, the stack is judged "
+        "by build-level supportless probes"
+        if payload_ribs or payload_bores else ""
+    )
     return _finding(
         "form.constant_section",
         not breakers,
-        "pure constant-section extrusion"
-        + (f" with {len(form.holes)} small transverse hole(s)" if form.holes else "")
+        ("pure constant-section extrusion"
+         + (f" with {len(form.holes)} small transverse hole(s)"
+            if form.holes else "")
+         + payload_note)
         if not breakers
         else "section constancy broken by: " + ", ".join(breakers),
     )

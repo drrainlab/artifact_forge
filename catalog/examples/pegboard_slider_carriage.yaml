@@ -1,0 +1,65 @@
+# Teaching example: a station branch on one pegboard face plate.
+# The adapter plate screws flat onto the aux boss line (axis y — its 2
+# holes run along its own Y), and the slider carriage rides the adapter's
+# dovetail foot (params.female: b — the female carriage poses FROM the
+# posed male rail). Chains may continue THROUGH the rotated carriage:
+# the kernel composes quarter-turn poses exactly.
+schema: assembly/v1
+id: pegboard_slider_carriage
+strict: true
+root: board
+
+shared:
+  mount_pilot_d: 4.5mm    # M4 pilots on the board's boss patterns
+
+parts:
+  - ref: board
+    product:
+      schema: product/v1
+      id: carriage_board
+      archetype: pegboard_mount_base_v1@1
+      params:
+        plate_l: 80mm
+        plate_w: 60mm
+        aux_corners: 2      # opt-in second pattern: a line for the adapter
+        aux_axis: y         # the adapter's 2 holes run along ITS OWN Y
+        aux_sx: 28mm        # = adapter hole_span; foot (16.5) clears the
+        aux_cy: 0mm         #   21mm gap between the bosses
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: adapter
+    product:
+      schema: product/v1
+      id: carriage_rail
+      archetype: rail_plate_adapter_v1@1
+      params:
+        head: plate
+        adapter_l: 30mm     # < slider travel (40) — no overhang
+        hole_span: 28mm     # = board aux_sx
+        hole_screw: M4
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: carriage
+    product:
+      schema: product/v1
+      id: carriage_shoe
+      archetype: rail_slider_v1@1
+      params:
+        rail_top_w: 16.65mm   # derived from the adapter's socket numbers:
+        rail_h: 5.7mm         #   rail_top_w = groove_bottom_w - slide_clearance
+        rail_angle: 23.68     #   rail_h = groove_depth - vert_clearance
+        travel: 40mm
+      manufacturing: {material: PETG, support_policy: none}
+
+joints:
+  # branch mount: UNROTATED off the root (anchor = the adapter's plate
+  # BOTTOM datum mount_foot — the plate sits on the boss tops)
+  - type: screw_joint
+    a: board.aux_top
+    b: adapter.mount_foot
+    rotate: [0, 0, 0]
+    params: {screw: M4, count: 2, pilots: aux_pilot}
+  # leaf: the carriage (female) rides the posed male foot from below
+  - type: dovetail_joint
+    a: adapter.mount_foot
+    b: carriage.rail_slot
+    rotate: [180, 0, 0]
+    params: {female: b}

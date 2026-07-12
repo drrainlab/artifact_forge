@@ -86,6 +86,11 @@ regions:
   - {id: plate_face, role: mounting_surface, editable: true}
   - {id: center_zone, role: aesthetic_lightening, editable: true}
 
+datums:
+  - id: center
+    description: plate center — hole patterns reference here
+    mates: [screw_joint]
+
 surface_style: molded_utility_part
 
 catalog:

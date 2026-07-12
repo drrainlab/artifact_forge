@@ -185,6 +185,17 @@ regions:
      description: "the male dovetail accessories slide onto — geometry is
        the interface, no modifier may restyle it"}
 
+datums:
+  - id: branch_axis
+    description: clamped branch axis
+  - id: clamp_mate
+    description: mating plane to the lower half. The clamp pair grips a
+      HARDWARE rod/branch — it has NO printed carrier mount; do not screw
+      the clamps to a board (no holes on the lower, no board pilots on
+      the upper). If a prompt asks for a clamped rod, either omit the
+      clamps honestly or root the assembly at the clamp itself
+    mates: [compression_gap_joint, screw_joint]
+
 surface_style: molded_utility_part
 
 catalog:

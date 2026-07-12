@@ -15,6 +15,7 @@ Shapes (all plain JSON):
   ContractViewModel  {must_have, must_not_have, invariants}
   ValidateViewModel  {ok, product, archetype, strict, status, form_checks,
                       params, capability, contract, findings, form}
+  PreviewVM          {section: {plane, segments}, holes, bores} | null
   CatalogCardVM      {id, version, object_class, description, summary,
                       status, maturity, pack, pack_name, domain, modes,
                       tier, kind, audience, tags, use_cases, hardware,
@@ -141,6 +142,27 @@ def form_vm(form: PartForm) -> dict[str, Any]:
     }
 
 
+def preview_vm(form: PartForm) -> dict[str, Any]:
+    """Card preview — the exact section silhouette plus hole/bore circles.
+    Deliberately tiny: no regions/frame/datums, just enough to draw."""
+    from ..core.fasteners import screw_spec
+
+    return {
+        "section": {
+            "plane": form.section.plane,
+            "segments": [_segment_vm(s) for s in form.section.outer.segments],
+        },
+        "holes": [
+            {"at": [h.at[0], h.at[1]], "d": screw_spec(h.screw)["clear"]}
+            for h in form.holes
+        ],
+        "bores": [
+            {"center": list(b.center), "d": b.d, "axis": b.axis}
+            for b in form.bores
+        ],
+    }
+
+
 def catalog_card_vm(spec: ArchetypeSpec, *, status: str, pack: str,
                     pack_name: str, domain: str, source_relpath: str,
                     examples_count: int,
@@ -180,6 +202,7 @@ def catalog_card_vm(spec: ArchetypeSpec, *, status: str, pack: str,
             {"name": n, "type": p.type, "role": p.role,
              "exposed": bool(p.exposed), "description": p.description,
              "choices": list(p.choices) if p.type == "choice" else None,
+             "format": p.format,
              "default": getattr(p.default, "literal", p.default)}
             for n, p in spec.parameters.items()
         ],
@@ -223,6 +246,7 @@ def params_vm(archetype: ArchetypeSpec, state: PipelineState) -> list[dict[str, 
             "locked": spec.role == "safety_locked",
             "description": spec.description,
             "choices": list(spec.choices) if spec.type == "choice" else None,
+            "format": spec.format,
             "value": value,
             "min": resolved_min,
             "max": resolved_max,

@@ -60,6 +60,13 @@ regions:
   - {id: base_web, role: high_stress_region, editable: false,
      forbidden_modifiers: [add_hex_perforation]}
 
+datums:
+  - id: mount_face
+    description: cup mount flange face — screws to the bracket bolt circle
+    mates: [screw_joint]
+  - id: rim
+    description: cup opening rim (payload side)
+
 surface_style: molded_utility_part
 
 catalog:

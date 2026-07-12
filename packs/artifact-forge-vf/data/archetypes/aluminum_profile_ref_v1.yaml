@@ -71,6 +71,14 @@ regions:
   - {id: profile_body, role: mounting_surface, editable: false,
      label: "Profile body (reference)"}
 
+datums:
+  - id: station_1
+    description: profile station 1 (reference hardware, not printed)
+  - id: station_2
+    description: profile station 2
+  - id: station_3
+    description: profile station 3
+
 surface_style: molded_utility_part
 
 catalog:

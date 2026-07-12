@@ -41,13 +41,30 @@ def build_text_solid(tr: TextReliefFeature) -> cq.Workplane:
             height = tr.depth + 1.0
     if tr.polygons:
         # explicit relief polygons (a flattened SVG path) — one prism per
-        # polygon, fused into a compound like the field cutters
+        # outline, its holes cut through (overshot past both faces so the
+        # boolean never fights a coplanar face), fused into a compound.
+        # Built via makePolygon, NOT chained lineTo: a traced sketch is
+        # thousands of points and the Workplane parent chain recurses
+        # once per call — detailed art blows the stack.
+        def _prism(poly, z_lo: float, h: float) -> cq.Workplane:
+            pts = [cq.Vector(px, py, z_lo) for px, py in poly]
+            wire = cq.Wire.makePolygon(pts + [pts[0]])
+            face = cq.Face.makeFromWires(wire)
+            solid = cq.Solid.extrudeLinear(face, cq.Vector(0.0, 0.0, h))
+            return cq.Workplane(obj=solid)
+
         pieces = []
-        for poly in tr.polygons:
-            wp = cq.Workplane("XY", origin=(0, 0, 0)).moveTo(*poly[0])
-            for px, py in poly[1:]:
-                wp = wp.lineTo(px, py)
-            pieces.extend(wp.close().extrude(height).solids().vals())
+        for i, poly in enumerate(tr.polygons):
+            prism = _prism(poly, 0.0, height)
+            for parent, hole in tr.holes:
+                if parent == i:
+                    prism = prism.cut(_prism(hole, -0.2, height + 0.4))
+            # stencil bridges: subtracted from the CUTTER, so a through
+            # cut leaves solid tabs holding each hole region in place
+            for parent, rect in tr.bridges:
+                if parent == i:
+                    prism = prism.cut(_prism(rect, -0.2, height + 0.4))
+            pieces.extend(prism.solids().vals())
         glyphs = cq.Workplane(obj=cq.Compound.makeCompound(pieces))
     else:
         glyphs = (

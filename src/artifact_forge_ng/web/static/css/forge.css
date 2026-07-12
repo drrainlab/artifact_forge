@@ -56,6 +56,27 @@ main { flex: 1; overflow: auto; }
 /* catalog */
 .catalog { padding: 20px 24px; }
 
+/* horizontal preview cards */
+.cards.hgrid { grid-template-columns: repeat(auto-fill, minmax(430px, 1fr)); }
+.card.hcard { display: flex; gap: 14px; align-items: flex-start;
+  transition: border-color .15s; }
+.card.hcard:hover { border-color: var(--orange); }
+.hcard .preview { width: 110px; height: 110px; flex-shrink: 0;
+  background: var(--bg3); border: 1px solid var(--line); border-radius: 4px;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.hcard .preview svg { width: 100%; height: 100%; }
+.preview-ph { display: flex; flex-direction: column; align-items: center;
+  gap: 2px; text-align: center; padding: 6px; }
+.preview-ph b { font-family: var(--mono); font-size: 26px; color: var(--line); }
+.preview-ph span { font-family: var(--mono); font-size: 9px; color: var(--dim); }
+.hcard .cbody { flex: 1; min-width: 0; }
+.hcard .desc.full { max-height: none; color: var(--text); opacity: .85; }
+.showing { font-family: var(--mono); font-size: 10px; color: var(--faint);
+  margin: 2px 0 12px; }
+.linklike { background: none; border: none; color: var(--cyan);
+  font-family: var(--mono); font-size: 10px; cursor: pointer;
+  text-decoration: underline; padding: 0 2px; }
+
 /* catalog explorer */
 .catalog-layout { display: flex; gap: 18px; align-items: flex-start; }
 .catmain { flex: 1; min-width: 0; }
@@ -136,6 +157,8 @@ textarea:focus, input:focus { outline: none; border-color: var(--amber); }
 .prow input, .prow select { background: var(--bg3); border: 1px solid var(--line);
   color: var(--text); font-family: var(--mono); font-size: 12px; padding: 4px 6px; border-radius: 3px; }
 .prow .range { color: var(--faint); font-size: 10px; }
+.prow .svg-pick { padding: 3px 8px; font-size: 10px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .prow.locked { opacity: .5; }
 
 /* workspace */
@@ -230,3 +253,8 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 #insp-card td { padding: 2px 8px 2px 0; color: var(--dim); vertical-align: top; }
 #insp-card td:first-child { color: var(--faint); width: 42px; }
 #insp-card .rc-protected { color: var(--yellow); }
+
+/* -- assembly wizard (prompt -> assembly) -------------------------------- */
+.joblog { background: var(--panel2, #101418); border: 1px solid var(--line, #223);
+  padding: 8px 10px; font-size: 12px; max-height: 260px; overflow-y: auto;
+  white-space: pre-wrap; }

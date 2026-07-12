@@ -20,7 +20,8 @@ from ..catalog.loader import Catalog, CatalogError, load_catalog
 from ..core.findings import Finding, Level, Status
 from ..pipeline import PipelineFailure, PipelineState, pre_cad_from_instance
 from ..product.assembly import AssemblyInstance, JointUse
-from .joints import IDENTITY_POSE, JOINT_TYPES, JointError, Pose, compute_pose
+from .joints import (IDENTITY_POSE, JOINT_TYPES, JointError, Pose,
+                     compose_pose, compute_pose, inverse_pose)
 from .mates import interface_findings, resolve_port_anchor
 
 
@@ -74,9 +75,15 @@ def _inject_shared(asm: AssemblyInstance, catalog: Catalog) -> dict[str, Any]:
 def _joint_findings(
     asm: AssemblyInstance,
     states: dict[str, PipelineState],
+    ir_eval: Any = None,
 ) -> tuple[list[Finding], dict[str, Pose], list[dict[str, Any]]]:
     """IR-level joint verification + the assembly poses (root = identity;
-    every joint poses its B part; recorded for the report)."""
+    every joint poses its B part; recorded for the report). ``ir_eval``
+    lets the evaluation session memoize the per-joint check — ONE loop
+    serves both the plain and the cached paths."""
+    if ir_eval is None:
+        def ir_eval(decl, joint, form_a, form_b, pose):
+            return decl.ir_check(form_a, form_b, pose, joint)
     findings: list[Finding] = []
     poses: dict[str, Pose] = {asm.root: IDENTITY_POSE}
     pose_report: list[dict[str, Any]] = [
@@ -121,31 +128,15 @@ def _joint_findings(
             ))
             continue
         # Chained joints (B mates a part that is itself posed): the global
-        # pose composes through the parent. v1 composes pure translations
-        # only — a rotated parent would need Euler composition, and no
-        # current pack chains through one; refuse honestly instead.
+        # pose composes through the parent — quarter turns are closed
+        # under composition, so a ROTATED parent composes exactly (a box
+        # riding a flipped dovetail carriage is a legal chain). The
+        # ir_check below still sees the RELATIVE pose; only the global
+        # placement composes.
         parent = poses.get(joint.a_ref)
         pose_global = pose
         if parent is not None and parent is not IDENTITY_POSE:
-            if any(abs(a) > 1e-9 for a in parent.rotate):
-                findings.append(Finding(
-                    check="assembly.joint_pose", status=Status.FAIL,
-                    level=Level.ASSEMBLY,
-                    message=(
-                        f"joint {i} ({joint.type}): chaining through the "
-                        f"ROTATED part {joint.a_ref!r} is not supported in v1"
-                    ),
-                    critical=True,
-                ))
-                continue
-            pose_global = Pose(
-                rotate=pose.rotate,
-                translate=(
-                    pose.translate[0] + parent.translate[0],
-                    pose.translate[1] + parent.translate[1],
-                    pose.translate[2] + parent.translate[2],
-                ),
-            )
+            pose_global = compose_pose(parent, pose)
         if joint.b_ref != asm.root and joint.b_ref not in poses:
             poses[joint.b_ref] = pose_global
             pose_report.append({
@@ -156,7 +147,7 @@ def _joint_findings(
             })
         # IR checks always see the RELATIVE pose (B in A's frame) — that is
         # what the mating arithmetic is written against.
-        findings.extend(decl.ir_check(form_a, form_b, pose, joint))
+        findings.extend(ir_eval(decl, joint, form_a, form_b, pose))
     for part in asm.parts:
         if part.ref not in poses:
             findings.append(Finding(
@@ -176,43 +167,20 @@ def _joint_findings(
 
 
 def run_assembly_validate(path: Path, strict_flag: bool | None) -> dict[str, Any]:
-    catalog = load_catalog()
-    asm = load_assembly(path)
-    strict = asm.strict if strict_flag is None else strict_flag
-    validate_assembly(asm, catalog)
-    instances = _inject_shared(asm, catalog)
-    states = {
-        ref: pre_cad_from_instance(inst, catalog, strict)
-        for ref, inst in instances.items()
-    }
-    joint_findings, _, pose_report = _joint_findings(asm, states)
+    return validate_assembly_doc(load_assembly(path), load_catalog(), strict_flag)
 
-    parts_summary = {ref: st.summary() for ref, st in states.items()}
-    critical_joint = [f for f in joint_findings if f.critical and f.status is Status.FAIL]
-    status = "fail" if critical_joint or any(
-        s["status"] == "fail" for s in parts_summary.values()
-    ) else "pass"
-    out = {
-        "assembly": asm.id,
-        "root": asm.root,
-        "parts": parts_summary,
-        "assembly_pose": pose_report,
-        "joints": [f.to_dict() for f in joint_findings],
-        "status": status,
-    }
-    if asm.meta:
-        out["meta"] = dict(asm.meta)
-    if strict:
-        for ref, st in states.items():
-            st.enforce_strict()
-        if critical_joint:
-            raise AssemblyFailure(
-                out,
-                "strict: joint failures: "
-                + ", ".join(f.check for f in critical_joint),
-                code=4,
-            )
-    return out
+
+def validate_assembly_doc(
+    asm: AssemblyInstance, catalog: Catalog, strict_flag: bool | None
+) -> dict[str, Any]:
+    """CAD-free assembly validation on an already-parsed document — a thin
+    one-pass facade over a fresh evaluation session. Callers that
+    re-validate repeatedly (the intent repair loop) hold their own session
+    to reuse the cache across attempts."""
+    from .evaluation import AssemblyEvaluationSession
+
+    return AssemblyEvaluationSession(catalog).validate(
+        asm, strict_flag=strict_flag)
 
 
 class AssemblyFailure(PipelineFailure):
@@ -315,12 +283,26 @@ def run_assembly_build(
         blocked = []
         for h in form_b.holes:
             hx, hy, z_top = h.at
-            p_top = pose_b.apply((hx, hy, z_top + 6.0))
-            p_bot = pose_b.apply((hx, hy, z_top - h.through - 1.0))
-            probe = channel_probe([p_top, p_bot], d=2.6)
-            frac = max(
-                solid_fraction(placed[r].workplane, probe) for r in placed
-            )
+            # driver access needs 6mm on the HEAD side; the thread side
+            # only pokes 1mm past the exit (into the receiving pilot).
+            # countersink_face names the head side — a plate mounted
+            # face-down (a wall bracket on a board) has it at "bottom".
+            # A PLAIN hole (no countersink) accepts the screw from either
+            # side: one clear insertion direction is enough.
+            if getattr(h, "countersink", True):
+                head_bottom = getattr(h, "countersink_face", "top") == "bottom"
+                margins = [(1.0, 6.0)] if head_bottom else [(6.0, 1.0)]
+            else:
+                margins = [(6.0, 1.0), (1.0, 6.0)]
+            frac = float("inf")
+            for above, below in margins:
+                p_top = pose_b.apply((hx, hy, z_top + above))
+                p_bot = pose_b.apply((hx, hy, z_top - h.through - below))
+                probe = channel_probe([p_top, p_bot], d=2.6)
+                frac = min(frac, max(
+                    solid_fraction(placed[r].workplane, probe)
+                    for r in placed
+                ))
             if frac > 0.05:
                 blocked.append(f"({hx:.1f},{hy:.1f}) fill {frac:.2f}")
         joint_findings.append(afind(
@@ -337,18 +319,25 @@ def run_assembly_build(
         fa = states[joint.a_ref].form.frame
         fb = states[joint.b_ref].form.frame
         pose_b = poses[joint.b_ref]
+        pose_a = poses[joint.a_ref]
         # sample the plug's mid-depth center: must be BELOW the rim plane
-        # and inside the interior void of the box (not resting on top)
+        # and inside the interior void of the box (not resting on top).
+        # The interior bounds are BOX-LOCAL — compare in the box frame
+        # (the esp32 example's box was the root, which hid this; a
+        # station's box sits deep in a posed chain).
         probe_pt = pose_b.apply((0.0, 0.0, fb["plug_mid_z"]))
+        inv_a = inverse_pose(pose_a)
+        local_pt = inv_a.apply(probe_pt)
         inside = (
-            fa["inner_u0"] < probe_pt[0] < fa["inner_u1"]
-            and fa["inner_v0"] < probe_pt[1] < fa["inner_v1"]
-            and probe_pt[2] < fa["shell_h"]
+            fa["inner_u0"] < local_pt[0] < fa["inner_u1"]
+            and fa["inner_v0"] < local_pt[1] < fa["inner_v1"]
+            and local_pt[2] < fa["shell_h"]
         )
-        # and the box material must NOT be there (it is the interior void)
-        box_probe_ = channel_probe(
-            [probe_pt, (probe_pt[0], probe_pt[1], probe_pt[2] - 1.0)], d=3.0
-        )
+        # and the box material must NOT be there (it is the interior
+        # void) — probe 1mm down IN THE BOX FRAME, posed back to global
+        second_pt = pose_a.apply(
+            (local_pt[0], local_pt[1], local_pt[2] - 1.0))
+        box_probe_ = channel_probe([probe_pt, second_pt], d=3.0)
         frac = solid_fraction(placed[joint.a_ref].workplane, box_probe_)
         joint_findings.append(afind(
             "assembly.lid_seats",
@@ -525,15 +514,17 @@ def _wiring_check(asm, states, poses, placed, afind) -> Finding:
     d = parse_quantity(str(asm.wiring.d), "length", where="assembly.wiring.d")
     x, entry_u, z_c, drop_y = (f[k] for k in needed)
     top_z = f.get("flange_t", 5.0) + 2.0
-    # continue past the mount plane through the posed cup base to its cavity
+    # The channel keys are SOURCE-LOCAL — pose them into the assembly
+    # frame (the desk-lamp bracket happened to be the root, which hid
+    # this; a station's bracket is posed).
+    src_pose = poses[asm.wiring.from_part]
     dst_pose = poses[asm.wiring.to_part]
     exit_end = dst_pose.apply((0.0, 0.0, dst.form.params.get("base_t", 3.0) + 2.0))
-    path = [
-        (x, entry_u, top_z),
-        (x, entry_u, z_c),
-        (x, drop_y, z_c),
-        (x, drop_y, exit_end[2]),
-    ]
+    p0 = src_pose.apply((x, entry_u, top_z))
+    p1 = src_pose.apply((x, entry_u, z_c))
+    p2 = src_pose.apply((x, drop_y, z_c))
+    # the drop continues from the posed drop point into the cup cavity
+    path = [p0, p1, p2, (p2[0], p2[1], exit_end[2])]
     # Probe LEG BY LEG and keep the worst: one full-path fraction would
     # dilute a short plug (a too-small cup exit) below the threshold —
     # a 3mm blockage in a 200mm path is 1.5% "clear" and 100% stuck cable.

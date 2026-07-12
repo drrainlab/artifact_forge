@@ -114,20 +114,40 @@ def _boss_pattern(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     (self-tap or heatset). Square bosses in v1 (RibFeature machinery);
     the floor-slab keepout regions protect them from lightening fields."""
     state.require_base("boss_pattern")
+    # any flat-floor base works: a shell (floor_t) or a plain plate
+    # (plate_t) — a pegboard face plate grows the same mount bosses an
+    # enclosure floor does
     floor_t = state.frame.get("floor_t")
     if floor_t is None:
-        raise RecipeError("boss_pattern needs a rounded_box_shell base (floor_t)")
+        floor_t = state.frame.get("plate_t")
+    if floor_t is None:
+        raise RecipeError(
+            "boss_pattern needs a flat-floor base (rounded_box_shell "
+            "floor_t or rounded_plate plate_t)")
     sx, sy = p["sx"] / 2.0, p["sy"] / 2.0
     cx, cy = p["cx"], p["cy"]
     boss, height = p["boss"], p["height"]
     pilot_d, pilot_depth = p["pilot_d"], p["pilot_depth"]
+    corners = int(round(p.get("corners", 4)))   # .get: direct-op tests
+    if corners == 0:
+        return  # an explicit opt-out (auxiliary mount pattern disabled)
+    if corners not in (2, 4):
+        raise RecipeError(
+            f"boss_pattern corners must be 0 (skip), 2 or 4, got {corners}")
     if pilot_depth >= height + floor_t - 0.8:
         raise RecipeError("pilot bore would pierce the floor under the boss")
     name = op_id or "bosses"
     top = floor_t + height
-    for i, (bx, by) in enumerate(
-        [(cx - sx, cy - sy), (cx + sx, cy - sy), (cx + sx, cy + sy), (cx - sx, cy + sy)]
-    ):
+    axis = str(p.get("axis", "x"))
+    if axis not in ("x", "y"):
+        raise RecipeError(f"boss_pattern axis must be x or y, got {axis!r}")
+    if corners == 2:
+        positions = ([(cx - sx, cy), (cx + sx, cy)] if axis == "x"
+                     else [(cx, cy - sx), (cx, cy + sx)])
+    else:
+        positions = [(cx - sx, cy - sy), (cx + sx, cy - sy),
+                     (cx + sx, cy + sy), (cx - sx, cy + sy)]
+    for i, (bx, by) in enumerate(positions):
         state.ribs.append(
             RibFeature(
                 name=f"{name}_{i}",
@@ -166,6 +186,8 @@ _register(RecipeOpDecl(
         "cx": ("length", 0.0), "cy": ("length", 0.0),
         "boss": ("length", 7.0), "height": ("length", 6.0),
         "pilot_d": ("length", 4.0), "pilot_depth": ("length", 5.0),
+        "corners": ("count", 4),
+        "axis": ("choice", "x"),
     },
     validators=("topology.ribs_present", "topology.pockets_present"),
     apply=_boss_pattern,
@@ -285,6 +307,8 @@ def _hole_pattern(
     kind = p["kind"]
     center = (p["cx"], p["cy"])
     count = int(round(p["count"]))
+    if count <= 0:
+        return  # an explicit opt-out (mount_holes: 0) — no holes, no keepouts
     if kind == "line":
         centers = line_centers(count, p["spacing"], center)
     elif kind == "bolt_circle":
@@ -368,6 +392,28 @@ _register(RecipeOpDecl(
     ),
     apply=lambda s, p, i: _hole_pattern(s, p, i, countersunk=True),
     description="countersunk fastener holes; cs_face names where the head seats",
+))
+
+
+def _publish_datum(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Publish a named assembly datum at explicit part coordinates. Datums
+    are the assembly anchor vocabulary — when a form's ops do not already
+    name the plane a joint lands on (a box floor underside, say), the
+    recipe DECLARES it instead of leaving the anchor implied."""
+    state.require_base("publish_datum")
+    if not op_id:
+        raise RecipeError("publish_datum needs an id: — it names the datum")
+    state.datums[op_id] = {
+        "at": [p["x"], p["y"], p["z"]], "rotate": [0.0, 0.0, 0.0]}
+
+
+_register(RecipeOpDecl(
+    name="publish_datum",
+    kind="feature",
+    params={"x": ("length", 0.0), "y": ("length", 0.0), "z": ("length", 0.0)},
+    validators=("form.datums_within_outline",),
+    apply=_publish_datum,
+    description="named assembly datum at explicit coordinates (anchor vocabulary)",
 ))
 
 

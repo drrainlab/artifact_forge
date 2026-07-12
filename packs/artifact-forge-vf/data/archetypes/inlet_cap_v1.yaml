@@ -137,6 +137,12 @@ regions:
   - {id: saddle, role: interface_keepout, editable: false,
      label: "Saddle slot"}
 
+datums:
+  - id: spout
+    description: open chute spout — drips into the channel
+  - id: tube_in
+    description: hose socket (blind, hardware tube stops here)
+
 surface_style: molded_utility_part
 
 catalog:

@@ -46,6 +46,10 @@ regions:
   - {id: grip, role: soft_contact_surface, editable: false}
   - {id: pads, role: mounting_surface, editable: true}
 
+datums:
+  - id: grip_apex
+    description: grip apex
+
 surface_style: molded_utility_part
 
 catalog:

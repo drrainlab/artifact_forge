@@ -62,12 +62,17 @@ regions:
   - {id: spool_flanges, role: mounting_surface, editable: false,
      label: spool flanges, aliases: [flanges, spool]}
 
+datums:
+  - id: axis
+    description: spool axis
+
 surface_style: molded_utility_part
 
 catalog:
   domain: household
   modes: [utility]
   tags: [spool, cord, cable, string, lights]
+  search_aliases: [катушка, моталка]
 
 validators:
   - form.spool_flanges_ok

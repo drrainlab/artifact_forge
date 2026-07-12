@@ -766,4 +766,17 @@ features:
       - interface.mate_compatible
       - assembly.no_orphan_ports
       - assembly.no_interference
-
+  - id: led_light_chamber
+    description: enclosed cylindrical chamber whose inner wall carries an
+      adhesive LED strip; the driver mounts on interior bosses and power
+      enters through a wall port
+    verified_by:
+      - form.shell_walls_ok
+      - topology.cutout_present
+  - id: glowing_svg_membrane
+    description: SVG silhouette engraved from the inside of a panel down
+      to a thin translucent membrane — the contour glows when lit, no
+      through-cut, no fallen islands, diffusion built in
+    verified_by:
+      - form.svg_relief_printable
+      - topology.text_relief_present

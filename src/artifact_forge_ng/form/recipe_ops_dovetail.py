@@ -68,11 +68,16 @@ def _dovetail_adapter_body(state: RecipeState, p: dict[str, Any], op_id: str) ->
             "at": [w / 2.0, 0.0, f["payload_cv"]], "rotate": [0.0, 0.0, 0.0],
         }
     else:
-        # accessory plate: two vertical through-bores on the hole span
-        for i, uy in enumerate((-p["hole_span"] / 2.0, p["hole_span"] / 2.0)):
-            state.bores.append(BoreFeature(
-                f"{op_id or 'plate'}_hole_{i}", "Z", (w / 2.0, uy, 0.0),
-                p["hole_d"], (f["foot_plane_v"] - 1.0, f["base_top_v"] + 1.0),
+        # accessory plate: two vertical through-HOLES on the hole span —
+        # HoleFeatures, so the plate is a legal screw_joint B side (its
+        # holes land on a carrier's boss pilots)
+        from .part import HoleFeature
+        plate_t = f["base_top_v"] - f["foot_plane_v"]
+        for uy in (-p["hole_span"] / 2.0, p["hole_span"] / 2.0):
+            state.holes.append(HoleFeature(
+                at=(w / 2.0, uy, f["base_top_v"]),
+                screw=str(p.get("hole_screw", "M4")), through=plate_t,
+                countersink=False,
             ))
         state.regions.append(
             Region("accessory_plate", RegionRole.MOUNTING_SURFACE,
@@ -97,6 +102,7 @@ _register(RecipeOpDecl(
         "payload_arc_deg": ("angle", 240.0), "clip_wall": ("length", 3.0),
         "neck_drop": ("length", 4.0), "plate_w": ("length", 40.0),
         "hole_span": ("length", 20.0), "hole_d": ("length", 4.5),
+        "hole_screw": ("choice", "M4"),
         "corner_r": ("length", 2.0),
     },
     validators=(
@@ -192,9 +198,48 @@ def _rail_slider_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None
     ])
     state.datums["rail_slot"] = {
         "at": [travel / 2.0, 0.0, 0.0], "rotate": [0.0, 0.0, 0.0]}
+
+    # optional payload mount stack on the shoe's TOP: two bosses with
+    # pilot bores — the carriage CARRIES a payload (a snap box on the
+    # slider), the missing physical link of the station story
+    payload_mount = int(round(p.get("payload_mount", 0)))
+    if payload_mount:
+        if payload_mount != 2:
+            raise RecipeError(
+                f"payload_mount must be 0 or 2, got {payload_mount}")
+        from .part import RibFeature
+        p_sx = p.get("payload_sx", 30.0) / 2.0
+        boss = p.get("payload_boss", 7.0)
+        b_h = p.get("payload_boss_h", 6.0)
+        pd, pdepth = p.get("payload_pilot_d", 4.0), p.get("payload_pilot_depth", 5.0)
+        if p.get("payload_sx", 30.0) > travel - boss:
+            raise RecipeError(
+                f"payload_sx {p['payload_sx']:g} does not fit the "
+                f"{travel:g} travel")
+        top = body_h + b_h
+        cx = travel / 2.0
+        for i, bx in enumerate((cx - p_sx, cx + p_sx)):
+            state.ribs.append(RibFeature(
+                name=f"{name}_payload_boss_{i}",
+                box=Box3(bx - boss / 2.0, -boss / 2.0, body_h - 0.6,
+                         bx + boss / 2.0, boss / 2.0, top),
+            ))
+            state.bores.append(BoreFeature(
+                name=f"payload_pilot_{i}", axis="Z", center=(bx, 0.0, 0.0),
+                d=pd, span=(top - pdepth, top), overshoot=(0.0, 1.0),
+            ))
+        state.datums["payload_top"] = {
+            "at": [cx, 0.0, top], "rotate": [0.0, 0.0, 0.0]}
     state.frame.update(
-        # the dovetail_rail FEMALE frame keys (interfaces.py)
-        groove_top_w=g_top, groove_bottom_w=g_neck, groove_depth=depth,
+        # dovetail_rail FEMALE frame keys in the SOCKET convention the
+        # dovetail_joint ir_check measures: groove_top_w is the OPENING a
+        # male enters (the slot mouth = the neck), groove_bottom_w the
+        # wide flank end inside, socket_top_v the opening plane the male
+        # foot seats on (v=0, the slot mouth face). The shoe's slot is a
+        # legitimate short socket — an adapter foot slides it like a rail
+        # segment.
+        groove_top_w=g_neck, groove_bottom_w=g_top, groove_depth=depth,
+        socket_top_v=0.0,
         slider_travel=travel, slider_wall=wall, slider_ceiling=ceiling,
         slider_lat_clearance=c_lat, slider_vert_clearance=c_vert,
         slider_rail_top_w=top_w, slider_rail_h=rail_h,
@@ -213,6 +258,12 @@ _register(RecipeOpDecl(
         "travel": ("length", 30.0),
         "wall": ("length", 3.0),
         "ceiling_t": ("length", 4.0),
+        "payload_mount": ("count", 0),
+        "payload_sx": ("length", 30.0),
+        "payload_boss": ("length", 7.0),
+        "payload_boss_h": ("length", 6.0),
+        "payload_pilot_d": ("length", 4.0),
+        "payload_pilot_depth": ("length", 5.0),
     },
     validators=(
         "form.rail_slider_fit_ok",

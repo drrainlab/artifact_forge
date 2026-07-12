@@ -1,8 +1,9 @@
 // Product Cockpit — screens. Truth first: every panel renders view models
 // from the pipeline; the UI never invents state.
 import { api } from "app/api.js";
-import { renderSection } from "app/section.js";
+import { renderSection, sectionSvg } from "app/section.js";
 import { ThreeView } from "app/three_view.js";
+import { renderAssemblyWizard } from "app/assembly_wizard.js";
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const screenEl = $("#screen");
@@ -47,6 +48,8 @@ function renderHome() {
     <div class="entries">
       <div class="entry" data-go="wizard"><h3>Create from prompt</h3>
         <p>Describe the part; the system shows what it understood, what it can build, and only then forges.</p></div>
+      <div class="entry" data-go="assembly"><h3>Assemble from prompt</h3>
+        <p>Describe a multi-part product; the model composes parts, joints and wiring from the catalog — the pipeline judges the draft.</p></div>
       <div class="entry" data-go="yaml"><h3>Create from YAML</h3>
         <p>Paste a product or assembly document and validate it against the catalog.</p></div>
       <div class="entry" data-go="catalog"><h3>Browse archetype catalog</h3>
@@ -71,8 +74,10 @@ function renderHome() {
 
 // --------------------------------------------------------------- catalog
 // Explorer view state (survives tab switches within the session).
-const catView = { tab: "featured", q: "", domains: new Set(), packs: new Set(),
-                  statuses: new Set(), advanced: false };
+const catView = { tab: "all", q: "", domains: new Set(), packs: new Set(),
+                  statuses: new Set(), advanced: false, expanded: new Set() };
+const previews = {};  // archetype id -> PreviewVM | null | undefined(=not asked)
+let catSearchTimer = null;
 
 function isAdvancedCard(a) {
   return a.audience === "advanced" || a.kind !== "archetype" || a.tier === "private";
@@ -103,6 +108,19 @@ function catalogSort(cards, featured) {
     || x.id.localeCompare(y.id));
 }
 
+function previewHtml(a) {
+  const pv = previews[a.id];
+  if (pv && pv.section) {
+    return sectionSvg(pv.section, { holes: pv.holes, bores: pv.bores });
+  }
+  const known = pv === null;  // asked and honestly no default preview
+  return `<div class="preview-ph">
+    <b>${esc((a.domain[0] || "?").toUpperCase())}</b>
+    <span>${esc(a.domain)}</span>
+    <span class="faint">${known ? "no default preview" : "…"}</span>
+  </div>`;
+}
+
 function catalogCard(a) {
   const chips = [
     `<span class="chip">${esc(a.domain)}</span>`,
@@ -112,15 +130,25 @@ function catalogCard(a) {
   ].join(" ");
   const tags = (a.tags || []).length
     ? `<div class="tags">${a.tags.map((t) => esc(t)).join(" · ")}</div>` : "";
-  return `<div class="card">
-    <h3>${esc(a.id)} <span class="badge ${a.status}">${a.status}</span>${a.maturity ? ` <span class="badge off" title="lifecycle stage (informational)">${esc(a.maturity)}</span>` : ""}</h3>
-    <div class="chips">${chips}</div>
-    <div class="desc">${esc(a.summary)}</div>
-    ${tags}
-    <div class="meta">features ${a.provides_features.length} ·
-      validators ${a.validators.length} · examples ${a.examples_count}
-      ${a.status === "metadata_only" ? "<br>can author YAML: yes · can build STL: no" : ""}</div>
-    <button class="ghost" data-arch="${esc(a.id)}">open in wizard</button>
+  const summary = a.summary.length > 170 ? a.summary.slice(0, 167) + "…" : a.summary;
+  const expandable = a.description.trim().length > a.summary.length + 5;
+  const open = catView.expanded.has(a.id);
+  return `<div class="card hcard">
+    <div class="preview" data-pid="${esc(a.id)}">${previewHtml(a)}</div>
+    <div class="cbody">
+      <h3>${esc(a.id)} <span class="badge ${a.status}">${a.status}</span>${a.maturity ? ` <span class="badge off" title="lifecycle stage (informational)">${esc(a.maturity)}</span>` : ""}</h3>
+      <div class="chips">${chips}</div>
+      <div class="desc">${esc(summary)}</div>
+      ${open ? `<div class="desc full">${esc(a.description)}</div>` : ""}
+      ${tags}
+      <div class="meta">features ${a.provides_features.length} ·
+        validators ${a.validators.length} · examples ${a.examples_count}
+        ${a.status === "metadata_only" ? "<br>can author YAML: yes · can build STL: no" : ""}</div>
+      <div class="row mt">
+        <button class="ghost" data-arch="${esc(a.id)}">open in wizard</button>
+        ${expandable ? `<button class="ghost" data-more="${esc(a.id)}">${open ? "less" : "more"}</button>` : ""}
+      </div>
+    </div>
   </div>`;
 }
 
@@ -131,16 +159,46 @@ function checkGroup(title, items, sel, key) {
       <span class="faint">${it.count}</span></label>`).join("")}</div>`;
 }
 
+async function loadPreviews(ids) {
+  const missing = ids.filter((id) => previews[id] === undefined);
+  for (let i = 0; i < missing.length; i += 8) {
+    const chunk = missing.slice(i, i + 8);
+    try {
+      const got = await api.previews(chunk);
+      chunk.forEach((id) => { previews[id] = got[id] ?? null; });
+    } catch (err) {
+      console.warn("previews unavailable:", err);
+      chunk.forEach((id) => { previews[id] = null; });
+    }
+    const c = state.catalog;
+    if (!c) return;
+    chunk.forEach((id) => {
+      const el = screenEl.querySelector(`.preview[data-pid="${CSS.escape(id)}"]`);
+      const card = c.archetypes.find((a) => a.id === id);
+      if (el && card) el.innerHTML = previewHtml(card);
+    });
+  }
+}
+
 async function renderCatalog() {
   if (!state.catalog) state.catalog = await api.catalog();
   const c = state.catalog;
   const featured = c.featured || [];
   const visible = catalogSort(c.archetypes.filter(cardMatches), featured);
-  const hiddenCount = c.archetypes.length - c.archetypes.filter(
-    (a) => catView.advanced || !isAdvancedCard(a)).length;
+  const total = c.archetypes.length;
+  const hiddenAdvanced = c.archetypes.filter((a) => isAdvancedCard(a)).length;
+  const filtersActive = catView.q || catView.domains.size || catView.packs.size
+    || catView.statuses.size;
 
-  const tabs = ["featured", "domains", "packs", "all"].map((t) =>
-    `<button class="subtab ${catView.tab === t ? "active" : ""}" data-cattab="${t}">${t[0].toUpperCase() + t.slice(1)}</button>`).join("");
+  const tabDefs = [["all", `All (${visible.length})`], ["featured", "Featured"],
+                   ["domains", "Domains"], ["packs", "Packs"]];
+  const tabs = tabDefs.map(([t, label]) =>
+    `<button class="subtab ${catView.tab === t ? "active" : ""}" data-cattab="${t}">${label}</button>`).join("");
+
+  const showing = `<div class="showing">Showing ${visible.length} of ${total} archetypes
+    ${!catView.advanced && hiddenAdvanced ? `· ${hiddenAdvanced} hidden as advanced/reference
+      <button class="linklike" data-showadv>show advanced</button>` : ""}
+    ${filtersActive ? `<button class="linklike" data-clearf>clear filters ×</button>` : ""}</div>`;
 
   let body = "";
   if (catView.tab === "featured") {
@@ -150,7 +208,7 @@ async function renderCatalog() {
       .map((d) => `<button class="tile" data-domain="${esc(d.id)}">
         <b>${esc(d.id)}</b><span class="faint">${d.count} archetype${d.count === 1 ? "" : "s"}</span></button>`).join("");
     body = `<h3 class="dim">FEATURED STARTERS</h3>
-      <div class="cards">${featCards.map(catalogCard).join("")}</div>
+      <div class="cards hgrid">${featCards.map(catalogCard).join("")}</div>
       <h3 class="dim" style="margin-top:22px">BROWSE BY DOMAIN</h3>
       <div class="tiles">${tiles}</div>`;
   } else if (catView.tab === "domains" || catView.tab === "packs") {
@@ -162,9 +220,9 @@ async function renderCatalog() {
     });
     body = [...groups.keys()].sort().map((g) =>
       `<h3 class="dim">${esc(g.toUpperCase())} <span class="faint">${groups.get(g).length}</span></h3>
-       <div class="cards">${groups.get(g).map(catalogCard).join("")}</div>`).join("");
+       <div class="cards hgrid">${groups.get(g).map(catalogCard).join("")}</div>`).join("");
   } else {
-    body = `<div class="cards">${visible.map(catalogCard).join("")}</div>
+    body = `<div class="cards hgrid">${visible.map(catalogCard).join("")}</div>
       <h3 class="dim" style="margin:22px 0 12px">EXAMPLES</h3>
       <div class="cards">${c.examples.map((e) => `
         <div class="card"><h3>${esc(e.id)} <span class="badge recipe">${e.kind}</span></h3>
@@ -180,10 +238,11 @@ async function renderCatalog() {
       ${checkGroup("Pack", (c.facets?.packs || []), catView.packs, "packs")}
       ${checkGroup("Status", (c.facets?.statuses || []), catView.statuses, "statuses")}
       <label class="fadv"><input id="catadv" type="checkbox" ${catView.advanced ? "checked" : ""}>
-        show advanced <span class="faint">(+${hiddenCount} reference/private)</span></label>
+        show advanced <span class="faint">(+${hiddenAdvanced} reference/private)</span></label>
     </aside>
     <div class="catmain">
       <div class="subtabs">${tabs}</div>
+      ${showing}
       ${body}
     </div>
   </div>`;
@@ -197,14 +256,36 @@ async function renderCatalog() {
       renderCatalog();
     }));
   const q = screenEl.querySelector("#catq");
-  q.addEventListener("input", () => { catView.q = q.value; renderCatalog(); });
+  q.addEventListener("input", () => {
+    clearTimeout(catSearchTimer);
+    catSearchTimer = setTimeout(async () => {
+      catView.q = q.value;
+      await renderCatalog();
+      const nq = screenEl.querySelector("#catq");
+      nq.focus();
+      nq.setSelectionRange(nq.value.length, nq.value.length);
+    }, 120);
+  });
   screenEl.querySelector("#catadv").addEventListener("change", (e) => {
     catView.advanced = e.target.checked; renderCatalog();
+  });
+  const adv = screenEl.querySelector("[data-showadv]");
+  if (adv) adv.addEventListener("click", () => { catView.advanced = true; renderCatalog(); });
+  const clearf = screenEl.querySelector("[data-clearf]");
+  if (clearf) clearf.addEventListener("click", () => {
+    catView.q = ""; catView.domains.clear(); catView.packs.clear();
+    catView.statuses.clear(); renderCatalog();
   });
   screenEl.querySelectorAll("[data-facet]").forEach((cb) =>
     cb.addEventListener("change", () => {
       const set = catView[cb.dataset.facet];
       cb.checked ? set.add(cb.value) : set.delete(cb.value);
+      renderCatalog();
+    }));
+  screenEl.querySelectorAll("[data-more]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const id = b.dataset.more;
+      catView.expanded.has(id) ? catView.expanded.delete(id) : catView.expanded.add(id);
       renderCatalog();
     }));
   screenEl.querySelectorAll("[data-example]").forEach((b) =>
@@ -214,6 +295,11 @@ async function renderCatalog() {
     }));
   screenEl.querySelectorAll("[data-arch]").forEach((b) =>
     b.addEventListener("click", () => renderWizard({ archetype_id: b.dataset.arch })));
+
+  // previews load AFTER first paint, only for rendered cards, in batches
+  const shownIds = [...screenEl.querySelectorAll(".preview[data-pid]")]
+    .map((el) => el.dataset.pid);
+  loadPreviews(shownIds);
 }
 
 // ---------------------------------------------------------------- wizard
@@ -246,10 +332,35 @@ async function renderWizard(preset = null) {
 
   async function revalidate() {
     wiz.validation = await api.validate(wizYaml(), false);
+    // a pipeline-level fail carries no param cards — keep the last good
+    // set (or the archetype's spec) so the user can still FIX the value
+    if (wiz.validation.params?.length) wiz.lastParams = wiz.validation.params;
+    else {
+      wiz.validation.params = wiz.lastParams
+        || (wiz.archetype?.parameters || []).map((p) => ({
+             ...p, value: p.default, locked: p.role === "safety_locked",
+             min: null, max: null }));
+    }
     return wiz.validation;
   }
 
+  // A failed API call must never leave the wizard silently frozen on the
+  // previous stage — show the error and offer a retry of the SAME stage.
   const render = async () => {
+    try {
+      await renderStage();
+    } catch (err) {
+      screenEl.innerHTML = `<div class="wizard">${stagesBar()}
+        <div class="panel"><h3>WIZARD ERROR</h3>
+          <div class="mt"><span class="badge fail">stage ${wiz.stage} failed</span></div>
+          <pre class="mt" style="white-space:pre-wrap">${esc(String(err?.message || err))}</pre>
+          <div class="row mt"><button class="forge" id="retry">Retry</button></div>
+        </div></div>`;
+      $("#retry").addEventListener("click", () => render());
+    }
+  };
+
+  const renderStage = async () => {
     if (wiz.stage === 1) {
       screenEl.innerHTML = `<div class="wizard">${stagesBar()}
         <div class="panel"><h3>DESCRIBE THE PART</h3>
@@ -336,6 +447,8 @@ async function renderWizard(preset = null) {
           <div id="pgroups">${paramGroups(v.params, wiz.params)}</div>
           <div class="row mt"><button class="forge" id="next">Validate form →</button>
             <span id="pstatus" class="badge ${v.status}">${v.status}</span></div>
+          <div id="pfindings">${v.status === "fail"
+            ? findingsTable((v.findings || []).filter((f) => f.status !== "pass")) : ""}</div>
         </div></div>`;
       let timer = null;
       const bind = () => {
@@ -348,8 +461,51 @@ async function renderWizard(preset = null) {
               $("#pstatus").className = `badge ${nv.status}`;
               $("#pstatus").textContent = nv.status;
               $("#pgroups").innerHTML = paramGroups(nv.params, wiz.params);
+              $("#pfindings").innerHTML = nv.status === "fail"
+                ? findingsTable((nv.findings || []).filter((f) => f.status !== "pass")) : "";
               bind();
             }, 350);
+          }));
+        screenEl.querySelectorAll("[data-svg-for]").forEach((btn) =>
+          btn.addEventListener("click", () =>
+            screenEl.querySelector(`[data-svg-file="${btn.dataset.svgFor}"]`).click()));
+        screenEl.querySelectorAll("[data-svg-file]").forEach((file) =>
+          file.addEventListener("change", async () => {
+            const name = file.dataset.svgFile;
+            const btn = screenEl.querySelector(`[data-svg-for="${name}"]`);
+            const f = file.files[0];
+            if (!f) return;
+            btn.textContent = "⋯ importing";
+            try {
+              // layered color art is flattened server-side (luminance
+              // painter model); single-layer files pass through exactly
+              const motifW = parseFloat(
+                screenEl.querySelector('[data-param="motif_w"]')?.value
+                || screenEl.querySelector('[data-param="motif_w"]')?.placeholder
+                || "60") || 60;
+              const res = await api.svgFlatten(await f.text(), motifW);
+              if (!res.ok) {
+                const msg = res.findings?.[0]?.message || "svg import failed";
+                svgImportNotes.set(name, { label: `✗ ${msg}`, title: msg });
+                btn.textContent = `✗ ${msg}`;
+                return;
+              }
+              svgImportNotes.set(name, {
+                label: res.flattened
+                  ? `✓ ${f.name} — ${res.info.layers} layers → union`
+                  : `✓ ${f.name}`,
+                title: `${res.outlines} outlines, ${res.holes} holes, `
+                  + `min feature ${res.min_width_mm}mm at ${motifW}mm`,
+              });
+              const inp = screenEl.querySelector(`[data-param="${name}"]`);
+              inp.value = res.path;
+              inp.dispatchEvent(new Event("input"));
+              btn.textContent = svgImportNotes.get(name).label;
+              btn.title = svgImportNotes.get(name).title;
+            } catch (e) {
+              svgImportNotes.set(name, { label: `✗ ${e.message}`, title: e.message });
+              btn.textContent = `✗ ${e.message}`;
+            }
           }));
       };
       bind();
@@ -391,6 +547,10 @@ async function renderWizard(preset = null) {
   render();
 }
 
+// last .svg import result per param name — survives the pgroups
+// re-render that follows every revalidate
+const svgImportNotes = new Map();
+
 function paramGroups(params, current) {
   const roles = ["functional", "assembly", "structural", "manufacturing", "aesthetic", "style"];
   const groups = {};
@@ -404,11 +564,17 @@ function paramGroups(params, current) {
               `<option ${c === val ? "selected" : ""}>${c}</option>`).join("")}</select>`
           : `<input data-param="${p.name}" value="${esc(current[p.name] ?? "")}"
                placeholder="${p.value ?? ""}" ${p.locked ? "disabled" : ""}>`;
+        const note = svgImportNotes.get(p.name);
+        const filePick = p.format === "svg_path_data" && !p.locked
+          ? `<button class="ghost svg-pick" data-svg-for="${p.name}" type="button"
+               title="${esc(note?.title || "load path data from an .svg file")}">${esc(note?.label || "📂 .svg")}</button>
+             <input type="file" data-svg-file="${p.name}" accept=".svg,image/svg+xml" hidden>`
+          : "";
         const range = p.min != null || p.max != null
           ? `${p.min ?? "—"} … ${p.max ?? "—"}` : "";
         return `<div class="prow ${p.locked ? "locked" : ""}">
           <span class="pname" title="${esc(p.description)}">${p.name}${p.exposed ? " ●" : ""}</span>
-          ${input}<span class="range">${range}</span>
+          ${input}<span class="range">${filePick || range}</span>
           <span class="faint">${p.type}</span></div>`;
       }).join("")}
     </div>`).join("");
@@ -944,6 +1110,8 @@ function go(name) {
   if (name === "home") renderHome();
   else if (name === "catalog") renderCatalog();
   else if (name === "wizard") renderWizard();
+  else if (name === "assembly")
+    renderAssemblyWizard({ screenEl, api, openInWorkspace, status: state.status });
   else if (name === "yaml") renderYamlEntry();
   else renderWorkspace();
 }

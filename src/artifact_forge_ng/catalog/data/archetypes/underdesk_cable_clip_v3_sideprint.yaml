@@ -85,6 +85,13 @@ regions:
   - {id: snap_root, role: high_stress_region, editable: false}
   - {id: lower_lip, role: retaining_flexure, editable: false}
 
+datums:
+  - id: mount_face
+    description: desk mounting face
+    mates: [screw_joint]
+  - id: mouth_center
+    description: cable mouth center
+
 surface_style: molded_utility_part
 
 catalog:

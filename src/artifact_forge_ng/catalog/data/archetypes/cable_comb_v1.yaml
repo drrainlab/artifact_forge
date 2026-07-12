@@ -58,6 +58,10 @@ regions:
   - {id: teeth, role: high_stress_region, editable: false,
      forbidden_modifiers: [add_hex_perforation]}
 
+datums:
+  - id: first_slot
+    description: first cable slot center
+
 surface_style: molded_utility_part
 
 catalog:

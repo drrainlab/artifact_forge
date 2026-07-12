@@ -28,6 +28,8 @@ jobs:
           find packs/official -path '*/examples/*.yaml' | while read -r y; do
             uv run forge validate "$y"
           done
+      - name: Datum-declaration honesty audit (declared vs built Form IR)
+        run: uv run forge audit
       - name: Fast IR tier
         run: uv run pytest -m "not cad" -q
 

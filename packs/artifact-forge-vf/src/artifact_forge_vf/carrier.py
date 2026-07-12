@@ -83,6 +83,12 @@ def carrier_findings(
         return []  # not a row — no row story to tell
     rails = _rail_refs(asm, states)
     profiles = _profile_refs(asm, states)
+    if not rails:
+        # a lone profile_perch on a non-VF assembly (e.g. a workshop
+        # station) is judged by its own ir_check; without water rails
+        # there is no row-drainage story to tell — failing "nothing
+        # drains" on a dry assembly would be a false witness
+        return []
     # upstream -> downstream: the JOINT CHAIN is the truth (a hands to b).
     # Ordering by pose would silently forgive a row built backwards —
     # exactly the defect row_drains_under_mount must catch.

@@ -186,19 +186,53 @@ def voronoi_cells(
     min_ligament: float,
     edge_margin: float,
     relax_iterations: int = 2,
-    min_cell_area: float = 12.0,
+    min_cell_area: float | None = None,
     corner_smooth: int = 2,
+    init: str = "grid",
 ) -> list[Poly]:
     """Deterministic relaxed Voronoi cells, shrunk for the ligament,
-    filtered against keepouts and Chaikin-smoothed into organic blobs."""
+    filtered against keepouts and Chaikin-smoothed into organic blobs.
+
+    Two rules keep a pattern field COVERING its window instead of
+    clustering (the ring-band lesson — "more voronoi" used to make the
+    band sparser):
+
+    - ``init="grid"`` starts the sites on a jittered grid sized so cells
+      are near-square: uniform-random starts leave sliver cells that die
+      in the ligament shrink, and every dead cell is a bald patch on the
+      part. ``init="random"`` keeps the uniform scatter — the bone-window
+      look, and the survivor when keepout masks eat most of the window
+      (a grid dies in lockstep where a scatter finds the free pockets);
+    - ``min_cell_area=None`` scales the sliver filter to the pattern
+      itself — a fraction of the MEAN cell area (window / sites), clamped
+      to [4.0, 12.0]. The old absolute 12.0 silently dropped most cells
+      on a narrow band, so asking for more sites made the pattern SPARSER.
+    """
     inner = window.shrunk(edge_margin)
     if inner.width <= 0 or inner.height <= 0:
         return []
+    n_sites = max(3, sites)
+    if min_cell_area is None:
+        mean_area = inner.width * inner.height / n_sites
+        min_cell_area = min(12.0, max(4.0, 0.3 * mean_area))
     rng = random.Random(seed)
-    points = [
-        (rng.uniform(inner.u0, inner.u1), rng.uniform(inner.v0, inner.v1))
-        for _ in range(max(3, sites))
-    ]
+    if init == "random":
+        points = [
+            (rng.uniform(inner.u0, inner.u1), rng.uniform(inner.v0, inner.v1))
+            for _ in range(n_sites)
+        ]
+    else:
+        cell_side = math.sqrt(inner.width * inner.height / n_sites)
+        rows = max(1, round(inner.height / cell_side))
+        cols = max(1, math.ceil(n_sites / rows))
+        du, dv = inner.width / cols, inner.height / rows
+        points = [
+            (
+                inner.u0 + (k % cols + 0.5 + rng.uniform(-0.35, 0.35)) * du,
+                inner.v0 + (k // cols + 0.5 + rng.uniform(-0.35, 0.35)) * dv,
+            )
+            for k in range(n_sites)
+        ]
     for _ in range(max(0, relax_iterations)):
         cells = [_cell(s, points, inner) for s in points]
         points = [

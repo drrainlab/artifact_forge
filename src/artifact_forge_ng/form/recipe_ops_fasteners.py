@@ -60,6 +60,47 @@ _register(RecipeOpDecl(
 ))
 
 
+def _plug_window(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
+    """Opens the plug's inner field down to the base plate: the plug keeps
+    only a ``rim_w`` seat band (the ring that mates the shell), the plate
+    behind stays intact. A full plug over a translucent panel blocks it —
+    the lamp face's glowing membrane needs LIGHT behind it, not 4mm of
+    plug over the motif. The window is a circular blind pocket entered
+    from the plug top; its floor IS the plate top, so seat, hooks and the
+    engraved membrane are untouched."""
+    f = state.frame
+    if "plug_u0" not in f:
+        raise RecipeError("plug_window needs an inset_plug first")
+    rim_w = p["rim_w"]
+    l = f["plug_u1"] - f["plug_u0"]
+    w = f["plug_v1"] - f["plug_v0"]
+    d = min(l, w) - 2.0 * rim_w
+    if d <= 8.0:
+        raise RecipeError(
+            f"plug window O{d:.1f} too small — reduce rim_w {rim_w:.1f}")
+    if rim_w < 2.0:
+        raise RecipeError(
+            f"plug seat rim {rim_w:.1f} < 2.0 — the ring must survive as a seat")
+    t = state.width          # plate top = the window floor
+    depth = f["plug_depth"]
+    state.bores.append(BoreFeature(
+        name=op_id or "plug_window", axis="Z", center=(0.0, 0.0, t),
+        d=d, span=(t, t + depth), overshoot=(0.0, 1.0),
+    ))
+    state.frame.update(plug_window_d=d)
+
+
+_register(RecipeOpDecl(
+    name="plug_window",
+    kind="feature",
+    params={"rim_w": ("length", 6.0)},
+    validators=("topology.bores_open",),
+    apply=_plug_window,
+    description="opens the plug inner field into a seat RING — a window "
+                "for translucent/glowing panels behind the plug",
+))
+
+
 def _pin_pair(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     """Two press-fit/alignment pins rising +Z from ``z0`` (a lid's plug
     top in the model frame; the assembly pose flips them into the box's

@@ -54,6 +54,11 @@ regions:
   - {id: corner, role: high_stress_region, editable: false,
      label: corner web, aliases: [gusset, corner]}
 
+datums:
+  - id: corner_line
+    description: inner corner line of the two legs
+    mates: [screw_joint]
+
 surface_style: molded_utility_part
 
 catalog:

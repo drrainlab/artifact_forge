@@ -63,6 +63,10 @@ regions:
   - {id: plate_lightening, role: aesthetic_lightening, editable: true,
      label: plate canvas, aliases: [top face]}
 
+datums:
+  - id: strap_center
+    description: strap slot pair center
+
 surface_style: molded_utility_part
 
 interfaces:

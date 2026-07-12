@@ -83,6 +83,15 @@ regions:
   - {id: hub_body, role: mounting_surface, editable: false,
      label: connector hub, aliases: [hub, body]}
 
+datums:
+  - id: hub_center
+    description: hub center
+  - id: 'socket_*'
+    description: rod socket (one per enabled arm)
+    conditional: true
+    audit_params:
+      - {}
+
 surface_style: molded_utility_part
 
 # One port per possible arm — a toggled-off arm publishes no datum and

@@ -23,11 +23,11 @@ from ..catalog.loader import (
     load_catalog,
     suggest_region,
 )
-from ..form.recipe_ops import RECIPE_OPS
+from ..form.recipe_ops import RECIPE_OPS, RecipeError
 from ..pipeline import PipelineFailure, pre_cad_from_instance
 from ..product.instance import ProductInstance
 from .jobs import ThreadJobRunner
-from .serialize import catalog_card_vm, contract_vm, error_finding, validate_vm
+from .serialize import catalog_card_vm, contract_vm, error_finding, preview_vm, validate_vm
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 EXAMPLES_DIR = REPO_ROOT / "catalog" / "examples"
@@ -206,6 +206,42 @@ def api_catalog() -> dict[str, Any]:
     }
 
 
+#: (id, version, origin) -> PreviewVM | None. Presentation cache only.
+_PREVIEW_CACHE: dict[tuple[str, int, str], dict[str, Any] | None] = {}
+
+
+@app.get("/api/catalog/previews")
+def api_catalog_previews(ids: str | None = None) -> dict[str, Any]:
+    """Best-effort card previews from the pre-CAD Form IR. No CAD, no LLM,
+    no repair/fallback generation; a failed default build is an honest
+    null (the UI renders a placeholder). No exception escapes."""
+    import logging
+
+    out: dict[str, Any] = {}
+    try:
+        catalog = load_catalog()
+        wanted = set(filter(None, ids.split(","))) if ids else None
+        for spec in catalog.archetypes.values():
+            if wanted is not None and spec.id not in wanted:
+                continue
+            key = (spec.id, spec.version, catalog.origins.get(spec.id, ""))
+            if key not in _PREVIEW_CACHE:
+                try:
+                    instance = ProductInstance(
+                        schema="product/v1", id=f"preview_{spec.id}",
+                        archetype=spec.ref, strict=False)
+                    state = pre_cad_from_instance(instance, catalog, False)
+                    _PREVIEW_CACHE[key] = (
+                        preview_vm(state.form) if state.form is not None
+                        and state.form.section is not None else None)
+                except Exception:
+                    _PREVIEW_CACHE[key] = None
+            out[spec.id] = _PREVIEW_CACHE[key]
+    except Exception as exc:  # the catalog page must survive a broken preview pass
+        logging.getLogger(__name__).warning("previews failed wholesale: %s", exc)
+    return out
+
+
 def _examples_index() -> list[dict[str, Any]]:
     from ..packs import pack_example_dirs
 
@@ -263,6 +299,10 @@ def api_validate(body: YamlBody) -> JSONResponse:
         return _fail([error_finding(str(exc), "schema.catalog")])
     except PipelineFailure as exc:
         return _fail([error_finding(str(exc), "schema.pipeline")])
+    # the recipe kernel's honest refusal (bad svg path, wall too thin…)
+    # is a finding the cockpit renders, never a 500 that kills the wizard
+    except RecipeError as exc:
+        return _fail([error_finding(str(exc), "form.recipe")])
     return JSONResponse(validate_vm(state))
 
 
@@ -424,8 +464,8 @@ def api_edit_preview(body: EditBody) -> JSONResponse:
     val = (yaml.safe_load(validation.body.decode())
            if not isinstance(validation, dict) else validation)
     # IR diff of the headline effect: a valid patch can still do the
-    # OPPOSITE of the intent (more voronoi sites -> fewer surviving cells
-    # in a narrow band) — the preview must say so BEFORE apply.
+    # OPPOSITE of the intent (e.g. a bigger edge_margin eating every cell
+    # on a narrow band) — the preview must say so BEFORE apply.
     before_val = yaml.safe_load(
         api_validate(YamlBody(yaml=body.yaml, strict=False)).body.decode()
     )
@@ -519,6 +559,84 @@ def main() -> None:
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
 
 
+# -- svg import: extract path data, flattening layered art if needed ------------
+
+
+class SvgFlattenBody(BaseModel):
+    svg: str
+    #: target motif width, mm — tunes the printable-floor opening radius
+    motif_w: float = 60.0
+
+
+@app.post("/api/svg/flatten")
+def api_svg_flatten(body: SvgFlattenBody) -> JSONResponse:
+    """SVG file text in, ready-to-use ``svg_path`` data out. Single-layer
+    files (glyph exports) pass through EXACTLY as authored; layered color
+    art is reduced by the luminance painter model (dark = ink raised,
+    light = paper cut, background falls away) — which needs the CAD
+    backend, once, at import time. The YAML then carries the flattened
+    path, so validation stays CAD-free."""
+    import re as _re
+
+    from ..form.recipe_ops import RecipeError as _RecipeError
+    from ..form.svg_path import svg_path_to_polygons
+
+    if not body.svg.strip():
+        return _fail([error_finding("empty svg", "svg.input")])
+    ds = _re.findall(r'\bd="([^"]+)"', body.svg)
+    if not ds:
+        return _fail([error_finding(
+            "no <path> elements — convert shapes to paths in the editor",
+            "svg.input")])
+    joined = " ".join(ds)
+    motif_w = max(1.0, float(body.motif_w))
+    try:
+        outlines, holes, mw = svg_path_to_polygons(joined, motif_w)
+        return JSONResponse({
+            "ok": True, "path": joined, "flattened": False,
+            "outlines": len(outlines), "holes": len(holes),
+            "min_width_mm": round(mw, 3),
+        })
+    except _RecipeError as exc:
+        if "path noise" in str(exc):
+            # traced art leaves invisible specks and hatch slivers —
+            # clean at import time and REPORT the counts; the relief op
+            # guard stays strict
+            from ..form.recipe_ops_text import MIN_STROKE_ENGRAVE
+            from ..form.svg_path import import_svg_path
+
+            try:
+                cleaned, info = import_svg_path(
+                    joined, motif_w, floor=MIN_STROKE_ENGRAVE)
+                outlines, holes, mw = svg_path_to_polygons(cleaned, motif_w)
+            except _RecipeError as exc2:
+                return _fail([error_finding(str(exc2), "svg.path")])
+            return JSONResponse({
+                "ok": True, "path": cleaned, "flattened": False,
+                "outlines": len(outlines), "holes": len(holes),
+                "min_width_mm": round(mw, 3), **info,
+            })
+        if "OVERLAP" not in str(exc):
+            return _fail([error_finding(str(exc), "svg.path")])
+    if not _cad_available():
+        return _fail([error_finding(
+            "layered fills need the CAD backend to flatten — start with "
+            "CAD ON, or flatten in your editor (Inkscape: Path → Union)",
+            "svg.flatten")])
+    try:
+        from ..cad.svg_flatten import flatten_svg_layers
+
+        path, info = flatten_svg_layers(body.svg, motif_w=motif_w)
+        outlines, holes, mw = svg_path_to_polygons(path, motif_w)
+    except _RecipeError as exc:
+        return _fail([error_finding(str(exc), "svg.flatten")])
+    return JSONResponse({
+        "ok": True, "path": path, "flattened": True,
+        "outlines": len(outlines), "holes": len(holes),
+        "min_width_mm": round(mw, 3), "info": info,
+    })
+
+
 # -- intent / natural edit (the LLM seam; deterministic fallback) ---------------
 
 
@@ -587,3 +705,54 @@ def api_nl_edit(body: NlEditBody) -> JSONResponse:
         return _fail([error_finding(str(exc), "edit.llm")])
     except Exception as exc:  # noqa: BLE001 — structured, never a traceback
         return _fail([error_finding(str(exc), "edit.nl")])
+
+
+# -- prompt -> assembly (wave W3): creative composition over the catalog ---------
+
+
+class AssemblyIntentBody(BaseModel):
+    prompt: str
+    #: optional user-attached SVG (full document or raw path data) —
+    #: cleaned at intake; the model references it as "@svg", the server
+    #: substitutes the real path data at expansion
+    svg: str | None = None
+
+
+@app.post("/api/assembly/intent", response_model=None)
+def api_assembly_intent(body: AssemblyIntentBody) -> JSONResponse | dict[str, Any]:
+    """Compose a multi-part assembly from a text prompt. Always an async
+    job (2-3 LLM calls + up to 3 CAD-free validations): poll
+    /api/jobs/{id}. The result carries the three-tier verification state
+    (failed / pre_cad_pass / build_required) — the draft YAML then flows
+    through the ordinary /api/validate and /api/build unchanged."""
+    from ..form.recipe_ops import RecipeError as _RecipeError
+    from . import assembly_intent, llm
+
+    if not body.prompt.strip():
+        return _fail([error_finding("empty prompt", "assembly.intent.input")])
+    catalog = load_catalog()
+    prompt = body.prompt
+    svg_asset, svg_summary = None, ""
+    if body.svg and body.svg.strip():
+        try:
+            svg_asset, svg_summary = assembly_intent.prepare_svg_asset(
+                body.svg)
+        except _RecipeError as exc:
+            # a broken asset fails the request up front — no LLM calls
+            return _fail([error_finding(str(exc), "assembly.intent.svg")])
+
+    def run(job: Any) -> Any:
+        if not llm.available():
+            job.log.append("LLM OFF — deterministic suggestions only")
+            return assembly_intent.deterministic_assembly(prompt, catalog)
+        try:
+            return assembly_intent.llm_assembly(
+                prompt, catalog, progress=job.log.append,
+                svg_asset=svg_asset, svg_summary=svg_summary)
+        except RuntimeError as exc:
+            job.log.append(f"LLM failed: {exc} — deterministic fallback")
+            out = assembly_intent.deterministic_assembly(prompt, catalog)
+            out["notes"] = f"{exc}; deterministic fallback"
+            return out
+
+    return {"job": jobs.submit("assembly_intent", run)}

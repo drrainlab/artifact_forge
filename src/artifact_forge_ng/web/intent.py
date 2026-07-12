@@ -132,9 +132,19 @@ def llm_intent(prompt: str, catalog: Catalog) -> dict[str, Any]:
         out = deterministic_intent(prompt, catalog)
         out["notes"] = f"LLM proposed unknown archetype {raw.get('archetype_id')!r}; deterministic fallback"
         return out
+    def _placeholder(v: Any) -> bool:
+        # the model saying "I don't know" in any dialect — the archetype
+        # default must win, not a sentinel that fails the recipe
+        # (empty svg_path, '<UNKNOWN>'…)
+        if v is None:
+            return True
+        s = str(v).strip()
+        return (not s or (s.startswith("<") and s.endswith(">"))
+                or s.upper() in ("UNKNOWN", "TBD", "TODO", "N/A", "NONE", "?"))
+
     params = {
         k: v for k, v in (raw.get("params") or {}).items()
-        if k in spec.parameters
+        if k in spec.parameters and not _placeholder(v)
     }
     return {
         "ok": True,
@@ -292,10 +302,10 @@ def nl_edit(text: str, current_yaml: str, archetype, catalog: Catalog,
         "- fit field params to the window: on narrow bands/strips (height "
         "≤ 10mm) set edge_margin 0.5-0.8mm (NOT more — every cell shrinks "
         "by ligament/2 per side and 1mm margins kill them all) and "
-        "min_ligament ~1.2mm; on ring/cylinder bands keep sites 16-20 — "
-        "fewer sites make cells wider than 0.6*radius and the cylindrical "
-        "mapping honestly refuses, more sites make cells too narrow to "
-        "survive the shrink.\n"
+        "min_ligament ~1.2mm; on ring/cylinder bands 16-24 sites cover the "
+        "full circumference, and 'more/denser' means RAISE sites (cells "
+        "scale down honestly) — but fewer than ~12 sites make cells wider "
+        "than 0.6*radius and the cylindrical mapping honestly refuses.\n"
         f"Archetype {archetype.id}: params {', '.join(param_names)}.\n"
         f"Allowed modifiers: {'; '.join(mod_digest) or '-'}.\n"
         "Target regions:\n"

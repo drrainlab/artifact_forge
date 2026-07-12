@@ -65,6 +65,11 @@ regions:
   - {id: shell, role: mounting_surface, editable: false}
   - {id: floor, role: aesthetic_lightening, editable: true}
 
+datums:
+  - id: rim
+    description: box rim — a lid seats here
+    mates: [lid_seat, screw_joint]
+
 surface_style: molded_utility_part
 
 catalog:

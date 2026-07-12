@@ -57,6 +57,10 @@ regions:
   - {id: wheel_teeth, role: high_stress_region, editable: false,
      label: tooth ring, aliases: [teeth, ring]}
 
+datums:
+  - id: wheel_axis
+    description: ratchet wheel axis
+
 surface_style: molded_utility_part
 
 catalog:

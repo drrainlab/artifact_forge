@@ -113,6 +113,64 @@ def build_bom(asm: Any, states: dict[str, Any], catalog: Any) -> dict[str, Any]:
             ),
         })
 
+    # LED strip + driver: derived from light-chamber carriers — strip
+    # length from the chamber's inner perimeter, never guessed
+    import math as _math
+    for state in states.values():
+        if "led_light_chamber" not in getattr(
+                state.archetype, "provides_features", []):
+            continue
+        ctx = state.resolved.context
+        d = ctx.get("lamp_d")
+        wall = ctx.get("wall", 3.0)
+        perimeter = _math.pi * (d - 2.0 * wall) if d else None
+        hardware.append({
+            "item": "LED strip / flex neon, 12V",
+            "qty": 1,
+            "note": ("around the chamber's inner wall, or along the face "
+                     "panel's seat ring for through-cut motifs"
+                     + (f"; length ≈ {perimeter / 10:.0f} cm"
+                        if perimeter else "")),
+        })
+        hardware.append({
+            "item": "12V LED driver / power brick",
+            "qty": 1,
+            "note": "mounts on the interior psu_pilot_* bosses (zip-tie "
+                    "or M3 screws); inline cord switch recommended",
+        })
+        port = str(state.resolved.choices.get("power_port", "")).lower()
+        if port == "barrel_55":
+            hardware.append({
+                "item": "DC barrel jack 5.5x2.1mm, panel mount",
+                "qty": 1,
+                "note": "snaps into the wall port cutout; wire to the "
+                        "driver input",
+            })
+        elif port == "usb_c":
+            hardware.append({
+                "item": "USB-C power breakout, panel mount",
+                "qty": 1,
+                "note": "fits the wall port cutout; needs a 12V PD "
+                        "trigger board or a 5V-rated strip",
+            })
+
+    # lamp socket inserts: derived from socket-cavity carriers (the cup's
+    # socket preset is the standard part that drops in — E27/GU10)
+    socket_lines: dict[str, int] = {}
+    for state in states.values():
+        if "socket_cavity" not in getattr(
+                state.archetype, "provides_features", []):
+            continue
+        preset = str(state.resolved.choices.get("socket", "e27")).upper()
+        socket_lines[preset] = socket_lines.get(preset, 0) + 1
+    for preset, qty in sorted(socket_lines.items()):
+        hardware.append({
+            "item": f"{preset} lamp socket insert",
+            "qty": qty,
+            "note": "standard socket housing dropped into the printed cup; "
+                    "wire before seating",
+        })
+
     # silicone tubing: derived from declared hose ports
     tube_ports = 0
     tube_od = None

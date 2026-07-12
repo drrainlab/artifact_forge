@@ -1,0 +1,144 @@
+schema: archetype/v1
+id: contour_lamp_face_v1
+version: 1
+object_class: contour_lamp_face
+description: >
+  The lamp's face — a round snap-on panel carrying a light-emitting SVG
+  motif. Default motif_style cutout: THROUGH slits — the LED/neon light
+  inside the chamber shines straight out, auto-generated stencil
+  bridges keep every enclosed island attached. Alternative membrane:
+  engraved from the inside, leaving a thin translucent skin that glows
+  softly. Pairs with contour_lamp_body_v1 (lid_seat + snap_joint).
+
+provides_features:
+  - mounting_plate_body
+  - snap_hooks
+  - glowing_svg_membrane
+
+parameters:
+  face_d:
+    {type: length, default: 140mm, min: 90mm, max: 200mm,
+     role: assembly, exposed: true,
+     description: face diameter — match the body's lamp_d}
+  face_t:
+    {type: length, default: 2.4mm, min: 2mm, max: 4mm, role: manufacturing,
+     description: panel thickness; glow membrane = face_t - glow_depth}
+  wall:
+    {type: length, default: 3mm, min: 2.4mm, max: 5mm, role: assembly,
+     description: the BODY's wall — the plug diameter chains from it}
+  seat_clearance:
+    {type: length, default: 0.3mm, min: 0.15mm, max: 0.6mm, role: assembly}
+  plug_depth:
+    {type: length, default: 4mm, min: 3mm, max: 8mm, role: assembly}
+  # -- snap family (share with the body) --
+  beam_t:
+    {type: length, default: 1.8mm, min: 1.2mm, max: 3mm, role: structural}
+  hook_w:
+    {type: length, default: 8mm, min: 5mm, max: 16mm, role: assembly}
+  hook_len:
+    {type: length, default: 10mm, min: 6mm, max: 18mm, role: structural}
+  lip_d:
+    {type: length, default: 1.6mm, min: 1mm, max: 2.5mm, role: assembly}
+  lip_h:
+    {type: length, default: 3mm, min: 2mm, max: 5mm, role: assembly}
+  rim_w:
+    {type: length, default: 6mm, min: 3mm, max: 15mm, role: structural,
+     description: "plug seat ring width — the plug is a RING, its window
+       lets the chamber light reach the membrane"}
+  # -- the glowing motif --
+  motif_style:
+    {type: choice, choices: [cutout, membrane], default: cutout,
+     role: functional, exposed: true,
+     description: "cutout = through light slits (stencil bridges hold
+       enclosed islands); membrane = engrave from the inside, a thin
+       glowing skin"}
+  svg_path:
+    {type: string,
+     default: "M 0 -40 L 14 -18 L 7 -20 L 18 2 L 9 0 L 22 22 L 3 22 L 3 34 L -3 34 L -3 22 L -22 22 L -9 0 L -18 2 L -7 -20 L -14 -18 Z",
+     role: functional, exposed: true, format: svg_path_data,
+     description: "SVG path data (d attribute) — closed subpaths, even-odd
+       holes supported; the default is a pine silhouette, paste your own"}
+  motif_w:
+    {type: length, default: 90mm, min: 20mm, max: 180mm,
+     role: functional, exposed: true,
+     description: rendered motif width on the face}
+  glow_depth:
+    {type: length, default: 1.6mm, min: 0.8mm, max: 3mm, role: functional,
+     description: engrave depth from the inside; the remaining membrane
+       (face_t - glow_depth) is what glows — 0.6-1.0mm reads best in PETG}
+
+constraints:
+  # the motif must sit inside the plug WINDOW — engraving under the seat
+  # ring would be dark
+  - motif_w < face_d - 2 * wall - 2 * seat_clearance - 2 * rim_w
+  - glow_depth < face_t - 0.7
+
+form:
+  type: recipe
+  section: recipe
+  plane: XY
+  width_axis: Z
+  ops:
+    # corner_r = face_d/2: the plate is a DISC. Modeled plug-up (outer
+    # face on the bed — the smoothest surface the printer makes), the
+    # lid_seat joint flips it onto the body rim.
+    - op: rounded_plate
+      id: face
+      params: {l: face_d, w: face_d, t: face_t, corner_r: "expr(face_d / 2)"}
+    - op: inset_plug
+      id: plug
+      params: {l: "expr(face_d - 2 * wall - 2 * seat_clearance)",
+               w: "expr(face_d - 2 * wall - 2 * seat_clearance)",
+               depth: plug_depth,
+               corner_r: "expr((face_d - 2 * wall - 2 * seat_clearance) / 2)"}
+    - op: snap_hook_pair
+      id: snap
+      params: {beam_t: beam_t, hook_w: hook_w, hook_len: hook_len,
+               lip_d: lip_d, lip_h: lip_h}
+    # the plug becomes a seat RING: the window floor is the plate itself,
+    # so the chamber light lands directly on the engraved membrane
+    - op: plug_window
+      id: window
+      params: {rim_w: rim_w}
+    # cut/engraved from the INSIDE (top = plug side in the modeled
+    # pose); mirror: yes so the silhouette reads correctly from OUTSIDE
+    # once the panel flips onto the body — the stamp-die logic
+    - op: svg_relief
+      id: glow
+      params: {path: svg_path, width: motif_w, depth: glow_depth,
+               mode: motif_style, mirror: "yes", duty: label,
+               face: top, rotate: 0}
+
+regions:
+  - {id: face, role: mounting_surface, editable: false,
+     label: light face, aliases: [front, лицо]}
+
+datums:
+  - id: seat
+    description: plug mating plane — lands on the lamp body rim
+    mates: [lid_seat, snap_joint]
+
+catalog:
+  domain: lighting
+  modes: [utility]
+  tags: [lamp, face, svg, silhouette, glow, membrane, contour]
+  search_aliases: [силуэт, светящийся контур, панель светильника]
+  use_cases: [custom silhouette night light, logo lamp face]
+
+validators:
+  - form.holes_within_outline
+  - topology.bores_open
+  - form.svg_relief_printable
+  - form.stamp_mirrored_ok
+  - form.datums_within_outline
+  - topology.text_relief_present
+  - topology.ribs_present
+  - topology.single_connected_solid
+
+forbidden_forms: []
+
+allowed_modifiers: []
+
+contract:
+  must_have:
+    - glowing_svg_membrane

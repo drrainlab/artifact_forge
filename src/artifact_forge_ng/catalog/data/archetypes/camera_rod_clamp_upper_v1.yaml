@@ -162,6 +162,13 @@ regions:
      label: "Dovetail rail",
      description: "the male dovetail accessories slide onto"}
 
+datums:
+  - id: branch_axis
+    description: clamped rod axis
+  - id: clamp_mate
+    description: mating plane to the lower half
+    mates: [compression_gap_joint, screw_joint]
+
 surface_style: molded_utility_part
 
 catalog:

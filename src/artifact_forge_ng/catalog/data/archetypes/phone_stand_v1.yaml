@@ -87,6 +87,10 @@ regions:
      description: "the tilted back of the rest (oriented canvas); top edge
        band and root stay solid"}
 
+datums:
+  - id: device_seat
+    description: device cradle seat
+
 surface_style: molded_utility_part
 
 catalog:

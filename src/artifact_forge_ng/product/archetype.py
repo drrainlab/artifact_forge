@@ -88,6 +88,11 @@ class ParamSpec(BaseModel):
     exposed: bool = False
     choices: list[str] = []
     description: str = ""
+    #: Machine-readable content hint for string parameters — the cockpit
+    #: renders a matching editor (svg_path_data gets a .svg file picker
+    #: that extracts the path d-attribute). Purely presentational; the
+    #: value stays a plain string end to end.
+    format: Literal["svg_path_data"] | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -95,6 +100,8 @@ class ParamSpec(BaseModel):
         if not isinstance(data, dict):
             return data
         ptype = data.get("type")
+        if data.get("format") is not None and ptype != "string":
+            raise ValueError("format is only valid on string parameters")
         if ptype == "string":
             if data.get("min") is not None or data.get("max") is not None:
                 raise ValueError("string parameters cannot have min/max")
@@ -217,10 +224,11 @@ class FormSpec(BaseModel):
 
 
 class CatalogMeta(BaseModel):
-    """Presentation-only catalog metadata — how the archetype is shelved
-    and faceted in the cockpit. NO build semantics live here: the pipeline
-    never reads this block, and the owning pack is always derived from the
-    loader's origin, never claimed by YAML.
+    """Presentation-and-search catalog metadata — how the archetype is
+    shelved, faceted and FOUND. NO build semantics live here: the build
+    pipeline never reads this block (candidate retrieval and the cockpit
+    do), and the owning pack is always derived from the loader's origin,
+    never claimed by YAML.
 
     ``domain`` is a free string so community packs can shelve new domains
     without touching core; the recommended public registry lives in
@@ -240,8 +248,39 @@ class CatalogMeta(BaseModel):
     audience: Literal["general", "advanced"] = "general"
     tags: list[str] = Field(default_factory=list)
     use_cases: list[str] = Field(default_factory=list)
+    #: Retrieval aliases in ANY language — the archetype brings its own
+    #: vocabulary instead of growing a global synonym dictionary. A new
+    #: pack's «аквариумная помпа» is findable the day it ships.
+    search_aliases: list[str] = Field(default_factory=list)
     hardware: list[str] = Field(default_factory=list)
     claims: dict[str, bool] = Field(default_factory=dict)
+
+
+class DatumSpec(BaseModel):
+    """A datum the archetype's form PUBLISHES — the assembly anchor
+    vocabulary (joints pose part B by landing its datum on part A's).
+
+    Grounding declaration for the assembly digest: the runtime truth stays
+    the built Form IR (``form.datums``); honesty is verified by building
+    the form on defaults and each ``audit_params`` variant and comparing
+    (catalog/audit.py, ``forge catalog audit``)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: Exact datum name OR a glob pattern ("socket_*") when the built name
+    #: depends on parameter values.
+    id: str
+    #: Semantics for the LLM: "rim center — the lid mates here".
+    description: str = ""
+    #: The datum may be absent under some parameter values. conditional
+    #: WITHOUT audit_params is a WARN in the audit — the flag must not
+    #: become a way to switch honesty off.
+    conditional: bool = False
+    #: Joint types that typically anchor here (bound fail-fast to JOINT_TYPES).
+    mates: list[str] = Field(default_factory=list)
+    #: Representative parameter variants the audit builds for conditional
+    #: datums (each entry is a params dict).
+    audit_params: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ArchetypeSpec(VersionedModel):
@@ -259,6 +298,9 @@ class ArchetypeSpec(VersionedModel):
     regions: list[RegionSpec] = []
     #: Declared typed connection ports (wave A1) — see product/interfaces.py.
     interfaces: list[InterfaceSpec] = []
+    #: Declared published datums (wave G3) — the assembly anchor vocabulary;
+    #: honesty verified against the built Form IR by ``forge catalog audit``.
+    datums: list[DatumSpec] = Field(default_factory=list)
     #: Declared force routes between regions — see LoadPathSpec.
     load_paths: list[LoadPathSpec] = []
     #: Informational lifecycle stage; buildability truth stays computed.

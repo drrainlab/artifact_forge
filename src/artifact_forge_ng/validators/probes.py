@@ -64,6 +64,8 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("form.stability_footprint", Level.FORM, "combined part+device COM stays inside the base footprint"),
         _decl("form.min_web_between_holes", Level.FORM, "no two holes closer than the minimum web"),
         _decl("form.holes_within_outline", Level.FORM, "every hole keeps the minimum web to the outline"),
+        _decl("form.datums_within_outline", Level.FORM,
+              "published assembly datums lie on the part outline"),
         _decl("form.cuts_respect_keepouts", Level.FORM, "no bore or box cut intersects a keepout region"),
         _decl("form.device_slot_fits", Level.FORM, "measured device slot fits the declared device thickness at tilt"),
         _decl("form.min_ligament_ok", Level.FORM, "webs between field cells meet the declared minimum ligament"),

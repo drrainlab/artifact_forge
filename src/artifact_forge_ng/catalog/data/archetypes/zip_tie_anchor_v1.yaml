@@ -54,6 +54,10 @@ regions:
   - {id: bridge, role: high_stress_region, editable: false,
      forbidden_modifiers: [add_hex_perforation]}
 
+datums:
+  - id: tunnel_entry
+    description: zip-tie tunnel entry
+
 surface_style: molded_utility_part
 
 catalog:

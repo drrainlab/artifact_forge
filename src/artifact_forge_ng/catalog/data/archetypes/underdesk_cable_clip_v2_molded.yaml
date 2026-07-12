@@ -95,6 +95,12 @@ regions:
      forbidden_modifiers: [add_hex_perforation]}
   - {id: perforation_safe_zone, role: aesthetic_lightening, editable: true}
 
+datums:
+  - id: flange_face
+    description: desk flange face
+  - id: mouth_center
+    description: cable mouth center
+
 surface_style: molded_utility_part
 
 catalog:

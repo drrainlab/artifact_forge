@@ -48,7 +48,8 @@ def rotate_point(
     p: tuple[float, float, float], rotate: tuple[float, float, float]
 ) -> tuple[float, float, float]:
     """Euler XYZ rotation restricted to quarter turns — exact arithmetic,
-    no float drift in poses."""
+    no float drift in poses. Extrinsic (fixed world axes), X then Y then Z
+    — the same convention cad.assembly.place and the viewer apply."""
     x, y, z = p
     for axis, deg in enumerate(rotate):
         c = int(round(math.cos(math.radians(deg))))
@@ -60,6 +61,69 @@ def rotate_point(
         else:
             x, y = c * x - s * y, s * x + c * y
     return (x, y, z)
+
+
+def _rotation_matrix(
+    rotate: tuple[float, float, float],
+) -> tuple[tuple[int, ...], ...]:
+    """Integer 3x3 matrix (rows) of a quarter-turn Euler triple — exact."""
+    cols = [rotate_point(e, rotate) for e in
+            ((1, 0, 0), (0, 1, 0), (0, 0, 1))]
+    return tuple(
+        tuple(int(round(cols[j][i])) for j in range(3)) for i in range(3)
+    )
+
+
+def _mat_mul(a, b):
+    return tuple(
+        tuple(sum(a[i][k] * b[k][j] for k in range(3)) for j in range(3))
+        for i in range(3)
+    )
+
+
+def _canonical_euler_table() -> dict[Any, tuple[float, float, float]]:
+    """matrix -> the canonical quarter-turn Euler triple producing it.
+    The 24 proper quarter-turn rotations are all reachable from angles
+    {0, 90, 180, 270}; canonical = fewest non-zero components, then the
+    smallest angles — deterministic, always inside the legal set."""
+    table: dict[Any, tuple[float, float, float]] = {}
+    angles = (0.0, 90.0, 180.0, 270.0)
+    candidates = sorted(
+        ((rx, ry, rz) for rx in angles for ry in angles for rz in angles),
+        key=lambda t: (sum(1 for a in t if a), sum(t), t),
+    )
+    for triple in candidates:
+        table.setdefault(_rotation_matrix(triple), triple)
+    return table
+
+
+_EULER_BY_MATRIX = _canonical_euler_table()
+
+
+def inverse_pose(pose: Pose) -> Pose:
+    """The exact inverse: ``inverse_pose(P).apply(P.apply(x)) == x``.
+    Quarter-turn rotations invert by transposition — still integers."""
+    m = _rotation_matrix(pose.rotate)
+    m_inv = tuple(tuple(m[j][i] for j in range(3)) for i in range(3))
+    rotate = _EULER_BY_MATRIX[m_inv]
+    tx, ty, tz = pose.translate
+    t_inv = tuple(
+        -(m_inv[i][0] * tx + m_inv[i][1] * ty + m_inv[i][2] * tz)
+        for i in range(3)
+    )
+    return Pose(rotate=rotate, translate=t_inv)  # type: ignore[arg-type]
+
+
+def compose_pose(parent: Pose, local: Pose) -> Pose:
+    """Global pose of a chained part: ``global.apply(x) ==
+    parent.apply(local.apply(x))``. Quarter turns are closed under
+    composition — the result is exact integers and its rotate triple
+    stays inside the legal set (canonical form from the 24-element
+    rotation group)."""
+    m = _mat_mul(_rotation_matrix(parent.rotate),
+                 _rotation_matrix(local.rotate))
+    rotate = _EULER_BY_MATRIX[m]
+    return Pose(rotate=rotate, translate=parent.apply(local.translate))
 
 
 def compute_pose(joint: JointUse, form_a: PartForm, form_b: PartForm) -> Pose:
@@ -94,6 +158,43 @@ def _finding(check: str, ok: bool, message: str, *, measured: float | None = Non
 
 
 @dataclass(frozen=True)
+class JointParamDecl:
+    """Grounding metadata for one ``joint.params`` key.
+
+    NEVER executed: the ir_check remains the single measuring truth. A
+    declaration that drifts from the ir_check body is caught by the
+    coherence test (tests/assembly/test_joint_grounding.py), not at
+    runtime."""
+
+    name: str
+    type: str                     # "length" | "count" | "screw" | "prefix" | "number"
+    default: Any = None           # None = the param is required
+    description: str = ""
+
+
+@dataclass(frozen=True)
+class JointSideDecl:
+    """What the ir_check expects one side (A or B) of the joint to expose.
+
+    Grounding metadata for the assembly digest and intent graph-grounding
+    — not enforced here; the ir_check measures, this only describes."""
+
+    role: str = ""                          # human-readable: "box shell"
+    #: Frame keys the side must carry. "{param}" substitutes the joint
+    #: param of that name ("{hooks}_beam_t" -> "<hooks>_beam_t").
+    frame_keys: tuple[str, ...] = ()
+    #: Name of the joint PARAM holding the bores prefix ("pilots"), or a
+    #: literal prefix when the ir_check hardcodes it ("butt_socket").
+    bores_prefix: str | None = None
+    pins_prefix: str | None = None
+    needs_pins: bool = False
+    needs_holes: bool = False
+    ribs_prefix: str | None = None          # "{hooks}_lip"
+    cutboxes_contains: str | None = None    # "snap_window"
+    datum_hint: str = ""                    # anchor convention: "rim (rounded_box_shell)"
+
+
+@dataclass(frozen=True)
 class JointDecl:
     name: str
     description: str
@@ -101,6 +202,19 @@ class JointDecl:
     ir_check: Callable[[PartForm, PartForm, Pose, JointUse], list[Finding]]
     #: Assembly-level CAD probe names this joint subscribes to.
     cad_checks: tuple[str, ...]
+    # -- grounding metadata (wave G) — empty means "not declared yet"; the
+    # -- shrink-only allowlist in test_joint_grounding.py tracks the gap.
+    params: tuple[JointParamDecl, ...] = ()
+    side_a: JointSideDecl | None = None
+    side_b: JointSideDecl | None = None
+    #: Pose-chain role. The KERNEL semantics is positional (the first joint
+    #: naming an unposed part establishes its pose; later joints of the
+    #: same pair only run their ir_check — see pipeline._joint_findings).
+    #: This field makes that intent legible to the LLM and the intent
+    #: graph-grounding; the kernel never reads it.
+    pose_mode: str = "either"               # "establish" | "verify" | "either"
+    #: Short YAML fragment for few-shot use in the assembly digest.
+    example: str = ""
 
 
 JOINT_TYPES: dict[str, JointDecl] = {}

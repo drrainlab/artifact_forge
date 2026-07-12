@@ -101,6 +101,13 @@ interfaces:
     region: payload_saddle
     keepouts: [payload_saddle]
 
+datums:
+  - id: mount_foot
+    description: male dovetail foot — rides a socket groove
+    mates: [dovetail_joint]
+  - id: payload_axis
+    description: clamped flashlight axis
+
 surface_style: molded_utility_part
 
 catalog:

@@ -297,6 +297,10 @@ def add_bone_windows(
         min_ligament=min_ligament,
         edge_margin=float(params.get("edge_margin", 2.0)),
         corner_smooth=int(round(params.get("corner_smooth", 3))),
+        # bone windows are a SCATTER against a heavy keepout mask, not a
+        # coverage field: a jittered grid dies in lockstep where the mask
+        # is wide; the uniform scatter finds the free pockets (Bio-4M canon)
+        init="random",
     )
     scale = max(0.0, min(window_scale, 1.0))
     polygons: list[tuple[tuple[float, float], ...]] = []

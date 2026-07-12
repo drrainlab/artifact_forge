@@ -114,16 +114,20 @@ _register(RecipeOpDecl(
 def _svg_relief(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     """An SVG path as geometry on a horizontal face — logos, ornaments,
     pattern dies. The path is flattened to polygons AT THE IR LEVEL
-    (svg_path.py guards: closed subpaths, no holes, no path noise), so
-    the printable-width check measures real numbers before any CAD."""
-    from .svg_path import svg_path_to_polygons
+    (svg_path.py guards: closed subpaths, even-odd holes, no path
+    noise), so the printable-width check measures real numbers — hole
+    webs included — before any CAD."""
+    from .svg_path import stencil_bridges, svg_path_to_polygons
 
     state.require_base("svg_relief")
     path_data = str(p["path"])
     width, depth = p["width"], p["depth"]
     mode = p["mode"]
-    if mode not in ("emboss", "engrave"):
-        raise RecipeError(f"mode {mode!r} not in (emboss, engrave)")
+    if mode == "membrane":
+        mode = "engrave"          # user-facing alias: the glowing skin
+    if mode not in ("emboss", "engrave", "cutout"):
+        raise RecipeError(
+            f"mode {mode!r} not in (emboss, engrave, membrane, cutout)")
     mirror = p["mirror"]
     if mirror not in ("yes", "no"):
         raise RecipeError(f"mirror {mirror!r} not in (yes, no)")
@@ -147,14 +151,36 @@ def _svg_relief(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
     if mode == "engrave" and depth >= t - 0.6:
         raise RecipeError(f"engrave depth {depth:g} pierces the {t:g} part")
 
-    polygons, min_width = svg_path_to_polygons(path_data, width)
+    polygons, holes, min_width = svg_path_to_polygons(path_data, width)
+    bridges: tuple = ()
+    if mode == "cutout":
+        if face != "top":
+            raise RecipeError("mode cutout supports face: top (v1) — "
+                              "the cutter pierces downward from the top")
+        # a THROUGH cut (light slits, stencils): the cutter pierces the
+        # whole part, and every enclosed hole region would fall out —
+        # one auto-bridge per hole keeps it attached. In the IR the
+        # feature stays an "engrave" whose depth overshoots the part:
+        # CAD build and the relief probes need no second branch.
+        bridge_w = p.get("bridge_w", 1.6)
+        if bridge_w < 1.0:
+            raise RecipeError(
+                f"bridge_w {bridge_w:g} < 1.0 — a stencil bridge must "
+                "survive as a printed tab")
+        bridges = stencil_bridges(polygons, holes, bridge_w)
+        depth = z + 0.4
+        mode = "engrave"
     name = op_id or "svg"
     tr = TextReliefFeature(
-        name=name, text=f"<svg:{len(polygons)} paths>",
+        name=name,
+        text=f"<svg:{len(polygons)} paths"
+             + (f", {len(holes)} holes" if holes else "")
+             + (f", {len(bridges)} bridges>" if bridges else ">"),
         at=(p["cx"], p["cy"]), plane_z=z,
         size=width, depth=depth, mode=mode,
         mirror=(mirror == "yes"), rotate_deg=p["rotate"],
-        direction=direction, polygons=polygons,
+        direction=direction, polygons=polygons, holes=holes,
+        bridges=bridges,
     )
     state.text_reliefs.append(tr)
     w, h = tr.footprint()
@@ -171,6 +197,8 @@ def _svg_relief(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
         f"{name}_svg_min_width": min_width,
         f"{name}_svg_is_emboss": 1.0 if mode == "emboss" else 0.0,
         f"{name}_svg_paths": float(len(polygons)),
+        f"{name}_svg_holes": float(len(holes)),
+        f"{name}_svg_bridges": float(len(bridges)),
     })
     state.frame.update(
         text_mirrored=1.0 if mirror == "yes" else 0.0,
@@ -194,6 +222,7 @@ _register(RecipeOpDecl(
         "cy": ("length", 0.0),
         "z": ("length", 0.0),
         "rotate": ("number", 0.0),
+        "bridge_w": ("length", 1.6),
     },
     validators=(
         "form.svg_relief_printable",
@@ -201,6 +230,8 @@ _register(RecipeOpDecl(
         "topology.text_relief_present",
     ),
     apply=_svg_relief,
-    description="SVG path data as relief geometry (closed hole-free "
-                "subpaths, flattened and width-measured at the IR level)",
+    description="SVG path data as relief geometry (closed subpaths, "
+                "even-odd holes, flattened and width-measured at the IR "
+                "level); mode cutout = THROUGH light slits with "
+                "auto-generated stencil bridges",
 ))

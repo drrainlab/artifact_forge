@@ -160,7 +160,16 @@ def build_form(
         "arm_tip": {
             "at": [width / 2.0, ctx["arm_len"], frame["arm_center_v"]],
             "rotate": [0.0, 0.0, 0.0],
-        }
+        },
+        # plate-TOP center of the mount hole line: the CARRIER-MATING face.
+        # The arm hangs BELOW the plate plane (z < 0) — the bracket mounts
+        # a flat carrier (pegboard line bosses, mount_sx = screw_spacing)
+        # with rotate [180, 0, 0], plate top against the boss tops, arm
+        # extending AWAY from the board.
+        "board_mount": {
+            "at": [width / 2.0, 0.0, pt],
+            "rotate": [0.0, 0.0, 0.0],
+        },
     }
     if mount_bc > 1e-6:
         frame["mount_c_y"] = mount_c_y

@@ -51,6 +51,10 @@ regions:
   - {id: foot_pad, role: soft_contact_surface, editable: false,
      label: floor pad, aliases: [pad, foot]}
 
+datums:
+  - id: tube_axis
+    description: furniture tube axis
+
 surface_style: molded_utility_part
 
 catalog:

@@ -152,8 +152,29 @@ def _load_archetype(
                     f"{name!r} is not a declared region"
                 )
     _bind_interfaces(spec, region_ids, where)
+    _bind_datums(spec, where)
     _bind_recipe_ops(spec, where)
     return spec
+
+
+def _bind_datums(spec: ArchetypeSpec, where: str) -> None:
+    """Wave G3 fail-fast: datum declaration ids unique, mate joint types
+    known. Whether the datum is actually BUILT is runtime truth — the
+    honesty audit (catalog/audit.py) measures it on the real Form IR."""
+    from ..assembly.joints import JOINT_TYPES  # packs registered by now
+
+    seen: set[str] = set()
+    for datum in spec.datums:
+        w = f"{where} datum {datum.id!r}"
+        if datum.id in seen:
+            raise CatalogError(f"{w}: duplicate datum id")
+        seen.add(datum.id)
+        for joint_type in datum.mates:
+            if joint_type not in JOINT_TYPES:
+                raise CatalogError(
+                    f"{w}: unknown joint type {joint_type!r} in mates; "
+                    f"known: {sorted(JOINT_TYPES)}"
+                )
 
 
 def _bind_interfaces(

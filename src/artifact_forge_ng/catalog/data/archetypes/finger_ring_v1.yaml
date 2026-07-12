@@ -57,6 +57,10 @@ regions:
   - {id: seam_keepout, role: high_stress_region, editable: false,
      label: seam column, aliases: [seam]}
 
+datums:
+  - id: axis
+    description: finger axis
+
 surface_style: molded_utility_part
 
 catalog:

@@ -68,6 +68,10 @@ regions:
      forbidden_modifiers: [add_hex_perforation]}
   - {id: tip_lip, role: retaining_flexure, editable: false}
 
+datums:
+  - id: bay_center
+    description: headphone bay center
+
 surface_style: molded_utility_part
 
 catalog:

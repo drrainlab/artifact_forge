@@ -53,6 +53,12 @@ regions:
   - {id: coupler_body, role: mounting_surface, editable: false,
      label: coupler body, aliases: [coupler, body]}
 
+datums:
+  - id: shaft_a
+    description: shaft A socket axis
+  - id: shaft_b
+    description: shaft B socket axis
+
 surface_style: molded_utility_part
 
 catalog:

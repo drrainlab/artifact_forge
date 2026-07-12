@@ -7,7 +7,7 @@ split, and every public and test-consumed name keeps its import path.
 from __future__ import annotations
 
 from .joints_core import (  # noqa: F401
-    IDENTITY_POSE, PILOT_PREFIX, POSITION_TOL, JointDecl, JointError,
+    IDENTITY_POSE, PILOT_PREFIX, POSITION_TOL, JointDecl, JointError, compose_pose, inverse_pose,
     JOINT_TYPES, Pose, compute_pose, rotate_point, _finding,
 )
 from .joints_mechanical import (  # noqa: F401

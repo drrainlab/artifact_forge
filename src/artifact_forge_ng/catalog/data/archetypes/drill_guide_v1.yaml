@@ -95,6 +95,9 @@ catalog:
   domain: jigs
   modes: [workshop, engineering]
   tags: [drill, guide, bushing, dowel, jig]
+  # retrieval aliases in the maker's own language — the archetype brings
+  # its vocabulary with it, no global dictionary edit needed
+  search_aliases: [кондуктор, сверловочный кондуктор]
 
 validators:
   - form.bushing_fit_ok

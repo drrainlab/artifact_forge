@@ -154,6 +154,13 @@ regions:
        editable false in v1 because field mapping around the X axis is not
        supported yet}
 
+datums:
+  - id: mount_face
+    description: wall mounting face
+    mates: [screw_joint]
+  - id: tool_axis
+    description: clamped tool axis
+
 surface_style: molded_utility_part
 
 catalog:

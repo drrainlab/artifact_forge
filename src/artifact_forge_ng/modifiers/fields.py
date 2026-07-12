@@ -147,11 +147,12 @@ def add_voronoi_field(
     if pw.mapping == "cylindrical" and ligament < 1.0:
         return [fail(use.id, f"cylindrical field ligament {ligament:g} < 1.0 — "
                              "through-wall webs this thin do not print")]
+    n_sites = int(round(params.get("sites", 18)))
     cells = voronoi_cells(
         pw.window,
         list(pw.keepouts),
         seed=seed,
-        sites=int(round(params.get("sites", 18))),
+        sites=n_sites,
         min_ligament=ligament,
         edge_margin=params.get("edge_margin", 3.0),
         relax_iterations=int(round(params.get("relax_iterations", 2))),
@@ -189,7 +190,8 @@ def add_voronoi_field(
         )
     )
     return [
-        note(use.id, f"{len(cells)} voronoi cells (seed {seed}, {cut_mode}) on {use.target}")
+        note(use.id, f"{len(cells)}/{n_sites} voronoi cells survived filters "
+                     f"(seed {seed}, {cut_mode}) on {use.target}")
     ]
 
 

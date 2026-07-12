@@ -44,6 +44,10 @@ parameters:
   hole_d:
     {type: length, default: 4.5mm, min: 3mm, max: 6mm, role: assembly,
      description: clearance holes (M4 default)}
+  hole_screw:
+    {type: choice, choices: [M3, M4, M5], default: M4, role: assembly,
+     description: "screw size the plate holes clear — the plate is a
+       screw_joint B side (its holes land on a carrier's boss pilots)"}
 
 constraints:
   - groove_bottom_w >= groove_top_w + 1
@@ -70,6 +74,7 @@ form:
         plate_w: plate_w
         hole_span: hole_span
         hole_d: hole_d
+        hole_screw: hole_screw
 
 regions:
   - {id: foot_interface, role: interface_keepout, editable: false,
@@ -87,7 +92,7 @@ interfaces:
     clearance: 0.25mm
     region: foot_interface
     keepouts: [foot_interface]
-    accepts: [wearable_cuff]
+    accepts: [wearable_cuff, rail_slider]
     assembly_role: required
   - id: accessory_pattern
     type: screw_pattern
@@ -95,6 +100,17 @@ interfaces:
     datum: plate_top
     frame: {normal: "+Z", up: "+Y"}
     region: accessory_plate
+
+datums:
+  - id: mount_foot
+    description: male dovetail foot underside — rides a dovetail groove
+    mates: [dovetail_joint]
+  - id: plate_top
+    description: accessory plate top plane — screw-pattern reference.
+      As the CARRIER-MATING face (plate on a board's boss line) mount
+      FLIPPED, rotate [180,0,0] — the dovetail foot must point AWAY
+      from the carrier
+    mates: [screw_joint]
 
 surface_style: molded_utility_part
 

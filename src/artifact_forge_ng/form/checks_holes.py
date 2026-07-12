@@ -92,9 +92,39 @@ def check_holes_within_outline(form: PartForm) -> Finding:
     )
 
 
+def check_datums_within_outline(form: PartForm) -> Finding:
+    """A published assembly datum must lie ON the part, not float in air:
+    within the declared outline (u/v) inflated by 2mm, when the builder
+    declares outline_* keys — an anchor 40mm off the plate is a recipe
+    typo, not a mating point. Forms without outline keys pass honestly
+    as unmeasurable (the assembly audit still builds and compares)."""
+    f = form.frame
+    keys = ("outline_u0", "outline_v0", "outline_u1", "outline_v1")
+    if any(k not in f for k in keys):
+        return _finding(
+            "form.datums_within_outline", True,
+            "no outline_* frame keys — datum placement not measurable here",
+        )
+    tol = 2.0
+    stray = [
+        name for name, d in form.datums.items()
+        if not (f["outline_u0"] - tol <= d["at"][0] <= f["outline_u1"] + tol
+                and f["outline_v0"] - tol <= d["at"][1] <= f["outline_v1"] + tol)
+    ]
+    return _finding(
+        "form.datums_within_outline",
+        not stray,
+        f"{len(form.datums)} datum(s) on the part" if not stray
+        else f"datums off the outline: {stray}",
+    )
+
+
 register_probe("form.min_web_between_holes")(
     lambda form, ctx: check_min_web_between_holes(form)
 )
 register_probe("form.holes_within_outline")(
     lambda form, ctx: check_holes_within_outline(form)
+)
+register_probe("form.datums_within_outline")(
+    lambda form, ctx: check_datums_within_outline(form)
 )

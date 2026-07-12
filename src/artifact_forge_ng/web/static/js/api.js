@@ -2,11 +2,18 @@
 // the UI never derives engine truth on its own.
 async function j(url, opts) {
   const r = await fetch(url, opts);
+  if (!r.ok) {
+    // 500s carry no view model — surface a readable error instead of
+    // letting r.json() throw a cryptic SyntaxError the UI swallows
+    const text = await r.text().catch(() => "");
+    throw new Error(`${url} → HTTP ${r.status}${text ? `: ${text.slice(0, 300)}` : ""}`);
+  }
   return r.json();
 }
 export const api = {
   status: () => j("/api/status"),
   catalog: () => j("/api/catalog"),
+  previews: (ids) => j(`/api/catalog/previews${ids ? `?ids=${ids.join(",")}` : ""}`),
   example: (name) => j(`/api/examples/${name}`),
   validate: (yaml, strict = null) =>
     j("/api/validate", {
@@ -37,6 +44,18 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt }),
+    }),
+  assemblyIntent: (prompt, svg = null) =>
+    j("/api/assembly/intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(svg ? { prompt, svg } : { prompt }),
+    }),
+  svgFlatten: (svg, motifW = 60.0) =>
+    j("/api/svg/flatten", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ svg, motif_w: motifW }),
     }),
   nlEdit: (yaml, text, selectedRegion = null) =>
     j("/api/nl_edit", {

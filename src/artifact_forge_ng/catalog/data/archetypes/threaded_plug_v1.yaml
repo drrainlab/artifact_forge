@@ -47,6 +47,10 @@ regions:
   - {id: plug_grip, role: mounting_surface, editable: false,
      label: grip disc, aliases: [grip, knob]}
 
+datums:
+  - id: thread_axis
+    description: external thread axis
+
 surface_style: molded_utility_part
 
 catalog:

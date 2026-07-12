@@ -37,8 +37,9 @@ parameters:
   hook_w:
     {type: length, default: 8mm, min: 5mm, max: 16mm, role: assembly}
   hook_len:
-    {type: length, default: 9mm, min: 6mm, max: 18mm, role: structural,
-     description: flexure length — longer means lower insertion strain}
+    {type: length, default: 10mm, min: 6mm, max: 18mm, role: structural,
+     description: flexure length — longer means lower insertion strain;
+       the default clears the 5% strain gate with the default beam/lip}
   lip_d:
     {type: length, default: 1.6mm, min: 1mm, max: 2.5mm, role: assembly,
      description: lip protrusion = clearance ride + window undercut}
@@ -70,6 +71,14 @@ form:
 
 regions:
   - {id: lid, role: mounting_surface, editable: true}
+  # the plate op already publishes this window in the Form IR —
+  # declaring it makes lightening modifiers legally targetable
+  - {id: lid_lightening, role: aesthetic_lightening, editable: true}
+
+datums:
+  - id: seat
+    description: lid underside center at the plug — lands on the box rim
+    mates: [lid_seat, snap_joint]
 
 surface_style: molded_utility_part
 

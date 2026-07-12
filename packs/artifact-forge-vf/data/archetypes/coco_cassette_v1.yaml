@@ -151,6 +151,13 @@ regions:
   - {id: tray, role: mounting_surface, editable: false,
      label: "Tray body"}
 
+datums:
+  - id: rim
+    description: cassette rim (tool-free grip)
+  - id: seat
+    description: cassette underside — drops into the rail seat
+    mates: [removable_insert]
+
 surface_style: molded_utility_part
 
 catalog:

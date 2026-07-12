@@ -18,7 +18,7 @@ def available() -> bool:
 
 
 def complete(system: str, user: str, schema: dict[str, Any],
-             cache_system: bool = True) -> dict[str, Any]:
+             cache_system: bool = True, max_tokens: int = 2000) -> dict[str, Any]:
     """Schema-constrained completion: the model MUST return JSON matching
     ``schema`` (enforced via a forced tool call). Raises RuntimeError on
     any transport/shape problem — callers turn that into a finding."""
@@ -31,7 +31,7 @@ def complete(system: str, user: str, schema: dict[str, Any],
     try:
         resp = client.messages.create(
             model=DEFAULT_MODEL,
-            max_tokens=2000,
+            max_tokens=max_tokens,
             system=sys_block,
             tools=[{
                 "name": "emit",

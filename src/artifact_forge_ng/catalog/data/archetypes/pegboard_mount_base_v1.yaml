@@ -37,6 +37,58 @@ parameters:
     {type: count, default: 1, min: 0, max: 1, role: assembly}
   peg_row_cy:
     {type: length, default: "expr(plate_w / 2 - 14)", min: 0mm, max: 70mm, role: assembly}
+  # -- face mount bosses: the receiving screw stack for printed payloads --
+  mount_sx:
+    {type: length, default: 30mm, min: 16mm, max: "expr(plate_l - 14)",
+     role: assembly, exposed: true,
+     description: mount boss grid X spacing — share it with the mounted
+       part (assembly.shared) so the bolt patterns coincide}
+  mount_sy:
+    {type: length, default: 20mm, min: 12mm, max: "expr(plate_w - 14)",
+     role: assembly, exposed: true}
+  mount_pilot_d:
+    {type: length, default: 4mm, min: 2.5mm, max: 5mm, role: assembly,
+     description: pilot bore for self-tap/heatset — M3 default}
+  mount_corners:
+    {type: count, default: 4, min: 2, max: 4, role: assembly, exposed: true,
+     description: "4 = a 2x2 boss grid (an enclosure floor); 2 = a boss
+       LINE at cy (a 2-hole line part: adapter plate rotated 90, a lamp
+       bracket with mount_sx = its screw_spacing); 3 is illegal"}
+  # -- auxiliary mount patterns (0 = absent): a station plate carries one
+  # -- branch per pattern; branches may chain further (the kernel
+  # -- composes quarter-turn poses through rotated parents) --
+  aux_corners:
+    {type: count, default: 0, min: 0, max: 4, role: assembly, exposed: true,
+     description: "second boss pattern (0 = none, 2 = line, 4 = grid) —
+       mounts a second branch (e.g. an adapter plate carrying a dovetail
+       slider); datum aux_top, pilots aux_pilot_*"}
+  aux_sx:
+    {type: length, default: 20mm, min: 14mm, max: "expr(plate_l - 14)",
+     role: assembly}
+  aux_sy:
+    {type: length, default: 14mm, min: 12mm, max: "expr(plate_w - 14)",
+     role: assembly}
+  aux_cy:
+    {type: length, default: 0mm, min: -70mm, max: 70mm, role: assembly,
+     description: "y offset of the aux pattern — keep patterns from
+       overlapping"}
+  aux_axis:
+    {type: choice, choices: [x, y], default: x, role: assembly,
+     description: "line direction of the aux pattern (y = for a part
+       whose 2 holes run along its own Y, mounted UNROTATED)"}
+  aux2_corners:
+    {type: count, default: 0, min: 0, max: 4, role: assembly, exposed: true,
+     description: "third boss pattern (0 = none) — a third branch (e.g. a
+       lamp bracket line, aux2_sx = its screw_spacing); datum aux2_top,
+       pilots aux2_pilot_*"}
+  aux2_sx:
+    {type: length, default: 56mm, min: 14mm, max: "expr(plate_l - 14)",
+     role: assembly}
+  aux2_sy:
+    {type: length, default: 14mm, min: 12mm, max: "expr(plate_w - 14)",
+     role: assembly}
+  aux2_cy:
+    {type: length, default: 0mm, min: -70mm, max: 70mm, role: assembly}
 
 constraints:
   - plate_l >= cols * 26
@@ -55,12 +107,46 @@ form:
       id: pegs
       params: {board: board, cols: cols, rows: rows, hook: hook,
                hook_len: hook_len, anti_lift: anti_lift, cy: peg_row_cy}
+    - op: boss_pattern
+      id: mount
+      params: {sx: mount_sx, sy: mount_sy, pilot_d: mount_pilot_d,
+               corners: mount_corners}
+    - op: boss_pattern
+      id: aux
+      params: {sx: aux_sx, sy: aux_sy, cy: aux_cy, pilot_d: mount_pilot_d,
+               corners: aux_corners, axis: aux_axis}
+    - op: boss_pattern
+      id: aux2
+      params: {sx: aux2_sx, sy: aux2_sy, cy: aux2_cy, pilot_d: mount_pilot_d,
+               corners: aux2_corners}
 
 regions:
   - {id: plate, role: mounting_surface, editable: false,
      label: payload face, aliases: [face, plate]}
   - {id: plate_lightening, role: aesthetic_lightening, editable: true,
      label: face canvas, aliases: [front face]}
+
+datums:
+  - id: board_face
+    description: plane lying against the pegboard (pegs side, external board)
+  - id: mount_top
+    description: mount boss-top plane on the face — printed payloads screw
+      here (pilots mount_pilot_*)
+    mates: [screw_joint, press_fit_pin_pair]
+  - id: aux_top
+    description: second mount pattern boss-top plane (pilots aux_pilot_*)
+      — present when aux_corners > 0
+    conditional: true
+    mates: [screw_joint]
+    audit_params:
+      - {aux_corners: 2}
+  - id: aux2_top
+    description: third mount pattern boss-top plane (pilots aux2_pilot_*)
+      — present when aux2_corners > 0
+    conditional: true
+    mates: [screw_joint]
+    audit_params:
+      - {aux2_corners: 2}
 
 surface_style: molded_utility_part
 
@@ -78,6 +164,8 @@ interfaces:
 
 validators:
   - form.peg_engagement_ok
+  - topology.ribs_present
+  - topology.pockets_present
   - form.holes_within_outline
   - interface.frame_exists
   - interface.frame_orthonormal

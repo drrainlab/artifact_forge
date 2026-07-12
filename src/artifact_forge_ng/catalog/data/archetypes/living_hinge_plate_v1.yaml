@@ -57,6 +57,10 @@ regions:
   - {id: blank_lightening, role: aesthetic_lightening, editable: true,
      label: plate canvas, aliases: [face]}
 
+datums:
+  - id: fold_line
+    description: living hinge fold line
+
 surface_style: molded_utility_part
 
 catalog:

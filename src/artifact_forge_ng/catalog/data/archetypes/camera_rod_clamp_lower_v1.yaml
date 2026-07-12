@@ -125,6 +125,13 @@ regions:
      aliases: [outer surface, shell],
      description: "body flanks and belly"}
 
+datums:
+  - id: branch_axis
+    description: clamped rod axis
+  - id: clamp_mate
+    description: mating plane to the upper half
+    mates: [compression_gap_joint, screw_joint]
+
 surface_style: molded_utility_part
 
 catalog:

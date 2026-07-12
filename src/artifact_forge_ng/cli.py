@@ -101,8 +101,59 @@ def main(argv: list[str] | None = None) -> int:
         help="emit the raw matrix as YAML instead of the table",
     )
 
+    p_audit = sub.add_parser(
+        "audit",
+        help="datum-declaration honesty audit: declared vs built Form IR",
+    )
+    p_audit.add_argument(
+        "--all", action="store_true",
+        help="also report archetypes that publish datums but declare none",
+    )
+
+    p_digest = sub.add_parser(
+        "digest",
+        help="inspect what the assembly-intent LLM actually sees for a "
+             "prompt: candidates + the grounding digest",
+    )
+    p_digest.add_argument("prompt", help="the user prompt to ground")
+    p_digest.add_argument(
+        "--candidates-only", action="store_true",
+        help="print only the retrieval result, not the full digest text",
+    )
+
     args = parser.parse_args(argv)
     try:
+        if args.command == "digest":
+            from .catalog.grounding import (assembly_digest,
+                                            select_assembly_candidates)
+            from .catalog.loader import load_catalog
+
+            catalog = load_catalog()
+            ids = select_assembly_candidates(args.prompt, catalog)
+            print(f"candidates ({len(ids)}):")
+            for aid in ids:
+                print(f"  - {aid}")
+            if not args.candidates_only:
+                print()
+                print(assembly_digest(catalog, part_ids=ids))
+            return 0
+        if args.command == "audit":
+            from .catalog.audit import audit_catalog_datums
+            from .catalog.loader import load_catalog
+
+            audits = audit_catalog_datums(
+                load_catalog(), only_declared=not args.all)
+            failed = False
+            for a in audits:
+                for w in a.warnings:
+                    print(f"WARN {a.archetype}: {w}")
+                for p in a.problems:
+                    print(f"FAIL {a.archetype}: {p}")
+                    failed = True
+            ok = sum(1 for a in audits if a.ok)
+            print(f"audited {len(audits)} archetype(s): {ok} ok, "
+                  f"{len(audits) - ok} with problems")
+            return 4 if failed else 0
         if args.command == "compat":
             from .catalog.compat import compat_matrix, render_compat
 

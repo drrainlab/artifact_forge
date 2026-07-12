@@ -307,13 +307,17 @@ def test_living_hinge_torn_web_refused():
 
 
 def test_slider_groove_mates_the_clamp_rail():
-    """The shoe's groove keys are the dovetail_rail FEMALE contract —
-    sized from the camera clamp's own rail numbers plus the clearance."""
+    """The shoe's groove keys are the dovetail_rail FEMALE contract in
+    the SOCKET convention the dovetail ir_check measures: groove_top_w is
+    the OPENING a male enters (the slot mouth = rail root + clearance),
+    groove_bottom_w the wide flank end inside (rail top + clearance),
+    socket_top_v the mouth plane."""
     state = run_pre_cad(EXAMPLES / "rail_slider_camera_16.yaml", None)
     f = state.form.frame
-    assert f["groove_top_w"] == pytest.approx(16.35)
-    assert f["groove_bottom_w"] < f["groove_top_w"]  # a real dovetail
+    assert f["groove_bottom_w"] == pytest.approx(16.35)
+    assert f["groove_top_w"] < f["groove_bottom_w"]  # a real dovetail
     assert f["groove_depth"] == pytest.approx(5.3)
+    assert f["socket_top_v"] == 0.0
     assert "rail_slot" in state.form.datums
 
 

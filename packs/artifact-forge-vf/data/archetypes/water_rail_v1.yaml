@@ -286,6 +286,33 @@ regions:
   - {id: dry_zone_back, role: mounting_surface, editable: true,
      label: "Dry back zone"}
 
+datums:
+  - id: cassette_seat
+    description: cassette seat — a cassette drops in here
+    mates: [removable_insert]
+  - id: drain_edge
+    description: drain edge of the channel
+  - id: feed
+    description: feed datum (cap chute drips here)
+  - id: inlet
+    description: channel inlet
+    mates: [fluid_joint, lap_flow_joint]
+  - id: outlet
+    description: channel outlet — hands water to the next module
+    mates: [fluid_joint, lap_flow_joint]
+  - id: line_east
+    description: east line datum for module chaining
+    mates: [tongue_groove]
+  - id: line_west
+    description: west line datum for module chaining
+    mates: [tongue_groove]
+  - id: module_origin
+    description: module origin
+  - id: seat_e
+    description: east seat corner
+  - id: seat_w
+    description: west seat corner
+
 surface_style: molded_utility_part
 
 catalog:

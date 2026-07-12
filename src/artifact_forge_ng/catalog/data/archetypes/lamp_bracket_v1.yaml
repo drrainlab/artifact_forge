@@ -22,7 +22,9 @@ parameters:
     {type: length, default: 160mm, min: 60mm, max: 190mm,
      role: functional, exposed: true}
   arm_w:
-    {type: length, default: 22mm, min: 12mm, max: 40mm, role: structural}
+    {type: length, default: 36mm, min: 12mm, max: 40mm, role: structural,
+     description: arm width; the default admits a 24mm cup bolt circle
+       (mount_bc max = arm_w - 10) as in the desk_lamp_e27 example}
   arm_h:
     {type: length, default: 22mm, min: 12mm, max: 40mm, role: structural}
   plate_l:
@@ -87,6 +89,22 @@ regions:
      forbidden_modifiers: [add_hex_perforation]}
   - {id: arm_tip_face, role: mounting_surface, editable: false}
   - {id: channel_zone, role: soft_contact_surface, editable: false}
+
+datums:
+  - id: arm_tip
+    description: free end of the bracket arm (overhang reference)
+  - id: board_mount
+    description: plate-TOP center of the mount hole line — the CARRIER-
+      MATING face; the arm hangs below the plate plane, so mount on a
+      board's line bosses with rotate [180,0,0] (arm extends away from
+      the board; pegboard mount_corners 2, mount_sx = screw_spacing)
+    mates: [screw_joint]
+  - id: mount_bc
+    description: bolt-circle center under the arm — the socket cup screws here
+    conditional: true
+    mates: [screw_joint]
+    audit_params:
+      - {mount_bc: 24mm}
 
 surface_style: molded_utility_part
 

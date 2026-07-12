@@ -59,6 +59,13 @@ regions:
   - {id: pipe_contact, role: soft_contact_surface, editable: false}
   - {id: snap_arms, role: high_stress_region, editable: false}
 
+datums:
+  - id: mount_face
+    description: wall mounting face
+    mates: [screw_joint]
+  - id: pipe_axis
+    description: clipped pipe axis
+
 surface_style: molded_utility_part
 
 catalog:

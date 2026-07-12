@@ -68,6 +68,13 @@ regions:
   - {id: plate, role: mounting_surface, editable: true}
   - {id: arm_root, role: high_stress_region, editable: false}
 
+datums:
+  - id: arm_tip
+    description: arm tip under the shelf
+  - id: wall_face
+    description: wall mounting face
+    mates: [screw_joint]
+
 surface_style: molded_utility_part
 
 catalog:

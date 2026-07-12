@@ -4,10 +4,10 @@ version: 1
 object_class: custom_stamp
 description: >
   Custom SVG stamp: a die plate carrying a MIRRORED SVG relief (paste
-  the path data — closed, hole-free subpaths; the narrowest feature is
-  measured against the nozzle, never hoped) under a pillar grip. The
-  text sibling is custom_stamp_v1; holes (an O's counter) wait for the
-  hole-subtraction iteration.
+  the path data — closed subpaths, even-odd holes supported: an O's
+  counter is cut from its outline; the narrowest feature INCLUDING
+  every hole web is measured against the nozzle, never hoped) under a
+  pillar grip. The text sibling is custom_stamp_v1.
 
 provides_features:
   - mounting_plate_body
@@ -16,8 +16,8 @@ provides_features:
 parameters:
   svg_path:
     {type: string, default: "M 0 0 L 20 0 L 20 6 L 12 6 L 12 20 L 8 20 L 8 6 L 0 6 Z",
-     role: functional, exposed: true,
-     description: "SVG path data (d attribute) — closed subpaths, no holes"}
+     role: functional, exposed: true, format: svg_path_data,
+     description: "SVG path data (d attribute) — closed subpaths; even-odd holes supported"}
   die_l:
     {type: length, default: 60mm, min: 20mm, max: 140mm, role: functional, exposed: true}
   die_w:

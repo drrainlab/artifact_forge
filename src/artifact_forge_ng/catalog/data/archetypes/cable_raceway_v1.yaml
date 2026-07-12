@@ -58,6 +58,17 @@ regions:
   - {id: back, role: mounting_surface, editable: true}
   - {id: channel, role: soft_contact_surface, editable: false}
 
+datums:
+  - id: back_face
+    description: mounting back face
+    mates: [screw_joint]
+  - id: end_face
+    description: section end face — the next split section butts here
+    mates: [butt_pin_joint]
+  - id: start_face
+    description: section start face — butts onto the previous section
+    mates: [butt_pin_joint]
+
 surface_style: molded_utility_part
 
 catalog:

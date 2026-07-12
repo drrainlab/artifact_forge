@@ -69,6 +69,10 @@ regions:
   - {id: plate_lightening, role: aesthetic_lightening, editable: true,
      label: plate canvas, aliases: [face]}
 
+datums:
+  - id: port_axis
+    description: threaded port axis
+
 surface_style: molded_utility_part
 
 catalog:

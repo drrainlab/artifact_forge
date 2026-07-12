@@ -35,6 +35,22 @@ parameters:
   ceiling_t:
     {type: length, default: 4mm, min: 3mm, max: 8mm, role: structural}
 
+  # -- optional payload mount stack on the shoe TOP (0 = bare shoe):
+  # -- the carriage CARRIES a payload — e.g. a snap enclosure with
+  # -- mount_holes 2 screws onto payload_pilot_* (match mount_span =
+  # -- payload_sx, mount_cy = 0) --
+  payload_mount:
+    {type: count, default: 0, min: 0, max: 2, role: assembly, exposed: true,
+     description: "2 = grow two pilot bosses on the shoe top (datum
+       payload_top, pilots payload_pilot_*); 0 = none"}
+  payload_sx:
+    {type: length, default: 30mm, min: 14mm, max: "expr(travel - 8)",
+     role: assembly,
+     description: payload pilot spacing — share with the payload's
+       mount_span}
+  payload_pilot_d:
+    {type: length, default: 4mm, min: 2.5mm, max: 5mm, role: assembly}
+
 constraints:
   - travel >= 1.2 * rail_top_w
 
@@ -49,13 +65,27 @@ form:
       params: {rail_top_w: rail_top_w, rail_h: rail_h,
                rail_angle: rail_angle, slide_clearance: slide_clearance,
                vert_clearance: vert_clearance, travel: travel,
-               wall: wall, ceiling_t: ceiling_t}
+               wall: wall, ceiling_t: ceiling_t,
+               payload_mount: payload_mount, payload_sx: payload_sx,
+               payload_pilot_d: payload_pilot_d}
 
 regions:
   - {id: shoe_payload_face, role: mounting_surface, editable: false,
      label: payload face, aliases: [top face, payload]}
   - {id: shoe_rail_slot, role: soft_contact_surface, editable: false,
      label: rail slot, aliases: [slot, groove]}
+
+datums:
+  - id: rail_slot
+    description: dovetail groove center — a male dovetail foot slides in here
+    mates: [dovetail_joint]
+  - id: payload_top
+    description: payload boss-top plane on the shoe — a payload (snap box)
+      screws here (pilots payload_pilot_*); present when payload_mount > 0
+    conditional: true
+    mates: [screw_joint]
+    audit_params:
+      - {payload_mount: 2}
 
 surface_style: molded_utility_part
 
@@ -70,7 +100,7 @@ interfaces:
     gender: female
     datum: rail_slot
     frame: {normal: "-Z", up: "+X"}
-    accepts: [camera_rod_clamp, branch_clamp]
+    accepts: [camera_rod_clamp, branch_clamp, payload_adapter]
 
 validators:
   - interface.frame_exists

@@ -76,6 +76,12 @@ regions:
   - {id: floor, role: aesthetic_lightening, editable: true,
      label: bin floor, aliases: [floor, base]}
 
+datums:
+  - id: rim
+    description: bin rim
+  - id: stack_rim
+    description: stacking rim for the next bin
+
 surface_style: molded_utility_part
 
 catalog:

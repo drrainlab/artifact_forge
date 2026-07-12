@@ -137,3 +137,59 @@ def test_catalog_facets_and_featured():
 
     if os.environ.get("ARTIFACT_FORGE_DISABLE_PACKS", "") in ("", "0"):
         assert c["featured"], "featured must not be empty with the showcase installed"
+
+
+def test_previews_cover_catalog_and_null_is_valid():
+    """Best-effort contract: every archetype id maps to a PreviewVM or an
+    honest null; a buildable archetype has real section segments."""
+    catalog_ids = {a["id"] for a in client.get("/api/catalog").json()["archetypes"]}
+    r = client.get("/api/catalog/previews")
+    assert r.status_code == 200
+    previews = r.json()
+    assert set(previews) == catalog_ids
+    comb = previews["cable_comb_v1"]
+    assert comb and comb["section"]["segments"], "buildable part must preview"
+    assert all(v is None or "section" in v for v in previews.values())
+
+
+def test_previews_ids_subset_and_cache():
+    r = client.get("/api/catalog/previews?ids=cable_comb_v1,adapter_plate_v1")
+    assert r.status_code == 200
+    assert set(r.json()) == {"cable_comb_v1", "adapter_plate_v1"}
+    # second call is served from the cache and stays 200
+    assert client.get("/api/catalog/previews?ids=cable_comb_v1").status_code == 200
+
+
+def test_svg_flatten_passthrough_and_layers():
+    """Single-layer path data passes through EXACTLY; layered color art
+    comes back flattened (needs CAD — skipped honestly without it)."""
+    simple = '<svg xmlns="http://www.w3.org/2000/svg"><path d="M 0 0 L 20 0 L 10 16 Z" fill="black"/></svg>'
+    r = client.post("/api/svg/flatten", json={"svg": simple, "motif_w": 30}).json()
+    assert r["ok"] and not r["flattened"]
+    assert r["path"] == "M 0 0 L 20 0 L 10 16 Z"
+    assert r["outlines"] == 1 and r["holes"] == 0
+
+    if not client.get("/api/status").json()["cad"]:
+        pytest.skip("CAD OFF — flatten path not reachable")
+    layered = (
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 60">'
+        '<path d="M 0 0 L 100 0 L 100 60 L 0 60 Z" fill="#8EFD01"/>'
+        '<path d="M 10 10 L 55 10 L 55 50 L 10 50 Z" fill="#222222"/>'
+        '<path d="M 45 10 L 90 10 L 90 50 L 45 50 Z" fill="#5A12BF"/>'
+        '<path d="M 40 22 L 60 22 L 60 38 L 40 38 Z" fill="white"/>'
+        "</svg>"
+    )
+    r = client.post("/api/svg/flatten", json={"svg": layered, "motif_w": 60}).json()
+    assert r["ok"] and r["flattened"]
+    assert r["outlines"] == 1 and r["holes"] == 1
+    assert r["min_width_mm"] > 0.8
+    assert r["info"]["ink_layers"] == 2 and r["info"]["paper_layers"] == 2
+
+
+def test_svg_flatten_honest_failures():
+    r = client.post("/api/svg/flatten", json={"svg": "<svg></svg>"}).json()
+    assert not r["ok"] and "no <path>" in r["findings"][0]["message"]
+    r = client.post(
+        "/api/svg/flatten",
+        json={"svg": '<svg><path d="M 0 0 L 10 0"/></svg>'}).json()
+    assert not r["ok"] and "OPEN" in r["findings"][0]["message"]

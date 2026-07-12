@@ -95,6 +95,10 @@ regions:
   - {id: snap_root_3, role: high_stress_region, editable: false,
      label: "Snap root 3"}
 
+datums:
+  - id: seat
+    description: frame seat in the cassette
+
 surface_style: molded_utility_part
 
 catalog:

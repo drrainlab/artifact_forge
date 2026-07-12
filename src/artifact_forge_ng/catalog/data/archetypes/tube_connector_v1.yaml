@@ -65,6 +65,10 @@ regions:
   - {id: tee_flange, role: mounting_surface, editable: false,
      label: stop flange, aliases: [flange, grip band]}
 
+datums:
+  - id: branch_px
+    description: +X branch socket axis
+
 surface_style: molded_utility_part
 
 # The +X branch exists in every config; the -X one only on a cross —

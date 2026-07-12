@@ -70,6 +70,10 @@ regions:
   - {id: pot_outer_shell, role: aesthetic_lightening, editable: false,
      label: outer wall, aliases: [outer surface, pot wall]}
 
+datums:
+  - id: axis
+    description: pot axis
+
 surface_style: molded_utility_part
 
 catalog:

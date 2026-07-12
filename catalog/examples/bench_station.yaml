@@ -1,0 +1,150 @@
+# The flagship bench station — the model's draft finished by the designed
+# user edit: the rod clamps are honestly OMITTED (they grip hardware and
+# have no printed carrier mount), everything else is the model's own
+# star + chain. Composes THROUGH the rotated carriage (kernel wave).
+schema: assembly/v1
+id: bench_station
+strict: true
+root: board
+shared:
+  mount_bc: 24mm
+parts:
+  - ref: board
+    product:
+      schema: product/v1
+      id: station_board
+      archetype: pegboard_mount_base_v1@1
+      params:
+        plate_l: 120mm
+        plate_w: 80mm
+        aux_corners: 2
+        aux_axis: y
+        aux_sx: 28mm
+        aux_cy: -20mm
+        aux2_corners: 2
+        aux2_sx: 56mm
+        aux2_cy: 25mm
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: adapter
+    product:
+      schema: product/v1
+      id: station_rail
+      archetype: rail_plate_adapter_v1@1
+      params: {head: plate, adapter_l: 30mm, hole_span: 28mm, hole_screw: M4}
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: slider
+    product:
+      schema: product/v1
+      id: station_carriage
+      archetype: rail_slider_v1@1
+      params:
+        rail_top_w: 16.65mm
+        rail_h: 5.7mm
+        rail_angle: 23.68
+        travel: 40mm
+        payload_mount: 2
+        payload_sx: 30mm
+        payload_pilot_d: 4mm
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: enc_base
+    product:
+      schema: product/v1
+      id: dimmer_box
+      archetype: enclosure_base_snap_v1@1
+      params:
+        box_l: 82mm
+        box_w: 52mm
+        box_h: 26mm
+        wall: 2.4mm
+        hook_len: 10mm
+        hook_w: 8mm
+        lip_h: 3mm
+        mount_holes: 2
+        mount_span: 30mm
+        mount_cy: 0mm
+        mount_screw: M3
+      modifiers:
+        - {id: add_hex_perforation, target: floor}
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: enc_lid
+    product:
+      schema: product/v1
+      id: dimmer_lid
+      archetype: enclosure_lid_snap_v1@1
+      params:
+        lid_l: 82mm
+        lid_w: 52mm
+        wall: 2.4mm
+        plug_depth: 3.5mm
+        beam_t: 1.8mm
+        lip_d: 1.6mm
+        hook_len: 10mm
+        hook_w: 8mm
+        lip_h: 3mm
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: bracket
+    product:
+      schema: product/v1
+      id: lamp_arm
+      archetype: lamp_bracket_v1@1
+      params:
+        arm_len: 160mm
+        arm_w: 36mm
+        arm_h: 36mm
+        channel_d: 8mm
+        mount_screw: M4
+        mount_screw_count: 4
+        mount_inset: 26mm
+        screw: M4
+        screw_spacing: 56mm
+      manufacturing: {material: PETG, support_policy: none}
+  - ref: cup
+    product:
+      schema: product/v1
+      id: lamp_cup
+      archetype: lamp_socket_cup_v1@1
+      params: {screw_count: 4, screw: M4, exit_d: 9mm}
+      manufacturing: {material: PETG, support_policy: none}
+joints:
+  - type: screw_joint
+    a: board.aux_top
+    b: adapter.plate_top
+    rotate: [180, 0, 0]     # plate top on the bosses, dovetail foot OUT
+    params: {screw: M4, count: 2, pilots: aux_pilot}
+  - type: dovetail_joint
+    a: adapter.mount_foot
+    b: slider.rail_slot
+    rotate: [180, 0, 0]
+    params: {female: b}
+  - type: screw_joint
+    a: slider.payload_top
+    b: enc_base.base
+    rotate: [0, 0, 0]       # carriage composes upright — box sits on it
+    params: {screw: M3, count: 2, pilots: payload_pilot}
+  - type: lid_seat
+    a: enc_base.rim
+    b: enc_lid.seat
+    rotate: [180, 0, 0]
+    params: {clearance: 0.3}
+  - type: snap_joint
+    a: enc_base.rim
+    b: enc_lid.seat
+    rotate: [180, 0, 0]
+    params: {hooks: snap}
+  - type: screw_joint
+    a: board.aux2_top
+    b: bracket.board_mount
+    rotate: [180, 0, 180]   # plate top on the bosses, arm sweeps UP
+    params: {screw: M4, count: 2, pilots: aux2_pilot}
+  - type: screw_joint
+    a: bracket.mount_bc
+    b: cup.mount_face
+    rotate: [180, 0, 0]
+    params: {screw: M4, count: 4}
+# the cable's PRINTED channel run: through the bracket arm into the cup.
+# The box -> bracket leg is an external cable (no channel-capable parts
+# on that path) — the probe only vouches for what is printed.
+wiring:
+  from_part: bracket
+  to_part: cup
+  d: 6mm

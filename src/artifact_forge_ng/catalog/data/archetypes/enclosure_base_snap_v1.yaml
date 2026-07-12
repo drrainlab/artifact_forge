@@ -44,6 +44,24 @@ parameters:
   hook_len:
     {type: length, default: 9mm, min: 6mm, max: 18mm, role: assembly}
 
+  # -- optional floor mount stack: the box screws DOWN onto an external
+  # -- pilot pattern (pegboard mount bosses); 0 holes = the default box --
+  mount_holes:
+    {type: count, default: 0, min: 0, max: 2, role: assembly, exposed: true,
+     description: countersunk floor holes (0 = none) for mounting the box
+       onto a pilot pattern below}
+  mount_span:
+    {type: length, default: 30mm, min: 16mm, max: "expr(box_l - 2 * wall - 10)",
+     role: assembly,
+     description: mount hole spacing — share with the carrier's boss grid
+       (pegboard mount_sx)}
+  mount_cy:
+    {type: length, default: 10mm, min: 0mm, max: "expr(box_w / 2 - wall - 5)",
+     role: assembly,
+     description: mount hole row offset — half the carrier's mount_sy}
+  mount_screw:
+    {type: choice, choices: [M3, M4], default: M3, role: assembly}
+
 constraints:
   - floor_t + 2 < box_h
   - hook_len + 4 < box_h
@@ -68,9 +86,27 @@ form:
       params: {w: "expr(hook_w + 0.8)", h: "expr(lip_h + 0.8)",
                top_offset: "expr(plug_depth + hook_len - lip_h - 0.4)"}
 
+    - op: countersunk_hole_pattern
+      id: mount
+      params: {kind: line, screw: mount_screw, count: mount_holes,
+               spacing: mount_span, cy: mount_cy, cs_face: top,
+               z_top: floor_t, through: floor_t}
+    - op: publish_datum
+      id: base
+      params: {x: 0mm, y: 0mm, z: 0mm}
+
 regions:
   - {id: shell, role: mounting_surface, editable: false}
   - {id: floor, role: aesthetic_lightening, editable: true}
+
+datums:
+  - id: base
+    description: floor underside center — the box seats on a carrier's
+      boss tops here (floor mount stack)
+    mates: [screw_joint]
+  - id: rim
+    description: shell rim center (top of the walls) — the snap lid seats here
+    mates: [lid_seat, snap_joint]
 
 surface_style: molded_utility_part
 
@@ -80,6 +116,11 @@ catalog:
   tags: [enclosure, snap]
 
 validators:
+  - form.datums_within_outline
+  - form.min_web_between_holes
+  - form.holes_within_outline
+  - topology.screw_holes_open
+  - topology.countersinks_present
   - form.shell_walls_ok
   - form.cuts_respect_keepouts
   - topology.single_connected_solid

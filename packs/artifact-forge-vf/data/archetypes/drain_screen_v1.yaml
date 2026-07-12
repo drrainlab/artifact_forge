@@ -106,6 +106,13 @@ regions:
   - {id: floor, role: aesthetic_lightening, editable: false, label: "Basket floor"}
   - {id: cup, role: mounting_surface, editable: false, label: "Basket body"}
 
+datums:
+  - id: rim
+    description: basket rim (grip)
+  - id: seat
+    description: basket seat — drops into the sump ledge
+    mates: [drop_in_screen]
+
 surface_style: molded_utility_part
 
 catalog:

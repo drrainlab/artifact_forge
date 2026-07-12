@@ -26,6 +26,47 @@ function arcPath(seg) {
   return `M ${ax} ${ay} A ${r} ${r} 0 ${large} ${sweepFlag} ${bx} ${by}`;
 }
 
+
+// Compact silhouette SVG for catalog cards: exact IR segments, optional
+// hole/bore circles, no labels. Returns an <svg> string.
+export function sectionSvg(section, { holes = [], bores = [] } = {}) {
+  const segs = section?.segments || [];
+  if (!segs.length) return "";
+  let minU = 1e9, minV = 1e9, maxU = -1e9, maxV = -1e9;
+  const upd = ([u, v]) => {
+    minU = Math.min(minU, u); maxU = Math.max(maxU, u);
+    minV = Math.min(minV, v); maxV = Math.max(maxV, v);
+  };
+  for (const s of segs) {
+    upd(s.a); upd(s.b);
+    if (s.type === "arc") {
+      const r = Math.hypot(s.a[0] - s.center[0], s.a[1] - s.center[1]);
+      upd([s.center[0] - r, s.center[1] - r]);
+      upd([s.center[0] + r, s.center[1] + r]);
+    }
+  }
+  const pad = Math.max(maxU - minU, maxV - minV) * 0.1 + 2;
+  const w = maxU - minU + 2 * pad, h = maxV - minV + 2 * pad;
+  const parts = [];
+  for (const s of segs) {
+    const d = s.type === "arc"
+      ? arcPath(s)
+      : `M ${s.a[0]} ${s.a[1]} L ${s.b[0]} ${s.b[1]}`;
+    parts.push(`<path d="${d}" fill="none" stroke="${segColor(s.tags)}" stroke-width="1.1" vector-effect="non-scaling-stroke"/>`);
+  }
+  // holes/bores as faint circles in the section plane (XY parts)
+  for (const c of holes) {
+    parts.push(`<circle cx="${c.at[0]}" cy="${c.at[1]}" r="${c.d / 2}" fill="none" stroke="#57606d" stroke-width="0.9" vector-effect="non-scaling-stroke"/>`);
+  }
+  for (const b of bores) {
+    if (b.axis !== "Z") continue;
+    parts.push(`<circle cx="${b.center[0]}" cy="${b.center[1]}" r="${b.d / 2}" fill="none" stroke="#57606d" stroke-width="0.9" vector-effect="non-scaling-stroke"/>`);
+  }
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMidYMid meet">
+    <g transform="translate(${pad - minU}, ${h - pad + minV}) scale(1,-1)">${parts.join("")}</g>
+  </svg>`;
+}
+
 export function renderSection(container, form) {
   if (!form || !form.section || !form.section.segments.length) {
     container.innerHTML = `<div class="dim" style="padding:40px">no section IR</div>`;

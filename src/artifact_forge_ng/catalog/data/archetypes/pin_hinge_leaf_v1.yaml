@@ -83,6 +83,10 @@ regions:
   - {id: leaf_lightening, role: aesthetic_lightening, editable: true,
      label: leaf canvas, aliases: [plate face]}
 
+datums:
+  - id: hinge_axis
+    description: hinge pin axis
+
 surface_style: molded_utility_part
 
 catalog:

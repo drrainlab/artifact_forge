@@ -8,8 +8,9 @@ from ..core.fasteners import screw_spec
 from ..core.findings import Finding, Level, Status
 from ..form.part import PartForm
 from ..product.assembly import JointUse
-from .joints_core import (PILOT_PREFIX, POSITION_TOL, JointDecl, Pose, _finding,
-                          _register, compute_pose, rotate_point)
+from .joints_core import (PILOT_PREFIX, POSITION_TOL, JointDecl, JointParamDecl,
+                          JointSideDecl, Pose, _finding, _register, compute_pose,
+                          rotate_point)
 
 # -- screw_joint ---------------------------------------------------------------
 
@@ -114,6 +115,32 @@ _register(JointDecl(
                 "thread pilots on A, verified coincident in the pose",
     ir_check=_screw_joint_ir,
     cad_checks=("assembly.no_interference", "assembly.screw_axes_clear"),
+    params=(
+        JointParamDecl("screw", "screw", "M4", "metric screw size (M3/M4...)"),
+        JointParamDecl("count", "count", 3, "number of screws that must engage"),
+        JointParamDecl("pilots", "prefix", PILOT_PREFIX,
+                       "bore-name prefix of the thread pilots on side A"),
+    ),
+    side_a=JointSideDecl(
+        role="part with thread pilot bores",
+        bores_prefix="pilots",
+        datum_hint="any datum; typically rim / mount_foot",
+    ),
+    side_b=JointSideDecl(
+        role="part with clearance holes",
+        needs_holes=True,
+        datum_hint="any datum; typically seat / plate center",
+    ),
+    pose_mode="either",
+    example="# B MUST carry clearance holes; check the archetype's params for\n"
+            "# opt-in hole stacks (e.g. enclosure mount_holes: 2 + base datum\n"
+            "# screws the box floor onto pegboard mount bosses: match\n"
+            "# mount_span = carrier mount_sx, mount_cy = carrier mount_sy / 2)\n"
+            "- type: screw_joint\n  a: box.rim\n  b: lid.seat\n"
+            "  rotate: [180, 0, 0]\n  params: {screw: M3, count: 2}\n"
+            "- type: screw_joint\n  a: board.mount_top\n  b: box.base\n"
+            "  rotate: [0, 0, 0]\n"
+            "  params: {screw: M3, count: 2, pilots: mount_pilot}",
 ))
 
 
@@ -189,6 +216,23 @@ _register(JointDecl(
                 "clearance and seats on the rim without bottoming out",
     ir_check=_lid_seat_ir,
     cad_checks=("assembly.no_interference", "assembly.lid_seats"),
+    params=(
+        JointParamDecl("clearance", "length", 0.3,
+                       "per-side gap between plug and shell interior"),
+    ),
+    side_a=JointSideDecl(
+        role="box shell (interior frame)",
+        frame_keys=("inner_u0", "inner_v0", "inner_u1", "inner_v1", "shell_h"),
+        datum_hint="rim (rounded_box_shell)",
+    ),
+    side_b=JointSideDecl(
+        role="lid plate with inset plug",
+        frame_keys=("plug_u0", "plug_v0", "plug_u1", "plug_v1", "plug_depth"),
+        datum_hint="seat (inset_plug)",
+    ),
+    pose_mode="establish",
+    example="- type: lid_seat\n  a: box.rim\n  b: lid.seat\n"
+            "  rotate: [180, 0, 0]\n  params: {clearance: 0.3}",
 ))
 
 
@@ -265,6 +309,25 @@ _register(JointDecl(
                 "the pose, thicker than the bore by the interference",
     ir_check=_press_fit_ir,
     cad_checks=("assembly.pins_engage",),
+    params=(
+        JointParamDecl("interference", "length", 0.1,
+                       "pin is thicker than its bore by this much (>0)"),
+        JointParamDecl("receivers", "prefix", PILOT_PREFIX,
+                       "bore-name prefix of the receiving bores on side A"),
+    ),
+    side_a=JointSideDecl(
+        role="part with receiving bores",
+        bores_prefix="receivers",
+        datum_hint="same anchor as the seating joint (rim)",
+    ),
+    side_b=JointSideDecl(
+        role="part carrying press pins",
+        needs_pins=True,
+        datum_hint="same anchor as the seating joint (seat)",
+    ),
+    pose_mode="verify",
+    example="- type: press_fit_pin_pair\n  a: box.rim\n  b: lid.seat\n"
+            "  rotate: [180, 0, 0]\n  params: {interference: 0.1}",
 ))
 
 
@@ -346,6 +409,24 @@ _register(JointDecl(
                 "press pins — identical outlines verified, pins on sockets",
     ir_check=_butt_pin_ir,
     cad_checks=("assembly.no_interference",),
+    params=(
+        JointParamDecl("interference", "length", 0.1,
+                       "pin thicker than its socket by this much"),
+    ),
+    side_a=JointSideDecl(
+        role="half with end-face sockets",
+        bores_prefix="butt_socket",
+        datum_hint="end-face datum of the first half",
+    ),
+    side_b=JointSideDecl(
+        role="half with end-face pins",
+        pins_prefix="butt_pin",
+        needs_pins=True,
+        datum_hint="end-face datum of the second half",
+    ),
+    pose_mode="establish",
+    example="- type: butt_pin_joint\n  a: left.end\n  b: right.end\n"
+            "  rotate: [0, 0, 0]\n  params: {interference: 0.1}",
 ))
 
 
@@ -442,6 +523,25 @@ _register(JointDecl(
                 "insertion strain verified, engagement probed in the pose",
     ir_check=_snap_joint_ir,
     cad_checks=("assembly.no_interference", "assembly.hooks_engage"),
+    params=(
+        JointParamDecl("hooks", "prefix", "snap",
+                       "name prefix of the hook ribs / frame keys on side B"),
+    ),
+    side_a=JointSideDecl(
+        role="shell with receiver windows",
+        frame_keys=("shell_wall", "inner_u0", "inner_u1"),
+        cutboxes_contains="snap_window",
+        datum_hint="rim (rounded_box_shell with snap windows)",
+    ),
+    side_b=JointSideDecl(
+        role="lid carrying cantilever hooks",
+        frame_keys=("{hooks}_beam_t", "{hooks}_hook_len", "{hooks}_lip_d"),
+        ribs_prefix="{hooks}_lip",
+        datum_hint="seat (inset_plug with snap hooks)",
+    ),
+    pose_mode="either",
+    example="- type: snap_joint\n  a: box.rim\n  b: lid.seat\n"
+            "  rotate: [180, 0, 0]\n  params: {hooks: snap}",
 ))
 
 
@@ -526,6 +626,24 @@ _register(JointDecl(
                 "the declared gap, saddles form one circle with equal radii",
     ir_check=_compression_gap_ir,
     cad_checks=("assembly.no_interference",),
+    params=(
+        JointParamDecl("gap", "length", None,
+                       "REQUIRED squeeze gap between the mating planes "
+                       "(>= 1.5mm; declare via assembly.shared)"),
+    ),
+    side_a=JointSideDecl(
+        role="lower clamp half",
+        frame_keys=("mate_z", "saddle_cz", "saddle_r", "cavity_center_u"),
+        datum_hint="mate-plane datum of the lower half",
+    ),
+    side_b=JointSideDecl(
+        role="upper clamp half",
+        frame_keys=("mate_z", "saddle_cz", "saddle_r", "cavity_center_u"),
+        datum_hint="mate-plane datum of the upper half",
+    ),
+    pose_mode="establish",
+    example="- type: compression_gap_joint\n  a: lower.mate\n"
+            "  b: upper.mate\n  rotate: [180, 0, 0]\n  params: {gap: 2mm}",
 ))
 
 
@@ -553,7 +671,20 @@ def _dovetail_ir(
     Axial retention is friction-only in v1 — stated in the report, not
     hidden."""
     check = "assembly.dovetail_ir"
-    fa, fb = form_a.frame, form_b.frame
+    # Which SIDE is the female socket. The pose chain runs a->b (a must
+    # already be posed), but physically either side may be the socket: a
+    # carriage (female) rides an already-mounted rail (male) with
+    # params {female: b}. The measured numbers are side-symmetric; only
+    # the datum-chain and overhang checks swap direction below.
+    female_side = str(joint.params.get("female", "a"))
+    if female_side not in ("a", "b"):
+        return [_finding(check, False,
+                         f"params.female must be 'a' or 'b', got "
+                         f"{female_side!r}")]
+    if female_side == "b":
+        fa, fb = form_b.frame, form_a.frame
+    else:
+        fa, fb = form_a.frame, form_b.frame
     missing = [k for k in _DOVETAIL_A_KEYS if k not in fa]
     missing += [f"B:{k}" for k in _DOVETAIL_B_KEYS if k not in fb]
     if missing:
@@ -586,16 +717,26 @@ def _dovetail_ir(
     if abs(ang_f - ang_m) > 3.0:
         problems.append(
             f"flank angles differ: female {ang_f:.1f} vs male {ang_m:.1f} deg")
-    if form_b.width > form_a.width + 0.1:
+    male_w = form_a.width if female_side == "b" else form_b.width
+    female_w = form_b.width if female_side == "b" else form_a.width
+    if male_w > female_w + 0.1:
         problems.append(
-            f"adapter length {form_b.width:g} overhangs the {form_a.width:g} "
-            "socket")
-    # posed foot plane must land on the socket top plane
-    foot_global_z = pose.apply((0.0, 0.0, fb["foot_plane_v"]))[2]
-    if abs(foot_global_z - fa["socket_top_v"]) > 0.05:
+            f"adapter length {male_w:g} overhangs the {female_w:g} socket")
+    # posed foot plane must land on the socket top plane. The pose is
+    # always B-in-A's-frame; whichever side is female contributes the
+    # socket plane, the male the foot plane.
+    if female_side == "b":
+        # after the swap fa = female (the posed form_b), fb = male (= A,
+        # the pose reference)
+        foot_global_z = fb["foot_plane_v"]
+        socket_global_z = pose.apply((0.0, 0.0, fa["socket_top_v"]))[2]
+    else:
+        foot_global_z = pose.apply((0.0, 0.0, fb["foot_plane_v"]))[2]
+        socket_global_z = fa["socket_top_v"]
+    if abs(foot_global_z - socket_global_z) > 0.05:
         problems.append(
             f"posed foot plane at {foot_global_z:.2f}, socket top at "
-            f"{fa['socket_top_v']:.2f} — datum chain broken")
+            f"{socket_global_z:.2f} — datum chain broken")
     return [_finding(
         check, not problems,
         "male dovetail rides the socket in the sliding band, retained "
@@ -612,4 +753,35 @@ _register(JointDecl(
                 "retention by undercut, friction-only axial hold (v1)",
     ir_check=_dovetail_ir,
     cad_checks=("assembly.no_interference",),
+    params=(
+        JointParamDecl("female", "choice", "a",
+                       "which side is the female socket; 'b' lets a "
+                       "carriage (female) ride an already-posed rail"),
+    ),
+    side_a=JointSideDecl(
+        role="female socket (groove)",
+        frame_keys=_DOVETAIL_A_KEYS,
+        datum_hint="rail_slot / socket datum of the socket part",
+    ),
+    side_b=JointSideDecl(
+        role="male dovetail foot",
+        frame_keys=_DOVETAIL_B_KEYS,
+        datum_hint="mount_foot / foot datum of the adapter part",
+    ),
+    pose_mode="establish",
+    example="# cuff socket (opens up): rotate [0,0,0]. rail_slider slot\n"
+            "# (opens DOWN, male enters from below): rotate [180,0,0] and\n"
+            "# parameterize the slider BY the male's socket numbers:\n"
+            "#   rail_top_w = groove_bottom_w - slide_clearance\n"
+            "#   rail_h = groove_depth - vert_clearance\n"
+            "#   tan(rail_angle) = (groove_bottom_w - groove_top_w) / 2 / rail_h\n"
+            "# (adapter defaults 12/17/6 -> rail_top_w 16.65mm, rail_h 5.7mm,\n"
+            "#  rail_angle 23.7)\n"
+            "- type: dovetail_joint\n  a: slider.rail_slot\n"
+            "  b: adapter.mount_foot\n  rotate: [180, 0, 0]\n"
+            "# carriage rides an ALREADY-POSED rail (male first in the\n"
+            "# chain): a = the posed male, b = the female carriage:\n"
+            "- type: dovetail_joint\n  a: adapter.mount_foot\n"
+            "  b: slider.rail_slot\n  rotate: [180, 0, 0]\n"
+            "  params: {female: b}",
 ))

@@ -55,14 +55,18 @@ class CompileLog:
 
 def _build_plate(plate: PlateFeature) -> cq.Workplane:
     cx, cy = (plate.x0 + plate.x1) / 2.0, (plate.y0 + plate.y1) / 2.0
-    body = (
-        cq.Workplane("XY", origin=(cx, cy, plate.z_bottom))
-        .rect(plate.x1 - plate.x0, plate.y1 - plate.y0)
-        .extrude(plate.thickness)
-    )
-    if plate.corner_r > 0.05:
+    l, w = plate.x1 - plate.x0, plate.y1 - plate.y0
+    r = max(0.0, min(plate.corner_r, l / 2.0, w / 2.0))
+    wp = cq.Workplane("XY", origin=(cx, cy, plate.z_bottom))
+    if abs(l - w) < 1e-9 and abs(r - l / 2.0) < 1e-6:
+        # corner_r = half the side: the plate IS a disc. A corner fillet
+        # of exactly half-width is degenerate — OCC refuses it and the
+        # safe wrapper would silently hand back the square.
+        return wp.circle(l / 2.0).extrude(plate.thickness)
+    body = wp.rect(l, w).extrude(plate.thickness)
+    if r > 0.05:
         body, _ = safe_fillet_edges(
-            body, body.edges("|Z").vals(), plate.corner_r,
+            body, body.edges("|Z").vals(), r,
             min_length=plate.thickness * 0.5,
         )
     return body
