@@ -371,10 +371,13 @@ The paid flagships:
 
 ## Licenses
 
-### Core license — criteria fixed, the choice deferred
+### Core license — Apache-2.0 (decided)
 
-The decision is made **before the repository goes public**; for now only
-the criteria are recorded:
+The core engine ships under **Apache-2.0** ([LICENSE](../LICENSE)) — the
+column that won on maker-community trust, vendor integration and
+contributor friction. The bundled free packs (showcase, Vertical Farm)
+are Apache-2.0 as well. The criteria the decision was weighed against
+stay recorded:
 
 | Criterion | Apache-2.0 | AGPL-3.0 | BSL / FSL |
 |---|---|---|---|
