@@ -1,615 +1,670 @@
-# Vertical Farm Pack — канон раздела (tilted flush row)
+# Vertical Farm Pack — section canon (tilted flush row)
 
-> **DESIGN CORRECTION (2026-07-08).** Каскадная архитектура VF-1..VF-4
-> (уклон внутри желоба, ступеньки ~7.9 мм между модулями, drip-handover
-> между модулями) признана **design mistake** для целевого продукта и
-> заменена каноном **tilted_flush_row**, описанным этим документом.
-> Каскадные goldens удалены; история — в git (коммиты VF-3/VF-4).
+> **DESIGN CORRECTION (2026-07-08).** The cascade architecture of VF-1..VF-4
+> (slope inside the channel, ~7.9 mm steps between modules, drip-handover
+> between modules) has been declared a **design mistake** for the target
+> product and replaced by the **tilted_flush_row** canon described in this
+> document. The cascade goldens were removed; the history lives in git
+> (VF-3/VF-4 commits).
 
-Модульные элементы вертикальной фермы для микрозелени на кокосовом субстрате.
-Golden artifacts: `water_rail_cell_2020_petg` (ячейка из трёх печатаемых
-частей) и `vertical_farm_row_3x1` (полный ряд: cap → 3 flush-модуля →
-collector на двух прямых профилях 2020, магниты включены).
-
-```
-Base Water Rail        — транспортирует и ограничивает воду (никогда не хранит)
-Coco Cassette          — определяет контакт субстрата с водой
-Snap Retainer Frame    — легко прижимает кокос, не сдавливая его
-Inlet Cap / Collector  — вода входит каплей, выходит в дренажную трубку
-Straight 2020/3030     — НЕСЁТ ряд (reference hardware, cut to length)
-```
-
-## Законы раздела
-
-1. **Transient pulse, storage forbidden.** Вода подаётся импульсом, проходит
-   по желобу и уходит. Стоячая вода где угодно — контрактный FAIL
-   (`closed_water_reservoir`, `dead_water_pocket` в `must_not_have`).
-2. **Уклон — у МОНТАЖА, не у геометрии.** Желоб — ПОСТОЯННОЙ глубины
-   (`form.water_channel_constant_depth_ok`); rail и профили моделируются
-   горизонтальными; весь ряд монтируется под 1.0–2.0° (default 1.5°) —
-   это машинно объявляется в `mount_context` сборки и проверяется
-   `assembly.row_drains_under_mount` (виртуальные высоты v = z + y·tan(slope);
-   нет mount_context / полоса нарушена / ряд реверснут → FAIL).
-   Одиночная ячейка buildable горизонтально, но operational только в
-   монтаже — на детали это честная INFO-нота `form.drainage_requires_mount`
-   (grade не трогает).
-3. **Модули flush, стыки lap-flow.** Соседние модули в ОДНОЙ плоскости
-   (ΔZ = 0), торцы на контролируемом зазоре `face_gap` 0.3–0.6; шаг ряда =
-   `module_w + face_gap`. Передача воды — lap-стык: губа, продолжающая
-   ПЛОСКОСТЬ ПОЛА желоба (верх губы = уровень пола: выше — дамба, ниже —
-   ступенька), ложится в СКВОЗНОЙ, открытый снизу проём в полу приёмника;
-   у кончика губы остаётся осознанный слот 0.5–2.5 мм.
-4. **Шов — не водяной путь и не герметик.** Основной поток пересекает стык
-   ПО ВЕРХУ губы. Случайные капли в слот падают сквозь открытый воздух —
-   видимо, чистимо, мимо алюминия/магнитов/сухих зон
-   (`form.lap_slot_leak_path_controlled`). Герметичные межмодульные стыки —
-   **никогда** (anti-goal), в том числе случайно (слот < 0.5 — FAIL).
-5. **Rail owns water; cassette owns agronomy.** Новые культуры = новые
-   кассеты, rail не трогается (Cassette Interface Standard ниже).
-6. **Профиль несёт, пластик позиционирует.** Rail — не плита, а сухой
-   каркас вокруг защищённого водяного ядра (lightweight dry shell,
-   −40% пластика): крупные гладкие окна, открытые снизу, НЕ honeycomb;
-   несущая функция — у стандартного ПРЯМОГО профиля, посадка полная
-   (span gap 0 — чек, не нота).
-7. **Магниты — только выравнивание.** Запечатанные сухие карманы d6.4×2.4
-   в обеих ±Y гранях (default off): не герметик, не опора; ни одна грань
-   магнита не видит воду (≥1.2 мм пластика до любой мокрой зоны).
-8. **Всё моется щёткой.** Желоб открыт в небо, lap-проём сквозной,
-   snap-окна сквозные, окна облегчения открыты вниз — скрытых мокрых
-   полостей нет (always-on manufacturing-чеки).
-9. **Красивый, но инженерно неправильный лоток — FAIL.** Каждая фича
-   верифицируется чеками; strict-режим останавливает билд.
-
-## Геометрия воды (как построено)
+Modular vertical-farm elements for microgreens on coco substrate.
+Golden artifacts: `water_rail_cell_2020_petg` (a cell made of three printable
+parts) and `vertical_farm_row_3x1` (a full row: cap → 3 flush modules →
+collector on two straight 2020 profiles, magnets enabled).
 
 ```
-       cap (drip tower)                 lap-стык (ΔZ = 0)                collector
-        │ FALL_ENTRY 2.5        губа 4×1.4, верх = пол желоба            ловит губу
-        ▼                       ▼   слот 0.5–2.5 (открыт вниз)           последнего
-   ┌────────────┐  face_gap ┌────────────┐            ┌────────────┐     модуля
-   │ желоб 16×5 │◄──0.4────►│ желоб 16×5 │──── ... ──►│ желоб 16×5 │──► лоток→дренаж
-   └────────────┘           └────────────┘            └────────────┘
-   ══════════════════ прямой профиль 2020, полная посадка ══════════════
-                весь ряд смонтирован под 1.5° (mount_context)
+Base Water Rail        — transports and constrains water (never stores it)
+Coco Cassette          — defines substrate-to-water contact
+Snap Retainer Frame    — lightly holds the coco down without squeezing it
+Inlet Cap / Collector  — water enters as a drip, exits into the drain tube
+Straight 2020/3030     — CARRIES the row (reference hardware, cut to length)
 ```
 
-- Желоб режется с пола seat-кармана, глубина `channel_d = 5` ПОСТОЯННА;
-  под полом ≥ 2 мм материала (`channel_floor_margin`).
-- Датумы rail: `inlet`/`outlet` — на плоскости пола, в `face_gap/2` СНАРУЖИ
-  граней (мейт outlet-on-inlet даёт ΔZ=0 и шаг `module_w + face_gap` by
-  construction); `feed` — пол + FALL_ENTRY 2.5 (ЕДИНСТВЕННОЕ падение ряда —
-  сюда капает cap); `drain_edge` — низ кончика губы (сюда мейтится
-  collector; протрузия губы 4 мм = воздушный зазор капельной кромки).
-- Lap-физика при ΔZ=0: любая толщина губы НА водяном пути — либо дамба
-  (1.4 мм подпора при 1.5° = лужа ~53 мм), либо скрытый карман. Поэтому
-  губа продолжает пол, а проём приёмника — сквозной (samp непредставим);
-  разъединение модулей — вертикальным подъёмом (проём без потолка).
+## Section laws
+
+1. **Transient pulse, storage forbidden.** Water is fed as a pulse, travels
+   along the channel and leaves. Standing water anywhere is a contract FAIL
+   (`closed_water_reservoir`, `dead_water_pocket` in `must_not_have`).
+2. **The slope belongs to the MOUNT, not the geometry.** The channel has
+   CONSTANT depth (`form.water_channel_constant_depth_ok`); the rail and the
+   profiles are modeled horizontal; the whole row is mounted at 1.0–2.0°
+   (default 1.5°) — this is machine-declared in the assembly's `mount_context`
+   and verified by `assembly.row_drains_under_mount` (virtual heights
+   v = z + y·tan(slope); no mount_context / band violated / row reversed →
+   FAIL). A single cell is buildable horizontally but operational only when
+   mounted — on the part this is an honest INFO note
+   `form.drainage_requires_mount` (does not affect grade).
+3. **Modules flush, joints lap-flow.** Adjacent modules sit in ONE plane
+   (ΔZ = 0), end faces at a controlled `face_gap` of 0.3–0.6; row pitch =
+   `module_w + face_gap`. Water handover is a lap joint: a lip continuing the
+   FLOOR PLANE of the channel (lip top = floor level: higher — a dam, lower —
+   a step) rests in a THROUGH, bottom-open cutout in the receiver's floor;
+   a deliberate 0.5–2.5 mm slot remains at the lip tip.
+4. **The seam is not a water path and not a sealant.** The main flow crosses
+   the joint OVER THE TOP of the lip. Stray drops into the slot fall through
+   open air — visible, cleanable, clear of aluminum/magnets/dry zones
+   (`form.lap_slot_leak_path_controlled`). Sealed inter-module joints —
+   **never** (anti-goal), including accidentally (slot < 0.5 — FAIL).
+5. **Rail owns water; cassette owns agronomy.** New crops = new cassettes,
+   the rail stays untouched (Cassette Interface Standard below).
+6. **The profile carries, the plastic positions.** The rail is not a slab but
+   a dry frame around a protected water core (lightweight dry shell,
+   −40% plastic): large smooth windows, open from below, NOT honeycomb;
+   the load-bearing function belongs to the standard STRAIGHT profile,
+   seating is full (span gap 0 — a check, not a note).
+7. **Magnets are alignment only.** Sealed dry pockets d6.4×2.4 in both ±Y
+   faces (default off): not a sealant, not a support; no magnet face ever
+   sees water (≥1.2 mm of plastic to any wet zone).
+8. **Everything is brush-cleanable.** The channel is open to the sky, the lap
+   cutout is through, the snap windows are through, the lightweight windows
+   open downward — no hidden wet cavities (always-on manufacturing checks).
+9. **A beautiful but engineering-wrong tray is a FAIL.** Every feature is
+   verified by checks; strict mode stops the build.
+
+## Water geometry (as built)
+
+```
+       cap (drip tower)                  lap joint (ΔZ = 0)                 collector
+        │ FALL_ENTRY 2.5         lip 4×1.4, top = channel floor           catches the
+        ▼                        ▼   slot 0.5–2.5 (open below)            last module's
+   ┌──────────────┐  face_gap ┌──────────────┐          ┌──────────────┐    lip
+   │ channel 16×5 │◄──0.4───► │ channel 16×5 │─── ... ─►│ channel 16×5 │──► tray→drain
+   └──────────────┘           └──────────────┘          └──────────────┘
+   ═══════════════════ straight 2020 profile, full seating ═══════════════════
+                the whole row is mounted at 1.5° (mount_context)
+```
+
+- The channel is cut from the seat-pocket floor, depth `channel_d = 5` is
+  CONSTANT; ≥ 2 mm of material below the floor (`channel_floor_margin`).
+- Rail datums: `inlet`/`outlet` — on the floor plane, `face_gap/2` OUTSIDE
+  the faces (the outlet-on-inlet mate yields ΔZ=0 and pitch `module_w +
+  face_gap` by construction); `feed` — floor + FALL_ENTRY 2.5 (the ONLY drop
+  in the row — the cap drips here); `drain_edge` — the bottom of the lip tip
+  (the collector mates here; the 4 mm lip protrusion = the drip edge's air
+  gap).
+- Lap physics at ΔZ=0: any lip thickness ON the water path is either a dam
+  (1.4 mm of head at 1.5° = a ~53 mm puddle) or a hidden pocket. Hence the
+  lip continues the floor, and the receiver cutout is through (a sump is
+  unrepresentable); modules are separated by a vertical lift (the cutout has
+  no ceiling).
 
 ## Cassette Interface Standard (MVP-1.5)
 
-Любая будущая кассета (`sprout_mesh_cassette_v1`, `rockwool_cube_cassette_v1`,
-`netpot_cassette_v1`, …) обязана:
+Any future cassette (`sprout_mesh_cassette_v1`, `rockwool_cube_cassette_v1`,
+`netpot_cassette_v1`, …) must:
 
-1. **Разделять shared-параметры** (имена — контракт):
+1. **Share the shared parameters** (the names are a contract):
    `cassette_l`, `cassette_w`, `cassette_h`, `seat_clearance` (0.5–1.0),
-   `module_pitch`. В assembly-примере они объявлены один раз — рассинхрон
-   непредставим (`_inject_shared`).
-2. **Публиковать frame-ключи** (машинная половина интерфейса):
+   `module_pitch`. In the assembly example they are declared once — a desync
+   is unrepresentable (`_inject_shared`).
+2. **Publish the frame keys** (the machine half of the interface):
    `cassette_u0/v0/u1/v1`, `cassette_h`, `floor_bottom_z`,
-   `window_cx/window_w/window_floor_z` + shell-ключи для snap
-   (`shell_wall`, `inner_u0/u1`). Rail публикует `seat_*` и `channel_*`.
-3. **Проходить joint `removable_insert`** в позе: зазор в полосе, tool-free
-   rim, окно ВНУТРИ желоба, reach 1–2 мм, дренажный зазор ≥ 1 мм под окном.
-   Съём под монтажным уклоном — прежний вертикальный подъём (cos 2° ≈
-   0.9994): `assembly.cassettes_removable_under_mount` — rollup-нота.
-4. **Проходить кассетные чеки**: `form.cassette_no_reservoir`,
+   `window_cx/window_w/window_floor_z` + the shell keys for snap
+   (`shell_wall`, `inner_u0/u1`). The rail publishes `seat_*` and `channel_*`.
+3. **Pass the `removable_insert` joint** in pose: clearance within the band,
+   tool-free rim, the window INSIDE the channel, reach 1–2 mm, a drainage gap
+   ≥ 1 mm under the window. Removal under the mount slope is the same
+   vertical lift (cos 2° ≈ 0.9994):
+   `assembly.cassettes_removable_under_mount` — a rollup note.
+4. **Pass the cassette checks**: `form.cassette_no_reservoir`,
    `form.no_secondary_water_channel`, `form.snap_pockets_cleanable`;
-   `form.substrate_retained_under_mount` — INFO-нота (кокос при 1.0–2.0°
-   статичен; для будущих mat-кассет станет реальным чеком с governor-липом).
+   `form.substrate_retained_under_mount` — an INFO note (coco at 1.0–2.0°
+   is static; for future mat cassettes it will become a real check with a
+   governor lip).
 
-⚠️ Контактное окно **уже желоба** (default 12 мм при желобе 16): окно шире
-желоба физически не может в него опуститься. Площадь контакта набирается
-длиной окна вдоль потока (`window_l`). Пол желоба ровный — reach окна
-равномерен по всей длине.
+⚠️ The contact window is **narrower than the channel** (default 12 mm with a
+16 channel): a window wider than the channel physically cannot drop into it.
+Contact area is gained through window length along the flow (`window_l`).
+The channel floor is flat — window reach is uniform along the whole length.
 
-## Реестр (recipe ops — form/recipe_ops_water.py)
+## Registry (recipe ops — form/recipe_ops_water.py)
 
-| op | kind | что делает |
+| op | kind | what it does |
 |---|---|---|
-| `water_rail_body` | base | корпус + seat + желоб ПОСТОЯННОЙ глубины + коридоры + 4 водяных датума + lightweight-окна (param-gated, обратимо) |
-| `lap_outlet_lip` | feature | губа-продолжение пола за фронт (−Y); датум drain_edge |
-| `lap_inlet_receiver` | feature | сквозной открытый снизу проём в полу входа (+Y) |
-| `edge_magnet_pockets` | feature | запечатанные сухие карманы d6x2 в ±Y гранях (default off) |
-| `profile_seat_slot` | feature | 2 нижних паза под 2020/3030 вдоль потока, сухие |
-| `tongue_groove_edges` | feature | tongue (+X) / groove (−X), только позиционирование |
-| `substrate_tray_body` | base | shell кассеты (wall default 2.2 — lightweight touch) |
-| `contact_window` | feature | слэб под дном (drop 1–2 мм); ДО mesh_floor |
-| `mesh_floor` | feature | плоская ортогональная сквозная сетка |
-| `lift_tabs` | feature | 2 пальцевых паза в бортике |
-| `retainer_frame_body` / `frame_snap_hooks` | base/feature | рамка + 4 крюка |
-| `inlet_cap_body` | base | drip tower; мейтит `rail.feed` |
-| `collector_endcap_body` | base | Γ-лоток; catch-датум НА КОНЧИКЕ ГУБЫ, мейтит `rail.drain_edge`; derived `hang_drop = seat_depth + channel_d + lip_t` |
-| `profile_ref_body` | base | ПРЯМОЙ профиль cut-to-length (slope 0 — модель буквально правдива), станции на flush-шаге |
+| `water_rail_body` | base | body + seat + CONSTANT-depth channel + corridors + 4 water datums + lightweight windows (param-gated, reversible) |
+| `lap_outlet_lip` | feature | a lip continuing the floor past the front (−Y); the drain_edge datum |
+| `lap_inlet_receiver` | feature | a through, bottom-open cutout in the inlet floor (+Y) |
+| `edge_magnet_pockets` | feature | sealed dry pockets d6x2 in the ±Y faces (default off) |
+| `profile_seat_slot` | feature | 2 bottom slots for 2020/3030 along the flow, dry |
+| `tongue_groove_edges` | feature | tongue (+X) / groove (−X), positioning only |
+| `substrate_tray_body` | base | the cassette shell (wall default 2.2 — a lightweight touch) |
+| `contact_window` | feature | a slab under the bottom (drop 1–2 mm); BEFORE mesh_floor |
+| `mesh_floor` | feature | a flat orthogonal through mesh |
+| `lift_tabs` | feature | 2 finger recesses in the rim |
+| `retainer_frame_body` / `frame_snap_hooks` | base/feature | the frame + 4 hooks |
+| `inlet_cap_body` | base | the drip tower; mates `rail.feed` |
+| `collector_endcap_body` | base | an L-shaped tray; the catch datum AT THE LIP TIP, mates `rail.drain_edge`; derived `hang_drop = seat_depth + channel_d + lip_t` |
+| `profile_ref_body` | base | a STRAIGHT profile cut-to-length (slope 0 — the model is literally truthful), stations at the flush pitch |
 
 Joints (`assembly/joints.py`): `removable_insert`, `tongue_groove`,
-`snap_joint`, **`lap_flow_joint`** (flush-передача: ΔZ=0 ±0.05, face_gap
-0.3–0.6, губа 3–6 в проёме, слот 0.5–2.5, приёмник ≥ отдающего по ширине),
-`fluid_joint` (drip — ТОЛЬКО у адаптеров: cap→feed, drain_edge→collector),
-`saddle_hang` (auxiliary verification), `profile_perch` (локальная посадка
-паза на профиль).
+`snap_joint`, **`lap_flow_joint`** (flush handover: ΔZ=0 ±0.05, face_gap
+0.3–0.6, lip 3–6 inside the cutout, slot 0.5–2.5, the receiver ≥ the giver
+in width), `fluid_joint` (drip — ONLY at the adapters: cap→feed,
+drain_edge→collector), `saddle_hang` (auxiliary verification),
+`profile_perch` (local seating of the slot on the profile).
 
 ## mount_context (product/assembly.py)
 
 ```yaml
 mount_context:
   type: tilted_flush_row
-  slope_deg: 1.5          # схема 0–3; операционная полоса 1.0–2.0 — чеком
+  slope_deg: 1.5          # schema 0–3; operational band 1.0–2.0 — by check
   slope_source: "whole row mounted on straight 2020 profiles at 1.5 deg"
 ```
-`slope_axis: Y` / `slope_direction: inlet_to_outlet` фиксированы литералами.
-CAD остаётся горизонтальным; не-90° поз не существует. Row-чеки
-(`assembly/carrier.py`) считают виртуальные высоты и порядок цепочки берут
-из lap-joints (a→b), не из поз — реверснутый ряд ловится.
+`slope_axis: Y` / `slope_direction: inlet_to_outlet` are fixed as literals.
+The CAD stays horizontal; non-90° poses do not exist. Row checks
+(`assembly/carrier.py`) compute virtual heights and take the chain order
+from the lap-joints (a→b), not from poses — a reversed row is caught.
 
-## Row-чеки в глобальных позах (assembly/carrier.py)
+## Row checks in global poses (assembly/carrier.py)
 
-- `assembly.row_flush_aligned` — все модули в одной плоскости (ΔZ ≤ 0.1),
-  шаг `module_w + face_gap` (±0.3);
-- `assembly.row_drains_under_mount` — монотонный виртуальный спуск полов
-  от первого входа до последнего выхода под объявленным mount;
-- `assembly.profile_support_full_length` — каждый rail на КАЖДОМ прямом
-  профиле, посадка полная, span gap 0 (модельный уклон профиля ≠ 0 — FAIL);
-- `assembly.magnet_alignment_ok` — карманы смежных граней соосны ±0.5
-  (n/a-PASS без магнитов);
-- `assembly.cassettes_removable_under_mount` — rollup insert-вердиктов.
+- `assembly.row_flush_aligned` — all modules in one plane (ΔZ ≤ 0.1),
+  pitch `module_w + face_gap` (±0.3);
+- `assembly.row_drains_under_mount` — a monotonic virtual descent of the
+  floors from the first inlet to the last outlet under the declared mount;
+- `assembly.profile_support_full_length` — every rail on EVERY straight
+  profile, full seating, span gap 0 (a nonzero modeled profile slope → FAIL);
+- `assembly.magnet_alignment_ok` — pockets of adjacent faces coaxial ±0.5
+  (n/a-PASS without magnets);
+- `assembly.cassettes_removable_under_mount` — a rollup of the insert
+  verdicts.
 
-## Regions / роли
+## Regions / roles
 
-- `transient_water_path` — желоб, lap_lip, lap_receiver, контактное окно,
-  spout_path, catch_tray.
-- `substrate_support_mesh` — канва сетки.
-- lap-вырезы, лежащие внутри объявленных водяных регионов, НЕ нарушают
-  interface-keepout (keepout защищает порт от СУХИХ фич и модификаторов,
-  не от собственных пустот водяной системы).
-- Остальное: seat/tongue/groove/profile/magnet-карманы → `interface_keepout`;
-  snap-корни → `high_stress_region`; сухая задняя зона → `mounting_surface`.
+- `transient_water_path` — the channel, lap_lip, lap_receiver, the contact
+  window, spout_path, catch_tray.
+- `substrate_support_mesh` — the mesh canvas.
+- Lap cutouts lying inside declared water regions do NOT violate
+  interface-keepout (keepout protects a port from DRY features and modifiers,
+  not from the water system's own voids).
+- The rest: seat/tongue/groove/profile/magnet pockets → `interface_keepout`;
+  snap roots → `high_stress_region`; the dry back zone → `mounting_surface`.
 
-## Отчёты
+## Reports
 
-- `water_report.yaml`: канал (slope 0, drop 0), lap_handover
-  (lip/receiver/face_gap + «seam is not primary water path»), блок `row:` —
-  kind `tilted_flush_row`, slope из mount_context, modules_flush /
+- `water_report.yaml`: the channel (slope 0, drop 0), lap_handover
+  (lip/receiver/face_gap + "seam is not primary water path"), the `row:`
+  block — kind `tilted_flush_row`, slope from mount_context, modules_flush /
   stair_step:false, total_virtual_drop_mm, handovers (lap_flow ×N−1 +
   drip ×2), standing_water_under_mount, lap_seam_leak: controlled +
   drips_clear_of, orphan_fluid_ports.
-- `frame_report.yaml`: carrier (прямые профили cut-to-length, slope_deg 0
-  у МОДЕЛИ), slope_source: physical_mount + slope_deg из mount_context,
+- `frame_report.yaml`: carrier (straight profiles cut-to-length, the MODEL's
+  slope_deg 0), slope_source: physical_mount + slope_deg from mount_context,
   full_profile_seating: true, span_gap_mm: 0, stair_step: false.
-- BOM (`assembly/bom.py`, derived-only): профиль — «standard straight, cut
-  to length; mount the WHOLE row at {slope} deg»; магниты — «d6x2 …
-  module alignment only … preferably coated/epoxy-protected»; silicone
-  tube из hose_port; никаких HardwareSpec (зарезервировано за A2).
+- BOM (`assembly/bom.py`, derived-only): the profile — "standard straight,
+  cut to length; mount the WHOLE row at {slope} deg"; magnets — "d6x2 …
+  module alignment only … preferably coated/epoxy-protected"; the silicone
+  tube from hose_port; no HardwareSpec (reserved for A2).
 
-## Lightweight open skeleton (VF-4.1; generic-модификатор — следующая волна)
+## Lightweight open skeleton (VF-4.1; generic modifier — a future wave)
 
-- Окна режутся НАСКВОЗЬ через подседельный слэб (открыты снизу И сверху —
-  мостов нет by construction): остаются периметрическая рама, хребет
-  канала, band'ы профиля и рёбра 2.0 — открытый скелет. Кассета 220×220
-  накрывает каждый проём и опирается на кольцо+рёбра:
-  `form.cassette_support_span_ok` (окна ≥4 внутри seat-футпринта, сетка
-  цела, worst span ≤ 45). Запретные зоны — `form.lightweight_windows_dry_ok`.
-- НЕ honeycomb: грязь/биоплёнка/соль — только крупные гладкие чистимые окна.
-- Обратимо: `lightweight: false` → сплошная плита (smoke-тест держит оба
-  варианта). Экономия на дефолтной ячейке: 1068 → 588 см³ (−45%).
-- `lightweight_dry_shell_v1` как переиспользуемый модификатор — отдельная
-  волна (ROADMAP).
+- Windows are cut THROUGH the under-seat slab (open from below AND above —
+  no bridges by construction): what remains is the perimeter frame, the
+  channel spine, the profile bands and the 2.0 ribs — an open skeleton.
+  The 220×220 cassette covers each opening and rests on the ring+ribs:
+  `form.cassette_support_span_ok` (≥4 windows inside the seat footprint,
+  the grid intact, worst span ≤ 45). Forbidden zones —
+  `form.lightweight_windows_dry_ok`.
+- NOT honeycomb: dirt/biofilm/salt — only large smooth cleanable windows.
+- Reversible: `lightweight: false` → a solid slab (the smoke test keeps both
+  variants). Savings on the default cell: 1068 → 588 cm³ (−45%).
+- `lightweight_dry_shell_v1` as a reusable modifier — a separate wave
+  (ROADMAP).
 
-## Printability-контракт (VF-4.1)
+## Printability contract (VF-4.1)
 
-- **Ориентация — часть контракта**: печатные инстансы декларируют
-  `manufacturing.print_orientation: as_modeled` (= дном вниз для VF);
-  рассинхрон с решением билдера — FAIL
+- **Orientation is part of the contract**: printed instances declare
+  `manufacturing.print_orientation: as_modeled` (= bottom down for VF);
+  a mismatch with the builder's decision is a FAIL
   (`manufacturing.print_orientation_declared`).
-- **Always-on**: `manufacturing.supportless_lightweight_windows_ok` —
-  slab-проба НА СОЛИДЕ над потолком каждого нижнего глухого кармана
-  (сквозной → pass; мост ≤25 → pass-нота; ≤35 → WARN; больше → FAIL);
-  `manufacturing.horizontal_bore_supportless` — горизонтальный круглый бор
-  > Ø8 без teardrop-крыши → WARN.
-- **Teardrop-бор** (`BoreFeature.roof="teardrop"`): 45°-хорды к пику
-  d/2·√2 над центром — самонесущий потолок горизонтального бора; объём ⊃
-  цилиндра, все пробы валидны. Дренаж коллектора — teardrop.
-- **Магниты устанавливаются**: press-fit 0.1–0.3 диаметрально из СУХОЙ
-  стыковой грани (только ±Y грани — правило чека), капля CA в BOM-ноте;
-  frame_report печатает `magnet_installation: {method: press_fit_dry_face,
+- **Always-on**: `manufacturing.supportless_lightweight_windows_ok` — a slab
+  probe ON THE SOLID above the ceiling of every bottom blind pocket
+  (through → pass; bridge ≤25 → pass note; ≤35 → WARN; more → FAIL);
+  `manufacturing.horizontal_bore_supportless` — a horizontal round bore
+  > Ø8 without a teardrop roof → WARN.
+- **Teardrop bore** (`BoreFeature.roof="teardrop"`): 45° chords to a peak
+  d/2·√2 above the center — a self-supporting ceiling for a horizontal bore;
+  the volume ⊃ the cylinder, all probes valid. The collector drain is
+  teardrop.
+- **Magnets are installable**: press-fit 0.1–0.3 diametral, from the DRY
+  mating face (±Y faces only — a check rule), a drop of CA in a BOM note;
+  frame_report prints `magnet_installation: {method: press_fit_dry_face,
   water_exposed: false, role: alignment_only}`.
 
-## Collector = концевой receiver, U-рама, вертикальный слив (VF-4.1 + VF-4.2)
+## Collector = end receiver, U-frame, vertical drain (VF-4.1 + VF-4.2)
 
-Коллектор не «стоит рядом» — он ПРИНИМАЕТ финальную губу: capture 6–8 мм
-от грани (кончик губы ≥2 до apron-бортика), щёки lip_w/2+1.5 охватывают
-мокрую зону, mouth ≥ lip + 2×1.4, apron — низкий бортик 2.4–3.5 над
-handover-плоскостью (НЕ стена: глухая щель под кокос непредставима —
-`form.receiver_open_top_cleanable`: открытый верх, непрерывность с лотком,
-путь капли = путь щётки). В позе: `assembly.collector_captures_drain_edge`
-(кончик внутри объёма), `collector_mouth_envelopes_outlet_lip`,
-`collector_removable_by_hand` (над захваченной губой нет потолка в
-15-мм окне подъёма). Стык по-прежнему НЕгерметичен: cleanable, tool-free.
+The collector does not "stand nearby" — it RECEIVES the final lip: capture
+6–8 mm from the face (the lip tip ≥2 to the apron rim), cheeks lip_w/2+1.5
+wrap the wet zone, mouth ≥ lip + 2×1.4, the apron is a low rim 2.4–3.5 above
+the handover plane (NOT a wall: a blind coco-trapping slit is unrepresentable
+— `form.receiver_open_top_cleanable`: an open top, continuity with the tray,
+the drop's path = the brush's path). In pose:
+`assembly.collector_captures_drain_edge` (the tip inside the volume),
+`collector_mouth_envelopes_outlet_lip`, `collector_removable_by_hand`
+(no ceiling above the captured lip within a 15 mm lift window). The joint is
+still UNsealed: cleanable, tool-free.
 
-**VF-4.2 robustness**: лоток висит консолью — несут его ДВЕ полные боковые
-стенки U-рамы (толщина ≥3.5, от дна лотка до arm, полная длина), а не
-тонкие столбики; `form.collector_structure_sturdy` закрывает слепую зону
-`min_wall` (он мерил параметр `wall`, не фактические сечения рёбер). Слив
-**вертикальный вниз**: бор сверлится сквозь сплошной сумп (расширение
-`drain_extension`, зацеп трубки `drain_grip` ≥12 мм), push-in трубка
-входит СНИЗУ и уходит под ряд (порт `drain_out` normal −Z);
-`form.collector_tray_drains` переписан под вертикаль (пол→сумп, устье у
-низшей точки, сквозной вниз). Горизонтального бора и teardrop на коллекторе
-больше нет — `BoreFeature.roof="teardrop"` остаётся кернел-примитивом и
-always-on `horizontal_bore_supportless` сторожат будущие горизонтальные боры.
+**VF-4.2 robustness**: the tray hangs as a cantilever — it is carried by TWO
+full side walls of the U-frame (thickness ≥3.5, from the tray bottom to the
+arm, full length), not by thin posts; `form.collector_structure_sturdy`
+closes the `min_wall` blind spot (it measured the `wall` parameter, not the
+actual rib cross-sections). The drain goes **vertically down**: the bore is
+drilled through a solid sump (the `drain_extension` widening, tube grip
+`drain_grip` ≥12 mm), the push-in tube enters FROM BELOW and runs under the
+row (port `drain_out`, normal −Z); `form.collector_tray_drains` is rewritten
+for the vertical (floor→sump, the mouth at the lowest point, through
+downward). There is no horizontal bore and no teardrop on the collector
+anymore — `BoreFeature.roof="teardrop"` remains a kernel primitive, and the
+always-on `horizontal_bore_supportless` guards future horizontal bores.
 
-## Root chamber под кассетой (VF-5A) — param-gate `under_cassette`
+## Root chamber under the cassette (VF-5A) — param-gate `under_cassette`
 
-`under_cassette: skeleton | root_chamber` — оба режима одного rail.
-- **skeleton** (VF-4.1): сквозные окна, −45% пластика, но верхний перелив
-  капает вниз (см. overflow_containment).
-- **root_chamber** (VF-5A): под кассетой — СПЛОШНОЙ блок с **глухим дном**
-  (z0..4 — контейнмент перелива) и открытыми сверху **корневыми желобками**
-  (по 2 на сторону, level const-depth, глубина 12). Корни прорастают вниз
-  в желобки; вода дренируется **вперёд монтажным уклоном ровно как главный
-  канал** — никакой геометрии-уклона (`form.root_chamber_ok`: level,
-  full-length, глухое дно ≥2, чист от spine). Желобки соседних модулей
-  стыкуются через face_gap → непрерывный дренаж-путь вдоль ряда до
-  коллектора (`passive_root_drainage_return` — легализованная отдельная
-  подсистема, `no_secondary_water_channel` их исключает; НЕ второй
-  пульс-канал).
-- **Коллектор** для root_chamber — полноширинный лоток (`tray_w` до 180):
-  ловит губу канала (центр) + все корневые желобки по ширине модуля
-  (`assembly.collector_catches_root_drainage`; узкий коллектор проливает
-  → FAIL). Arm над рельсом (не над ртом) — редизайна не потребовалось.
-- **Магниты** в root_chamber — в сплошном периметре (x~84, offset до 90):
-  на дефолтном x60 карман попадал в желобок (мокрая зона) — магнит-чеки
-  честно падали.
-- **Съёмность кассеты** (в water_report `cassette_removal`): чисто до
-  прорастания / НЕ mid-cycle (корни в желобках) / end-cycle с урожаем.
-  Для микрозелени/салата/трав норма.
-- Golden: `vertical_farm_row_3x1_root_chamber` (rails root_chamber, магниты
-  x84, полноширинный коллектор 160мм — стенки уходят под профиль x90) —
-  overflow_containment: contained.
-- **Хекс-соты (закрытые чашки с дренажными прорезями) — VF-5B**, отдельно:
-  желобки (VF-5A) уже дают открытые дренируемые корневые зоны; соты добавят
-  разделение корней по растениям ценой дренажных прорезей.
+`under_cassette: skeleton | root_chamber` — both modes of a single rail.
+- **skeleton** (VF-4.1): through windows, −45% plastic, but top overflow
+  drips down (see overflow_containment).
+- **root_chamber** (VF-5A): under the cassette — a SOLID block with a
+  **blind bottom** (z0..4 — overflow containment) and top-open **root
+  troughs** (2 per side, level const-depth, depth 12). Roots grow down into
+  the troughs; water drains **forward by the mount slope exactly like the
+  main channel** — no geometry slope (`form.root_chamber_ok`: level,
+  full-length, blind bottom ≥2, clear of the spine). Troughs of adjacent
+  modules meet across the face_gap → a continuous drainage path along the
+  row to the collector (`passive_root_drainage_return` — a legalized
+  separate subsystem, excluded by `no_secondary_water_channel`; NOT a second
+  pulse channel).
+- **The collector** for root_chamber is a full-width tray (`tray_w` up to
+  180): it catches the channel lip (center) + all root troughs across the
+  module width (`assembly.collector_catches_root_drainage`; a narrow
+  collector spills → FAIL). The arm sits above the rail (not above the
+  mouth) — no redesign was needed.
+- **Magnets** in root_chamber sit in the solid perimeter (x~84, offset up to
+  90): at the default x60 the pocket landed in a trough (a wet zone) — the
+  magnet checks honestly failed.
+- **Cassette removal** (in the water report `cassette_removal`): clean before
+  rooting / NOT mid-cycle (roots in the troughs) / end-cycle together with
+  the harvest. For microgreens/lettuce/herbs this is the norm.
+- Golden: `vertical_farm_row_3x1_root_chamber` (root_chamber rails, magnets
+  x84, a full-width 160 mm collector — the walls pass under the x90 profile)
+  — overflow_containment: contained.
+- **Hex cells (closed cups with drainage slits) — VF-5B**, separately: the
+  troughs (VF-5A) already give open drainable root zones; hex cells would
+  add per-plant root separation at the cost of drainage slits.
 
 ## Endcap magnetic docking (VF-6) — `endcap_dock` / `dock_magnets`
 
-Торцевые доводчики (коллектор спереди, inlet-cap сзади) примагничиваются к
-крайним модулям ряда. У терминального модуля торцевые межмодульные магниты
-«висят вхолостую» — но переиспользовать их напрямую нельзя: они на x=±84,
-z=8 у боковой кромки, где коллекторная щека всего ~6 мм (зажата ртом лотка
-и профилем x90), а cap туда не дотягивается вовсе (±32). Развилка решена
-**вертикальным доком на общем x=±22**:
+The end adapters (the collector at the front, the inlet cap at the back)
+magnet onto the row's terminal modules. The terminal module's end-face
+inter-module magnets "hang idle" — but they cannot be reused directly: they
+sit at x=±84, z=8 near the side edge, where the collector cheek is only
+~6 mm (squeezed between the tray mouth and the x90 profile), and the cap
+does not reach there at all (±32). The fork is resolved by a **vertical dock
+at a shared x=±22**:
 
-- **rail** (`endcap_dock: none|front|back|both`, оп `endcap_dock_pockets`):
-  пара Z-карманов, открытых **ВВЕРХ** в верх ТОРЦЕВОЙ стенки (z=body_h),
-  на x=±`dock_x` (22), inset `dock_inset` (7) от грани — в сухом периметре,
-  над желобками (z-разнос 11.6 мм), печать supportless.
-- **коллектор/cap** (`dock_magnets: true`): встречные Z-карманы, открытые
-  **ВНИЗ** в подошву arm / потолок седла — ровно на интерфейсной плоскости
-  контакта (arm ↔ верх стенки, world z=8). Общий x=±22: коллектор берёт его
-  полноширинным arm (щёки и профиль ни при чём), cap (±32) свободно.
-- Магнит-к-магниту, alignment-only, press-fit, сухая грань — канон как у
-  межмодульных.
+- **rail** (`endcap_dock: none|front|back|both`, op `endcap_dock_pockets`):
+  a pair of Z-pockets opening **UP** in the top of the END wall (z=body_h),
+  at x=±`dock_x` (22), inset `dock_inset` (7) from the face — in the dry
+  perimeter, above the troughs (11.6 mm z-separation), supportless to print.
+- **collector/cap** (`dock_magnets: true`): counterpart Z-pockets opening
+  **DOWN** in the arm sole / saddle ceiling — exactly on the interface
+  contact plane (arm ↔ wall top, world z=8). The shared x=±22: the collector
+  takes it with its full-width arm (cheeks and profile are irrelevant), the
+  cap (±32) freely.
+- Magnet-to-magnet, alignment-only, press-fit, a dry face — the same canon
+  as the inter-module ones.
 
-Чеки:
-- `form.dock_pockets_dry` — доковые карманы блайнд, вертикальные (axis Z),
-  ≥1.2 до любой мокрой зоны, в press-band (rail + оба доводчика).
-- `assembly.endcap_docks_to_rail` — **honesty-closer**: мировые позиции
-  карманов доводчика и rail должны совпасть в позе (worst offset ≤1.0);
-  магнит без встречного = FAIL («no dock pocket» / «does not mate»). В
-  голдене offset = 0.00.
+Checks:
+- `form.dock_pockets_dry` — the dock pockets are blind, vertical (axis Z),
+  ≥1.2 to any wet zone, in the press band (rail + both adapters).
+- `assembly.endcap_docks_to_rail` — an **honesty-closer**: the world
+  positions of the adapter's and the rail's pockets must coincide in pose
+  (worst offset ≤1.0); a magnet without a counterpart = FAIL ("no dock
+  pocket" / "does not mate"). In the golden the offset = 0.00.
 
 Golden: `vertical_farm_row_3x1_root_chamber` — rail_1 `endcap_dock: back`,
-rail_3 `front`, rail_2 без дока; cap + collector `dock_magnets: true`.
+rail_3 `front`, rail_2 without a dock; cap + collector `dock_magnets: true`.
 
-## Print-feedback pass (VF-7) — сетка, слив, габариты
+## Print-feedback pass (VF-7) — mesh, drain, dimensions
 
-Три правки по осмотру напечатанных деталей в Bambu Studio:
+Three fixes from inspecting the printed parts in Bambu Studio:
 
-- **Сетка кассеты = манифолдный STL.** Печатная кассета приходила с «16
-  non-manifold edges» и отдельными сплошными/слипшимися ячейками. BRep
-  ВАЛИДЕН — рвётся ТЕССЕЛЯЦИЯ: OCC BRepMesh на одной планарной грани пола с
-  ~780 квадратными дырами роняет часть (мельче tolerance — ХУЖЕ: 16→157).
-  Порог чистой тесселяции ~450 ячеек → дефолтная ячейка **6→8 мм** (784→~440;
-  coco держится в 8 мм). Плюс новый **always-on `manufacturing.mesh_manifold`**:
-  тесселирует экспортный меш field-детали, **варит вершины по позиции** (OCC
-  отдаёт per-face, на общих рёбрах вершины дублируются — сырой индекс всегда
-  «non-manifold»), считает рёбра ≠2 граней → FAIL, если слайсер отвергнет STL.
-  Ловит именно тот дефект (cell=6 fail, cell=8 pass); гейт по `form.fields`
-  (простые экструзии тривиально манифолдны). В `substrate_mesh_floor.verified_by`.
-- **Коллектор сливается насухо.** Слив стоял ВПЕРЕДИ низшей точки пола → вода
-  застаивалась сзади. Теперь конец наклонного канала = позиция слива (низшая
-  точка совпадает со сливом, сзади ничего глубже), уклон 1.5→2.5° — лоток
-  пустеет (`collector_tray_drains`: «empties out the bottom»).
-- **Габариты под P1S.** Рельс печатался 251.6×252 при столе 256 → «too close
-  to exclusion». Дефолтный модуль **248→205** (печать ~209, ~23 мм зазор до
-  256 с каждой стороны), кассета 220→177, шаг 250→207, профиль 780→640.
-  Резайз сжимает периметр: фиксированный 20-мм алюминиевый профиль + боковая
-  стенка полноширинного коллектора съедают половину-ширины → желобки
-  `trough_w` 26→18, модульные магниты уходят ЗА профиль (`magnet_x_offset`
-  ~95, band до 106), коллектор `tray_w` 160→120. **~200 мм модуль — пол
-  дизайна**: ниже коллектор не помещается между желобками и профилем без
-  смены схемы. Root_chamber-golden перенастроен; базовые VF-голдены запинены
-  на 248 (fixture'ы). Cassette Interface Standard: номинал сетки ~207.
-- **Cap печатается без поддержки** (VF-7c). As-modeled седло открывается ВНИЗ
-  — широкий мост, внешняя губа висит («floating cantilever» в Bambu; движковый
-  `manufacturing.overhang` это НЕ ловит — слепая зона: IR-чек не моделирует
-  мост-потолок седла). Новая print-ориентация **`saddle_up`** (`orient_for_print`,
-  flip 180° вокруг X, запекается ТОЛЬКО в экспорт — парт-фрейм и все валидаторы
-  не тронуты): седло становится рецессом ВВЕРХ (чистый карман, без моста),
-  спаут — восходящим ребром, плоская вершина drip-tower ложится на стол.
-  Оп `inlet_cap_body` ставит ориентацию сам; голдены-ряды объявляют её у cap.
-  Support-free обоснован геометрией; финальное подтверждение — в слайсере
-  (движок мост седла не верифицирует).
+- **The cassette mesh = a manifold STL.** The printed cassette came out with
+  "16 non-manifold edges" and individual solid/fused cells. The BRep is
+  VALID — it is the TESSELLATION that breaks: OCC BRepMesh on a single
+  planar floor face with ~780 square holes drops part of it (finer than
+  tolerance is WORSE: 16→157). The clean-tessellation threshold is ~450
+  cells → the default cell **6→8 mm** (784→~440; coco holds in 8 mm). Plus a
+  new **always-on `manufacturing.mesh_manifold`**: it tessellates the export
+  mesh of a field part, **welds vertices by position** (OCC yields per-face
+  output, vertices are duplicated on shared edges — the raw index is always
+  "non-manifold"), counts edges with ≠2 faces → FAIL if the slicer would
+  reject the STL. It catches exactly that defect (cell=6 fail, cell=8 pass);
+  gated by `form.fields` (simple extrusions are trivially manifold). Listed
+  in `substrate_mesh_floor.verified_by`.
+- **The collector drains dry.** The drain sat AHEAD of the floor's lowest
+  point → water stagnated at the back. Now the end of the sloped channel =
+  the drain position (the lowest point coincides with the drain, nothing
+  deeper behind it), slope 1.5→2.5° — the tray empties
+  (`collector_tray_drains`: "empties out the bottom").
+- **Dimensions for the P1S.** The rail printed at 251.6×252 on a 256 bed →
+  "too close to exclusion". The default module **248→205** (print ~209,
+  ~23 mm margin to 256 on each side), cassette 220→177, pitch 250→207,
+  profile 780→640. The resize squeezes the perimeter: the fixed 20 mm
+  aluminum profile + the side wall of the full-width collector eat half the
+  width → troughs `trough_w` 26→18, module magnets move BEYOND the profile
+  (`magnet_x_offset` ~95, band up to 106), collector `tray_w` 160→120.
+  **A ~200 mm module is the design floor**: below it the collector no longer
+  fits between the troughs and the profile without changing the scheme. The
+  root_chamber golden is retuned; the base VF goldens are pinned at 248
+  (fixtures). Cassette Interface Standard: mesh nominal ~207.
+- **The cap prints without supports** (VF-7c). As-modeled, the saddle opens
+  DOWNWARD — a wide bridge, the outer lip hangs ("floating cantilever" in
+  Bambu; the engine's `manufacturing.overhang` does NOT catch this — a blind
+  spot: the IR check does not model the saddle's bridge ceiling). A new
+  print orientation **`saddle_up`** (`orient_for_print`, a 180° flip around
+  X, baked ONLY into export — the part frame and all validators untouched):
+  the saddle becomes an UPWARD recess (a clean pocket, no bridge), the spout
+  an ascending rib, the drip tower's flat top rests on the bed. The
+  `inlet_cap_body` op sets the orientation itself; the row goldens declare
+  it on the cap. Support-free is justified by geometry; final confirmation
+  happens in the slicer (the engine does not verify the saddle bridge).
 
-## Drain screen basket + слой обслуживания (VF-8)
+## Drain screen basket + maintenance layer (VF-8)
 
-Ряд рециркулирует: слив коллектора → (внешний резервуар + насос) → inlet
-cap следующего ряда. Coco-крошка и обрывки корней в сливной воде забивают
-насос/трубки и пачкают следующий ряд. Решение — **съёмная корзина-фильтр в
-сампе коллектора над сливом** (вынул, сполоснул, вставил): одна печатная
-деталь, никакой доп. обвязки, плюс машинно-выводимый отчёт обслуживания.
+The row recirculates: the collector drain → (external reservoir + pump) →
+the next row's inlet cap. Coco crumbs and root fragments in the drain water
+clog the pump/tubes and dirty the next row. The solution is a **removable
+filter basket in the collector sump above the drain** (pull it out, rinse,
+put it back): one printed part, no extra plumbing, plus a machine-derived
+maintenance report.
 
-Честный итог (НЕ «чистая вода»): **вода с пониженным содержанием мусора** —
-сетка снимает крупную coco-крошку и фрагменты корней, мелкая coco-пыль может
-пройти; засор виден ОТКРЫТО (лоток коллектора наполняется на виду, без скрытого
-back-up).
+The honest outcome (NOT "clean water"): **debris-reduced water** — the
+screen removes coarse coco crumbs and root fragments, fine coco dust may
+pass; a clog is visible IN THE OPEN (the collector tray fills up in plain
+sight, no hidden back-up).
 
-**Fail-safe семантика (три режима, разрешают конфликт no-bypass ↔ overflow):**
-- `normal_no_bypass` — ОБЯЗАТЕЛЕН: вся вода к сливу идёт через сетку/прорези,
-  фланец корзины садится в рецесс седла и перекрывает боковой аннулюс — обхода
-  посадки нет.
-- `emergency_visible_overflow` — ОБЯЗАТЕЛЕН: засор виден как подъём уровня в
-  ОТКРЫТОМ лотке коллектора; скрытого объёма back-up нет.
-- `emergency_unfiltered_bypass` — **ВЫКЛ по умолчанию**, только явный opt-in.
-  По умолчанию обод корзины стоит ВЫШЕ пути перелива лотка → засор проливает
-  открытый лоток на виду и НИКОГДА не перехлёстывает корзину к сливу (мусор не
-  уходит дальше). Опустить обод ниже перелива можно ТОЛЬКО через
-  `allow_emergency_bypass: true` у стыка — и тогда отчёт это флагует.
+**Fail-safe semantics (three modes, resolving the no-bypass ↔ overflow
+conflict):**
+- `normal_no_bypass` — MANDATORY: all water headed to the drain goes through
+  the mesh/slots, the basket flange sits in the seat recess and blocks the
+  side annulus — there is no way around the seat.
+- `emergency_visible_overflow` — MANDATORY: a clog shows as a rising level
+  in the OPEN collector tray; there is no hidden back-up volume.
+- `emergency_unfiltered_bypass` — **OFF by default**, explicit opt-in only.
+  By default the basket rim stands ABOVE the tray's overflow path → a clog
+  spills the open tray in plain sight and NEVER overtops the basket toward
+  the drain (debris goes no further). Lowering the rim below the overflow is
+  possible ONLY via `allow_emergency_bypass: true` on the joint — and then
+  the report flags it.
 
-**Геометрия = LOWERED SUMP + RADIAL FUNNEL (VF-8.1, разворот по фидбеку
-пользователя «не экран поперёк канала, а сливное ведёрко в колодце»).** Новый
-примитив кернела **`FunnelCutFeature`** — первый пол, наклонный СРАЗУ по X И Y
-(`ChannelCutFeature` умеет уклон только по Y): сходящийся книзу (при желании
-скошенный — разные центры верх/низ) фрустум, вычитается ruled-лофтом
-(cad/bores.py `cut_funnel`, тот же механизм, что у канала). Коллектор
-(param-gated `screen_seat`): пол лотка сходится ВОРОНКОЙ к центральному колодцу
-со ВСЕХ сторон, слив в АБСОЛЮТНО нижней точке колодца, компактная съёмная
-корзина-ведёрко садится В колодец над сливом — **вода падает В корзину, а не
-упирается в стену**. Слив сдвигается от задней стенки к центру лотка (`y_drain`
-центрируется в arm-clear зоне, `drain_extension` добавляется), воронка скошена
-(устье у слива, раструб раскрыт вперёд над лотком) — дренирует весь пол. Плюс
-вертикальная **шахта** (устье→rim) открывает крышу над колодцем, чтобы корзина
-опускалась и щётка доставала (дренируется воронкой+бором ниже). Off по умолчанию
-→ существующие коллекторы байт-в-байт не тронуты.
+**Geometry = LOWERED SUMP + RADIAL FUNNEL (VF-8.1, a pivot driven by the
+user's feedback: "not a screen across the channel but a drain bucket in a
+well").** A new kernel primitive **`FunnelCutFeature`** — the first floor
+sloped in X AND Y at once (`ChannelCutFeature` can slope only in Y): a
+downward-converging (optionally skewed — different top/bottom centers)
+frustum, subtracted with a ruled loft (cad/bores.py `cut_funnel`, the same
+mechanism as the channel's). The collector (param-gated `screen_seat`): the
+tray floor converges as a FUNNEL to a central well from ALL sides, the drain
+sits at the ABSOLUTE lowest point of the well, a compact removable bucket
+basket sits IN the well above the drain — **water falls INTO the basket
+rather than hitting a wall**. The drain moves from the back wall to the tray
+center (`y_drain` is centered in the arm-clear zone, `drain_extension` is
+added), the funnel is skewed (the throat at the drain, the bell opened
+forward over the tray) — it drains the whole floor. Plus a vertical
+**shaft** (throat→rim) opens the roof above the well so the basket can drop
+in and a brush can reach (it is drained by the funnel+bore below). Off by
+default → existing collectors are byte-for-byte untouched.
 
-**Корзина** — компактная sink-filter чашка (`substrate_tray_body`→`lift_tabs`→
-`screen_wall_slots`): мелкая донная сетка 2 мм + широкие вертикальные прорези во
-ВСЕХ 4 стенках (мелкий поддон в неглубоком лотке даёт мало донной сетки — стенки
-несут основную фильтр-площадь). Инварианты: **открытая площадь ≥ ~300 мм²**
-(≈4× сливного бора Ø9.4; факт ~334) — сетка не душит поток; **резервуар мусора
-≥ 3 мл** (факт ~3.3). Собственный `screen_wall` (НЕ shared `wall`) — толстые
-рельсовые стенки ряда не утолщают маленькую чашку.
+**The basket** is a compact sink-filter cup (`substrate_tray_body`→
+`lift_tabs`→`screen_wall_slots`): a fine 2 mm bottom mesh + wide vertical
+slots in ALL 4 walls (a shallow pan in a shallow tray gives little bottom
+mesh — the walls carry the main filter area). Invariants: **open area
+≥ ~300 mm²** (≈4× the Ø9.4 drain bore; actual ~334) — the screen does not
+choke the flow; **debris reservoir ≥ 3 ml** (actual ~3.3). Its own
+`screen_wall` (NOT the shared `wall`) — the row's thick rail walls do not
+thicken the little cup.
 
-**Оси проверок (VF-8.1):**
-- form: `collector_sump_is_lowest_point` (колодец ниже пола лотка, бор из его
-  дна), `tray_floor_slopes_to_sump` (воронка сходится к сливу со всех сторон),
-  `basket_not_transverse_flow_barrier` (раструб шире устья + утоплен → вода
-  падает внутрь, не перегорожен лоток), `no_standing_water_before_screen`
-  (монотонный спуск к сливу), `screen_open_area_ratio_ok`, `screen_debris_capacity_ok`;
-- assembly (IR-чек стыка `drop_in_screen`): `screen_normal_no_bypass`
-  (корзина накрывает слив, mesh-only, anti-shift, tool-free, обод выше перелива
-  иначе FAIL без `allow_emergency_bypass`), `drain_inside_screen_footprint`
-  (слив в футпринте корзины в позе), `screen_removable_from_sump` (обод возвышен,
-  прямой съём);
-- реюз `manufacturing.mesh_manifold`, `topology.single_connected_solid`,
+**Verification axes (VF-8.1):**
+- form: `collector_sump_is_lowest_point` (the well below the tray floor, the
+  bore from its bottom), `tray_floor_slopes_to_sump` (the funnel converges
+  to the drain from all sides), `basket_not_transverse_flow_barrier` (the
+  bell wider than the throat + recessed → water falls inside, the tray is
+  not blocked), `no_standing_water_before_screen` (a monotonic descent to
+  the drain), `screen_open_area_ratio_ok`, `screen_debris_capacity_ok`;
+- assembly (the `drop_in_screen` joint IR check): `screen_normal_no_bypass`
+  (the basket covers the drain, mesh-only, anti-shift, tool-free, the rim
+  above the overflow — otherwise FAIL without `allow_emergency_bypass`),
+  `drain_inside_screen_footprint` (the drain within the basket footprint in
+  pose), `screen_removable_from_sump` (the rim raised, a straight pull);
+- reuse of `manufacturing.mesh_manifold`, `topology.single_connected_solid`,
   `form.lift_access_ok`.
 
-**Отчёт обслуживания.** `water_report._row_water(...)` получил блок
-`maintenance` (drain_screen: «rinse», honest_note «DEBRIS-REDUCED water»;
-collector/channel/tubes/cassette — по присутствующим деталям; `all_tool_free`,
-`service_interval_hint: grow-test`). Строки появляются только для реально
-присутствующих деталей.
+**Maintenance report.** `water_report._row_water(...)` gained a
+`maintenance` block (drain_screen: "rinse", honest_note "DEBRIS-REDUCED
+water"; collector/channel/tubes/cassette — per the parts present;
+`all_tool_free`, `service_interval_hint: grow-test`). Lines appear only for
+parts actually present.
 
-**Pump topology (док-нота, не геометрия):** `слив коллектора --(gravity)-->
-резервуар --(насос)--> inlet cap`. НЕ «насос сосёт напрямую сквозь корзину» —
-прямое всасывание забивает сетку быстрее, тянет воздух и наносит мусор на меш.
-Сетка стережёт gravity-путь до резервуара; насос берёт из отстоявшегося
-резервуара.
+**Pump topology (a doc note, not geometry):** `collector drain --(gravity)-->
+reservoir --(pump)--> inlet cap`. NOT "the pump sucks directly through the
+basket" — direct suction clogs the screen faster, pulls air and drags debris
+onto the mesh. The screen guards the gravity path to the reservoir; the pump
+draws from the settled reservoir.
 
-**Mate = ДАТУМ, не порт.** Стык корзина↔колодец — по датумам `screen_seat`/
-`seat` + `drop_in_screen` + честность через `assembly.screen_normal_no_bypass`
-(прецедент `saddle_hang`/`hose_port`), без interface-порта: female-порт колодца
-(+Z) под скошенной геометрией не имеет чистой наружной нормали, а реестр
-INTERFACE_TYPES заморожен на 11 A1-типов. **CAD-acceptance** (strict `forge
-build` ловит то, что pre-CAD validate пропускает — закрыто дешёвым
-`test_root_chamber_row_builds_strict`): щётка достаёт весь пробег канала
-(`brush_access` — шахта открывает крышу над задней половиной колодца);
-`no_standing_water` не флагует колодец (сквозной вертикальный бор дренирует его,
-exemption `_pocket_drained_by_through_bore`); `no_interference` pass (корзина
-падает в открытый колодец, не врезается); mouth колодца = OUTER корзины +
-2·clr (гэп 0.75 в band). Обоснованная эволюция первого VF-8 (слив в углу →
-центральный воронка-колодец), которая заодно устранила класс проблем
-«корзина в глухом углу».
+**Mate = a DATUM, not a port.** The basket↔well joint goes through the
+`screen_seat`/`seat` datums + `drop_in_screen` + honesty via
+`assembly.screen_normal_no_bypass` (the `saddle_hang`/`hose_port`
+precedent), without an interface port: a female port of the well (+Z) under
+the skewed geometry has no clean outward normal, and the INTERFACE_TYPES
+registry is frozen at the 11 A1 types. **CAD acceptance** (strict
+`forge build` catches what pre-CAD validate misses — closed by the cheap
+`test_root_chamber_row_builds_strict`): the brush reaches the whole channel
+run (`brush_access` — the shaft opens the roof above the back half of the
+well); `no_standing_water` does not flag the well (the through vertical bore
+drains it, the `_pocket_drained_by_through_bore` exemption);
+`no_interference` pass (the basket drops into the open well, no collision);
+the well mouth = the basket's OUTER + 2·clr (the 0.75 gap in band). A
+justified evolution of the first VF-8 (a corner drain → a central
+funnel-well), which along the way eliminated the "basket in a blind corner"
+class of problems.
 
-Golden: `vertical_farm_row_3x1_root_chamber` — коллектор `screen_seat: true`,
-деталь `screen` (`drain_screen_v1`), стык `drop_in_screen`. Честный остаток:
-внешний пре-фильтр резервуара/насоса (обвязка); круглый юбочный slot-mesh
-(нужен cylindrical «slots»); двухступенчатая крупно+мелко сетка (не выбрана);
-точный размер ячейки vs скорость засора — grow-test (агрономия CAD'ом не
-верифицируется).
+Golden: `vertical_farm_row_3x1_root_chamber` — the collector
+`screen_seat: true`, part `screen` (`drain_screen_v1`), joint
+`drop_in_screen`. The honest remainder: an external pre-filter for the
+reservoir/pump (plumbing); a round skirt slot-mesh (needs cylindrical
+"slots"); a two-stage coarse+fine screen (not chosen); the exact cell size
+vs clogging rate — grow-test (agronomy is not verifiable by CAD).
 
-## Universal rail — floored lip-seat receiver, без сквозных дыр под водой (VF-9)
+## Universal rail — floored lip-seat receiver, no through holes under water (VF-9)
 
-VF-8 сделал `rail_1` особым (`inlet_mode: capped`) — костыль от двух симптомов
-ОДНОЙ проблемы: сквозной, открытый снизу приёмник `lap_in_lap_receiver` под
-жёлобом. Он (1) заставлял cap кормить особый capped-рейл и (2) на КАЖДОМ стыке
-рейл↔рейл оставлял открытую вниз дыру прямо под водой — «будет вытекать», не
-«контролируемая протечка». Корень — сама идея сквозного приёмника (чтобы
-сплошное дно не давало дамбу при ΔZ=0).
+VF-8 made `rail_1` special (`inlet_mode: capped`) — a crutch for two
+symptoms of ONE problem: the through, bottom-open `lap_in_lap_receiver`
+under the channel. It (1) forced the cap to feed a special capped rail and
+(2) left a downward-open hole right under the water at EVERY rail↔rail
+joint — "it will leak out", not a "controlled leak". The root is the very
+idea of a through receiver (so that a solid bottom would not make a dam at
+ΔZ=0).
 
-Инверсия (VF-9): рейл снова **УНИВЕРСАЛЬНЫЙ**, а приёмник — top-open **FLOORED
-lip-seat**: карман опущен ровно на `lip_t + clearance` ниже пола канала, со
-**сплошным дном**. Губа соседа садится в него, `верх губы = пол канала` —
-непрерывная водная поверхность (нет дамбы), при этом **нет дыры вниз**. Тот же
-floored-карман ловит и каплю cap (не проваливается) — поэтому `rail_1` перестаёт
-быть особым, а cap больше не обязан доставлять воду вовнутрь.
+The inversion (VF-9): the rail is again **UNIVERSAL**, and the receiver is a
+top-open **FLOORED lip-seat**: the pocket is lowered exactly
+`lip_t + clearance` below the channel floor, with a **solid bottom**. The
+neighbor's lip sits in it, `lip top = channel floor` — a continuous water
+surface (no dam), while there is **no hole downward**. The same floored
+pocket also catches the cap's drip (it does not fall through) — so `rail_1`
+stops being special, and the cap no longer has to deliver water inboard.
 
-- `_lap_inlet_receiver`: `pocket_floor = channel_floor − (lip_t + lip_clearance)`
-  (по умолчанию 1.4 + 0.3 = 1.7 мм), карман z от `pocket_floor` до `floor+0.2` —
-  мелкий (глубина ≤ 2.2, exempt в `no_standing_water_ir`). Публикует
-  `lap_pocket_floor_z`, `lap_pocket_depth`. Никакого `inlet_mode`/`inlet_capped`.
-- `check_lap_joint_geometry_ok` / `lap_slot_leak_path_controlled` переписаны:
-  приёмник ДОЛЖЕН быть floored (`z0 > 0.05`, floor = `lap_pocket_floor_z`); нет
-  открытого пути вниз, открыт только верхний tip-slot на стыке.
-- Новые form-чеки: **`lap_receiver_has_floor`** (сплошное дно),
-  **`lap_receiver_residual_volume_ok`** (это lip-SEAT, глубина ≤ 2 мм, не
-  резервуар — репортит `lap_receiver_residual_volume_mm3`),
-  **`rail_universal_inlet_accepts_cap_and_lap`** (один floored-вход ловит и каплю,
-  и губу).
-- **Инвариант `manufacturing.no_through_holes_in_wet_lap_zone`** (always-on): ни
-  один cutbox с открытым дном (`z0 ≤ 0.05`) не стоит под активным водным путём
-  (регионы `water_channel`/`lap_receiver`/`lap_lip`), КРОМЕ санкционированного
-  слива коллектора. PASS после floored-фикса; FAIL если вернуть сквозной приёмник.
-- Assembly-чеки: **`assembly.lap_joint_no_external_downward_leak`** (стык lap_flow —
-  приёмник закрыт снизу) и **`assembly.cap_drip_lands_in_channel_safe_floor`** (cap↔
-  rail.feed — капля падает на channel-safe дно, не в сквозную дыру), оба в
+- `_lap_inlet_receiver`: `pocket_floor = channel_floor − (lip_t +
+  lip_clearance)` (default 1.4 + 0.3 = 1.7 mm), the pocket z from
+  `pocket_floor` to `floor+0.2` — shallow (depth ≤ 2.2, exempt in
+  `no_standing_water_ir`). It publishes `lap_pocket_floor_z`,
+  `lap_pocket_depth`. No `inlet_mode`/`inlet_capped`.
+- `check_lap_joint_geometry_ok` / `lap_slot_leak_path_controlled` are
+  rewritten: the receiver MUST be floored (`z0 > 0.05`, floor =
+  `lap_pocket_floor_z`); there is no open path downward, only the top
+  tip-slot at the joint is open.
+- New form checks: **`lap_receiver_has_floor`** (a solid bottom),
+  **`lap_receiver_residual_volume_ok`** (this is a lip-SEAT, depth ≤ 2 mm,
+  not a reservoir — reports `lap_receiver_residual_volume_mm3`),
+  **`rail_universal_inlet_accepts_cap_and_lap`** (one floored inlet catches
+  both the drip and the lip).
+- **The `manufacturing.no_through_holes_in_wet_lap_zone` invariant**
+  (always-on): no cutbox with an open bottom (`z0 ≤ 0.05`) may sit under an
+  active water path (regions `water_channel`/`lap_receiver`/`lap_lip`),
+  EXCEPT the sanctioned collector drain. PASS after the floored fix; FAIL if
+  the through receiver is brought back.
+- Assembly checks: **`assembly.lap_joint_no_external_downward_leak`** (the
+  lap_flow joint — the receiver is closed from below) and
+  **`assembly.cap_drip_lands_in_channel_safe_floor`** (cap↔rail.feed — the
+  drip lands on a channel-safe floor, not into a through hole), both in
   `row_water_chain.verified_by`.
-- Голдены: у `rail_1` убран `inlet_mode: capped` — все рейлы одинаковы.
+- Goldens: `inlet_mode: capped` removed from `rail_1` — all rails are
+  identical.
 
-Архитектура ряда: `универсальный рейл (floored-приёмник + губа-выход, без мокрых
-сквозных дыр) → lap-переток без внешней протечки вниз → collector = единственный
-намеренный слив вниз`. CAD-проба (rail_2): под колонкой feed теперь solid (было
-0.00 сквозное); мелкий seat-паз выше, сплошное дно ниже.
+Row architecture: `a universal rail (floored receiver + outlet lip, no wet
+through holes) → lap handover with no external downward leak → collector =
+the only intentional drain downward`. CAD probe (rail_2): under the feed
+column there is now solid material (was 0.00 through); the shallow seat
+groove above, a solid bottom below.
 
-## Support-free Г-hook cap (VF-9 Part B)
+## Support-free L-hook cap (VF-9 Part B)
 
-Старый cap печатался только через `saddle_up` flip: as-modeled потолок седла —
-плоский мост над ~14мм с висящей внешней губой («floating cantilever», Bambu
-флагает; движковый `manufacturing.overhang` это НЕ ловил — слепая зона VF-7c).
-Задача Part B — печать AS-MODELED без flip.
+The old cap printed only via the `saddle_up` flip: as-modeled, the saddle
+ceiling is a flat bridge over ~14 mm with a hanging outer lip ("floating
+cantilever", Bambu flags it; the engine's `manufacturing.overhang` did NOT
+catch this — the VF-7c blind spot). Part B's goal — print AS-MODELED,
+without a flip.
 
-Геометрическое открытие: **двусторонний straddle через ~13мм стенку нельзя
-напечатать support-free** — над проёмом стенки (в печати самой детали стенки
-нет) внутренняя губа плеча всегда висит; gable над плоскостью z=8 не помогает
-(потолок на z=8 всё равно над воздухом). Единственные support-free варианты —
-односторонний hook или reorient/flip. Решение (утв. пользователем): **compact
-one-sided Г-hook + face dock**:
-- Короткая полка-опора (**hook_reach ~3.5мм**, `HOOK_LEDGE_BAND`) ложится на
-  ВНЕШНИЙ край верха стенки; внешняя нога/foot держит +Y-грань и достаёт до
-  стола. Полка = 4.4мм one-sided overhang (печатается), НЕ 14мм cantilever.
-- **Nose column** над каналом (`|x|<nose/2`) достаёт до стола, несёт вертикальный
-  бор (прямой слив, чистится сверху) и служит внутренним анкером крыши над
-  каналом (bridge, не cantilever); тянется вглубь на ~10мм — сплошные стенки по
-  бокам бора (иначе полый столбик не «ребро» для `topology.ribs_present`).
-- Убрана выпирающая spout-пластина; `print_orientation: as_modeled`, flip удалён.
-- **Магнитный док перенесён с верха стенки на вертикальную +Y-грань**
-  (Y-оси карманы): док на верху стенки требует ~7мм inboard-полку (un-printable
-  overhang), а вертикальная грань печатается чисто. Rail-амендмент VF-6:
-  `endcap_dock_style: top|face` (top=Z-карманы верха, collector; face=Y-карманы
-  торца, cap). `dock_drop` — общая просадка от верха стенки, чтобы cap и rail
-  сошлись по мировому z. `_endcap_dock` (carrier) и `check_dock_pockets_dry`
-  умеют обе оси.
-- `saddle_hang_ir` получил hook-ветку (гейт `hang_mode`): проверяет ledge reach
-  (`HOOK_LEDGE_BAND`, ≤ толщины стенки), leg gap у грани, посадку на верх стенки;
-  collector остаётся straddle (без изменений). Hook **не зависит от толщины
-  стенки** (цепляет внешний край) — mismatch толщины больше не failure mode.
-- Новый always-on **`manufacturing.cap_supportless_verified`** (закрывает
-  VF-7c): полка-overhang ≤ `CAP_ROOF_OVERHANG_MAX=5` И nose достаёт до стола;
-  старый плоский 14мм cantilever → FAIL.
+The geometric discovery: **a two-sided straddle across a ~13 mm wall cannot
+be printed support-free** — above the wall's gap (the wall itself is absent
+when the part is printed) the shoulder's inner lip always hangs; a gable
+above the z=8 plane does not help (a ceiling at z=8 is still over air). The
+only support-free options are a one-sided hook or reorient/flip. The
+solution (user-approved): a **compact one-sided L-hook + face dock**:
+- A short rest ledge (**hook_reach ~3.5 mm**, `HOOK_LEDGE_BAND`) rests on
+  the OUTER edge of the wall top; the outer leg/foot holds the +Y face and
+  reaches the bed. The ledge is a 4.4 mm one-sided overhang (printable),
+  NOT a 14 mm cantilever.
+- A **nose column** above the channel (`|x|<nose/2`) reaches the bed,
+  carries the vertical bore (a straight drain, cleaned from above) and
+  serves as the inner anchor of the roof above the channel (a bridge, not a
+  cantilever); it extends ~10 mm inward — solid walls on both sides of the
+  bore (otherwise the hollow post is not a "rib" for
+  `topology.ribs_present`).
+- The protruding spout plate is removed; `print_orientation: as_modeled`,
+  the flip is deleted.
+- **The magnetic dock moved from the wall top to the vertical +Y face**
+  (Y-axis pockets): a dock on the wall top would need a ~7 mm inboard ledge
+  (an un-printable overhang), while a vertical face prints cleanly. The VF-6
+  rail amendment: `endcap_dock_style: top|face` (top = Z-pockets in the wall
+  top, collector; face = Y-pockets in the end face, cap). `dock_drop` — a
+  shared drop from the wall top so that the cap and the rail meet at the
+  same world z. `_endcap_dock` (carrier) and `check_dock_pockets_dry` handle
+  both axes.
+- `saddle_hang_ir` gained a hook branch (gated by `hang_mode`): it verifies
+  the ledge reach (`HOOK_LEDGE_BAND`, ≤ the wall thickness), the leg gap at
+  the face, the seating on the wall top; the collector remains straddle
+  (unchanged). The hook **does not depend on the wall thickness** (it grips
+  the outer edge) — a thickness mismatch is no longer a failure mode.
+- A new always-on **`manufacturing.cap_supportless_verified`** (closes
+  VF-7c): the ledge overhang ≤ `CAP_ROOF_OVERHANG_MAX=5` AND the nose
+  reaches the bed; the old flat 14 mm cantilever → FAIL.
 
-CAD-acceptance: flush_smoke (cap без дока) И root_chamber (cap с face-доком) —
-оба strict PASS, no_interference/ribs_present/single_solid/overhang/
-cap_supportless_verified зелёные. Corbelled L-hook (двусторонний capture+nose)
-и gabled roof остаются возможной эволюцией после физической печати.
+CAD acceptance: flush_smoke (cap without a dock) AND root_chamber (cap with
+a face dock) — both strict PASS, no_interference/ribs_present/single_solid/
+overhang/cap_supportless_verified green. A corbelled L-hook (a two-sided
+capture+nose) and a gabled roof remain a possible evolution after a physical
+print.
 
-## Chute-cap (VF-9.2) — видимый водный путь, упор для трубки
+## Chute-cap (VF-9.2) — a visible water path, a stop for the tube
 
-Пользователь на собранном `out/` увидел, что бор cap читается как «сквозной
-тоннель»: константный Ø9.4 на всю высоту — трубку можно продавить НАСКВОЗЬ
-(упора нет), а форма не объясняет путь воды. Правило (закреплено валидатором):
-**cap не должен содержать закрытый горизонтальный водный тоннель — путь воды
-виден глазами**. Вариант B (утв. пользователем): **chute-cap**.
+On the assembled `out/` the user saw that the cap's bore reads as a "through
+tunnel": a constant Ø9.4 over the full height — the tube can be pushed all
+the way THROUGH (there is no stop), and the shape does not explain the water
+path. The rule (locked in by a validator): **the cap must not contain a
+closed horizontal water tunnel — the water path is visible to the eye**.
+Variant B (user-approved): the **chute-cap**.
 
-Путь воды: `трубка → вертикальный SOCKET с УПОРНЫМ БУРТИКОМ (глухое дно,
-Ø tube+0.4, глубина 12) → узкий DRIP ORIFICE Ø5 сквозь упор → короткая крытая
-КАМЕРА (шахта падения ≤10мм по Y) → ОТКРЫТЫЙ СВЕРХУ носик-жёлоб (U-корыто:
-пол + 2 стенки-рёбра) → капля с кончика падает на floored lip-seat, DRIP_INSET
-= 4.5мм ВНУТРИ канала` — дальше воду ведёт сам канал под уклоном ряда. Ровный
-пол жёлоба дренируется уклоном монтажа (как канал рейла — канон).
+The water path: `tube → a vertical SOCKET with a STOP SHOULDER (blind
+bottom, Ø tube+0.4, depth 12) → a narrow DRIP ORIFICE Ø5 through the stop →
+a short covered CHAMBER (a fall shaft ≤10 mm along Y) → a TOP-OPEN spout
+chute (a U-trough: floor + 2 wall ribs) → the drip from the tip lands on the
+floored lip-seat, DRIP_INSET = 4.5 mm INSIDE the channel` — from there the
+water is carried by the channel itself under the row slope. The chute's flat
+floor drains by the mount slope (like the rail channel — the canon).
 
-- Сквозной Ø9.4 бор и монолитный нос УДАЛЕНЫ; крыша над жёлобом прорезана «в
-  небо» (sky slot) — путь чистится щёткой сверху и виден.
-- **Парный сдвиг датумов**: `feed` рейла и `spout` cap оба на −DRIP_INSET —
-  поза ряда байт-в-байт, датумы честно отмечают реальную точку капли.
-- Чеки: `hose_bore_ok` (socket ОБЯЗАН быть глухим — сквозной socket без упора
-  = FAIL; orifice 4..tube−2, соосный, стыкуется с дном socket'а);
-  `spout_drop_path_ok` (пол+обе стенки, кончик = spout-датум, ширина в бюджете
-  канала); **новый `form.cap_water_path_visible`** (камера ≤10мм, sky-проём до
-  верха, нет горизонтальных боров в мокрой зоне); `no_standing_water_ir` —
-  экземпшен «глухой бор дренируется соосным orifice снизу» (заглушенный socket
-  без orifice остаётся FAIL); **`topology.fluid_path_open` переписан** — cap
-  пробится ОДНОЙ составной полилинией (socket→orifice→камера→вдоль жёлоба→за
-  кромку), никогда не требуя void ниже упора; **новый assembly
-  `cap_chute_drains_under_mount`** — виртуальные высоты обоих концов жёлоба В
-  ПОЗЕ смонтированного ряда (уклон ведёт воду к носику; без mount_context —
-  честный FAIL).
-- Инвариант архетипа: `orifice_d <= tube_od - 2` (упор реален).
-- Грабли: рёбра свариваются ПОСЛЕ вырезов и по порядку списка — пол жёлоба
-  (z<0) обязан вариться ПОСЛЕ ног/стенок (иначе WeldError «2 solids»); U-ноги
-  вокруг камеры (цельная ступня заполнила бы её обратно).
+- The through Ø9.4 bore and the monolithic nose are REMOVED; the roof above
+  the chute is cut open "to the sky" (a sky slot) — the path is
+  brush-cleanable from above and visible.
+- **A paired datum shift**: the rail's `feed` and the cap's `spout` both at
+  −DRIP_INSET — the row pose is byte-for-byte, the datums honestly mark the
+  real drip point.
+- Checks: `hose_bore_ok` (the socket MUST be blind — a through socket
+  without a stop = FAIL; the orifice 4..tube−2, coaxial, meets the socket
+  bottom); `spout_drop_path_ok` (floor + both walls, the tip = the spout
+  datum, width within the channel budget); the **new
+  `form.cap_water_path_visible`** (chamber ≤10 mm, the sky opening reaching
+  the top, no horizontal bores in the wet zone); `no_standing_water_ir` —
+  an exemption "a blind bore is drained by a coaxial orifice below" (a
+  plugged socket without an orifice remains FAIL);
+  **`topology.fluid_path_open` is rewritten** — the cap is probed with ONE
+  composite polyline (socket→orifice→chamber→along the chute→past the
+  edge), never demanding a void below the stop; the **new assembly
+  `cap_chute_drains_under_mount`** — virtual heights of both chute ends IN
+  THE POSE of the mounted row (the slope carries water to the spout; without
+  mount_context — an honest FAIL).
+- The archetype invariant: `orifice_d <= tube_od - 2` (the stop is real).
+- Gotcha: ribs are welded AFTER the cuts and in list order — the chute floor
+  (z<0) must be welded AFTER the legs/walls (otherwise WeldError
+  "2 solids"); U-legs around the chamber (a solid foot would fill it back
+  in).
 
-## Overflow honesty (VF-4.2, до VF-5 Root Chamber)
+## Overflow honesty (VF-4.2, before VF-5 Root Chamber)
 
-В номинале вода уходит через контактное окно в канал. Но при верхнем
-поливе ИЗБЫТОК под уклоном капает сквозь сквозной скелет вниз — контейнмента
-нет. Это ЯВНО в water_report: `overflow_containment {status: absent, path:
-drains_through_skeleton, user_action: keep a tray under the row,
-planned_fix: VF-5 root_chamber}`. Полное решение — корневая камера VF-5
-(глухое дно + соты + пассивный возврат слива в коллектор).
+Nominally water leaves through the contact window into the channel. But with
+top watering the EXCESS drips down through the through skeleton under the
+slope — there is no containment. This is EXPLICIT in the water report:
+`overflow_containment {status: absent, path: drains_through_skeleton,
+user_action: keep a tray under the row, planned_fix: VF-5 root_chamber}`.
+The full solution is the VF-5 root chamber (a blind bottom + cells + a
+passive drain return to the collector).
 
-## Печать (PETG prototype notes)
+## Printing (PETG prototype notes)
 
-- Все печатаемые части — плоско, без поддержек; мокрый путь сверху.
-- Потолки lightweight-окон — мосты ~37–43 мм: слайсер строит, провисание
-  в сухой невидимой зоне приемлемо; чек репортит span > 45 нотой.
-- Bed 250×250 для модуля 248 (`manufacturing.bed_fit`).
-- PETG для прототипа; пищевой PP — MVP-5. Магниты предпочтительно
-  с покрытием/эпоксидированные (BOM-нота).
+- All printable parts print flat, without supports; the wet path faces up.
+- The ceilings of the lightweight windows are ~37–43 mm bridges: the slicer
+  builds them, sagging in a dry invisible zone is acceptable; the check
+  reports span > 45 as a note.
+- Bed 250×250 for the 248 module (`manufacturing.bed_fit`).
+- PETG for the prototype; food-grade PP — MVP-5. Magnets preferably
+  coated/epoxy-sealed (BOM note).
 
-## CAD acceptance (двухуровневый)
+## CAD acceptance (two-level)
 
-- В suite: `vertical_farm_flush_smoke` (cap + 2 rails с ОДНИМ настоящим
-  lap-швом + кассета + collector + 1 профиль) — lap-геометрия реальна на
-  солидах (no_interference, сквозной проём), отчёты пишутся; плюс
-  однодетальный смок rail (масса lightweight on/off, губа/проём/карманы
-  пробами).
-- Полный ряд: `uv run forge build
+- In the suite: `vertical_farm_flush_smoke` (cap + 2 rails with ONE real
+  lap seam + cassette + collector + 1 profile) — the lap geometry is real on
+  solids (no_interference, a through cutout), the reports are written; plus
+  a single-part rail smoke (mass with lightweight on/off, the lip/cutout/
+  pockets by probes).
+- The full row: `uv run forge build
   catalog/examples/vertical_farm/vertical_farm_row_3x1.yaml`.
 
-## Честный остаток
+## Honest remainder
 
-- **VF-4.2**: anti-slide удержание ряда на СМОНТИРОВАННОМ под уклоном
-  профиле (клипсы/упоры) — посадка полная, но продольного замка нет;
-- `lightweight_dry_shell_v1` — generic-модификатор облегчения;
-- `dry_endcap_v1`; `vertical_farm_shelf_row_v1` (MVP-4); VF-5 Cassette Family;
-- герметичные межмодульные стыки — **никогда** (anti-goal);
-- CFD — никогда в v1; проверки — sampled centerline + probe-геометрия;
-- рендер сечений/exploded — общий output-слой, не пакетная забота.
+- **VF-4.2**: anti-slide retention of the row on the profile MOUNTED at a
+  slope (clips/stops) — the seating is full, but there is no longitudinal
+  lock;
+- `lightweight_dry_shell_v1` — a generic lightweighting modifier;
+- `dry_endcap_v1`; `vertical_farm_shelf_row_v1` (MVP-4); VF-5 Cassette
+  Family;
+- sealed inter-module joints — **never** (anti-goal);
+- CFD — never in v1; verification is a sampled centerline + probe geometry;
+- section/exploded renders — a shared output layer, not a pack concern.
 
-## История: superseded каскад (VF-3/VF-4)
+## History: the superseded cascade (VF-3/VF-4)
 
-Каскад (уклон 1.25° в желобе, inlet-датум с FALL_ENTRY, ступеньки 7.91 мм,
-скошенный профиль-суррогат 1.827°, span_gap 7.91 upstream-edge контакта)
-реализован и верифицирован в коммитах VF-3/VF-4 — если понадобится
-археология, она в git. Из каскада выжили: механизм `fluid_joint` (drip у
-адаптеров), FALL_ENTRY (только датум `feed`), process:reference,
-saddle_hang, profile_perch и вся Cassette Interface Standard.
+The cascade (a 1.25° slope in the channel, an inlet datum with FALL_ENTRY,
+7.91 mm steps, a chamfered 1.827° profile surrogate, span_gap 7.91 of
+upstream-edge contact) was implemented and verified in the VF-3/VF-4
+commits — if archaeology is ever needed, it is in git. What survived the
+cascade: the `fluid_joint` mechanism (drip at the adapters), FALL_ENTRY
+(only the `feed` datum), process:reference, saddle_hang, profile_perch and
+the whole Cassette Interface Standard.

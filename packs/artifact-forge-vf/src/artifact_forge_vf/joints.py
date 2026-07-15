@@ -686,7 +686,7 @@ def _saddle_hang_ir(
     problems: list[str] = []
     hook = fb.get("hang_mode", 0.0) >= 0.5
     if hook:
-        # VF-9 Part B one-sided Г-hook: the leg grips the wall's OUTBOARD face
+        # VF-9 Part B one-sided L-hook: the leg grips the wall's OUTBOARD face
         # and a SHORT ledge rests on the outboard part of the wall top — it does
         # NOT straddle to the inboard face (that would need an un-printable leg
         # in the seat). Capture: leg gap at the face + ledge reach onto the top.
@@ -726,7 +726,7 @@ def _saddle_hang_ir(
         problems.append(
             f"spout/tongue {fb['spout_w']:g} does not fit the "
             f"{fa['channel_w']:g} channel it dips into")
-    kind = "Г-hook grips the wall" if hook else "saddle straddles the wall"
+    kind = "L-hook grips the wall" if hook else "saddle straddles the wall"
     if problems:
         findings = [_finding(check, False, "; ".join(problems))]
     else:

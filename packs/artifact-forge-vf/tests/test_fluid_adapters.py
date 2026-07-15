@@ -128,7 +128,7 @@ def test_cap_chute_drains_under_mount():
 
 
 def test_cap_supportless_verified_and_cantilever_mutation():
-    """VF-9 Part B: the support-free Г-hook passes cap_supportless_verified
+    """VF-9 Part B: the support-free L-hook passes cap_supportless_verified
     (short rest ledge + nose column anchoring the roof). Reopening the roof
     into a deep floating cantilever (the old flat-bridge geometry) FAILs — the
     closed VF-7c blind spot."""
@@ -357,7 +357,7 @@ def test_cap_saddle_hangs_on_back_wall():
     pose = compute_pose(joint, rail, cap)
     findings = _saddle_hang_ir(rail, cap, pose, joint)
     assert findings[0].status.value == "pass", findings[0].message
-    assert "Г-hook grips" in findings[0].message  # VF-9 Part B one-sided hook
+    assert "L-hook grips" in findings[0].message  # VF-9 Part B one-sided hook
 
 
 def test_collector_saddle_hangs_on_front_wall():

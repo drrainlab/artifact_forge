@@ -21,6 +21,19 @@ function findingsTable(findings) {
   </table>`;
 }
 
+async function withBusy(btn, label, fn) {
+  if (!btn || btn.dataset.busy) return;
+  const old = btn.innerHTML;
+  btn.dataset.busy = "1";
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin"></span>${esc(label)}`;
+  try { return await fn(); } finally {
+    delete btn.dataset.busy;
+    btn.disabled = false;
+    btn.innerHTML = old;
+  }
+}
+
 const BADGES = {
   failed:        { label: "FAIL",           cls: "off" },
   pre_cad_pass:  { label: "PRE-CAD PASS",   cls: "on" },
@@ -49,6 +62,7 @@ export function renderAssemblyWizard({ screenEl, api, openInWorkspace, status })
     log: [],
     svg: null,             // attached SVG text (engraving/cutout asset)
     svgName: "",
+    history: null,         // fetched history metas (null = loading)
   };
 
   function badge() {
@@ -76,7 +90,7 @@ export function renderAssemblyWizard({ screenEl, api, openInWorkspace, status })
         <p class="dim">Multi-part composition from the catalog: parts, joints, shared
         dimensions, wiring. The model drafts; the deterministic pipeline judges.</p>
         <textarea id="asm-prompt" rows="4" spellcheck="false"
-          placeholder="верстачная станция на перфопанель: слайдер по ласточкину хвосту, площадка со snap-корпусом контроллера, лампа E27 на кронштейне, кабель от контроллера к патрону; корпус облегчить"></textarea>
+          placeholder="pegboard bench station: dovetail slider, adapter plate with a snap-fit controller box, E27 lamp on a bracket, cable from the controller to the socket; lighten the box"></textarea>
         <div class="row mt">
           <button class="forge" id="asm-go">Compose assembly</button>
           <button class="ghost" id="asm-svg-btn"
@@ -84,8 +98,21 @@ export function renderAssemblyWizard({ screenEl, api, openInWorkspace, status })
           ${st.svgName ? '<button class="ghost" id="asm-svg-clear" title="detach">✕</button>' : ""}
           <input type="file" id="asm-svg-file" accept=".svg,image/svg+xml" style="display:none">
         </div>
+      </div>
+      <div class="panel"><h3>HISTORY</h3>
+        <p class="dim">Every composed draft is kept — the failed ones too
+        (their findings are part of the story). Click to reopen.</p>
+        <div id="asm-history">${historyRows()}</div>
       </div></div>`;
     screenEl.querySelector("#asm-go").addEventListener("click", compose);
+    wireHistory();
+    if (st.history === null) {
+      api.assemblyHistory().then((r) => {
+        st.history = r.entries || [];
+        const el = screenEl.querySelector("#asm-history");
+        if (el) { el.innerHTML = historyRows(); wireHistory(); }
+      }).catch(() => { st.history = []; });
+    }
     const fileEl = screenEl.querySelector("#asm-svg-file");
     screenEl.querySelector("#asm-svg-btn").addEventListener("click", () => fileEl.click());
     fileEl.addEventListener("change", async () => {
@@ -103,6 +130,34 @@ export function renderAssemblyWizard({ screenEl, api, openInWorkspace, status })
       render();
       screenEl.querySelector("#asm-prompt").value = prompt;
     });
+  }
+
+  function historyRows() {
+    if (st.history === null) return `<div class="dim">loading…</div>`;
+    if (!st.history.length) return `<div class="dim">no drafts yet</div>`;
+    return `<table class="findings">${st.history.map((h) => {
+      const b = BADGES[h.verification_state] || BADGES.failed;
+      const when = (h.ts || "").replace("T", " ").replace("+00:00", " UTC");
+      return `<tr class="asm-hist" data-hid="${esc(h.id)}" style="cursor:pointer">
+        <td class="faint">${esc(when)}</td>
+        <td><span class="badge ${b.cls}">${esc(b.label)}</span></td>
+        <td>${h.parts ? esc(h.parts + " parts") : ""}${h.svg_attached ? " ⌘svg" : ""}</td>
+        <td class="msg">${esc((h.prompt || "").slice(0, 110))}</td></tr>`;
+    }).join("")}</table>`;
+  }
+
+  function wireHistory() {
+    screenEl.querySelectorAll(".asm-hist").forEach((row) =>
+      row.addEventListener("click", async () => {
+        const r = await api.assemblyHistoryEntry(row.dataset.hid);
+        if (!r.ok || !r.result) return;
+        st.result = r.result;
+        st.validation = r.result.validation || null;
+        st.verification = r.result.verification_state || "failed";
+        st.dirty = false;
+        st.state = "draft";
+        render();
+      }));
   }
 
   function renderProgress() {
@@ -127,6 +182,7 @@ export function renderAssemblyWizard({ screenEl, api, openInWorkspace, status })
         st.log.push(`job ${done.status}: ${done.error || "unknown"}`);
         st.state = "prompt"; render(); return;
       }
+      st.history = null;      // a fresh run belongs in the list
       st.result = done.result;
       st.validation = done.result.validation || null;
       st.verification = done.result.verification_state || "failed";
@@ -176,17 +232,20 @@ export function renderAssemblyWizard({ screenEl, api, openInWorkspace, status })
     screenEl.querySelector("#asm-back").addEventListener("click", () => {
       st.state = "prompt"; render();
     });
-    screenEl.querySelector("#asm-open").addEventListener("click", () =>
-      openInWorkspace(yamlEl.value));
-    screenEl.querySelector("#asm-validate").addEventListener("click", () =>
-      revalidate(yamlEl.value));
-    screenEl.querySelector("#asm-forge").addEventListener("click", () =>
-      forge(yamlEl.value));
+    const openBtn = screenEl.querySelector("#asm-open");
+    openBtn.addEventListener("click", () => withBusy(
+      openBtn, "validating…", () => openInWorkspace(yamlEl.value)));
+    const valBtn = screenEl.querySelector("#asm-validate");
+    valBtn.addEventListener("click", () => withBusy(
+      valBtn, "validating…", () => revalidate(yamlEl.value)));
+    const forgeBtn = screenEl.querySelector("#asm-forge");
+    forgeBtn.addEventListener("click", () => withBusy(
+      forgeBtn, "forging (CAD build)…", () => forge(yamlEl.value)));
     screenEl.querySelectorAll(".asm-sug").forEach((b) =>
-      b.addEventListener("click", async () => {
+      b.addEventListener("click", () => withBusy(b, "opening…", async () => {
         const ex = await api.example(b.dataset.file);
-        if (ex?.yaml) openInWorkspace(ex.yaml);
-      }));
+        if (ex?.yaml) await openInWorkspace(ex.yaml);
+      })));
   }
 
   function refreshControls() {

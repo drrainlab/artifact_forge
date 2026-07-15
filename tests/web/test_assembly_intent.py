@@ -614,3 +614,64 @@ def test_route_rejects_broken_svg_up_front(client):
     body = r.json()
     assert body["ok"] is False
     assert any("path" in f["message"] for f in body["findings"])
+
+
+# -- history: every structured outcome is kept, failed drafts too --------------------
+
+
+@pytest.fixture(autouse=True)
+def tmp_history(monkeypatch, tmp_path):
+    """EVERY test writes history into a throwaway file — route tests
+    must never pollute the developer's real out/assembly_history.json."""
+    from artifact_forge_ng.web import assembly_history
+    monkeypatch.setattr(assembly_history, "HISTORY_PATH",
+                        tmp_path / "assembly_history.json")
+    return assembly_history
+
+
+def test_history_records_and_lists(tmp_history):
+    hid = tmp_history.record("коробка", {
+        "yaml": "schema: assembly/v1\nid: box_asm\nparts: [{ref: a}, {ref: b}]",
+        "valid": True, "verification_state": "pre_cad_pass",
+        "iterations": 1, "source": "llm"})
+    metas = tmp_history.list_entries()
+    assert [m["id"] for m in metas] == [hid]
+    m = metas[0]
+    assert m["assembly_id"] == "box_asm" and m["parts"] == 2
+    assert m["verification_state"] == "pre_cad_pass" and m["valid"]
+    assert "result" not in m                      # metas stay light
+    full = tmp_history.get_entry(hid)
+    assert full["result"]["yaml"].startswith("schema:")
+    assert tmp_history.get_entry("nope") is None
+
+
+def test_history_keeps_failures_and_caps(tmp_history):
+    tmp_history.record("плохой промпт", {"valid": False,
+                                         "verification_state": "failed"})
+    monkeypatch_cap = 5
+    import artifact_forge_ng.web.assembly_history as ah
+    old_cap = ah.MAX_ENTRIES
+    ah.MAX_ENTRIES = monkeypatch_cap
+    try:
+        for i in range(8):
+            tmp_history.record(f"p{i}", {"valid": False,
+                                         "verification_state": "failed"})
+    finally:
+        ah.MAX_ENTRIES = old_cap
+    metas = tmp_history.list_entries()
+    assert len(metas) == monkeypatch_cap
+    assert metas[0]["prompt"] == "p7"             # newest first
+    assert not metas[0]["valid"]                  # failures ARE history
+
+
+def test_route_records_history(monkeypatch, catalog, client, tmp_history):
+    _mock_llm(monkeypatch, [canon()])
+    r = client.post("/api/assembly/intent", json={"prompt": PROMPT})
+    done = _wait_job(client, r.json()["job"])
+    hid = done["result"]["history_id"]
+    lst = client.get("/api/assembly/history").json()
+    assert lst["ok"] and any(e["id"] == hid for e in lst["entries"])
+    entry = client.get(f"/api/assembly/history/{hid}").json()
+    assert entry["ok"] and entry["result"]["yaml"] == done["result"]["yaml"]
+    missing = client.get("/api/assembly/history/nope").json()
+    assert missing["ok"] is False

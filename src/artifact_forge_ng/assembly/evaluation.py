@@ -28,8 +28,6 @@ one-pass facade over a fresh session (the parity test pins that).
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import Any
 
 from ..catalog.loader import Catalog
@@ -37,12 +35,9 @@ from ..core.findings import Finding
 from ..pipeline import PipelineState, pre_cad_from_instance
 from ..product.assembly import AssemblyInstance, JointUse
 from ..product.instance import ProductInstance
-
-
-def stable_hash(value: Any) -> str:
-    payload = json.dumps(value, sort_keys=True, separators=(",", ":"),
-                         ensure_ascii=False, default=str)
-    return hashlib.sha256(payload.encode()).hexdigest()
+# canonical home is util.hashing (shared with the build library);
+# re-exported here so every existing caller keeps working
+from ..util.hashing import stable_hash  # noqa: F401
 
 
 class EvaluationCache:

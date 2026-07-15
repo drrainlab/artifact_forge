@@ -1,156 +1,157 @@
-# Manufacturing Aids / Jigs / Fixtures — план домена
+# Manufacturing Aids / Jigs / Fixtures — domain plan
 
-Статусы: ✅ реализовано · 🔶 частично · ⬜ не начато. Канон шаблона —
-[INDEX.md](../INDEX.md); коммерческие правила — [ECOSYSTEM.md](../../ECOSYSTEM.md).
+Statuses: ✅ implemented · 🔶 partial · ⬜ not started. Template canon —
+[INDEX.md](../INDEX.md); commercial rules — [ECOSYSTEM.md](../../ECOSYSTEM.md).
 
-## 1. Scope и позиционирование
+## 1. Scope and positioning
 
-Производственная оснастка малых серий: сверлильные кондукторы, упоры,
-сборочные и паяльные fixtures, калибры-лесенки, go/no-go шаблоны,
-alignment-блоки. Контекст: AM как production resource — компаниям важны
-repeatability, отчёты, labels, BOM, материал и версия; ровно то, что AF
-делает валидаторами. Сильнейшее B2B-направление: оснастка нужна каждой
-мастерской, каждая — чуть другая, параметризация окупается мгновенно.
+Small-batch production tooling: drilling jigs, stops,
+assembly and soldering fixtures, tolerance-ladder gauges, go/no-go templates,
+alignment blocks. Context: AM as a production resource — companies care about
+repeatability, reports, labels, BOM, material and version; exactly what AF
+does with validators. The strongest B2B direction: every workshop needs
+tooling, each one is slightly different, parametrization pays off instantly.
 
-Каких claims домен НЕ делает:
+What claims this domain does NOT make:
 
-- Джиг — оснастка, НЕ мерительный инструмент класса точности: без
-  калибровки на месте никакой «гарантированной точности ±0.05».
-- НЕ обещает ресурс под ударные/фрезерные нагрузки — позиционирование
-  и направление, не восприятие сил резания.
-- Go/no-go калибры — цеховые пробники, не поверенные средства
-  измерения.
+- A jig is tooling, NOT a precision-class measuring instrument: without
+  on-site calibration there is no "guaranteed accuracy ±0.05".
+- Does NOT promise service life under impact/milling loads — positioning
+  and guidance, not absorbing cutting forces.
+- Go/no-go gauges are shop-floor probes, not certified measuring
+  instruments.
 
 ## 2. Mode / Environment / Tier
 
-Домен = pack, НЕ новый mode: контракт качества собирается из
-Engineering (допуски, min_wall, frames) и Workshop (нагрузки, крепёж).
+Domain = pack, NOT a new mode: the quality contract is assembled from
+Engineering (tolerances, min_wall, frames) and Workshop (loads, fasteners).
 
 ```text
 mode:        Engineering / Workshop
 environment: workshop / desk
-tier:        Business / Pro-центричный (Free — одиночные упоры-витрина)
+tier:        Business / Pro-centric (Free — single showcase stops)
 ```
 
-## 3. Что уже есть в движке — карта реюза
+## 3. What the engine already has — reuse map
 
-| Блок домена | Чем собирается сегодня | Статус |
+| Domain block | How it is built today | Status |
 |---|---|---|
-| Базовые плиты оснастки | `adapter_plate_v1`, `fastener_plate_v1`, `rounded_plate` | ✅ |
-| Отверстия/зенковки под крепёж заготовки | hole/counterbore/countersunk-паттерны | ✅ |
-| Гайки/вставки в тело джига | `nut_trap`, `heatset_insert_pocket` | ✅ |
-| Направляющие втулки кондуктора | `bearing_seat` (посадка стальной втулки/подшипника 608/625) | ✅ |
-| Позиционные упоры, сменные губки | dovetail: `dovetail_adapter_body`, `dovetail_joint`, порт `dovetail_rail` | ✅ |
-| Registration двух половин fixture | `pin_pair`, joint `butt_pin` (split+registration), `press_fit_pin_pair` | ✅ |
-| Облегчение крупной оснастки | `truss_web_cutouts`, `truss_beam_v1` | ✅ |
-| Крепёжные интерфейсы | порты `screw_pattern`/`heatset_insert_pattern` + `dovetail_rail` (A1/A1.5) | ✅ |
-| Комплектность/отчёт | BOM (`assembly/bom.py`), frame_report, swap-харнес (сменные губки!) | ✅ |
-| Маркировка (версия/номер джига) | text/label embossing op | ⬜ |
-| Дюймовая параметризация UX | units-resolve есть; дюймовые пресеты | 🔶 (YAML-конвенция, не движок) |
-| DIN/euro-палетная сетка оснастки | единый шаг системы | ⬜ (родня A4 Wall System) |
+| Base tooling plates | `adapter_plate_v1`, `fastener_plate_v1`, `rounded_plate` | ✅ |
+| Holes/countersinks for workpiece fastening | hole/counterbore/countersunk patterns | ✅ |
+| Nuts/inserts in the jig body | `nut_trap`, `heatset_insert_pocket` | ✅ |
+| Jig guide bushings | `bearing_seat` (fit for a steel bushing/bearing 608/625) | ✅ |
+| Positioning stops, swappable jaws | dovetail: `dovetail_adapter_body`, `dovetail_joint`, `dovetail_rail` port | ✅ |
+| Registration of two fixture halves | `pin_pair`, `butt_pin` joint (split+registration), `press_fit_pin_pair` | ✅ |
+| Lightening large tooling | `truss_web_cutouts`, `truss_beam_v1` | ✅ |
+| Fastening interfaces | `screw_pattern`/`heatset_insert_pattern` ports + `dovetail_rail` (A1/A1.5) | ✅ |
+| Completeness/report | BOM (`assembly/bom.py`), frame_report, swap harness (swappable jaws!) | ✅ |
+| Marking (jig version/number) | text/label embossing op | ⬜ |
+| Imperial parametrization UX | units-resolve exists; imperial presets | 🔶 (YAML convention, not engine) |
+| DIN/euro pallet grid for tooling | unified system pitch | ⬜ (relative of A4 Wall System) |
 
-## 4. Волны JF-1..3
+## 4. Waves JF-1..3
 
 ### JF-1 — Positioning Core ⬜
 
-Golden-артефакты (оба обязательны):
+Golden artifacts (both mandatory):
 
-- **`drilling_jig_v1`** — кондуктор: плита (`rounded_plate` +
-  hole-паттерн) с посадками под стальные направляющие втулки
-  (`bearing_seat` press-fit band) и боковым упором-линейкой; крепление
-  заготовки струбциной (плита даёт clamp-кромку).
-- **`stop_block_v1`** — параметрический упор (дюймовые и метрические
-  пресеты из одного YAML) с dovetail-фиксацией на рельсе
-  (`dovetail_adapter_body` + `dovetail_joint`): повторяемая длина
-  отреза/сверловки.
+- **`drilling_jig_v1`** — a drilling jig: a plate (`rounded_plate` +
+  hole pattern) with fits for steel guide bushings
+  (`bearing_seat` press-fit band) and a side fence-ruler; workpiece
+  fastening with a clamp (the plate provides a clamp edge).
+- **`stop_block_v1`** — a parametric stop (imperial and metric
+  presets from one YAML) with dovetail fixation on a rail
+  (`dovetail_adapter_body` + `dovetail_joint`): repeatable cut/drill
+  length.
 
-Критерий: оба golden в grade A; посадка втулки и dovetail-фиксация
-закрыты измеряющими валидаторами (§6); swap-тест «упор переставлен —
-рельс не тронут» через существующий swap-харнес.
+Criterion: both goldens at grade A; bushing fit and dovetail fixation
+covered by measuring validators (§6); the swap test "stop repositioned —
+rail untouched" via the existing swap harness.
 
 ### JF-2 — Assembly / Soldering Fixtures + Gauge Family ⬜
 
-- Сборочные/паяльные fixtures: плита + `standoff_pattern` под PCB/деталь
-  + `pin_pair` registration двух половин + `nut_trap` для прижимов;
-  окна доступа паяльника — `rounded_rect_cutout`.
-- **Gauge family**: лесенки допусков (ступенчатые щупы зазоров),
-  go/no-go пробники отверстий/валов — параметрические families
-  (механизм A4 extends/preset). Родня fit-templates домена repair
-  (RP-2) — общий валидатор лесенки.
-- Критерий: golden soldering_fixture + gauge_ladder; монотонность и
-  шаг ступеней — валидатором, не декларацией.
+- Assembly/soldering fixtures: plate + `standoff_pattern` for PCB/part
+  + `pin_pair` registration of two halves + `nut_trap` for clamps;
+  soldering-iron access windows — `rounded_rect_cutout`.
+- **Gauge family**: tolerance ladders (stepped gap feelers),
+  go/no-go probes for holes/shafts — parametric families
+  (A4 extends/preset mechanism). A relative of the repair domain's
+  fit-templates (RP-2) — shared ladder validator.
+- Criterion: golden soldering_fixture + gauge_ladder; step monotonicity and
+  pitch — via a validator, not a declaration.
 
 ### JF-3 — Versioning, Labels, B2B Report Bundle ⬜
 
-- Маркировка джига: номер, версия, дата — требует **text embossing op
-  ⬜** (главный gap домена); до него — параметрические насечки-риски.
-- **B2B report bundle**: BOM (втулки, винты, вставки — из joints/ops,
-  не декларация) + материал + версия + print notes одним пакетом —
-  прямой клиент A2 Build Package ⬜.
-- Критерий: `drilling_jig_v1` выдаёт пакет; тест сверяет крепёж BOM с
-  joints (рассинхрон непредставим — канон A2).
+- Jig marking: number, version, date — requires the **text embossing op
+  ⬜** (the domain's main gap); until then — parametric notch marks.
+- **B2B report bundle**: BOM (bushings, screws, inserts — derived from
+  joints/ops, not a declaration) + material + version + print notes as one
+  package — a direct client of A2 Build Package ⬜.
+- Criterion: `drilling_jig_v1` emits the package; a test cross-checks the BOM
+  fasteners against joints (desync is unrepresentable — A2 canon).
 
-## 5. Интерфейсы и стандарты домена
+## 5. Domain interfaces and standards
 
-**Fixture Interface Standard** (по образцу Cassette Interface Standard):
+**Fixture Interface Standard** (modeled on the Cassette Interface Standard):
 
-1. **Shared-параметры** (контракт имён): `datum_edge_offset`,
+1. **Shared parameters** (name contract): `datum_edge_offset`,
    `bushing_od`, `bushing_press_band` (0.05–0.15), `stop_travel`,
-   `grid_pitch` (шаг сетки крепления оснастки), `jig_version`.
-2. **Frame-ключи**: `datum_face_z`, `bushing_axis_*`, `stop_face_x`,
-   `rail_u0/u1` — registration-поверхности публикуются билдером и
-   меряются в позе.
-3. **Typed ports**: фиксация упоров — существующий `dovetail_rail`
-   (male/female, slide-ось в frame); крепление плит — `screw_pattern`;
-   registration половин — joint `butt_pin`. Новых типов JF-1 не вводит
-   — весь словарь A1 уже покрывает домен.
+   `grid_pitch` (tooling mounting grid pitch), `jig_version`.
+2. **Frame keys**: `datum_face_z`, `bushing_axis_*`, `stop_face_x`,
+   `rail_u0/u1` — registration surfaces are published by the builder and
+   measured in pose.
+3. **Typed ports**: stop fixation — the existing `dovetail_rail`
+   (male/female, slide axis in the frame); plate fastening — `screw_pattern`;
+   registration of halves — the `butt_pin` joint. JF-1 introduces no new types
+   — the entire A1 vocabulary already covers the domain.
 
-## 6. Валидаторы-кандидаты
+## 6. Validator candidates
 
-| Валидатор | Что меряет |
+| Validator | What it measures |
 |---|---|
-| `form.bushing_fit_ok` | press-fit band посадки втулки, глубина ≥ k·bushing_od, стенка вокруг ≥ min_wall |
-| `form.registration_surfaces_ok` | datum-грани компланарны/ортогональны в допуске, pin-registration без люфта сверх band |
-| `form.gauge_tolerance_ok` | ступени калибра монотонны, шаг постоянен, кромки ступеней не тоньше сопла |
-| `form.stop_repeatability_ok` | dovetail-упор: зацепление полное, люфт вдоль рабочей оси в band |
-| `manufacturing.jig_orientation_declared` | рабочие поверхности не поперёк слоёв; ориентация в отчёте |
-| `assembly.fixture_bom_complete` | каждая покупная позиция (втулка/винт/вставка) выведена из joint/op (клиент A2) |
+| `form.bushing_fit_ok` | press-fit band of the bushing fit, depth ≥ k·bushing_od, surrounding wall ≥ min_wall |
+| `form.registration_surfaces_ok` | datum faces coplanar/orthogonal within tolerance, pin registration without play beyond band |
+| `form.gauge_tolerance_ok` | gauge steps monotonic, pitch constant, step edges no thinner than the nozzle |
+| `form.stop_repeatability_ok` | dovetail stop: full engagement, play along the working axis within band |
+| `manufacturing.jig_orientation_declared` | working surfaces not across layers; orientation in the report |
+| `assembly.fixture_bom_complete` | every purchased item (bushing/screw/insert) derived from a joint/op (A2 client) |
 
-## 7. Free / Pro граница (Printables-тест)
+## 7. Free / Pro boundary (Printables test)
 
 | Free / Certified Free | Business / Pro |
 |---|---|
-| одиночный stop_block, простой кондуктор под один диаметр | families оснастки (сетки, серии диаметров, дюйм/метрика) |
-| один gauge-пробник | gauge families + fit-workflow допусков |
-| — | B2B bundle: BOM + материал + версия + print notes; приватные packs |
+| single stop_block, simple jig for one diameter | tooling families (grids, diameter series, imperial/metric) |
+| one gauge probe | gauge families + tolerance fit-workflow |
+| — | B2B bundle: BOM + material + version + print notes; private packs |
 
-Ценность B2B — repeatability, отчёты и версия, не сам STL упора.
+The B2B value is repeatability, reports and versioning, not the stop's STL
+itself.
 
-## 8. Риски и claims
+## 8. Risks and claims
 
-- **Точность**: пластиковый джиг ведёт сверло, но не заменяет станочную
-  оснастку; каждый отчёт несёт ноту «verify first article».
-- **Износ**: направляющая функция — у стальной втулки; сверление прямо
-  по пластику — WARN, не поддерживаемый режим.
-- **Термика**: паяльные fixtures — нота материала (PETG минимум, ASA
-  лучше); PLA у жала — FAIL-кандидат после environment-носителя ⬜.
-- **Калибры**: усадка материала смещает ступени — go/no-go честен
-  только после печатной калибровки (нота в отчёте, RP/JF-общая).
+- **Accuracy**: a plastic jig guides the drill but does not replace machine
+  tooling; every report carries a "verify first article" note.
+- **Wear**: the guiding function belongs to the steel bushing; drilling
+  directly into plastic — WARN, not a supported mode.
+- **Thermals**: soldering fixtures — a material note (PETG minimum, ASA
+  better); PLA near the tip — a FAIL candidate after the environment carrier ⬜.
+- **Gauges**: material shrinkage shifts the steps — go/no-go is honest
+  only after print calibration (report note, shared RP/JF).
 
-## 9. Связи
+## 9. Connections
 
-- **A1/A1.5 ✅**: dovetail-порты — механизм сменных губок/упоров;
-  swap-харнес — готовое доказательство перестановки оснастки.
-- **A2 BOM ⬜**: JF-3 report bundle — один из первых клиентов Build
-  Package (наравне с esp32_box из критерия A2).
-- **A4 Wall System ⬜**: единый шаг/рельс системы — родня grid_pitch;
-  gauge/appliance families ждут extends/preset.
-- **E-этап**: E2 load paths усилит claims прижимов; threads ⬜ — винтовые
-  прижимы джигов.
-- **Домены**: repair (общий валидатор лесенок RP-2/JF-2), electronics
-  (soldering fixtures под их же платы — общие standoff-паттерны).
+- **A1/A1.5 ✅**: dovetail ports — the mechanism for swappable jaws/stops;
+  the swap harness is ready-made proof of tooling repositioning.
+- **A2 BOM ⬜**: the JF-3 report bundle is one of the first Build
+  Package clients (alongside esp32_box from the A2 criterion).
+- **A4 Wall System ⬜**: the system's unified pitch/rail is a relative of
+  grid_pitch; gauge/appliance families wait for extends/preset.
+- **E stage**: E2 load paths will strengthen clamp claims; threads ✅ shipped — screw
+  clamps for jigs.
+- **Domains**: repair (shared ladder validator RP-2/JF-2), electronics
+  (soldering fixtures for their same boards — shared standoff patterns).
 
-Общие capability-gaps этого домена (лесенки посадок, environment/material
-гейты, contact-safety словарь, text embossing, threads/hinge/slide, grid-
-стандарт) централизованы в [CAPABILITIES.md](../CAPABILITIES.md) — домен их
-КЛИЕНТ, не владелец.
+The shared capability gaps of this domain (fit ladders, environment/material
+gates, contact-safety vocabulary, text embossing, threads/hinge/slide, grid
+standard) are centralized in [CAPABILITIES.md](../CAPABILITIES.md) — the domain
+is their CLIENT, not their owner.

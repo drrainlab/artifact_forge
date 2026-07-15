@@ -1,178 +1,178 @@
-# Pet / Aquarium / Terrarium — план домена
+# Pet / Aquarium / Terrarium — domain plan
 
-Статусы: ✅ реализовано · 🔶 частично · ⬜ не начато. Канон шаблона —
-[INDEX.md](../INDEX.md); коммерческие правила — [ECOSYSTEM.md](../../ECOSYSTEM.md).
+Statuses: ✅ implemented · 🔶 partial · ⬜ not started. Template canon —
+[INDEX.md](../INDEX.md); commercial rules — [ECOSYSTEM.md](../../ECOSYSTEM.md).
 
-## 1. Scope и позиционирование
+## 1. Scope and positioning
 
-Крепёж и системы вокруг аквариумов, террариумов и зообыта: клипсы
-воздушных/капельных трубок, держатели сенсоров и распылителей, кронштейны
-света, сетки-перегородки, кормушки-корпуса, позже — дозаторы и мистинг.
-Уникальное преимущество AF: **водная дисциплина VF переносится целиком**
-— transient water path, water_report, overflow honesty и fluid-порты уже
-существуют и проверены; ни один STL-каталог не скажет пользователю,
-куда денется вода при отказе. Второе преимущество — параметрические
-семейства под нестандартные диаметры трубок и толщины стёкол.
+Mounting hardware and systems around aquariums, terrariums and pet care: clips
+for air/drip tubing, sensor and diffuser holders, light brackets,
+mesh dividers, feeder enclosures, later — dispensers and misting.
+AF's unique advantage: **the VF water discipline transfers wholesale**
+— transient water path, water_report, overflow honesty and fluid ports already
+exist and are proven; no STL catalog will tell the user
+where the water goes on failure. The second advantage — parametric
+families for non-standard tube diameters and glass thicknesses.
 
-Каких claims домен НЕ делает:
+What claims this domain does NOT make:
 
-- НЕ заявляет «безопасно для животных» и НЕ заявляет аквариумную
-  нетоксичность материалов без тестов — только warnings и рекомендации
-  материалов (PETG, «без brass-вставок в воде» и т.п.).
-- НЕ покрывает изделия жизнеобеспечения, отказ которых убивает животное
-  (heater guards с претензией на защиту, авто-кормление как
-  единственный источник еды) — только с явной нотой «не единственная
-  система».
-- НЕ обещает стойкость к биоплёнке/обрастанию — предупреждение о
-  регулярной чистке в каждом wet-отчёте.
+- Does NOT claim "safe for animals" and does NOT claim aquarium
+  non-toxicity of materials without tests — only warnings and material
+  recommendations (PETG, "no brass inserts in water", etc.).
+- Does NOT cover life-support products whose failure kills the animal
+  (heater guards claiming protection, auto-feeding as the
+  sole food source) — only with an explicit "not the sole
+  system" note.
+- Does NOT promise resistance to biofilm/fouling — a regular-cleaning
+  warning in every wet report.
 
 ## 2. Mode / Environment / Tier
 
-Домен = pack + environments, НЕ новый mode: сухой крепёж живёт в
-Utility/Engineering, всё водяное — в существующем контракте Fluid/Grow.
+Domain = pack + environments, NOT a new mode: dry mounting lives in
+Utility/Engineering; everything watery lives in the existing Fluid/Grow contract.
 
 ```text
-mode:        Utility / Engineering (dry) · Fluid/Grow (wet-системы)
-environment: wet / humid (словарь ECOSYSTEM; технический носитель ⬜, линия PK)
-tier:        Free + Certified; Pro — только при появлении серьёзной системы (§7)
+mode:        Utility / Engineering (dry) · Fluid/Grow (wet systems)
+environment: wet / humid (ECOSYSTEM vocabulary; technical carrier ⬜, PK line)
+tier:        Free + Certified; Pro — only once a serious system appears (§7)
 ```
 
-## 3. Что уже есть в движке — карта реюза
+## 3. What the engine already has — reuse map
 
-| Блок домена | Чем собирается сегодня | Статус |
+| Domain block | How it is built today | Status |
 |---|---|---|
-| Клипсы трубок Ø4–16 (воздух/капля/CO2) | `pipe_clip_v1_sideprint` (snap_c) + `axial_channel` | ✅ |
-| Крепление клипс к стеклу/стойке | `zip_tie_anchor`, zip-слоты, `wall_ring_mount`, wall hooks | ✅ |
-| Кронштейны света | `lamp_bracket_v1` + `lamp_socket_cup_v1` | ✅ |
-| Сетки/перегородки/фальшдно | `mesh_floor` (ортогональная сквозная сетка) + mesh integrity check (manifold) | ✅ |
-| Кормушки-корпуса, короба электроники у воды | enclosure base/lid (+snap), `rounded_box_shell`, `port_cutout`, `wire_exit`, grommets | ✅ |
-| **Водная дисциплина целиком** | transient water path (роль TRANSIENT_WATER_PATH), «никаких скрытых резервуаров», water_report (топология, дренаж, containment), overflow honesty (VF-4.2), fluid_inlet/outlet порты (gravity is the pump) | ✅ |
-| Хомуты на трубы/штанги | `clamp_half_lower/upper` (TPU pad-ланды — не царапают стекло/акрил) | ✅ |
-| Кабель у воды (drip loop) | cable_raceway/comb, `cable_pass`-порт, `cord_slot_pair` | ✅ |
-| Гейт/шаттер-механика дозаторов | hinge/slide op отсутствует | ⬜ (PT-3, E-этап) |
-| Material/toxicity метаданные | носителя нет — warnings пока текстовые ноты | ⬜ |
-| Environment-профиль wet/humid на instance | носитель отсутствует | ⬜ (линия PK) |
-| Присоски/магнит-через-стекло посадка | магнит-карманы ✅, но пара «через стекло t» не валидирована | ⬜ |
+| Tube clips Ø4–16 (air/drip/CO2) | `pipe_clip_v1_sideprint` (snap_c) + `axial_channel` | ✅ |
+| Fastening clips to glass/stand | `zip_tie_anchor`, zip slots, `wall_ring_mount`, wall hooks | ✅ |
+| Light brackets | `lamp_bracket_v1` + `lamp_socket_cup_v1` | ✅ |
+| Meshes/dividers/false bottom | `mesh_floor` (orthogonal through mesh) + mesh integrity check (manifold) | ✅ |
+| Feeder enclosures, electronics boxes near water | enclosure base/lid (+snap), `rounded_box_shell`, `port_cutout`, `wire_exit`, grommets | ✅ |
+| **Water discipline wholesale** | transient water path (TRANSIENT_WATER_PATH role), "no hidden reservoirs", water_report (topology, drainage, containment), overflow honesty (VF-4.2), fluid_inlet/outlet ports (gravity is the pump) | ✅ |
+| Clamps on tubes/rods | `clamp_half_lower/upper` (TPU pad lands — do not scratch glass/acrylic) | ✅ |
+| Cable near water (drip loop) | cable_raceway/comb, `cable_pass` port, `cord_slot_pair` | ✅ |
+| Gate/shutter mechanics for dispensers | hinge/slide op missing | ⬜ (PT-3, E stage) |
+| Material/toxicity metadata | no carrier — warnings are text notes for now | ⬜ |
+| wet/humid environment profile on instance | carrier missing | ⬜ (PK line) |
+| Suction cups / magnet-through-glass fit | magnet pockets ✅, but the "through glass t" pair is not validated | ⬜ |
 
-## 4. Волны PT-1..3
+## 4. Waves PT-1..3
 
-### PT-1 — Dry Mounts (сухой крепёж) ⬜
+### PT-1 — Dry Mounts ⬜
 
-Всё вне воды: клипсы трубок, органайзеры шлангов, кронштейны на стойку.
-Golden: **`aquarium_tube_clip_family`** — snap_c-клипса как
-параметрическая family с пресетами **Ø4 / 6 / 8 / 12 / 16** (воздушная
-трубка → капельная → шланг фильтра) + zip-крепление к стеклу/стойке
-(zip-слоты) в одном YAML. Family доказывает то же, что вторая кассета
-доказала для VF: пресет меняется — snap-физика (strain) пересчитывается
-и валидируется на каждом Ø, а не на одном «референсном».
+Everything outside the water: tube clips, hose organizers, stand brackets.
+Golden: **`aquarium_tube_clip_family`** — a snap_c clip as a
+parametric family with presets **Ø4 / 6 / 8 / 12 / 16** (airline
+tube → drip line → filter hose) + zip fastening to glass/stand
+(zip slots) in one YAML. The family proves the same thing the second cassette
+proved for VF: when the preset changes, the snap physics (strain) is
+recomputed and validated on every Ø, not on a single "reference" one.
 
-Критерий закрытия: family в grade A на всех пяти пресетах;
-`form.tube_clip_retention_ok` (§6) меряет ретенцию реюзом snap-физики;
-side-goldens на готовых архетипах: lamp_bracket-пресет «аквариумный
-свет», крючок сачка/скребка (wall_hook пресетом).
+Closure criterion: family at grade A on all five presets;
+`form.tube_clip_retention_ok` (§6) measures retention by reusing the snap
+physics; side-goldens on ready archetypes: a lamp_bracket preset "aquarium
+light", a net/scraper hook (as a wall_hook preset).
 
-### PT-2 — Wet / In-Tank (у воды и в воде) ⬜
+### PT-2 — Wet / In-Tank ⬜
 
-Держатели у водной кромки и в воде: mount распылителя/misting-нозла,
-держатели сенсоров (температура, TDS) на стекло, направляющие потока.
-Ключевая работа волны — **обязательные material/toxicity warnings** в
-отчётах: любой инстанс с ролью TRANSIENT_WATER_PATH или флагом
-in-tank получает `manufacturing.wet_material_warning` (§6) — блок
-рекомендаций (PETG/PP, без латуни/меди в воде, чистка от биоплёнки) и
-честное «не тестировано на нетоксичность». Это заявка на trust badge
-**wet-safe-tested** из ECOSYSTEM — но badge только ПОСЛЕ реальных
-тестов, до того — warning-слой. Присоска/магнит-через-стекло — по
-готовности валидации пары ⬜.
+Holders at the waterline and in the water: diffuser/misting-nozzle mount,
+sensor holders (temperature, TDS) on glass, flow guides.
+The wave's key work — **mandatory material/toxicity warnings** in
+reports: any instance with the TRANSIENT_WATER_PATH role or an
+in-tank flag gets `manufacturing.wet_material_warning` (§6) — a block of
+recommendations (PETG/PP, no brass/copper in water, biofilm cleaning) and an
+honest "not tested for toxicity". This is a bid for the ECOSYSTEM
+**wet-safe-tested** trust badge — but the badge comes only AFTER real
+tests; until then, a warning layer. Suction cup / magnet-through-glass — once
+the pair validation is ready ⬜.
 
-### PT-3 — Systems (кормушки-дозаторы, мистинг) ⬜
+### PT-3 — Systems (feeder-dispensers, misting) ⬜
 
-Первые системы: гравитационная кормушка-дозатор (бункер enclosure +
-shutter/гейт — **блокировано hinge/slide op ⬜**, E-этап; до него —
-статические кормушки без механики) и террариумный мистинг —
-прямой реюз VF: fluid_inlet/outlet порты, handover только вниз,
-water_report на всю цепочку «резервуар пользователя → нозлы → дренаж»,
-overflow honesty («куда капает при отказе» — обязательный блок).
-Критерий: один системный golden с полным water_report и
-`assembly.no_orphan_fluid_ports` зелёным.
+First systems: a gravity feeder-dispenser (hopper enclosure +
+shutter/gate — **blocked by the hinge/slide op ⬜**, E stage; until then —
+static feeders without mechanics) and terrarium misting —
+a direct VF reuse: fluid_inlet/outlet ports, handover only downward,
+water_report over the entire chain "user's reservoir → nozzles → drainage",
+overflow honesty ("where it drips on failure" — a mandatory block).
+Criterion: one system golden with a full water_report and
+`assembly.no_orphan_fluid_ports` green.
 
-## 5. Интерфейсы и стандарты домена
+## 5. Domain interfaces and standards
 
-**Tube Clip Standard** (по образцу Cassette Interface Standard):
+**Tube Clip Standard** (modeled on the Cassette Interface Standard):
 
-1. **Shared-параметры** (имена — контракт): `tube_d` (номинал 4–16),
-   `clip_grip_pct` (охват C-профиля), `retention_gap` (band),
+1. **Shared parameters** (names are the contract): `tube_d` (nominal 4–16),
+   `clip_grip_pct` (C-profile wrap), `retention_gap` (band),
    `mount_kind` (zip / screw / hook).
-2. **Frame-ключи**: `tube_axis`, `clip_mouth_w`, `anchor_slot_xy` —
-   публикуются билдером, меряются валидаторами.
-3. **Typed ports**: трубка в клипсе — существующий
-   `cylindrical_payload_socket` (реюз mate-валидации A1); вода —
-   ТОЛЬКО существующие `fluid_inlet`/`fluid_outlet` (fluid_joint:
-   handover только вниз — «gravity is the pump» действует и для
-   мистинга); кабель сенсора — `cable_pass`. Новых типов PT-1/PT-2
-   не вводят.
-4. **Wet-конвенция**: любой мокрый путь объявляется ролью
-   TRANSIENT_WATER_PATH; скрытые полости в мокрой зоне — FAIL реюзом
-   VF-чеков cleanability (щётка проходит там, где вода).
+2. **Frame keys**: `tube_axis`, `clip_mouth_w`, `anchor_slot_xy` —
+   published by the builder, measured by validators.
+3. **Typed ports**: tube in clip — the existing
+   `cylindrical_payload_socket` (reuse of A1 mate validation); water —
+   ONLY the existing `fluid_inlet`/`fluid_outlet` (fluid_joint:
+   handover only downward — "gravity is the pump" applies to
+   misting too); sensor cable — `cable_pass`. PT-1/PT-2 introduce
+   no new types.
+4. **Wet convention**: every wet path is declared via the
+   TRANSIENT_WATER_PATH role; hidden cavities in the wet zone are a FAIL via
+   reuse of the VF cleanability checks (the brush reaches wherever water does).
 
-## 6. Валидаторы-кандидаты
+## 6. Validator candidates
 
-| Валидатор | Что меряет |
+| Validator | What it measures |
 |---|---|
-| `form.tube_clip_retention_ok` | охват/раскрыв C-профиля vs tube_d: ретенция есть, strain защёлкивания в band (реюз snap-физики) |
-| `form.clip_glass_contact_soft` | контактные ланды к стеклу/акрилу плоские или TPU-рекессы (реюз pad-ландов) — не царапают |
-| `manufacturing.wet_material_warning` | инстанс мокрой зоны несёт материал-блок (рекомендации + «not tested for toxicity» + нота чистки); gap: toxicity/material метаданные ⬜ — до носителя чек проверяет наличие warning-блока в отчёте |
-| `form.no_hidden_wet_cavity` (реюз VF) | в мокрой зоне нет закрытых полостей; всё моется |
-| `assembly.no_orphan_fluid_ports` (реюз) | каждая fluid-цепочка PT-3 замкнута: вход, путь, дренаж |
-| water_report (реюз VF) | топология воды, containment, overflow honesty для систем PT-3 |
+| `form.tube_clip_retention_ok` | C-profile wrap/opening vs tube_d: retention present, snap-in strain within band (snap-physics reuse) |
+| `form.clip_glass_contact_soft` | contact lands on glass/acrylic are flat or TPU recesses (pad-land reuse) — no scratching |
+| `manufacturing.wet_material_warning` | wet-zone instance carries a material block (recommendations + "not tested for toxicity" + cleaning note); gap: toxicity/material metadata ⬜ — until the carrier the check verifies the warning block is present in the report |
+| `form.no_hidden_wet_cavity` (VF reuse) | no closed cavities in the wet zone; everything is washable |
+| `assembly.no_orphan_fluid_ports` (reuse) | every PT-3 fluid chain is closed: inlet, path, drainage |
+| water_report (VF reuse) | water topology, containment, overflow honesty for PT-3 systems |
 
-## 7. Free / Pro граница (Printables-тест)
+## 7. Free / Pro boundary (Printables test)
 
 | Free / Certified | Pro |
 |---|---|
-| tube_clip_family (все Ø), крючки, кронштейны | — |
-| держатели сенсоров/нозлов с wet-warnings | — |
-| статические кормушки | — |
-| — | только при появлении серьёзной системы: дозатор с механикой / мистинг-система с water_report, family-пресетами и BOM |
+| tube_clip_family (all Ø), hooks, brackets | — |
+| sensor/nozzle holders with wet-warnings | — |
+| static feeders | — |
+| — | only once a serious system appears: a dispenser with mechanics / a misting system with water_report, family presets and BOM |
 
-Одиночная клипса гуглится на Printables за минуту — Free by test.
-Пока PT-3 не даст систему (дозатор/мистинг), Pro-полки у домена нет —
-это честно фиксируется, домен живёт как Free/Certified витрина
-wet-дисциплины.
+A single clip is Googlable on Printables in a minute — Free by test.
+Until PT-3 delivers a system (dispenser/misting), the domain has no Pro
+shelf — this is honestly recorded; the domain lives as a Free/Certified
+showcase of wet discipline.
 
-## 8. Риски и claims
+## 8. Risks and claims
 
-- **«Безопасно для животных» не заявляем.** Ни нетоксичность, ни
-  fish-safe/reptile-safe — только материал-рекомендации и warnings;
-  trust badge wet-safe-tested — после реальных тестов, не раньше.
-- **Биоплёнка/чистка**: любой мокрый инстанс несёт ноту регулярной
-  чистки; геометрически — реюз VF-cleanability (нет скрытых полостей).
-- **Жизнеобеспечение**: кормушка/мистинг всегда с нотой «не единственная
-  система»; отказоустойчивость не заявляется.
-- **Вода + электрика**: держатели сенсоров/света несут ноту drip loop
-  (кабель ниже точки входа) — nota, не гейт, до environment-носителя ⬜.
-- **UV/влага и материал**: PLA у воды деградирует — рекомендация PETG/PP
-  в каждом wet-отчёте.
+- **"Safe for animals" is not claimed.** Neither non-toxicity nor
+  fish-safe/reptile-safe — only material recommendations and warnings;
+  the wet-safe-tested trust badge comes after real tests, not before.
+- **Biofilm/cleaning**: every wet instance carries a regular-cleaning
+  note; geometrically — VF-cleanability reuse (no hidden cavities).
+- **Life support**: feeder/misting always with a "not the sole
+  system" note; fault tolerance is not claimed.
+- **Water + electrics**: sensor/light holders carry a drip loop note
+  (cable below the entry point) — a note, not a gate, until the environment carrier ⬜.
+- **UV/moisture and material**: PLA degrades near water — a PETG/PP
+  recommendation in every wet report.
 
-## 9. Связи
+## 9. Connections
 
-- **Линия VF ✅** — донор ядра: water discipline (transient path,
-  water_report, overflow honesty VF-4.2), fluid_joint, cleanability-чеки,
-  mesh_floor + mesh integrity; PT-3 мистинг — первый внешний потребитель
-  VF-водяных портов.
+- **VF line ✅** — the core donor: water discipline (transient path,
+  water_report, overflow honesty VF-4.2), fluid_joint, cleanability checks,
+  mesh_floor + mesh integrity; PT-3 misting is the first external consumer
+  of the VF water ports.
 - **A1/A1.5 ✅**: `cylindrical_payload_socket`, `fluid_inlet/outlet`,
-  `cable_pass`, mate-валидация — PT ничего нового в реестр не вносит
-  до PT-3.
-- **A2 BOM ⬜**: трубки/zip-стяжки/присоски как hardware-позиции систем.
-- **E-этап ⬜**: hinge/slide op разблокирует shutter-механику дозаторов
-  (PT-3).
-- **Линия PK ⬜**: environment-носитель wet/humid — тот самый gap,
-  который домен превращает из текстовых нот в гейты; Certified-критерии
-  PK-2 — целевая полка PT-1/PT-2.
-- **Соседние домены**: electronics (корпуса сенсоров у воды — общие
-  enclosure-ops + wet-warnings), mobility (env-гейты как параллельный
-  прецедент environment-профиля).
+  `cable_pass`, mate validation — PT contributes nothing new to the registry
+  before PT-3.
+- **A2 BOM ⬜**: tubes/zip ties/suction cups as hardware items of the systems.
+- **E stage ⬜**: the hinge/slide op unblocks the dispensers' shutter
+  mechanics (PT-3).
+- **PK line ⬜**: the wet/humid environment carrier is exactly the gap
+  this domain turns from text notes into gates; the PK-2 Certified criteria
+  are the target shelf for PT-1/PT-2.
+- **Neighboring domains**: electronics (sensor enclosures near water — shared
+  enclosure ops + wet-warnings), mobility (env gates as a parallel
+  precedent for the environment profile).
 
-Общие capability-gaps этого домена (лесенки посадок, environment/material
-гейты, contact-safety словарь, text embossing, threads/hinge/slide, grid-
-стандарт) централизованы в [CAPABILITIES.md](../CAPABILITIES.md) — домен их
-КЛИЕНТ, не владелец.
+The shared capability gaps of this domain (fit ladders, environment/material
+gates, contact-safety vocabulary, text embossing, threads/hinge/slide, grid
+standard) are centralized in [CAPABILITIES.md](../CAPABILITIES.md) — the domain
+is their CLIENT, not their owner.

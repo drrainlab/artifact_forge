@@ -258,3 +258,16 @@ button[disabled] { opacity: .45; cursor: not-allowed; }
 .joblog { background: var(--panel2, #101418); border: 1px solid var(--line, #223);
   padding: 8px 10px; font-size: 12px; max-height: 260px; overflow-y: auto;
   white-space: pre-wrap; }
+
+/* -- busy buttons: an async action in flight is VISIBLE ------------------- */
+.spin {
+  display: inline-block; width: 11px; height: 11px; margin-right: 7px;
+  border: 2px solid currentColor; border-top-color: transparent;
+  border-radius: 50%; vertical-align: -2px;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+button[data-busy] { opacity: 0.75; cursor: progress; }
+
+/* the docs card is an <a> — keep the entry look, kill the link look */
+a.entry.docs-link { display: block; text-decoration: none; color: inherit; }

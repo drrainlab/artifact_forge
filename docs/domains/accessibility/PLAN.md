@@ -1,176 +1,176 @@
-# Accessibility / Adaptive Utility — план домена
+# Accessibility / Adaptive Utility — domain plan
 
-Статусы: ✅ реализовано · 🔶 частично · ⬜ не начато. Канон шаблона —
-[INDEX.md](../INDEX.md); коммерческие правила — [ECOSYSTEM.md](../../ECOSYSTEM.md).
+Statuses: ✅ implemented · 🔶 partial · ⬜ not started. Template canon —
+[INDEX.md](../INDEX.md); commercial rules — [ECOSYSTEM.md](../../ECOSYSTEM.md).
 
-## 1. Scope и позиционирование
+## 1. Scope and positioning
 
-Daily-living аксессуары, снижающие бытовое усилие: утолщённые насадки
-на столовые приборы и инструменты, открывалки одной рукой, удлинители
-кнопок/выключателей, держатели книг/планшетов, кастомные стропы.
-Ценность AF здесь максимальна: «одна рука не как другая» — ровно тот
-случай, где параметрическая посадка под конкретного человека бьёт любой
-фиксированный STL. Домен social-good и Free-центричный by design.
+Daily-living accessories that reduce everyday effort: thickened grips
+for cutlery and tools, one-handed openers, button/switch
+extenders, book/tablet holders, custom straps.
+AF's value is at its maximum here: "one hand is not like another" is exactly
+the case where a parametric fit for a specific person beats any
+fixed STL. The domain is social-good and Free-centric by design.
 
-Каких claims домен НЕ делает (граница жёсткая, см.
+Which claims the domain does NOT make (the boundary is hard, see
 [medical/EXCLUDED.md](../medical/EXCLUDED.md)):
 
-- НЕ medical device, НЕ rehabilitation, НЕ assistive device в
-  регуляторном смысле, НЕ orthopedic: никаких «лечит», «корректирует»,
-  «восстанавливает функцию», «под пациента».
-- НЕ long-term skin-contact claims и НЕ прочность «на падение/опору
-  веса тела» (поручни, трости, подъёмники — вне scope навсегда).
-- НЕ заявляет пищевой контакт насадок на приборы by default (gap
-  food-safe метаданных ⬜ — как в repair: явная нота о материале).
+- NOT a medical device, NOT rehabilitation, NOT an assistive device in
+  the regulatory sense, NOT orthopedic: no "treats", "corrects",
+  "restores function", "patient-specific".
+- NO long-term skin-contact claims and NO strength "for falls/supporting
+  body weight" (grab bars, canes, lifts — out of scope forever).
+- Does NOT claim food contact for cutlery grips by default (the
+  food-safe metadata gap ⬜ — as in repair: an explicit material note).
 
-Формула позиционирования: **утилитарная насадка, которую удобно держать
-именно вашей рукой** — не терапия и не медизделие.
+The positioning formula: **a utilitarian grip that is comfortable to hold
+in precisely your hand** — not therapy and not a medical device.
 
 ## 2. Mode / Environment / Tier
 
-Домен = pack, НЕ новый mode: контракт «тело/контакт/комфорт» уже
-принадлежит режиму Wearable, остальное — Utility/Engineering.
+The domain = pack, NOT a new mode: the "body/contact/comfort" contract
+already belongs to the Wearable mode; the rest is Utility/Engineering.
 
 ```text
-mode:        Wearable (grip/hand-контакт) / Utility / Engineering
-environment: household / desk (kitchen — с материал-нотой)
-tier:        Free-центрично + Certified Free; Pro — узкий B2B (см. §7)
+mode:        Wearable (grip/hand contact) / Utility / Engineering
+environment: household / desk (kitchen — with a material note)
+tier:        Free-centric + Certified Free; Pro — narrow B2B (see §7)
 ```
 
-## 3. Что уже есть в движке — карта реюза
+## 3. What the engine already has — the reuse map
 
-| Блок домена | Чем собирается сегодня | Статус |
+| Domain block | What builds it today | Status |
 |---|---|---|
-| Насадки-утолщители (ручки приборов) | `revolve_band` / `recipe_revolve` (тело вращения: наружный grip-профиль + внутренний канал) | ✅ |
-| Осевой канал под черенок | `axial_channel`, `inset_plug`-clearance-цепочка как образец посадки | ✅ |
-| Ручки-скобы (двери, ящики, переноска) | `grab_handle_v1` (sweep-дуга) | ✅ |
-| Мягкие контакт-зоны | TPU pad-ланды (`clamp_half_lower/upper` — седло с рекессами), TPU-рекессы forearm_cuff | ✅ |
-| Вся wearable-механика | body_fit блок на ProductInstance, MODE_PROFILES (wearable требует body_fit), comfort_edge/donning/strap-валидаторы P2 | ✅ |
-| Защита кожи | роль `BODY_CONTACT_SURFACE` (абсолютная защита региона) | ✅ |
-| Стропы под руку/предмет | `add_strap_slots` (15–40 мм), интерфейс `strap_slot_pair`, `cord_slot_pair` | ✅ |
-| Крепление на предплечье | `forearm_cuff_v1` + dovetail-сокет (носимая база под насадки) | ✅ |
-| Рычаги/удлинители — плоские тела | `rounded_plate`, `boss_pattern`, `pin_pair` | ✅ |
-| body_fit регион `hand`/`grip` | словарь body_fit расширяем, но записей hand/grip нет | ⬜ (AU-1) |
-| Рычажная кинематика (открывалки) | нет hinge/pivot op (E-этап) — AU-2 стартует с монолитных рычагов | ⬜ |
-| Текстура хвата (противоскользящая) | texture op ⬜ (связь Bio-4M SDF) — пока рёбра/grid-поля модификаторами | 🔶 |
-| Food-safe метаданные материала | носитель отсутствует | ⬜ |
+| Thickening grips (utensil handles) | `revolve_band` / `recipe_revolve` (body of revolution: outer grip profile + inner channel) | ✅ |
+| Axial channel for the handle shaft | `axial_channel`, the `inset_plug` clearance chain as a fit exemplar | ✅ |
+| Bow handles (doors, drawers, carrying) | `grab_handle_v1` (sweep arc) | ✅ |
+| Soft contact zones | TPU pad lands (`clamp_half_lower/upper` — saddle with recesses), forearm_cuff TPU recesses | ✅ |
+| All wearable mechanics | body_fit block on ProductInstance, MODE_PROFILES (wearable requires body_fit), P2 comfort_edge/donning/strap validators | ✅ |
+| Skin protection | the `BODY_CONTACT_SURFACE` role (absolute region protection) | ✅ |
+| Straps for hand/object | `add_strap_slots` (15–40 mm), the `strap_slot_pair` interface, `cord_slot_pair` | ✅ |
+| Forearm mounting | `forearm_cuff_v1` + dovetail socket (wearable base for attachments) | ✅ |
+| Levers/extenders — flat bodies | `rounded_plate`, `boss_pattern`, `pin_pair` | ✅ |
+| body_fit region `hand`/`grip` | the body_fit vocabulary is extensible, but there are no hand/grip entries | ⬜ (AU-1) |
+| Lever kinematics (openers) | no hinge/pivot op (E-stage) — AU-2 starts with monolithic levers | ⬜ |
+| Grip texture (anti-slip) | texture op ⬜ (link to Bio-4M SDF) — for now ribs/grid fields via modifiers | 🔶 |
+| Food-safe material metadata | no carrier exists | ⬜ |
 
-## 4. Волны AU-1..3
+## 4. Waves AU-1..3
 
-### AU-1 — Grips (насадки-хваты) ⬜
+### AU-1 — Grips ⬜
 
-Golden: **`parametric_cutlery_grip_v1`** — насадка на столовый прибор
-или инструмент: внутренний профиль под черенок (плоский/овальный/круглый,
-через параметры сечения + clearance band по образцу `inset_plug`),
-внешний диаметр под руку конкретного человека. Ключевая работа волны —
-**расширение body_fit-словаря регионами `hand`/`grip`**
-(`grip_d`, `hand_width`, опционально `finger_groove`): внешний Ø берётся
-из body_fit, а не из воздуха; comfort_edge-валидаторы P2 реюзаются на
-кромках as-is. Side-goldens на готовых ops: pen/toothbrush grip (тот же
-рецепт, другой пресет), дверная ручка-скоба увеличенного Ø
-(`grab_handle_v1` пресетом).
+Golden: **`parametric_cutlery_grip_v1`** — a grip for a piece of cutlery
+or a tool: an inner profile for the handle shaft (flat/oval/round,
+via section parameters + a clearance band modeled on `inset_plug`), an
+outer diameter for a specific person's hand. The wave's key work is
+**extending the body_fit vocabulary with the `hand`/`grip` regions**
+(`grip_d`, `hand_width`, optionally `finger_groove`): the outer Ø is taken
+from body_fit, not out of thin air; the P2 comfort_edge validators are reused
+on the edges as-is. Side-goldens on existing ops: pen/toothbrush grip (same
+recipe, different preset), an enlarged-Ø bow door handle
+(`grab_handle_v1` via a preset).
 
-Критерий закрытия: golden в grade A; регион `hand/grip` в body_fit и
-задействован MODE_PROFILES; `form.grip_diameter_window_ok` (§6) меряет
-фактический наружный Ø против body_fit-окна; кромки контакта закрыты
-comfort_edge; роль BODY_CONTACT_SURFACE на наружной поверхности.
+Closure criterion: the golden at grade A; the `hand/grip` region in body_fit
+and engaged by MODE_PROFILES; `form.grip_diameter_window_ok` (§6) measures
+the actual outer Ø against the body_fit window; contact edges are covered by
+comfort_edge; the BODY_CONTACT_SURFACE role on the outer surface.
 
 ### AU-2 — Openers & Extenders ⬜
 
-Рычажная геометрия без подвижных частей: открывалки бутылок/банок под
-одну руку (монолитный рычаг + захват), ключи-крутилки для мелких ручек
-(вентили, ключи, регуляторы), удлинители кнопок/клавиш выключателей.
-Собирается из `rounded_plate` + `boss_pattern` + `revolve_band`
-(захватные кольца) + TPU pad-ланды в зоне контакта с предметом.
-Golden-кандидат: `jar_opener_lever_v1`. Валидатор волны —
-`form.lever_reach_ok` (§6): плечо рычага и раскрыв захвата в band от
-целевого предмета и усилия руки. Полноценные шарнирные механизмы — после
-hinge ⬜ (E-этап), волну не блокируют.
+Lever geometry without moving parts: one-handed bottle/jar openers
+(a monolithic lever + grip), turning keys for small knobs
+(valves, keys, regulators), button/switch-key extenders.
+Assembled from `rounded_plate` + `boss_pattern` + `revolve_band`
+(gripping rings) + TPU pad lands in the object contact zone.
+Golden candidate: `jar_opener_lever_v1`. The wave's validator is
+`form.lever_reach_ok` (§6): the lever arm and the grip opening within the
+band of the target object and hand force. Full hinged mechanisms — after
+hinge ✅ shipped (`hinge_leaf`, `living_hinge_groove`); nothing blocks the wave.
 
 ### AU-3 — Straps & Supports ⬜
 
-Держатели книги/планшета (настольные — реюз `phone_stand_v1`-семейства),
-кастомные стропы-держатели предметов на кисть/предплечье: `add_strap_slots`
-+ `strap_slot_pair` + опционально `forearm_cuff_socket_v1` как носимая
-база (dovetail-сокет уже умеет сменные насадки — A1 swap-драйверы).
-Критерий: один golden-держатель с strap-интерфейсом, strap-валидаторы P2
-зелёные, отчёт без терапевтической лексики (§8).
+Book/tablet holders (desktop — reuse of the `phone_stand_v1` family),
+custom object-holding straps on the hand/forearm: `add_strap_slots`
++ `strap_slot_pair` + optionally `forearm_cuff_socket_v1` as the wearable
+base (the dovetail socket already handles swappable attachments — A1 swap
+drivers). Criterion: one golden holder with a strap interface, P2 strap
+validators green, the report free of therapeutic vocabulary (§8).
 
-## 5. Интерфейсы и стандарты домена
+## 5. Domain interfaces and standards
 
-**Grip Fit Standard** (по образцу Cassette Interface Standard):
+**Grip Fit Standard** (modeled on the Cassette Interface Standard):
 
-1. **Shared-параметры** (имена — контракт): `handle_profile`
+1. **Shared parameters** (the names are the contract): `handle_profile`
    (round/oval/flat), `handle_w`, `handle_t`, `grip_clearance`
-   (band 0.2–0.6 — черенок должен и держаться, и выниматься для мытья),
-   `grip_d` (наружный, из body_fit), `grip_l`.
-2. **Frame-ключи**: `bore_axis_z`, `bore_entry_z`, `grip_od_k`,
-   `pad_land_z` — публикуются билдером, меряются валидаторами.
-3. **Typed ports**: посадка на черенок — существующий
-   `cylindrical_payload_socket` (female, ось = ось черенка); стропы —
-   `strap_slot_pair`; носимая база — `dovetail_rail` (сокет манжеты, A1
-   swap-харнес реюзом). Новых типов портов волна AU-1 не вводит.
+   (band 0.2–0.6 — the shaft must both hold and come out for washing),
+   `grip_d` (outer, from body_fit), `grip_l`.
+2. **Frame keys**: `bore_axis_z`, `bore_entry_z`, `grip_od_k`,
+   `pad_land_z` — published by the builder, measured by validators.
+3. **Typed ports**: the shaft seat is the existing
+   `cylindrical_payload_socket` (female, axis = shaft axis); straps —
+   `strap_slot_pair`; the wearable base — `dovetail_rail` (the cuff socket,
+   A1 swap harness reused). Wave AU-1 introduces no new port types.
 
-## 6. Валидаторы-кандидаты
+## 6. Candidate validators
 
-| Валидатор | Что меряет |
+| Validator | What it measures |
 |---|---|
-| `form.grip_diameter_window_ok` | фактический наружный Ø/сечение хвата в окне из body_fit (`hand/grip`), по всей grip_l |
-| `form.grip_bore_fit_ok` | внутренний профиль vs заявленный черенок: clearance в band, глубина ≥ k·handle_w |
-| `form.lever_reach_ok` | плечо рычага/раскрыв захвата в band целевого предмета (AU-2) |
-| `form.comfort_edge_ok` (реюз P2) | радиусы всех кромок в зоне BODY_CONTACT_SURFACE |
-| `form.body_contact_protected` (реюз P2) | модификаторы/фичи не вторгаются в контактный регион |
-| `manufacturing.grip_orientation_declared` | print_orientation задан; слои не поперёк изгиба рычага/дуги |
+| `form.grip_diameter_window_ok` | the actual outer Ø/grip section within the window from body_fit (`hand/grip`), along all of grip_l |
+| `form.grip_bore_fit_ok` | the inner profile vs the declared shaft: clearance in band, depth ≥ k·handle_w |
+| `form.lever_reach_ok` | the lever arm/grip opening within the target object's band (AU-2) |
+| `form.comfort_edge_ok` (P2 reuse) | radii of all edges in the BODY_CONTACT_SURFACE zone |
+| `form.body_contact_protected` (P2 reuse) | modifiers/features do not intrude into the contact region |
+| `manufacturing.grip_orientation_declared` | print_orientation is set; layers not across the lever/arc bend |
 
-## 7. Free / Pro граница (Printables-тест)
+## 7. Free / Pro boundary (the Printables test)
 
 | Free / Certified Free | Pro |
 |---|---|
-| cutlery/pen/tool grips по своим замерам | — |
-| открывалки, удлинители кнопок | — |
-| держатели со стропами, одиночные | — |
-| — | clinics/fablabs-workflow: батч-генерация под список людей, отчёты, versioning — **только после юридической проработки** (§8) |
+| cutlery/pen/tool grips from your own measurements | — |
+| openers, button extenders | — |
+| holders with straps, singles | — |
+| — | clinics/fablabs workflow: batch generation for a list of people, reports, versioning — **only after legal review** (§8) |
 
-Домен сознательно Free-центричный: social-good витрина и Certified
-Free — репутационная ценность выше выручки. Единственный Pro-кандидат —
-workflow для эрготерапевтических мастерских/фаблабов, и он заморожен ⬜
-до юридического заключения, что B2B-обёртка не превращает изделие в
-медицинское.
+The domain is deliberately Free-centric: a social-good showcase and Certified
+Free — reputational value above revenue. The only Pro candidate is a
+workflow for occupational-therapy workshops/fablabs, and it is frozen ⬜
+until a legal opinion that a B2B wrapper does not turn the product into a
+medical one.
 
-## 8. Риски и claims
+## 8. Risks and claims
 
-- **Язык — главный риск.** Отчёты и описания не должны звучать
-  терапевтически: запрещённый словарь («реабилитация», «ортез»,
-  «терапия», «пациент», «коррекция», «assistive device») фиксируется в
-  доменном lint-чеке текстов отчётов; разрешённый — «удобнее держать»,
-  «меньше усилия», «под вашу руку».
-- **Дрейф в medical**: любой запрос «под диагноз/под пациента» —
-  автоматически [medical/EXCLUDED.md](../medical/EXCLUDED.md), без
-  исключений даже для B2B.
-- **Кожный контакт**: только BODY_CONTACT_SURFACE + comfort_edge;
-  long-term contact claims не делаем; TPU-рекессы — рекомендация.
-- **Кухня/еда**: «not food-safe by default» нотой в каждом отчёте
-  cutlery-грипов, пока нет food-safe метаданных ⬜.
-- **Прочность рычагов**: AU-2 несёт ноту материала/ориентации; изделия,
-  на которые опираются весом тела, — вне scope навсегда.
+- **Language is the main risk.** Reports and descriptions must not sound
+  therapeutic: the forbidden vocabulary ("rehabilitation", "orthosis",
+  "therapy", "patient", "correction", "assistive device") is pinned in a
+  domain lint check of report texts; the allowed one — "easier to hold",
+  "less effort", "for your hand".
+- **Drift into medical**: any request "for a diagnosis/for a patient" is
+  automatically [medical/EXCLUDED.md](../medical/EXCLUDED.md), no
+  exceptions even for B2B.
+- **Skin contact**: only BODY_CONTACT_SURFACE + comfort_edge;
+  we make no long-term contact claims; TPU recesses are a recommendation.
+- **Kitchen/food**: a "not food-safe by default" note in every cutlery-grip
+  report until food-safe metadata ⬜ exists.
+- **Lever strength**: AU-2 carries a material/orientation note; products
+  that bear body weight are out of scope forever.
 
-## 9. Связи
+## 9. Connections
 
 - **A1/A1.5 ✅**: `cylindrical_payload_socket`, `strap_slot_pair`,
-  `dovetail_rail` + swap-харнес — насадки на манжету AU-3 реюзают
-  манжета-адаптерные драйверы as-is.
-- **P2 (wearable) ✅**: body_fit, comfort/donning/strap-валидаторы,
-  BODY_CONTACT_SURFACE, TPU-рекессы — ядро домена; AU-1 расширяет
-  словарь body_fit (`hand/grip`), не механизм.
-- **A2 BOM ⬜**: стропы/липучки как hardware-позиции для AU-3.
-- **E-этап ⬜**: hinge разблокирует шарнирные открывалки (AU-2+);
-  texture op ⬜ (Bio-4M SDF) — противоскользящий хват.
-- **Линия PK ⬜**: Certified Free критерии (PK-2) — целевая полка
-  домена; Pro-workflow — только с PK-3 + юридика.
-- **Соседние домены**: repair (revolve-посадки, fit-band общие),
-  craft (текстура хвата = тот же texture-gap ⬜).
+  `dovetail_rail` + the swap harness — AU-3 cuff attachments reuse
+  the cuff-adapter drivers as-is.
+- **P2 (wearable) ✅**: body_fit, comfort/donning/strap validators,
+  BODY_CONTACT_SURFACE, TPU recesses — the domain's core; AU-1 extends
+  the body_fit vocabulary (`hand/grip`), not the mechanism.
+- **A2 BOM ⬜**: straps/velcro as hardware items for AU-3.
+- **E-stage ⬜**: hinge unlocks hinged openers (AU-2+);
+  texture op ⬜ (Bio-4M SDF) — anti-slip grip.
+- **PK line ⬜**: Certified Free criteria (PK-2) are the domain's target
+  shelf; the Pro workflow — only with PK-3 + legal.
+- **Neighboring domains**: repair (revolve fits, shared fit band),
+  craft (grip texture = the same texture gap ⬜).
 
-Общие capability-gaps этого домена (лесенки посадок, environment/material
-гейты, contact-safety словарь, text embossing, threads/hinge/slide, grid-
-стандарт) централизованы в [CAPABILITIES.md](../CAPABILITIES.md) — домен их
-КЛИЕНТ, не владелец.
+This domain's shared capability gaps (fit ladders, environment/material
+gates, contact-safety vocabulary, text embossing, threads/hinge/slide, grid
+standard) are centralized in [CAPABILITIES.md](../CAPABILITIES.md) — the
+domain is their CLIENT, not their owner.

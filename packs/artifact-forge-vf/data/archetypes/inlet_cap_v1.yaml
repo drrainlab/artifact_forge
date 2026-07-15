@@ -5,7 +5,7 @@ object_class: water_inlet_cap
 maturity: sandbox_buildable
 description: >
   Vertical Farm Pack (VF-9.2 chute-cap): the Water Inlet Cap — a support-free
-  Г-hook whose water path is VISIBLE. The drip line seats in a vertical tube
+  L-hook whose water path is VISIBLE. The drip line seats in a vertical tube
   socket on a STOP SHOULDER (it cannot be pushed through); a narrower drip
   orifice drops the water through a short covered chamber into an OPEN-TOP
   chute (a U-trough) that carries it inboard and drips it off the nose tip

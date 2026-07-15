@@ -263,7 +263,7 @@ def cap_supportless_verified(geometry: Geometry, form: PartForm) -> Finding:
     ok = not problems
     return _finding(
         check, Status.PASS if ok else Status.FAIL,
-        f"support-free Г-hook: {overhang:.1f}mm rest ledge, the nose column "
+        f"support-free L-hook: {overhang:.1f}mm rest ledge, the nose column "
         "anchors the roof — nothing floats as-modeled"
         if ok else "; ".join(problems),
         measured=overhang, limit=CAP_ROOF_OVERHANG_MAX)

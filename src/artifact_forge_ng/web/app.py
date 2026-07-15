@@ -742,17 +742,134 @@ def api_assembly_intent(body: AssemblyIntentBody) -> JSONResponse | dict[str, An
             return _fail([error_finding(str(exc), "assembly.intent.svg")])
 
     def run(job: Any) -> Any:
+        from . import assembly_history
+
+        def done(out: dict[str, Any]) -> dict[str, Any]:
+            # every structured outcome is history — failed drafts too
+            out["history_id"] = assembly_history.record(
+                prompt, out, svg_attached=bool(svg_asset))
+            return out
+
         if not llm.available():
             job.log.append("LLM OFF — deterministic suggestions only")
-            return assembly_intent.deterministic_assembly(prompt, catalog)
+            return done(assembly_intent.deterministic_assembly(
+                prompt, catalog))
         try:
-            return assembly_intent.llm_assembly(
+            return done(assembly_intent.llm_assembly(
                 prompt, catalog, progress=job.log.append,
-                svg_asset=svg_asset, svg_summary=svg_summary)
+                svg_asset=svg_asset, svg_summary=svg_summary))
         except RuntimeError as exc:
             job.log.append(f"LLM failed: {exc} — deterministic fallback")
             out = assembly_intent.deterministic_assembly(prompt, catalog)
             out["notes"] = f"{exc}; deterministic fallback"
-            return out
+            return done(out)
 
     return {"job": jobs.submit("assembly_intent", run)}
+
+
+# -- build library: reopen (byte-exact) or rebuild (drift-checked) any built device
+
+
+@app.get("/api/library")
+def api_library(limit: int = 30) -> JSONResponse:
+    """Latest revision per built device + the three independent status
+    axes: saved artifacts (existence/size here; full sha on open),
+    rebuild inputs (USED deps only), CAD environment."""
+    from ..catalog.revision import catalog_snapshot
+    from ..store import registry
+
+    snapshot = catalog_snapshot(load_catalog())   # ONE snapshot per request
+    entries = []
+    for meta in registry.list_latest(max(1, min(limit, 100))):
+        manifest = registry.get_build(meta["id"], meta["build_id"])
+        if manifest is None:
+            continue
+        bundle = registry.bundle_dir(meta["id"], meta["build_id"])
+        entries.append({
+            **meta,
+            "artifacts": registry.artifacts_present(manifest, bundle),
+            "drift": registry.drift(manifest, snapshot),
+        })
+    return JSONResponse({"ok": True, "entries": entries})
+
+
+@app.get("/api/library/{device_id}")
+def api_library_device(device_id: str) -> JSONResponse:
+    from ..store import registry
+
+    revs = registry.revisions(device_id)
+    if not revs:
+        return _fail([error_finding(
+            f"unknown library device {device_id!r}", "library.device")])
+    return JSONResponse({"ok": True, "latest": revs[0], "revisions": revs})
+
+
+@app.get("/api/library/{device_id}/{build_id}")
+def api_library_build(device_id: str, build_id: str) -> JSONResponse:
+    """One archived revision: source seed + manifest + drift + FULL
+    integrity verification (sha256 of every exported file)."""
+    from ..catalog.revision import catalog_snapshot
+    from ..store import registry
+
+    manifest = registry.get_build(device_id, build_id)
+    if manifest is None:
+        return _fail([error_finding(
+            f"unknown build {device_id!r}/{build_id!r}", "library.build")])
+    bundle = registry.bundle_dir(device_id, build_id)
+    return JSONResponse({
+        "ok": True,
+        "source": registry.read_source(device_id, build_id),
+        "original": registry.read_original(device_id, build_id),
+        "manifest": manifest,
+        "drift": registry.drift(manifest, catalog_snapshot(load_catalog())),
+        "integrity": registry.verify_artifacts(manifest, bundle),
+    })
+
+
+@app.get("/api/library/{device_id}/{build_id}/artifact/{artifact_path:path}")
+def api_library_artifact(device_id: str, build_id: str,
+                         artifact_path: str) -> Any:
+    """Controlled bundle-file endpoint — deliberately NOT a static mount:
+    only manifest-exported geometry is reachable, and the resolved path
+    must stay inside the bundle (no ../ escapes to source/manifest)."""
+    from fastapi.responses import FileResponse
+
+    from ..store import registry
+
+    manifest = registry.get_build(device_id, build_id)
+    if manifest is None:
+        return _fail([error_finding(
+            f"unknown build {device_id!r}/{build_id!r}", "library.artifact")])
+    if artifact_path not in registry.export_paths(manifest):
+        return _fail([error_finding(
+            f"{artifact_path!r} is not an exported artifact of this build",
+            "library.artifact")])
+    bundle = registry.bundle_dir(device_id, build_id).resolve()
+    full = (bundle / artifact_path).resolve()
+    if not full.is_relative_to(bundle) or not full.exists():
+        return _fail([error_finding(
+            f"artifact {artifact_path!r} unavailable", "library.artifact")])
+    return FileResponse(full)
+
+
+@app.get("/api/assembly/history")
+def api_assembly_history(limit: int = 50) -> JSONResponse:
+    """Newest-first history of prompt->assembly runs — failed drafts
+    included (they carry the findings that killed them)."""
+    from . import assembly_history
+
+    return JSONResponse({
+        "ok": True,
+        "entries": assembly_history.list_entries(max(1, min(limit, 100))),
+    })
+
+
+@app.get("/api/assembly/history/{history_id}")
+def api_assembly_history_entry(history_id: str) -> JSONResponse:
+    from . import assembly_history
+
+    entry = assembly_history.get_entry(history_id)
+    if entry is None:
+        return _fail([error_finding(
+            f"unknown history entry {history_id!r}", "assembly.history")])
+    return JSONResponse({"ok": True, **entry})

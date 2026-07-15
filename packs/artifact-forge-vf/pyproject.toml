@@ -1,9 +1,9 @@
 [project]
 name = "artifact-forge-vf"
 version = "0.1.0"
-description = "Artifact Forge Vertical Farm Pack — water rails, cassettes, collectors, fluid adapters (private, pro tier)"
+description = "Artifact Forge Vertical Farm Pack — water rails, cassettes, collectors, fluid adapters (free bundled pack)"
 readme = "README.md"
-license = { text = "Proprietary" }
+license = { text = "Apache-2.0" }
 authors = [
     { name = "Gleb Bondarenko", email = "pinepico8@gmail.com" },
 ]

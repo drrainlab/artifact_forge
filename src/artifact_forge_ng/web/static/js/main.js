@@ -39,6 +39,22 @@ async function refreshTop() {
     <span class="badge on">STRICT default</span>`;
 }
 
+// An async action in flight must be VISIBLE on the button itself:
+// spinner + verb, disabled, restored on finish. Re-render inside fn is
+// fine — restoring a detached node is harmless.
+async function withBusy(btn, label, fn) {
+  if (!btn || btn.dataset.busy) return;
+  const old = btn.innerHTML;
+  btn.dataset.busy = "1";
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spin"></span>${esc(label)}`;
+  try { return await fn(); } finally {
+    delete btn.dataset.busy;
+    btn.disabled = false;
+    btn.innerHTML = old;
+  }
+}
+
 // ------------------------------------------------------------------ home
 function renderHome() {
   const s = state.status;
@@ -57,16 +73,14 @@ function renderHome() {
       <div class="entry disabled"><h3>Create from reference image</h3>
         <p><span class="badge off">vision intent — v2</span></p></div>
     </div>
-    <div class="sysstatus"><table>
-      <tr><td>Buildable archetypes (python)</td><td>${s.archetypes.buildable.length}</td></tr>
-      <tr><td>Recipe archetypes (pure YAML)</td><td>${s.archetypes.recipe.length}</td></tr>
-      <tr><td>Metadata-only</td><td>${s.archetypes.metadata_only.length}</td></tr>
-      <tr><td>Modifiers</td><td>${s.modifiers.length}</td></tr>
-      <tr><td>Assembly joints</td><td>${s.joints.join(", ")}</td></tr>
-      <tr><td>Recipe ops</td><td>${s.recipe_ops.length}</td></tr>
-      <tr><td>CAD backend</td><td>${s.cad ? "ON" : "OFF"}</td></tr>
-      <tr><td>LLM</td><td>${s.llm ? "ON (Anthropic)" : "OFF — deterministic intent fallback"}</td></tr>
-    </table></div>
+    <a class="entry docs-link" href="https://artifactforge.dev" target="_blank"
+       rel="noopener">
+      <h3>Documentation → artifactforge.dev</h3>
+      <p>The full story: every archetype, joint, recipe op and validator —
+      plus guides from prompt to printed part.
+      ${s.cad ? "" : '<span class="badge off">CAD OFF</span>'}
+      ${s.llm ? "" : '<span class="badge off">LLM OFF — deterministic fallback</span>'}</p>
+    </a>
   </div>`;
   screenEl.querySelectorAll(".entry[data-go]").forEach((el) =>
     el.addEventListener("click", () => go(el.dataset.go)));
@@ -289,10 +303,10 @@ async function renderCatalog() {
       renderCatalog();
     }));
   screenEl.querySelectorAll("[data-example]").forEach((b) =>
-    b.addEventListener("click", async () => {
+    b.addEventListener("click", () => withBusy(b, "opening…", async () => {
       const ex = await api.example(b.dataset.example);
       await openInWorkspace(ex.yaml);
-    }));
+    })));
   screenEl.querySelectorAll("[data-arch]").forEach((b) =>
     b.addEventListener("click", () => renderWizard({ archetype_id: b.dataset.arch })));
 
@@ -356,7 +370,8 @@ async function renderWizard(preset = null) {
           <pre class="mt" style="white-space:pre-wrap">${esc(String(err?.message || err))}</pre>
           <div class="row mt"><button class="forge" id="retry">Retry</button></div>
         </div></div>`;
-      $("#retry").addEventListener("click", () => render());
+      $("#retry").addEventListener("click", () => withBusy(
+        $("#retry"), "retrying…", () => render()));
     }
   };
 
@@ -371,8 +386,9 @@ async function renderWizard(preset = null) {
           </div>
           <div id="intent-out" class="mt"></div>
         </div></div>`;
-      $("#detect").addEventListener("click", async () => {
-        $("#intent-out").innerHTML = `<span class="dim">detecting…</span>`;
+      $("#detect").addEventListener("click", () => withBusy(
+          $("#detect"), "detecting intent (LLM)…", async () => {
+        $("#intent-out").innerHTML = `<span class="dim">the model is reading the prompt…</span>`;
         const out = await api.intent($("#prompt").value);
         if (!out.ok) {
           $("#intent-out").innerHTML = findingsTable(out.findings || []);
@@ -395,13 +411,14 @@ async function renderWizard(preset = null) {
             ).join("")}
           </div>`;
         screenEl.querySelectorAll("[data-pick]").forEach((b) =>
-          b.addEventListener("click", () => {
+          b.addEventListener("click", () => withBusy(b, "loading contract…",
+            async () => {
             wiz.archetype = state.catalog.archetypes.find((a) => a.id === b.dataset.pick);
             for (const [k, v] of Object.entries(out.params || {}))
               if (wiz.archetype.parameters.some((p) => p.name === k)) wiz.params[k] = v;
-            wiz.stage = 2; render();
-          }));
-      });
+            wiz.stage = 2; await render();
+          })));
+      }));
       return;
     }
 
@@ -418,7 +435,9 @@ async function renderWizard(preset = null) {
           <div class="mt dim">Invariants: ${c.invariants.map(esc).join(" · ") || "—"}</div>
           <div class="row mt"><button class="forge" id="next">Accept contract →</button></div>
         </div></div>`;
-      $("#next").addEventListener("click", () => { wiz.stage = 3; render(); });
+      $("#next").addEventListener("click", () => withBusy(
+        $("#next"), "checking capability…",
+        async () => { wiz.stage = 3; await render(); }));
       return;
     }
 
@@ -436,7 +455,9 @@ async function renderWizard(preset = null) {
             ${cap.unsupported_features.length ? '<span class="badge fail">blocked by missing capability</span>' : ""}
           </div>
         </div></div>`;
-      $("#next")?.addEventListener("click", () => { wiz.stage = 4; render(); });
+      $("#next")?.addEventListener("click", () => withBusy(
+        $("#next"), "loading parameters…",
+        async () => { wiz.stage = 4; await render(); }));
       return;
     }
 
@@ -509,7 +530,9 @@ async function renderWizard(preset = null) {
           }));
       };
       bind();
-      $("#next").addEventListener("click", () => { wiz.stage = 5; render(); });
+      $("#next").addEventListener("click", () => withBusy(
+        $("#next"), "validating form…",
+        async () => { wiz.stage = 5; await render(); }));
       return;
     }
 
@@ -530,7 +553,8 @@ async function renderWizard(preset = null) {
         <div id="buildlog" class="mt"></div>
       </div></div>`;
     renderSection($("#sec"), v.form);
-    $("#forge").addEventListener("click", async () => {
+    $("#forge").addEventListener("click", () => withBusy(
+        $("#forge"), "forging (CAD build)…", async () => {
       $("#buildlog").innerHTML = `<span class="dim">forging…</span>`;
       const { job } = await api.build(wizYaml());
       const done = await api.waitJob(job, (j) => {
@@ -542,7 +566,7 @@ async function renderWizard(preset = null) {
       } else {
         $("#buildlog").innerHTML = findingsTable([done.error]);
       }
-    });
+    }));
   };
   render();
 }
@@ -597,7 +621,8 @@ function renderYamlEntry() {
       <textarea id="yamlin" rows="18" spellcheck="false"></textarea>
       <div class="row mt"><button class="forge" id="openws">Validate & open workspace</button></div>
     </div></div>`;
-  $("#openws").addEventListener("click", () => openInWorkspace($("#yamlin").value));
+  $("#openws").addEventListener("click", () => withBusy(
+    $("#openws"), "validating…", () => openInWorkspace($("#yamlin").value)));
 }
 
 // ------------------------------------------------------------- workspace
@@ -607,6 +632,161 @@ async function openInWorkspace(yamlText, buildReport = null) {
   state.validation = await api.validate(yamlText, false);
   setNav("workspace");
   renderWorkspace();
+}
+
+// ------------------------------------------------------------------ library
+// The durable device library: every build is an immutable revision with
+// provenance. Three INDEPENDENT status axes per entry — saved artifacts,
+// rebuild inputs (used deps only), CAD environment. Reopen is byte-exact
+// (served from the archived bundle); Rebuild regenerates and archives a
+// new revision.
+
+function libChip(cls, label, title = "") {
+  return `<span class="badge ${cls}" title="${esc(title)}">${esc(label)}</span>`;
+}
+
+function libAxisChips(e) {
+  const chips = [];
+  const a = e.artifacts?.state;
+  if (a === "intact") chips.push(libChip("on", "saved: intact"));
+  else if (a === "none") chips.push(libChip("warn", "source only"));
+  else chips.push(libChip("off", "saved: damaged",
+    (e.artifacts?.bad || []).join(", ")));
+  const d = e.drift || {};
+  if (d.missing_archetypes?.length)
+    chips.push(libChip("off", `rebuild: archetype gone (${d.missing_archetypes.join(", ")})`));
+  else if (d.inputs_changed)
+    chips.push(libChip("warn",
+      `rebuild inputs changed: ${[...(d.changed_archetypes || []), ...(d.changed_modifiers || [])].join(", ")}`));
+  else chips.push(libChip("on", "rebuild inputs unchanged",
+    d.unrelated_catalog_changes ? "catalog contains unrelated changes" : ""));
+  const env = Object.keys(d.cad_env_changed || {});
+  chips.push(env.length
+    ? libChip("warn", `CAD env changed: ${env.join(", ")}`,
+        env.map((k) => `${k}: ${d.cad_env_changed[k].was} → ${d.cad_env_changed[k].now}`).join("; "))
+    : libChip("on", "CAD env unchanged"));
+  return chips.join(" ");
+}
+
+async function renderLibrary() {
+  screenEl.innerHTML = `<div class="home"><div class="panel">loading library…</div></div>`;
+  let data;
+  try { data = await api.library(50); } catch (e) {
+    screenEl.innerHTML = `<div class="home"><div class="panel">library unavailable: ${esc(e.message)}</div></div>`;
+    return;
+  }
+  const entries = data.entries || [];
+  if (!entries.length) {
+    screenEl.innerHTML = `<div class="home"><div class="panel">
+      <h3>LIBRARY</h3>
+      <p class="dim">No archived builds yet — every <b>Forge</b> (CLI or cockpit)
+      lands here as an immutable revision: source, geometry, provenance.</p></div></div>`;
+    return;
+  }
+  screenEl.innerHTML = `<div class="home"><div class="panel">
+    <h3>LIBRARY <span class="dim">${entries.length} device(s) — reopen is byte-exact from the archived bundle; rebuild regenerates (drift-checked)</span></h3>
+    <table class="findings">${entries.map((e) => `
+      <tr class="lib-row" data-dev="${esc(e.id)}" data-bid="${esc(e.build_id)}" style="cursor:pointer">
+        <td><span class="badge ${e.grade === "A" ? "on" : e.grade ? "warn" : "off"}">${esc(e.grade || e.status || "?")}</span></td>
+        <td>${esc(e.kind)}</td>
+        <td class="msg"><b>${esc(e.id)}</b></td>
+        <td class="faint">${e.parts ? esc(e.parts + " part(s)") : ""}</td>
+        <td class="faint">${esc(String(e.builds || 1))} build(s)</td>
+        <td class="faint">${esc((e.ts || "").replace("T", " ").replace("+00:00", ""))}</td>
+        <td>${libAxisChips(e)}</td></tr>`).join("")}
+    </table></div></div>`;
+  screenEl.querySelectorAll(".lib-row").forEach((row) =>
+    row.addEventListener("click", () =>
+      renderLibraryEntry(row.dataset.dev, row.dataset.bid)));
+}
+
+function librarySyntheticReport(manifest, deviceId, buildId) {
+  // export URLs point at the CONTROLLED artifact route (allowlisted,
+  // containment-checked) — the library is deliberately not a static mount
+  const base = `/api/library/${deviceId}/${buildId}/artifact/`;
+  const ex = manifest.exports || {};
+  if (manifest.kind !== "assembly")
+    return ex.stl ? { exports: { stl: base + ex.stl.path } } : null;
+  const parts = {};
+  for (const [ref, rows] of Object.entries(ex.parts || {}))
+    if (rows.stl) parts[ref] = { exports: { stl: base + rows.stl.path } };
+  return Object.keys(parts).length ? { parts } : null;
+}
+
+async function renderLibraryEntry(deviceId, buildId) {
+  screenEl.innerHTML = `<div class="home"><div class="panel">verifying ${esc(deviceId)}…</div></div>`;
+  let r, dev;
+  try {
+    [r, dev] = await Promise.all([
+      api.libraryBuild(deviceId, buildId), api.libraryDevice(deviceId)]);
+  } catch (e) {
+    screenEl.innerHTML = `<div class="home"><div class="panel">entry unavailable: ${esc(e.message)}</div></div>`;
+    return;
+  }
+  if (!r.ok) { renderLibrary(); return; }
+  const m = r.manifest;
+  const integ = r.integrity || {};
+  const sourceOnly = m.artifact_state === "source_only";
+  const canOpenSaved = integ.state === "intact" && !sourceOnly;
+  const tool = m.tool || {};
+  const drift = r.drift || {};
+  screenEl.innerHTML = `<div class="home"><div class="panel">
+    <h3>${esc(deviceId)} <span class="dim">${esc(m.kind)} · ${esc(buildId)}</span></h3>
+    <div class="row">${libAxisChips({ artifacts: integ, drift })}
+      ${integ.state === "damaged" ? `<span class="dim">damaged: ${esc((integ.bad || []).join(", "))}</span>` : ""}</div>
+    ${drift.unrelated_catalog_changes ? `<p class="dim">catalog contains unrelated changes (this device's inputs are unchanged)</p>` : ""}
+    ${Object.keys(drift.af_changed || {}).length ? `<p class="dim">AF code changed since this build: ${esc(Object.keys(drift.af_changed).join(", "))}</p>` : ""}
+    <table class="findings">
+      <tr><td>built</td><td class="msg">${esc(m.ts || "")}</td></tr>
+      <tr><td>grade</td><td class="msg">${esc(m.grade || m.status || "?")}</td></tr>
+      <tr><td>archetypes</td><td class="msg">${esc(Object.entries(m.dependencies?.archetypes || {}).map(([k, v]) => `${k}@${v.version}`).join(", "))}</td></tr>
+      <tr><td>tool</td><td class="msg">af ${esc(tool.af_version || "?")}${tool.af_commit ? ` (${esc(tool.af_commit)})` : ""} · cadquery ${esc(tool.cadquery || "?")} · ocp ${esc(tool.cadquery_ocp || "?")} · py ${esc(tool.python || "?")}</td></tr>
+      <tr><td>source digest</td><td class="msg faint">${esc((m.source_digest || "").slice(0, 16))}… (bytes ${esc((m.source_bytes_digest || "").slice(0, 16))}…)</td></tr>
+    </table>
+    <div class="row mt">
+      ${canOpenSaved
+        ? `<button class="forge" id="lib-open">Open saved (byte-exact)</button>`
+        : `<button class="forge" id="lib-open-src">Open source</button>`}
+      ${canOpenSaved ? `<button class="ghost" id="lib-open-src">Open source</button>` : ""}
+      <button class="ghost" id="lib-rebuild" ${state.status?.cad ? "" : "disabled"}>⚒ Rebuild (new revision)</button>
+      <button class="ghost" id="lib-back">← Library</button>
+    </div>
+    <div id="lib-log" class="mt"></div>
+    <h3 class="mt">BUILDS</h3>
+    <table class="findings">${(dev.revisions || []).map((rev) => `
+      <tr class="lib-rev" data-bid="${esc(rev.build_id)}" style="cursor:pointer">
+        <td>${rev.build_id === buildId ? "▶" : ""}</td>
+        <td class="faint">${esc((rev.ts || "").replace("T", " ").replace("+00:00", ""))}</td>
+        <td><span class="badge ${rev.grade === "A" ? "on" : "warn"}">${esc(rev.grade || rev.status || "?")}</span></td>
+        <td class="msg faint">${esc(rev.build_id)}</td>
+        <td class="faint">${esc(rev.artifact_state || "")}</td></tr>`).join("")}
+    </table></div></div>`;
+  const openSaved = screenEl.querySelector("#lib-open");
+  if (openSaved) openSaved.addEventListener("click", () => withBusy(
+    openSaved, "opening saved geometry…", () => openInWorkspace(
+      r.source, librarySyntheticReport(m, deviceId, buildId))));
+  const openSrc = screenEl.querySelector("#lib-open-src");
+  if (openSrc) openSrc.addEventListener("click", () => withBusy(
+    openSrc, "validating source…", () => openInWorkspace(r.source)));
+  screenEl.querySelector("#lib-back").addEventListener("click", renderLibrary);
+  const rebuildBtn = screenEl.querySelector("#lib-rebuild");
+  rebuildBtn.addEventListener("click", () => withBusy(
+      rebuildBtn, "rebuilding (CAD)…", async () => {
+    const log = screenEl.querySelector("#lib-log");
+    log.innerHTML = `<span class="dim">rebuilding…</span>`;
+    try {
+      const { job } = await api.build(r.source);
+      const done = await api.waitJob(job, (j) => {
+        log.innerHTML = `<div class="yaml-pane">${esc((j.log || []).join("\n"))}</div>`;
+      });
+      if (done.status === "done") {
+        state.buildReport = done.result;
+        await openInWorkspace(r.source, done.result);
+      } else {
+        log.innerHTML = findingsTable([done.error]);
+      }
+    } catch (e) { log.innerHTML = `<span class="dim">${esc(e.message)}</span>`; }
+  }));
 }
 
 function renderWorkspace() {
@@ -641,6 +821,8 @@ function renderWorkspace() {
 }
 
 function artifactUrl(path) {
+  // library bundle artifacts arrive as ready /api/ URLs — pass through
+  if (String(path).startsWith("/api/")) return String(path);
   // exports paths may be absolute — everything under out/ is served as /artifacts/
   const tail = String(path).split(/\/out\//).pop().replace(/^out\//, "");
   return "/artifacts/" + tail;
@@ -660,7 +842,8 @@ async function load3D(view, v, isAssembly) {
   try {
     if (isAssembly && report?.parts) {
       const poses = {};
-      for (const p of report.assembly_pose || []) poses[p.part] = p;
+      // a library synthetic report has no poses — validate re-derives them
+      for (const p of report.assembly_pose || v.assembly_pose || []) poses[p.part] = p;
       for (const [ref, part] of Object.entries(report.parts)) {
         const stl = part.exports?.stl;
         if (!stl) continue;
@@ -778,7 +961,7 @@ function editPanel() {
       <select id="target"><option value="">— auto —</option></select>
       <span id="targetmeta" class="faint"></span>
     </div>
-    <div class="row mt"><input id="nl" type="text" placeholder="сделай без поддержек / make it stronger…" style="flex:1">
+    <div class="row mt"><input id="nl" type="text" placeholder="make it support-free / make it stronger…" style="flex:1">
     <button class="forge" id="nlgo">Propose patch</button></div>
     <div class="row mt dim">intents:
       ${["make_support_free", "make_stronger", "make_biomorphic", "remove_perforation"].map((i) =>
@@ -890,7 +1073,8 @@ async function wireEdit(v) {
         <button class="forge" id="apply" ${p.noop || blocked ? "disabled" : ""}>Apply patch (rebuild + verify preserve)</button>
         <button class="ghost" id="cancel">Cancel</button></div>`;
     $("#cancel").addEventListener("click", () => (out.innerHTML = ""));
-    $("#apply").addEventListener("click", async () => {
+    $("#apply").addEventListener("click", () => withBusy(
+        $("#apply"), "rebuilding + verifying…", async () => {
       out.innerHTML = `<span class="dim">rebuilding + verifying preserve…</span>`;
       const { job } = await api.editApply(state.yaml, intent, patch);
       const done = await api.waitJob(job);
@@ -915,16 +1099,18 @@ async function wireEdit(v) {
       }
       out.innerHTML = repHtml +
         `<div class="row mt"><button class="ghost" id="openedited">open edited product in workspace</button></div>`;
-      $("#openedited").addEventListener("click", async () => {
+      $("#openedited").addEventListener("click", () => withBusy(
+        $("#openedited"), "opening…", async () => {
         const txt = await (await fetch(artifactUrl(rep.edited_yaml))).text();
         await openInWorkspace(txt);
-      });
-    });
+      }));
+    }));
   };
-  $("#nlgo").addEventListener("click", async () => {
+  $("#nlgo").addEventListener("click", () => withBusy(
+      $("#nlgo"), "translating (LLM)…", async () => {
     if (!$("#nl").value.trim()) {
       $("#nl").focus();
-      out.innerHTML = `<div class="dim">describe the change first (e.g. "add voronoi pattern", "сделай без поддержек") — or use an intent button below</div>`;
+      out.innerHTML = `<div class="dim">describe the change first (e.g. "add voronoi pattern", "make it support-free") — or use an intent button below</div>`;
       return;
     }
     out.innerHTML = `<span class="dim">translating…</span>`;
@@ -935,7 +1121,7 @@ async function wireEdit(v) {
     } catch (e) {
       out.innerHTML = findingsTable([{ status: "fail", check: "edit.nl", message: String(e) }]);
     }
-  });
+  }));
   document.querySelectorAll("[data-intent]").forEach((b) =>
     b.addEventListener("click", () => preview(b.dataset.intent, null)));
 }
@@ -1113,6 +1299,7 @@ function go(name) {
   else if (name === "assembly")
     renderAssemblyWizard({ screenEl, api, openInWorkspace, status: state.status });
   else if (name === "yaml") renderYamlEntry();
+  else if (name === "library") renderLibrary();
   else renderWorkspace();
 }
 document.querySelectorAll("#nav button").forEach((b) =>

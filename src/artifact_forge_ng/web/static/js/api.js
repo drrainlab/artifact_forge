@@ -51,6 +51,11 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(svg ? { prompt, svg } : { prompt }),
     }),
+  library: (limit = 50) => j(`/api/library?limit=${limit}`),
+  libraryDevice: (id) => j(`/api/library/${id}`),
+  libraryBuild: (id, buildId) => j(`/api/library/${id}/${buildId}`),
+  assemblyHistory: (limit = 30) => j(`/api/assembly/history?limit=${limit}`),
+  assemblyHistoryEntry: (id) => j(`/api/assembly/history/${id}`),
   svgFlatten: (svg, motifW = 60.0) =>
     j("/api/svg/flatten", {
       method: "POST",

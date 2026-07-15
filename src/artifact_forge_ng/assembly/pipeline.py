@@ -485,6 +485,31 @@ def run_assembly_build(
     (target / "assembly_report.yaml").write_text(
         yaml.safe_dump(report, sort_keys=False, allow_unicode=True)
     )
+
+    # the DEVICE-level archive: one immutable library revision per
+    # assembly build (sub-parts live inside this bundle, never alone)
+    from ..catalog.revision import catalog_snapshot
+    from ..store import registry as _registry
+
+    used_archetypes: dict[str, int | None] = {}
+    used_modifiers: list[str] = []
+    for st in states.values():
+        used_archetypes[st.instance.archetype_id] = st.archetype.version
+        used_modifiers.extend(use.id for use in st.instance.modifiers)
+    report["build_id"] = _registry.archive_build(
+        device_id=asm.id,
+        kind="assembly",
+        source_doc=asm.model_dump(
+            by_alias=True, mode="json", exclude_defaults=False),
+        original_bytes=path.read_bytes(),
+        out_target=target,
+        status=status,
+        grade=grade,
+        snapshot=catalog_snapshot(catalog),
+        used_archetypes=used_archetypes,
+        used_modifiers=used_modifiers,
+    )
+
     if strict and status != "pass":
         raise AssemblyFailure(
             report,

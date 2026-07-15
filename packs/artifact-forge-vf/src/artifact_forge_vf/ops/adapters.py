@@ -24,7 +24,7 @@ from .water_common import DRIP_INSET, ORIFICE_LEN, CAP_COVERED_RUN_MAX
 
 
 def _inlet_cap_body(state: RecipeState, p: dict[str, Any], op_id: str) -> None:
-    """The Water Inlet Cap (VF-9.2 chute-cap): a support-free Г-hook whose water
+    """The Water Inlet Cap (VF-9.2 chute-cap): a support-free L-hook whose water
     path is VISIBLE — no closed horizontal tunnel, no ambiguous through bore.
     The path: a vertical TUBE SOCKET in the tower (blind, with a stop shoulder —
     the tube cannot be pushed through) -> a narrow DRIP ORIFICE through the stop
@@ -210,7 +210,7 @@ _register(RecipeOpDecl(
         "topology.cutout_present", "topology.ribs_present",
     ),
     apply=_inlet_cap_body,
-    description="support-free Г-hook inlet cap (VF-9 Part B): vertical hose "
+    description="support-free L-hook inlet cap (VF-9 Part B): vertical hose "
                 "bore through a nose column dipping into the rail inlet "
                 "channel; hooks the wall's outboard edge, docks on the +Y "
                 "face; prints as-modeled with no floating cantilever",

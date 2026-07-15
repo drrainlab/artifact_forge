@@ -1,50 +1,51 @@
 # Medical / Dental — explicitly excluded
 
-Домен исключён из публичных паков — записано явно, чтобы граница была
-решением, а не умолчанием.
+The domain is excluded from public packs — written down explicitly so the
+boundary is a decision, not a default.
 
-## Почему вне scope
+## Why it is out of scope
 
-- **Регуляторика**: медицинские изделия (EU MDR, FDA) требуют
-  сертификации, клинической оценки и post-market surveillance — это
-  несовместимо с community/self-serve моделью паков.
-- **Материалы и биосовместимость**: FDM-пластики и домашняя печать не
-  дают контролируемой биосовместимости, стерилизуемости и усталостных
-  гарантий.
-- **Ответственность**: patient-specific изделие с дефектом — это вред
-  человеку, а не сломанная клипса. Honesty-валидаторы AF меряют
-  геометрию, не клинический исход.
+- **Regulation**: medical devices (EU MDR, FDA) require
+  certification, clinical evaluation, and post-market surveillance — this is
+  incompatible with the community/self-serve pack model.
+- **Materials and biocompatibility**: FDM plastics and home printing do not
+  provide controlled biocompatibility, sterilizability, or fatigue
+  guarantees.
+- **Liability**: a defective patient-specific device means harm to a
+  person, not a broken clip. AF's honesty validators measure
+  geometry, not clinical outcome.
 
-Рынок при этом огромен (dental 3DP: $4.9B в 2025 → прогноз $26.7B к
-2033, GVR) — исключение осознанно оставляет деньги на столе ради
-доверия к остальной платформе.
+The market is nonetheless huge (dental 3DP: $4.9B in 2025 → forecast $26.7B by
+2033, GVR) — the exclusion deliberately leaves money on the table for the
+sake of trust in the rest of the platform.
 
-## Что НЕЛЬЗЯ даже в research/B2B-паках
+## What is NOT allowed even in research/B2B packs
 
 ```text
-- patient-specific medical claims (ортезы, протезы, шины «под пациента»);
-- implants и всё инвазивное;
-- prescription optics / коррекция зрения (граница Eyewear!);
-- PPE/защита с сертификационными заявлениями (маски, каски, очки-защита);
-- стерильность / контакт с раной / long-term skin-contact claims.
+- patient-specific medical claims (orthoses, prostheses, patient-fitted splints);
+- implants and anything invasive;
+- prescription optics / vision correction (the Eyewear boundary!);
+- PPE/protection with certification claims (masks, helmets, protective eyewear);
+- sterility / wound contact / long-term skin-contact claims.
 ```
 
-## Условия пересмотра (все три одновременно)
+## Conditions for revisiting (all three simultaneously)
 
-1. Внешний **certification path** (партнёр или заказчик, который несёт
-   регуляторную сертификацию изделия как своего продукта).
-2. Партнёр с **регуляторной экспертизой** (MDR/FDA) в контуре проекта.
-3. **B2B-контракт**, где AF — инженерный инструмент поставщика, а не
-   производитель медизделия; никаких public-паков.
+1. An external **certification path** (a partner or customer who carries
+   the regulatory certification of the device as their own product).
+2. A partner with **regulatory expertise** (MDR/FDA) inside the project's
+   perimeter.
+3. A **B2B contract** where AF is the supplier's engineering tool, not
+   the manufacturer of a medical device; no public packs whatsoever.
 
-## Границы с соседними доменами
+## Boundaries with neighboring domains
 
-- [Accessibility](../accessibility/PLAN.md): daily-living accessory —
-  легально; всё, что лечит/реабилитирует/компенсирует диагноз —
-  сюда, т.е. excluded.
-- Eyewear ([ECOSYSTEM.md](../../ECOSYSTEM.md)): оправы как
-  maker/costume/non-prescription frames — легально; линзы, рецепты,
-  оптическая коррекция, сертифицированная защита глаз — excluded.
-- Wearable (линия P): комфорт-контракты (body-contact, donning) —
-  инженерная честность, НЕ медицинское заявление; формулировки в
-  отчётах не должны звучать как терапевтические.
+- [Accessibility](../accessibility/PLAN.md): a daily-living accessory is
+  legitimate; anything that treats/rehabilitates/compensates for a diagnosis
+  belongs here, i.e. excluded.
+- Eyewear ([ECOSYSTEM.md](../../ECOSYSTEM.md)): frames as
+  maker/costume/non-prescription frames are legitimate; lenses, prescriptions,
+  optical correction, certified eye protection — excluded.
+- Wearable (the P line): comfort contracts (body-contact, donning) are
+  engineering honesty, NOT a medical claim; report wording
+  must not sound therapeutic.

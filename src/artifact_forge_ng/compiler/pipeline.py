@@ -38,8 +38,34 @@ def orient_for_print(geometry: Geometry, form: PartForm) -> Geometry:
 
 def run_build(product_path: Path, out_dir: Path, strict_flag: bool | None) -> dict[str, Any]:
     state = run_pre_cad(product_path, strict_flag)
-    out, _ = run_build_from_state(state, out_dir / state.instance.id)
+    target = out_dir / state.instance.id
+    out, _ = run_build_from_state(state, target)
+    out["build_id"] = _archive_product(state, product_path, target, out)
     return out
+
+
+def _archive_product(state, product_path: Path, target: Path,
+                     out: dict[str, Any]) -> str:
+    """Every DEVICE build lands in the library as an immutable revision
+    (assembly sub-parts go through run_build_from_state directly and are
+    deliberately not archived — the assembly bundle carries them)."""
+    from ..catalog.revision import catalog_snapshot
+    from ..store import registry
+
+    source_doc = state.instance.model_dump(
+        by_alias=True, mode="json", exclude_defaults=False)
+    return registry.archive_build(
+        device_id=state.instance.id,
+        kind="product",
+        source_doc=source_doc,
+        original_bytes=product_path.read_bytes(),
+        out_target=target,
+        status=out.get("status", "unknown"),
+        grade=(out.get("score") or {}).get("grade"),
+        snapshot=catalog_snapshot(state.catalog),
+        used_archetypes={state.instance.archetype_id: state.archetype.version},
+        used_modifiers=[use.id for use in state.instance.modifiers],
+    )
 
 
 def run_build_from_state(state, target: Path) -> tuple[dict[str, Any], "object"]:

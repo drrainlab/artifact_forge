@@ -1,148 +1,150 @@
-# Mobility / Bike / Vehicle — доменный план (MB)
+# Mobility / Bike / Vehicle — domain plan (MB)
 
-Развёртка домена из [ECOSYSTEM.md](../../ECOSYSTEM.md) («Future Domains
-to Watch → Mobility / Bike / Vehicle Accessories»). Канон шаблона —
+Expansion of the domain from [ECOSYSTEM.md](../../ECOSYSTEM.md) ("Future Domains
+to Watch → Mobility / Bike / Vehicle Accessories"). Template canon —
 [INDEX.md](../INDEX.md).
 
-## 1. Scope и позиционирование
+## 1. Scope and positioning
 
-Аксессуары для велосипеда, салона авто и van/camper-пространств:
-крепления света и камер на руль, клипсы и органайзеры салона,
-cargo-организация на 2020-профилях. Ценность AF против STL-каталогов:
-диаметр руля — ПАРАМЕТР (22.2 / 25.4 / 31.8 мм — один YAML), payload —
-съёмный dovetail-адаптер, environment-гейты — валидаторы, а не мелкий
-шрифт в описании.
+Accessories for bicycles, car interiors, and van/camper spaces:
+handlebar mounts for lights and cameras, interior clips and organizers,
+cargo organization on 2020 profiles. AF's value versus STL catalogs:
+the handlebar diameter is a PARAMETER (22.2 / 25.4 / 31.8 mm — one YAML),
+the payload is a swappable dovetail adapter, environment gates are
+validators, not fine print in the description.
 
-**Каких claims домен НЕ делает:**
+**Which claims the domain does NOT make:**
 
-- НЕ airbag zone, НЕ pedal zone, НЕ зона обзора водителя;
-- НЕ road-safety-critical part (тормоза, рулевые тяги, детские кресла);
-- никаких crash-rated / vibration-rated заявлений без измеряющих проб;
-- PLA для high-heat салона запрещается гейтом, а не «не рекомендуется».
+- NOT the airbag zone, NOT the pedal zone, NOT the driver's field of view;
+- NOT a road-safety-critical part (brakes, steering linkages, child seats);
+- no crash-rated / vibration-rated claims without measuring probes;
+- PLA for the high-heat interior is forbidden by a gate, not "not recommended".
 
 ## 2. Mode / Environment / Tier
 
-Домен = pack, НЕ новый mode (правило пяти осей). Auto/Vehicle — это
-**environment profile**, не режим: так решено в ECOSYSTEM («base mode +
-warnings; отдельный Mobility-mode ТОЛЬКО когда появятся соответствующие
-валидаторы»).
+The domain = pack, NOT a new mode (the rule of five axes). Auto/Vehicle is an
+**environment profile**, not a mode: that's how ECOSYSTEM decided ("base mode +
+warnings; a separate Mobility mode ONLY when the corresponding
+validators appear").
 
 ```text
 mode:        Engineering / Utility / Workshop
 environment: vehicle / outdoor / high-heat / vibration / UV
-tier:        Free + Certified Free; Pro — families и системы
+tier:        Free + Certified Free; Pro — families and systems
 ```
 
-## 3. Что уже есть в движке — карта реюза
+## 3. What the engine already has — the reuse map
 
-Компас домена: **bike light mount почти собран из готового** — руль это
-труба, а вся манжетно-адаптерная механика A1 уже golden на предплечье.
+The domain's compass: **the bike light mount is almost assembled from existing
+parts** — a handlebar is a tube, and all of A1's cuff-adapter mechanics are
+already golden on the forearm.
 
-| Building block | Статус | Реюз в домене |
+| Building block | Status | Reuse in the domain |
 |---|---|---|
-| `pipe_clip_v1_sideprint` (snap_c арк-ретенция) | ✅ | руль = труба Ø22.2–31.8; та же арк-физика, тот же sideprint «ноль нависаний» |
-| A1 свап-механика: `forearm_cuff_socket_v1` + `flashlight_adapter_25_v1` ↔ `rail_plate_adapter_v1`, харнес `assembly/swap.py` | ✅ | фонарь ↔ action-cam plate на руле — ТОТ ЖЕ dovetail_rail сокет и тот же харнес, тело крепления не меняется ни байтом |
-| Интерфейсы `dovetail_rail`, `snap_joint`, `strap_slot_pair`, `screw_pattern` (frame normal/up, mate-валидация, `forge compat`) | ✅ | typed-порты домена готовы, матрица совместимости выводится |
-| `wall_ring_mount`, `clamp_half_lower/upper` (TPU-ланды) | ✅ | хомутовые крепления на трубы рамы / стойки кемпера |
-| `add_strap_slots` (15–40мм), `add_zip_tie_slots`, `cord_slot_pair` | ✅ | ремни/стяжки — штатное velo-крепление |
-| `aluminum_profile_ref_v1` (2020) + `profile_seat_slot`, `endcap_dock_pockets` | ✅ | van/camper cargo-системы на стандартном профиле |
-| `edge_magnet_pockets`, `nut_trap`, `heatset_insert_pocket` | ✅ | съёмные крышки органайзеров, металлический крепёж |
-| `form.stability_footprint` (COM), snap strain-физика | ✅ | база для retention-проверок |
-| Environment-profile носитель на instance | ⬜ | БЛОКЕР MB-2: материал-гейты по среде негде повесить |
-| Vibration-валидаторы | ⬜ | честно: измеряющих проб нет — только WARN-hints |
-| Text embossing op (маркировка «NOT FOR SAFETY USE») | ⬜ | желателен, не блокер |
+| `pipe_clip_v1_sideprint` (snap_c arc retention) | ✅ | handlebar = tube Ø22.2–31.8; same arc physics, same sideprint "zero overhangs" |
+| A1 swap mechanics: `forearm_cuff_socket_v1` + `flashlight_adapter_25_v1` ↔ `rail_plate_adapter_v1`, harness `assembly/swap.py` | ✅ | flashlight ↔ action-cam plate on the handlebar — the SAME dovetail_rail socket and the same harness, the mount body doesn't change by a byte |
+| Interfaces `dovetail_rail`, `snap_joint`, `strap_slot_pair`, `screw_pattern` (frame normal/up, mate validation, `forge compat`) | ✅ | the domain's typed ports are ready, the compatibility matrix is derived |
+| `wall_ring_mount`, `clamp_half_lower/upper` (TPU lands) | ✅ | clamp mounts on frame tubes / camper posts |
+| `add_strap_slots` (15–40mm), `add_zip_tie_slots`, `cord_slot_pair` | ✅ | straps/zip ties — standard velo mounting |
+| `aluminum_profile_ref_v1` (2020) + `profile_seat_slot`, `endcap_dock_pockets` | ✅ | van/camper cargo systems on the standard profile |
+| `edge_magnet_pockets`, `nut_trap`, `heatset_insert_pocket` | ✅ | removable organizer lids, metal fasteners |
+| `form.stability_footprint` (COM), snap strain physics | ✅ | the basis for retention checks |
+| Environment-profile carrier on the instance | ⬜ | BLOCKER for MB-2: there's nowhere to hang material gates by environment |
+| Vibration validators | ⬜ | honestly: no measuring probes — only WARN hints |
+| Text embossing op ("NOT FOR SAFETY USE" marking) | ⬜ | desirable, not a blocker |
 
-## 4. Волны MB-1..3
+## 4. Waves MB-1..3
 
 ### MB-1 — Handlebar Mount System ⬜
 
-Golden-артефакт: **`bike_light_handlebar_mount`** — snap_c-клип на руль
-(арк-ретенция `pipe_clip_v1_sideprint`, параметр bar_d) + `dovetail_rail`
-сокет; свап фонарь ↔ action-cam plate ЧЕРЕЗ существующий swap-харнес
-(`flashlight_adapter_25_v1` / `rail_plate_adapter_v1` реюзаются как есть
-или с минимальным пресетом). Дополнительно: strap-вариант крепления
-(`add_strap_slots`) для карбоновых рулей, где snap нежелателен.
+Golden artifact: **`bike_light_handlebar_mount`** — a snap_c clip on the
+handlebar (arc retention from `pipe_clip_v1_sideprint`, parameter bar_d) + a
+`dovetail_rail` socket; the flashlight ↔ action-cam plate swap goes THROUGH
+the existing swap harness (`flashlight_adapter_25_v1` / `rail_plate_adapter_v1`
+reused as-is or with a minimal preset). Additionally: a strap mount variant
+(`add_strap_slots`) for carbon handlebars where a snap is undesirable.
 
-Критерий: golden под bar_d 22.2 и 31.8 без правки геометрии руками;
-`interface.swap_part_builds` + `form.handlebar_retention_ok` зелёные;
-`forge compat` показывает mate руль-клип ↔ оба адаптера.
+Criterion: the golden works for bar_d 22.2 and 31.8 with no manual geometry
+edits; `interface.swap_part_builds` + `form.handlebar_retention_ok` are green;
+`forge compat` shows the handlebar-clip mate ↔ both adapters.
 
 ### MB-2 — Car Interior Clips ⬜
 
-Клипсы кабеля/очков/парковочных карт, dashboard-safe держатели
-(не в зоне обзора/airbag). **Зависимость: environment-носитель на
-instance ⬜** — гейт «PLA не для салона» обязан стать измеряемым
-`manufacturing.material_env_ok`, а не примечанием. До закрытия гейта
-волна не стартует (фича без валидатора = галлюцинация).
+Cable/glasses/parking-card clips, dashboard-safe holders
+(not in the field-of-view/airbag zone). **Dependency: the environment carrier
+on the instance ⬜** — the "PLA is not for the interior" gate must become a
+measurable `manufacturing.material_env_ok`, not a note. Until the gate closes,
+the wave does not start (a feature without a validator = a hallucination).
 
 ### MB-3 — Cargo / Van / Camper ⬜
 
-Органайзеры на 2020-профилях (реюз `aluminum_profile_ref_v1`,
-`process: reference` из VF-4): крючки, лотки, страп-анкеры, разделители.
-Family единого шага крепления — кандидат в механизм A4.
+Organizers on 2020 profiles (reuse of `aluminum_profile_ref_v1`,
+`process: reference` from VF-4): hooks, trays, strap anchors, dividers.
+A family with a unified mounting pitch — a candidate for the A4 mechanism.
 
-## 5. Интерфейсы и стандарты домена
+## 5. Domain interfaces and standards
 
-**Handlebar Mount Standard** (по образцу Cassette Interface Standard):
+**Handlebar Mount Standard** (modeled on the Cassette Interface Standard):
 
-- shared-параметры: `bar_d`, `clamp_w`, `strap_width`, `payload_offset`;
-- frame-ключи: `bar_axis` (ось трубы), `payload_n` (нормаль сокета),
+- shared parameters: `bar_d`, `clamp_w`, `strap_width`, `payload_offset`;
+- frame keys: `bar_axis` (tube axis), `payload_n` (socket normal),
   `strap_tab_*`;
-- typed ports: `dovetail_rail` (payload, female на клипе),
-  `strap_slot_pair` (ремень), `snap_joint` (арк-захват руля);
-  cassette-урок реюзается: `shared:` перезаписывает параметры свопнутой
-  детали — рассинхрон адаптеров непредставим.
+- typed ports: `dovetail_rail` (payload, female on the clip),
+  `strap_slot_pair` (strap), `snap_joint` (handlebar arc grip);
+  the cassette lesson is reused: `shared:` overwrites the parameters of the
+  swapped part — adapter desync is unrepresentable.
 
-Payload-адаптеры домен НЕ плодит: любой существующий/будущий
-dovetail-адаптер платформы (фонарь, плата, будущие) совместим по compat.
+The domain does NOT multiply payload adapters: any existing/future
+dovetail adapter of the platform (flashlight, plate, future ones) is
+compat-compatible.
 
-## 6. Валидаторы-кандидаты
+## 6. Candidate validators
 
-| Валидатор | База | Статус |
+| Validator | Basis | Status |
 |---|---|---|
-| `form.handlebar_retention_ok` | реюз snap strain 1.5·δ·t/L² + арк-охват | ⬜ (сборка из готового) |
-| `form.bar_diameter_in_range` | clearance-band интерфейса | ⬜ |
-| `manufacturing.material_env_ok` | environment-носитель ⬜ — capability gap | ⬜ БЛОКЕР MB-2 |
-| `assembly.payload_swap_verified` | прямой реюз `interface.swap_part_builds` | ✅ механика |
-| `manufacturing.vibration_hints` | **WARN-уровень**: честно — без измерений это предупреждение (locknut/страховочная стяжка), не проверка | ⬜ |
+| `form.handlebar_retention_ok` | reuse of snap strain 1.5·δ·t/L² + arc coverage | ⬜ (assembled from existing parts) |
+| `form.bar_diameter_in_range` | interface clearance band | ⬜ |
+| `manufacturing.material_env_ok` | environment carrier ⬜ — capability gap | ⬜ BLOCKER for MB-2 |
+| `assembly.payload_swap_verified` | direct reuse of `interface.swap_part_builds` | ✅ mechanics |
+| `manufacturing.vibration_hints` | **WARN level**: honestly — without measurements this is a warning (locknut/safety zip tie), not a check | ⬜ |
 
-## 7. Free / Pro граница (Printables-тест)
+## 7. Free / Pro boundary (the Printables test)
 
 | Free / Certified | Pro |
 |---|---|
-| bike_light_handlebar_mount под один bar_d, простая cable clip салона, одиночный крюк на 2020 | family «весь диапазон рулей × payload-адаптеры» с compat-матрицей и отчётами |
-| одиночные организаторы | van/camper cargo-СИСТЕМА (единый шаг, BOM, print notes) |
+| bike_light_handlebar_mount for one bar_d, a simple interior cable clip, a single hook on 2020 | the family "the whole handlebar range × payload adapters" with a compat matrix and reports |
+| single organizers | a van/camper cargo SYSTEM (unified pitch, BOM, print notes) |
 | — | commercial output / print-farm license |
 
-Одиночный держатель фонаря есть на Printables — он Free. Платна
-система: параметрический диапазон + верифицированный своп + отчёты.
+A single flashlight holder exists on Printables — it's Free. What's paid is
+the system: parametric range + verified swap + reports.
 
-## 8. Риски и claims
+## 8. Risks and claims
 
-1. Среда агрессивная (UV, +70°C салон, вибрация) — до появления
-   environment-гейтов домен обязан носить `vehicle-environment-warning`
-   (Pack Trust Badge из ECOSYSTEM) на всех изделиях.
-2. Vibration-hints не выдавать за проверки: WARN с текстом «не измерено».
-3. Юридическая рамка в каждом PACK.md: accessory, not a safety device;
-   зона установки — ответственность пользователя, но запретные зоны
-   перечислены явно.
-4. Отказ крепления = потеря фонаря/камеры, не авария — payload-класс
-   изделий фиксируется в claims (никаких кронштейнов детских кресел).
+1. The environment is aggressive (UV, +70°C interior, vibration) — until
+   environment gates appear, the domain must carry a `vehicle-environment-warning`
+   (Pack Trust Badge from ECOSYSTEM) on all products.
+2. Do not pass off vibration hints as checks: a WARN with the text "not measured".
+3. A legal frame in every PACK.md: accessory, not a safety device;
+   the installation zone is the user's responsibility, but the forbidden zones
+   are listed explicitly.
+4. Mount failure = losing a light/camera, not a crash — the payload class of
+   the products is fixed in claims (no child-seat brackets whatsoever).
 
-## 9. Связи
+## 9. Connections
 
-- **A1/A1.5 ✅** — несущая механика домена (порты, dovetail, swap-харнес,
-  frames); MB-1 — третий swap-драйвер после манжеты и VF-кассет.
-- **A2 BOM ⬜** — ремни/винты/гайки MB-изделий в build package.
-- **Environment-носитель ⬜** (линия PK, «технические носители») —
-  блокер MB-2; MB — его первый настоящий клиент-заказчик.
-- **Линия P** — strap-механика (P2/P3) общая с wearable; кемпер-крюки
-  граничат с Workshop Wall System (A4).
-- **Линия VF** — 2020-профиль и `process: reference` реюзаются в MB-3.
-- Соседние домены: repair (клипсы салона ≈ replacement clips),
-  electronics (крепления камер/сенсоров на транспорте).
+- **A1/A1.5 ✅** — the domain's load-bearing mechanics (ports, dovetail, swap
+  harness, frames); MB-1 is the third swap driver after the cuff and VF cassettes.
+- **A2 BOM ⬜** — straps/screws/nuts of MB products in the build package.
+- **Environment carrier ⬜** (PK line, "technical carriers") —
+  the blocker for MB-2; MB is its first real client-customer.
+- **P line** — strap mechanics (P2/P3) shared with wearable; camper hooks
+  border on the Workshop Wall System (A4).
+- **VF line** — the 2020 profile and `process: reference` are reused in MB-3.
+- Neighboring domains: repair (interior clips ≈ replacement clips),
+  electronics (camera/sensor mounts on vehicles).
 
-Общие capability-gaps этого домена (лесенки посадок, environment/material
-гейты, contact-safety словарь, text embossing, threads/hinge/slide, grid-
-стандарт) централизованы в [CAPABILITIES.md](../CAPABILITIES.md) — домен их
-КЛИЕНТ, не владелец.
+This domain's shared capability gaps (fit ladders, environment/material
+gates, contact-safety vocabulary, text embossing, threads/hinge/slide, grid
+standard) are centralized in [CAPABILITIES.md](../CAPABILITIES.md) — the
+domain is their CLIENT, not their owner.

@@ -1,153 +1,154 @@
-# Education / FabLab — доменный план (ED)
+# Education / FabLab — domain plan (ED)
 
-Развёртка домена из [ECOSYSTEM.md](../../ECOSYSTEM.md) («Future Domains
-to Watch → Education / FabLab»). Канон шаблона — [INDEX.md](../INDEX.md).
+Expansion of the domain from [ECOSYSTEM.md](../../ECOSYSTEM.md) ("Future Domains
+to Watch → Education / FabLab"). Template canon — [INDEX.md](../INDEX.md).
 
-## 1. Scope и позиционирование
+## 1. Scope and positioning
 
-Учебные наборы для классов, FabLab-ов и кружков: объекты, на которых
-РУКАМИ щупают инженерные понятия — посадки и зазоры, мосты и нависания,
-статику ферм, подшипники, тригонометрию. Ключевая идея: **сам ДВИЖОК —
-учебный материал**. Honesty-валидаторы AF — предмет урока: ученик
-печатает объект, валидатор предсказывает поведение, печать подтверждает
-или опровергает — и расхождение тоже урок. Ни одна STL-площадка не даёт
-пары «предсказание → измерение».
+Teaching kits for classrooms, FabLabs, and clubs: objects on which
+engineering concepts are felt WITH THE HANDS — fits and clearances, bridges
+and overhangs, truss statics, bearings, trigonometry. The key idea: **the
+ENGINE itself is the teaching material**. AF's honesty validators are the
+subject of the lesson: the student prints an object, the validator predicts
+the behavior, the print confirms or refutes it — and the discrepancy is a
+lesson too. No STL platform provides the pair "prediction → measurement".
 
-**Каких claims домен НЕ делает:**
+**Which claims the domain does NOT make:**
 
-- НЕ toy-safety сертификация: EN71 не заявляем; «classroom-safe» =
-  оговорки про острые кромки и мелкие детали в отчёте, не сертификат;
-- НЕ лабораторное метрологическое оборудование (калибры — учебные);
-- НЕ обещание образовательных результатов — только измеряемые свойства
-  самих объектов.
+- NOT toy-safety certification: we do not claim EN71; "classroom-safe" =
+  caveats about sharp edges and small parts in the report, not a certificate;
+- NOT laboratory metrology equipment (the gauges are educational);
+- NOT a promise of educational outcomes — only measurable properties
+  of the objects themselves.
 
 ## 2. Mode / Environment / Tier
 
-Домен = pack, НЕ новый mode: у класса нет своего валидаторного
-контракта — уроки живут в существующих режимах.
+The domain = pack, NOT a new mode: a classroom has no validator
+contract of its own — lessons live in the existing modes.
 
 ```text
-mode:        Utility / Engineering / Cinema (разрезные и демо-модели)
+mode:        Utility / Engineering / Cinema (cutaway and demo models)
 environment: household / desk
-tier:        Free / Edu — наполняет существующую Education/FabLab-
-             лицензию из ECOSYSTEM продуктовым содержанием
+tier:        Free / Edu — fills the existing Education/FabLab
+             license from ECOSYSTEM with product content
 ```
 
-## 3. Что уже есть в движке — карта реюза
+## 3. What the engine already has — the reuse map
 
-| Building block | Статус | Реюз как урок |
+| Building block | Status | Reuse as a lesson |
 |---|---|---|
-| `manufacturing.overhang` / `min_wall` / `supportless` / `bed_fit` | ✅ | демонстрации FDM-ограничений: печатаем серию, сверяем с вердиктом валидатора |
-| Clearance-band механика интерфейсов (mate-валидация A1) | ✅ | урок «посадки»: band — то самое понятие, которое щупает tolerance ladder |
-| `truss_beam_v1`, `truss_web_cutouts` | ✅ | статика: ферма против сплошной балки при том же весе |
-| `bearing_turntable_base_v1` (посадка 608) | ✅ | урок «подшипник»: press-fit посадка реального 608 |
-| `phone_stand_v1` (device_slot = f(tilt)) | ✅ | тригонометрия: слот выводится из угла — формула видна в YAML |
-| `grab_handle_v1` (sweep), `shelf_bracket_v1` (loft) | ✅ | CAD-операции наглядно: sweep/loft как объекты |
-| `pin_pair`, `snap_hook_pair`, `dovetail_adapter_body`, `tongue_groove_edges` | ✅ | ступени tolerance ladder и «зоопарк соединений» |
-| `adapter_plate_v1` + `standoff_pattern` + `aluminum_profile_ref_v1` (2020) | ✅ | шасси classroom robotics ED-3 |
-| `frame_report` (explode/sections) | ✅ | «разрезные» модели: сечения генерируются, не рисуются |
-| Hinge (`pin_hinge`, остаток R4) | ⬜ | урок «шарнир» ждёт закрытия E-этапом |
-| Threads (R5) | ⬜ | урок «резьба» — после соответствующей волны |
-| Text embossing op | ⬜ | подписи ступеней лесенки прямо на детали; до него — таблица в отчёте |
+| `manufacturing.overhang` / `min_wall` / `supportless` / `bed_fit` | ✅ | demonstrations of FDM constraints: print a series, compare against the validator's verdict |
+| Clearance-band interface mechanics (A1 mate validation) | ✅ | the "fits" lesson: the band is the very concept the tolerance ladder lets you feel |
+| `truss_beam_v1`, `truss_web_cutouts` | ✅ | statics: a truss versus a solid beam at the same weight |
+| `bearing_turntable_base_v1` (608 seat) | ✅ | the "bearing" lesson: press-fit seat for a real 608 |
+| `phone_stand_v1` (device_slot = f(tilt)) | ✅ | trigonometry: the slot is derived from the angle — the formula is visible in the YAML |
+| `grab_handle_v1` (sweep), `shelf_bracket_v1` (loft) | ✅ | CAD operations made tangible: sweep/loft as objects |
+| `pin_pair`, `snap_hook_pair`, `dovetail_adapter_body`, `tongue_groove_edges` | ✅ | tolerance ladder steps and the "joint zoo" |
+| `adapter_plate_v1` + `standoff_pattern` + `aluminum_profile_ref_v1` (2020) | ✅ | classroom robotics chassis ED-3 |
+| `frame_report` (explode/sections) | ✅ | "cutaway" models: sections are generated, not drawn |
+| Hinge | ✅ | shipped: `hinge_leaf` + `living_hinge_groove` — the "hinge" lesson is unblocked |
+| Threads (R5) | ⬜ | the "thread" lesson — after the corresponding wave |
+| Text embossing op | ⬜ | ladder step labels right on the part; until then — a table in the report |
 
-## 4. Волны ED-1..3
+## 4. Waves ED-1..3
 
 ### ED-1 — Fit & Print Physics ⬜
 
-Golden-артефакт: **`tolerance_ladder_v1`** — лесенка посадок: пары
-штырь/гнездо (реюз `pin_pair` + clearance-band механики) с шагом зазора
-0.05–0.6 мм; печатаешь — щупаешь руками clearance band: где press-fit,
-где slide, где болтается. **Валидатор меряет каждую ступень**
-(`form.ladder_steps_ok`: монотонность шага, номинал каждой пары), отчёт
-печатается рядом с лесенкой как «лист предсказаний». Рядом в волне:
-bridge/overhang test-объекты — перекличка с `manufacturing.overhang`:
-объект нарочно пересекает границу вердикта, ученик видит, где валидатор
-сказал WARN и где печать реально провисла.
+Golden artifact: **`tolerance_ladder_v1`** — a ladder of fits: pin/socket
+pairs (reuse of `pin_pair` + clearance-band mechanics) with clearance steps
+of 0.05–0.6 mm; you print it — you feel the clearance band with your hands:
+where it's press-fit, where it slides, where it rattles. **The validator
+measures every step** (`form.ladder_steps_ok`: step monotonicity, nominal of
+each pair), the report is printed next to the ladder as a "prediction sheet".
+Alongside in the wave: bridge/overhang test objects — an echo of
+`manufacturing.overhang`: the object deliberately crosses the verdict
+boundary, the student sees where the validator said WARN and where the print
+actually sagged.
 
-Критерий: golden билдится, каждая ступень имеет измеренный номинал в
-отчёте; тест сверяет шаг лесенки с декларацией (рассинхрон
-непредставим); печать-подтверждение по Certified-критериям.
+Criterion: the golden builds, each step has a measured nominal in the
+report; a test checks the ladder step against the declaration (desync is
+unrepresentable); print confirmation per Certified criteria.
 
 ### ED-2 — Mechanisms ⬜
 
-Урок «подшипник» на `bearing_turntable_base_v1` (608 — самый дешёвый
-подшипник мира) + урок «наклон» на phone_stand (слот = f(tilt), меняем
-угол — смотрим на пересчёт и COM-гейт). Hinge-урок — **когда закроется
-R4-остаток `pin_hinge` ⬜**; до того волна честно без шарнира, а не с
-нарисованным.
+The "bearing" lesson on `bearing_turntable_base_v1` (608 — the world's
+cheapest bearing) + the "tilt" lesson on phone_stand (slot = f(tilt), change
+the angle — watch the recomputation and the COM gate). The hinge lesson —
+**now that the hinge ops have shipped (`hinge_leaf`)**; previously the wave was
+honestly without a hinge rather than with a drawn one.
 
 ### ED-3 — Kits & Chassis ⬜
 
-Parametric lesson kits (методичка + YAML: один параметр — одно понятие);
+Parametric lesson kits (teacher guide + YAML: one parameter — one concept);
 classroom robotics chassis (`adapter_plate_v1` + `standoff_pattern` +
-2020-профиль как рама — реюз `process: reference` из VF); «разрезные»
-модели — **реюз sections из `frame_report`**: сечение изделия как
-учебный плакат, генерируемый из того же YAML.
+2020 profile as the frame — reuse of `process: reference` from VF); "cutaway"
+models — **reuse of sections from `frame_report`**: a cross-section of the
+product as a teaching poster, generated from the same YAML.
 
-## 5. Интерфейсы и стандарты домена
+## 5. Domain interfaces and standards
 
-**Lesson Kit Standard** (по образцу Cassette Interface Standard):
+**Lesson Kit Standard** (modeled on the Cassette Interface Standard):
 
-- shared-параметры: `step_count`, `clearance_start/step` (лесенка),
-  `label_scheme`; у шасси — `deck_w/l`, `standoff_grid`;
-- frame-ключи: `probe_axis` (ось вставки пар), `deck_top_n` (шасси);
-- typed ports: шасси декларирует `screw_pattern` (модули датчиков) и
-  `cable_pass` — школьные модули совместимы через `forge compat`, и
-  сама матрица совместимости — учебный экспонат.
+- shared parameters: `step_count`, `clearance_start/step` (ladder),
+  `label_scheme`; for the chassis — `deck_w/l`, `standoff_grid`;
+- frame keys: `probe_axis` (pair insertion axis), `deck_top_n` (chassis);
+- typed ports: the chassis declares `screw_pattern` (sensor modules) and
+  `cable_pass` — school modules are compatible via `forge compat`, and
+  the compatibility matrix itself is a teaching exhibit.
 
-## 6. Валидаторы-кандидаты
+## 6. Candidate validators
 
-| Валидатор | База | Статус |
+| Validator | Basis | Status |
 |---|---|---|
-| `form.ladder_steps_ok` | clearance-band + номиналы пар | ⬜ (сборка из готового) |
-| `form.bridge_test_declared` | связка test-объекта с порогом `manufacturing.overhang` | ⬜ |
-| `manufacturing.*` (все) | существуют | ✅ реюз как ПРЕДМЕТ урока |
-| `form.stability_footprint` | существует | ✅ (стенды, шасси) |
-| `assembly.no_orphan_ports` | существует | ✅ (шасси с модулями) |
+| `form.ladder_steps_ok` | clearance-band + pair nominals | ⬜ (assembled from existing parts) |
+| `form.bridge_test_declared` | linking the test object to the `manufacturing.overhang` threshold | ⬜ |
+| `manufacturing.*` (all) | exist | ✅ reuse as the SUBJECT of the lesson |
+| `form.stability_footprint` | exists | ✅ (stands, chassis) |
+| `assembly.no_orphan_ports` | exists | ✅ (chassis with modules) |
 
-Особенность домена: валидаторы не только гейтят — их вердикты входят в
-учебный материал (лист предсказаний к печати).
+The domain's peculiarity: validators don't only gate — their verdicts become
+part of the teaching material (the prediction sheet for the print).
 
-## 7. Free / Pro граница (Printables-тест)
+## 7. Free / Pro boundary (the Printables test)
 
-| Free / Edu | Платно (Edu-лицензия / Pro) |
+| Free / Edu | Paid (Edu license / Pro) |
 |---|---|
-| tolerance_ladder, bridge/overhang тесты, одиночные уроки-объекты | **lesson kit workflow**: серия YAML + методичка + листы предсказаний + классный batch (30 лесенок с именами) |
-| шасси в базовой конфигурации | families шасси под классные наборы датчиков, private-каталог школы (B2B-механика PK) |
+| tolerance_ladder, bridge/overhang tests, single lesson objects | **lesson kit workflow**: a YAML series + teacher guide + prediction sheets + classroom batch (30 ladders with names) |
+| chassis in the base configuration | chassis families for classroom sensor kits, a school's private catalog (PK B2B mechanics) |
 
-Тестовые кубики и лесенки есть на Printables — они Free by rule.
-Платна инфраструктура класса: workflow, batch, методички, отчёты.
+Test cubes and ladders exist on Printables — they are Free by rule.
+What's paid is the classroom infrastructure: workflow, batch, guides, reports.
 
-## 8. Риски и claims
+## 8. Risks and claims
 
-1. Дети: только «classroom-safe» оговорки (кромки, размер деталей
-   ≥ порога, отчёт warnings без замалчивания) — НЕ EN71, НЕ «child-safe»
-   (ECOSYSTEM: child-visible, но НЕ child-safe unless tested).
-2. Расхождение предсказания и печати на чужом принтере — не баг домена,
-   а материал урока; но пороги обязаны честно указывать материал и
-   ориентацию, на которых калиброваны.
-3. Не обещать методических результатов — AF поставляет измеряемые
-   объекты, не педагогику.
-4. Robotics-шасси — не «робот»: электроника/моторы вне scope, шасси
-   заявляет только крепёж и габариты.
+1. Children: only "classroom-safe" caveats (edges, part size
+   ≥ threshold, report warnings without suppression) — NOT EN71, NOT "child-safe"
+   (ECOSYSTEM: child-visible, but NOT child-safe unless tested).
+2. Divergence between the prediction and the print on someone else's printer
+   is not a domain bug but lesson material; yet the thresholds must honestly
+   state the material and orientation they were calibrated on.
+3. Do not promise pedagogical outcomes — AF ships measurable
+   objects, not pedagogy.
+4. The robotics chassis is not a "robot": electronics/motors are out of scope,
+   the chassis claims only mounting and dimensions.
 
-## 9. Связи
+## 9. Connections
 
-- **Роль в экосистеме**: воронка в community packs (CP) — «человек с
-  YAML → автор пака» начинается с урока; демо для OS-6 «good first
-  packs»; наполнение Education/FabLab-лицензии (Studio-лицензии
-  ECOSYSTEM).
-- **A1/A1.5 ✅** — clearance-band и compat-матрица = учебные экспонаты;
-  порты шасси. **A2 BOM ⬜** — комплектовка классного набора (винты,
-  608, профиль) — BOM как раздаточный лист.
-- **E-этап** — pin_hinge/threads открывают ED-2+ уроки по мере
-  появления (домен потребляет, не форсирует).
-- **Линии PK/CP** — Edu-tier обкатывает free-механику PK-2; классы —
-  естественный источник CP-паков.
-- Соседние домены: studio (стенд как урок), jigs (калибры взрослеют в
-  B2B), repair (урок «почини ручку» — мост доменов).
+- **Role in the ecosystem**: a funnel into community packs (CP) — "a person
+  with a YAML → pack author" starts with a lesson; a demo for OS-6 "good first
+  packs"; content for the Education/FabLab license (ECOSYSTEM Studio
+  licenses).
+- **A1/A1.5 ✅** — the clearance band and the compat matrix = teaching
+  exhibits; chassis ports. **A2 BOM ⬜** — classroom kit provisioning (screws,
+  608, profile) — the BOM as a handout sheet.
+- **E-stage** — hinge/thread ops have shipped and unlock ED-2+ lessons as they
+  land (the domain consumes, it does not force).
+- **PK/CP lines** — the Edu tier road-tests PK-2's free mechanics; classrooms
+  are a natural source of CP packs.
+- Neighboring domains: studio (a stand as a lesson), jigs (gauges mature into
+  B2B), repair (the "fix the handle" lesson — a bridge between domains).
 
-Общие capability-gaps этого домена (лесенки посадок, environment/material
-гейты, contact-safety словарь, text embossing, threads/hinge/slide, grid-
-стандарт) централизованы в [CAPABILITIES.md](../CAPABILITIES.md) — домен их
-КЛИЕНТ, не владелец.
+This domain's shared capability gaps (fit ladders, environment/material
+gates, contact-safety vocabulary, text embossing, threads/hinge/slide, grid
+standard) are centralized in [CAPABILITIES.md](../CAPABILITIES.md) — the
+domain is their CLIENT, not their owner.

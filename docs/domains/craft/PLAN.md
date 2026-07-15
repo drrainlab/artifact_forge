@@ -1,186 +1,187 @@
-# Craft / Mold / Ceramics — план домена
+# Craft / Mold / Ceramics — domain plan
 
-Статусы: ✅ реализовано · 🔶 частично · ⬜ не начато. Канон шаблона —
-[INDEX.md](../INDEX.md); коммерческие правила — [ECOSYSTEM.md](../../ECOSYSTEM.md).
+Statuses: ✅ implemented · 🔶 partial · ⬜ not started. Template canon —
+[INDEX.md](../INDEX.md); commercial rules — [ECOSYSTEM.md](../../ECOSYSTEM.md).
 
-## 1. Scope и позиционирование
+## 1. Scope and positioning
 
-Параметрические формы для отливки и оттиска: открытые формы (мыло, гипс,
-воск, бетон-декор), двухчастные формы с registration-ключами, штампы и
-текстурные роллеры для керамики/полимерной глины, шаблоны/риббоны для
-гончарки. Печатается не изделие, а **инструмент** — форма, из которой
-пользователь отливает изделие. Ценность AF: draft angle, усадка
-материала отливки и demold-зазоры — измеряемые параметры с валидаторами,
-а не «на глаз», как в типовых STL-формах.
+Parametric molds for casting and impressions: open molds (soap, plaster,
+wax, decorative concrete), two-part molds with registration keys, stamps and
+texture rollers for ceramics/polymer clay, templates/ribs for
+pottery. What gets printed is not the product but the **tool** — the mold from
+which the user casts the product. AF's value: draft angle, casting-material
+shrinkage and demold clearances are measurable parameters with validators,
+not "by eye" as in typical STL molds.
 
-Каких claims домен НЕ делает:
+What claims this domain does NOT make:
 
-- НЕ заявляет food-safe by default: формы для шоколада/льда — только с
-  явной оговоркой о материале, слоистости FDM (поры = бактерии) и
-  пищевом покрытии; гарантий пищевого контакта нет (gap food-safe
-  метаданных ⬜).
-- НЕ покрывает горячее литьё выше стойкости пластика формы (металл,
-  высокотемпературные смолы) — только гипс/силикон/воск/мыло/бетон и
-  аналогичные холодные/тёплые материалы.
-- НЕ обещает срок службы формы (абразивные материалы съедают PLA) —
-  только ноты материала.
+- Does NOT claim food-safe by default: molds for chocolate/ice — only with
+  an explicit disclaimer about material, FDM layering (pores = bacteria) and
+  food-grade coating; no guarantees of food contact (food-safe
+  metadata gap ⬜).
+- Does NOT cover hot casting above the mold plastic's heat resistance (metal,
+  high-temperature resins) — only plaster/silicone/wax/soap/concrete and
+  similar cold/warm materials.
+- Does NOT promise mold service life (abrasive materials eat PLA) —
+  material notes only.
 
 ## 2. Mode / Environment / Tier
 
-Домен = pack, НЕ новый mode: формы — инженерные детали с обычным
-контрактом качества, уникальных проверок уровня mode нет (draft/demold —
-валидаторы form.*, не новый контракт).
+Domain = pack, NOT a new mode: molds are engineering parts under the regular
+quality contract; there are no unique mode-level checks (draft/demold are
+form.* validators, not a new contract).
 
 ```text
-mode:        Engineering / Utility (по изделию)
-environment: workshop (мокрое литьё — WARN-нота, не wet-гейт)
-tier:        Free (открытые формы) + Pro (two-part, registration, профили отливки)
+mode:        Engineering / Utility (per product)
+environment: workshop (wet casting — WARN note, not a wet gate)
+tier:        Free (open molds) + Pro (two-part, registration, casting profiles)
 ```
 
-## 3. Что уже есть в движке — карта реюза
+## 3. What the engine already has — reuse map
 
-| Блок домена | Чем собирается сегодня | Статус |
+| Domain block | How it is built today | Status |
 |---|---|---|
-| Ванна/корыто формы | `rounded_box_shell` (стенки + дно) | ✅ |
-| Круглые/осесимметричные формы | `revolve_band` / `recipe_revolve` | ✅ |
-| Посадка полуформ друг в друга | `inset_plug` — посадка plug↔interior с clearance-цепочкой: почти готовый mold-registration | ✅ |
-| Registration-ключи половинок | `pin_pair` (butt_pin) — штырь/гнездо с band-посадкой | ✅ |
-| Замыкание половинок | `edge_magnet_pockets` (сухие запечатанные карманы, alignment-only) | ✅ |
-| Стяжка половинок винтами | hole/counterbore-паттерны + `nut_trap` | ✅ |
-| Рёбра жёсткости ванны (распирание отливкой) | рёбра-модификаторы, `truss_web_cutouts` | ✅ |
-| Заливные воронки/каналы | `port_cutout`, `axial_channel` (вент/pour как каналы) | 🔶 (конус воронки — параметрами revolve) |
-| Draft angle в ops | нет носителя уклона стенок | ⬜ (VF-5 production readiness уже планировал draft angles — общий building block) |
-| Текстура (штампы/роллеры) | texture op — прямая связь с Bio-4M SDF движком | ⬜ (CR-3) |
-| Материал-профили ОТЛИВКИ (усадка/вязкость) | носителя нет; усадка пока — параметр shrinkage_pct | ⬜ |
-| Food-safe метаданные | носителя нет | ⬜ |
+| Mold tub/trough | `rounded_box_shell` (walls + floor) | ✅ |
+| Round/axisymmetric molds | `revolve_band` / `recipe_revolve` | ✅ |
+| Half-molds seating into each other | `inset_plug` — plug↔interior fit with clearance chain: nearly ready-made mold registration | ✅ |
+| Registration keys of the halves | `pin_pair` (butt_pin) — pin/socket with band fit | ✅ |
+| Closing the halves | `edge_magnet_pockets` (dry sealed pockets, alignment-only) | ✅ |
+| Bolting the halves together | hole/counterbore patterns + `nut_trap` | ✅ |
+| Tub stiffening ribs (casting pressure) | rib modifiers, `truss_web_cutouts` | ✅ |
+| Pour funnels/channels | `port_cutout`, `axial_channel` (vent/pour as channels) | 🔶 (funnel cone — via revolve parameters) |
+| Draft angle in ops | no carrier for wall taper | ⬜ (VF-5 production readiness already planned draft angles — shared building block) |
+| Texture (stamps/rollers) | texture op — direct link to the Bio-4M SDF engine | ⬜ (CR-3) |
+| CASTING material profiles (shrinkage/viscosity) | no carrier; shrinkage is currently a shrinkage_pct parameter | ⬜ |
+| Food-safe metadata | no carrier | ⬜ |
 
-## 4. Волны CR-1..3
+## 4. Waves CR-1..3
 
-### CR-1 — Open Molds (открытые формы) ⬜
+### CR-1 — Open Molds ⬜
 
-Golden: **`parametric_soap_mold_v1`** — открытая форма: полость
-(прямоугольная/овальная, из `rounded_box_shell` + вычет полости),
-**draft angle** стенок полости (новый building block ⬜ — параметр
-`draft_deg` 1–5°, реализуется как конусность вычитаемого тела),
-**усадка** масштаб-параметром `shrinkage_pct` (полость растёт на усадку
-материала отливки), скругления demold на всех внутренних кромках
-(вынимаемость + отсутствие концентраторов у отливки). Side-goldens:
-круглая форма-шайба на `recipe_revolve`, лоток на N ячеек (полость ×
-паттерн).
+Golden: **`parametric_soap_mold_v1`** — an open mold: cavity
+(rectangular/oval, from `rounded_box_shell` + cavity subtraction),
+**draft angle** on the cavity walls (new building block ⬜ — parameter
+`draft_deg` 1–5°, implemented as taper of the subtracted body),
+**shrinkage** via a `shrinkage_pct` scale parameter (the cavity grows by the
+casting material's shrinkage), demold fillets on all internal edges
+(removability + no stress concentrators in the cast piece). Side-goldens:
+a round puck mold on `recipe_revolve`, an N-cell tray (cavity ×
+pattern).
 
-Критерий закрытия: golden в grade A; `form.draft_angle_ok` и
-`form.demold_clearance_ok` (§6) реально меряют уклон и кромки; отчёт
-несёт таблицу «материал отливки → рекомендованный shrinkage_pct» (§5);
-S/M/L-варианты из одного YAML.
+Closure criterion: golden at grade A; `form.draft_angle_ok` and
+`form.demold_clearance_ok` (§6) actually measure taper and edges; the report
+carries a "casting material → recommended shrinkage_pct" table (§5);
+S/M/L variants from one YAML.
 
-### CR-2 — Two-Part Molds (двухчастные формы) ⬜
+### CR-2 — Two-Part Molds ⬜
 
-Полуформы с плоскостью разъёма: registration через `pin_pair`
-(butt_pin_joint — посадка штырь↔гнездо уже с band) и/или
-`inset_plug`-бортик (полуформа садится в полуформу clearance-цепочкой);
-замыкание — `edge_magnet_pockets` или винтовая стяжка
-(counterbore + `nut_trap`). Заливная воронка (pour funnel, конус
-`recipe_revolve`) и вент-каналы (`axial_channel` от верхних точек
-полости к разъёму). Golden-кандидат: `two_part_figure_mold_v1`
-(осесимметричная полость). Валидаторы волны: `assembly.mold_halves_registered`
-(ключи соосны, зазор разъёма в band), `form.pour_vent_topology_ok`
-(воронка в верхней точке, вент из каждого локального максимума полости —
-родня water_report-топологии, только воздух вместо воды).
+Half-molds with a parting plane: registration via `pin_pair`
+(butt_pin_joint — pin↔socket fit already with band) and/or an
+`inset_plug` rim (one half seats into the other via the clearance chain);
+closing — `edge_magnet_pockets` or a screw tie
+(counterbore + `nut_trap`). Pour funnel (cone via
+`recipe_revolve`) and vent channels (`axial_channel` from the cavity's top
+points to the parting plane). Golden candidate: `two_part_figure_mold_v1`
+(axisymmetric cavity). Wave validators: `assembly.mold_halves_registered`
+(keys coaxial, parting gap within band), `form.pour_vent_topology_ok`
+(funnel at the top point, a vent from every local maximum of the cavity —
+a relative of the water_report topology, just air instead of water).
 
 ### CR-3 — Stamps / Texture Rollers / Ceramics ⬜
 
-Штампы и текстурные роллеры: тело — `rounded_plate` (штамп) или
-`revolve_band` (роллер, уже умеет втулки/ручки), рабочая поверхность —
-**texture op ⬜**: прямая связь с Bio-4M SDF-движком (SDF-поля уже
-генерируют органический рельеф в био-скинах — здесь тот же рельеф
-становится рабочей поверхностью инструмента, инвертированный оттиск).
-Плюс керамические шаблоны: риббоны-профили (`rounded_plate` + профильный
-вырез), калибры толщины стенки. Волна блокирована texture op — до него
-только геометрические текстуры (hex/grid/voronoi поля-модификаторы ✅
-как рельеф первого поколения, 🔶).
+Stamps and texture rollers: body — `rounded_plate` (stamp) or
+`revolve_band` (roller, already supports bushings/handles), working surface —
+**texture op ⬜**: direct link to the Bio-4M SDF engine (SDF fields already
+generate organic relief in bio-skins — here the same relief becomes the
+tool's working surface, an inverted impression).
+Plus ceramic templates: profile ribs (`rounded_plate` + profile
+cutout), wall-thickness gauges. The wave is blocked by the texture op — until
+then only geometric textures (hex/grid/voronoi field modifiers ✅
+as first-generation relief, 🔶).
 
-## 5. Интерфейсы и стандарты домена
+## 5. Domain interfaces and standards
 
-**Mold Registration Standard** (по образцу Cassette Interface Standard):
+**Mold Registration Standard** (modeled on the Cassette Interface Standard):
 
-1. **Shared-параметры** (имена — контракт): `cavity_l/w/d`,
+1. **Shared parameters** (names are the contract): `cavity_l/w/d`,
    `draft_deg` (1–5), `shrinkage_pct`, `parting_clearance` (0.1–0.3),
    `key_d`, `key_count`, `wall_t`.
-2. **Конвенция shrinkage** — усадка материала ОТЛИВКИ, не печати
-   (печатную компенсацию владеет слайсер). Таблица-справочник в отчёте:
+2. **Shrinkage convention** — shrinkage of the CASTING material, not the print
+   (print compensation is owned by the slicer). Reference table in the report:
 
-   | Материал отливки | shrinkage_pct (типично) |
+   | Casting material | shrinkage_pct (typical) |
    |---|---|
-   | мыльная основа | 0.5–1.0 |
-   | гипс | 0.1–0.3 |
-   | силикон (platinum) | 0.1–0.4 |
-   | воск | 1.0–2.5 |
-   | бетон-декор | 0.3–0.6 |
+   | soap base | 0.5–1.0 |
+   | plaster | 0.1–0.3 |
+   | silicone (platinum) | 0.1–0.4 |
+   | wax | 1.0–2.5 |
+   | decorative concrete | 0.3–0.6 |
 
-   Числа — рекомендация с нотой «уточните по паспорту материала»;
-   полноценные материал-профили отливки — носитель ⬜ (Pro, §7).
-3. **Frame-ключи**: `parting_plane_z`, `cavity_floor_z`, `key_*_xy`,
-   `funnel_axis` — публикуются билдером, меряются валидаторами.
-4. **Typed ports**: registration-ключи — кандидат на реюз
-   `removable_insert`-семейства (tool-free разъём половинок); новый тип
-   `mold_registration` вводится только вместе с mate-валидатором ⬜.
+   The numbers are a recommendation with a "verify against the material
+   datasheet" note; full casting material profiles — carrier ⬜ (Pro, §7).
+3. **Frame keys**: `parting_plane_z`, `cavity_floor_z`, `key_*_xy`,
+   `funnel_axis` — published by the builder, measured by validators.
+4. **Typed ports**: registration keys are a reuse candidate for the
+   `removable_insert` family (tool-free separation of the halves); a new
+   `mold_registration` type is introduced only together with its mate validator ⬜.
 
-## 6. Валидаторы-кандидаты
+## 6. Validator candidates
 
-| Валидатор | Что меряет |
+| Validator | What it measures |
 |---|---|
-| `form.draft_angle_ok` | фактический уклон всех стенок полости ≥ draft_deg по направлению съёма (gap ⬜ — новый building block, общий с VF-5 production readiness) |
-| `form.demold_clearance_ok` | нет поднутрений против направления съёма; внутренние кромки полости скруглены ≥ r_min |
-| `form.mold_wall_ok` | стенка ванны держит распирание отливкой: толщина/рёбра от cavity_d (обобщение min_wall) |
-| `form.pour_vent_topology_ok` | воронка в верхней точке разъёма; вент из каждого локального максимума полости (CR-2) |
-| `assembly.mold_halves_registered` | ключи соосны в позе (band), зазор разъёма = parting_clearance, половинки разнимаются вертикальным подъёмом |
-| `manufacturing.mold_surface_note` | нота слоистости рабочей поверхности (пост-обработка/покрытие) — honesty-нота, не гейт |
+| `form.draft_angle_ok` | actual taper of all cavity walls ≥ draft_deg along the demold direction (gap ⬜ — new building block, shared with VF-5 production readiness) |
+| `form.demold_clearance_ok` | no undercuts against the demold direction; internal cavity edges filleted ≥ r_min |
+| `form.mold_wall_ok` | tub wall withstands casting pressure: thickness/ribs derived from cavity_d (generalization of min_wall) |
+| `form.pour_vent_topology_ok` | funnel at the top point of the parting plane; a vent from every local maximum of the cavity (CR-2) |
+| `assembly.mold_halves_registered` | keys coaxial in pose (band), parting gap = parting_clearance, halves separate by vertical lift |
+| `manufacturing.mold_surface_note` | note about working-surface layering (post-processing/coating) — honesty note, not a gate |
 
-## 7. Free / Pro граница (Printables-тест)
+## 7. Free / Pro boundary (Printables test)
 
 | Free / Certified Free | Pro |
 |---|---|
-| открытые формы (мыло, гипс, лоток ячеек) с draft + shrinkage | two-part molds: registration, воронки, венты, `assembly.*`-отчёт |
-| одиночный штамп с geometric-текстурой | материал-профили отливки (носитель ⬜): shrinkage/вязкость/венты из профиля |
-| — | registration systems как family (пресеты ключей/замыканий), texture-библиотеки поверх texture op ⬜ |
+| open molds (soap, plaster, cell tray) with draft + shrinkage | two-part molds: registration, funnels, vents, `assembly.*` report |
+| single stamp with a geometric texture | casting material profiles (carrier ⬜): shrinkage/viscosity/vents from the profile |
+| — | registration systems as a family (key/closure presets), texture libraries on top of the texture op ⬜ |
 
-Открытую мыльную форму легко найти готовой — Free by test; параметрика
-двухчастных форм с проверенной registration и топологией вентов — то,
-что STL не повторит.
+An open soap mold is easy to find ready-made — Free by test; parametric
+two-part molds with verified registration and vent topology are what
+an STL cannot replicate.
 
-## 8. Риски и claims
+## 8. Risks and claims
 
-- **Food-safe**: формы для шоколада/льда — только с оговоркой «материал
-  и покрытие — ответственность пользователя; FDM-поверхность пориста»;
-  food-safe не заявляем by default (gap метаданных ⬜). Certified для
-  пищевых форм не выдаётся до появления носителя.
-- **Химия отливки**: экзотермичные смолы/агрессивные материалы могут
-  повести форму — нота материала формы (PETG vs PLA) в каждом отчёте.
-- **Draft-валидатор честен или его нет**: до `form.draft_angle_ok` ⬜
-  параметр draft_deg не рекламируется как «проверенный» — фича без
-  измеряющего валидатора = галлюцинация.
-- **Усадка — рекомендация**: таблица §5 не гарантия размера отливки;
-  отчёт всегда несёт ноту «уточните по паспорту материала».
-- **Абразив/износ**: бетон и шамот съедают форму — нота ресурса.
+- **Food-safe**: molds for chocolate/ice — only with the disclaimer "material
+  and coating are the user's responsibility; FDM surface is porous";
+  food-safe is not claimed by default (metadata gap ⬜). Certified for
+  food molds is not issued until a carrier appears.
+- **Casting chemistry**: exothermic resins/aggressive materials can warp
+  the mold — a mold-material note (PETG vs PLA) in every report.
+- **The draft validator is honest or absent**: until `form.draft_angle_ok` ⬜
+  the draft_deg parameter is not advertised as "verified" — a feature without
+  a measuring validator = a hallucination.
+- **Shrinkage is a recommendation**: the §5 table is not a guarantee of cast
+  dimensions; the report always carries a "verify against the material
+  datasheet" note.
+- **Abrasion/wear**: concrete and grog eat the mold — a service-life note.
 
-## 9. Связи
+## 9. Connections
 
-- **A1/A1.5 ✅**: registration-ключи через существующие joints
-  (`removable_insert`-семейство как разъём половинок); тип
-  `mold_registration` — кандидат в реестр портов.
-- **A2 BOM ⬜**: магниты/винты замыкания половинок как hardware-позиции.
-- **VF-5 production readiness**: draft_angle ⬜ — общий building block
-  (VF планировал draft для литьевого производства кассет; строим один
-  раз, реюзают оба).
-- **Bio-4M ✅ / texture op ⬜**: SDF-движок био-скинов — готовый
-  генератор рельефа для CR-3; texture op делает его рабочей
-  поверхностью инструмента.
-- **Линия PK ⬜**: материал-профили отливки — pro-контент pack-механизма.
-- **Соседние домены**: repair (revolve/clearance-посадки общие),
-  accessibility (texture-gap общий), education (открытая форма —
-  идеальный учебный артефакт «валидатор ловит поднутрение»).
+- **A1/A1.5 ✅**: registration keys via existing joints
+  (the `removable_insert` family as the halves' separation joint); the
+  `mold_registration` type is a candidate for the port registry.
+- **A2 BOM ⬜**: magnets/screws closing the halves as hardware items.
+- **VF-5 production readiness**: draft_angle ⬜ — shared building block
+  (VF planned draft for injection-molded cassette production; build it once,
+  both reuse it).
+- **Bio-4M ✅ / texture op ⬜**: the bio-skin SDF engine is a ready-made
+  relief generator for CR-3; the texture op turns it into the tool's working
+  surface.
+- **PK line ⬜**: casting material profiles — pro content of the pack mechanism.
+- **Neighboring domains**: repair (shared revolve/clearance fits),
+  accessibility (shared texture gap), education (an open mold is the
+  ideal teaching artifact: "the validator catches an undercut").
 
-Общие capability-gaps этого домена (лесенки посадок, environment/material
-гейты, contact-safety словарь, text embossing, threads/hinge/slide, grid-
-стандарт) централизованы в [CAPABILITIES.md](../CAPABILITIES.md) — домен их
-КЛИЕНТ, не владелец.
+The shared capability gaps of this domain (fit ladders, environment/material
+gates, contact-safety vocabulary, text embossing, threads/hinge/slide, grid
+standard) are centralized in [CAPABILITIES.md](../CAPABILITIES.md) — the domain
+is their CLIENT, not their owner.

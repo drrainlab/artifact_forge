@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 out/
+.artifact-forge/
 dist/
 *.egg-info/
 .DS_Store

@@ -1,50 +1,51 @@
-# Доменные планы Artifact Forge
+# Artifact Forge domain plans
 
-Развёртка «Future Domains to Watch» из [ECOSYSTEM.md](../ECOSYSTEM.md):
-каждый недоохваченный домен — собственный план в подпапке. Домены НЕ
-становятся режимами (правило пяти осей: **новый рынок ≠ новый mode;
-новый валидаторный контракт = новый mode**) — это packs/domains поверх
-существующих режимов и environment-профилей.
+Expansion of "Future Domains to Watch" from [ECOSYSTEM.md](../ECOSYSTEM.md):
+every under-covered domain gets its own plan in a subfolder. Domains do NOT
+become modes (the rule of five axes: **a new market ≠ a new mode;
+a new validator contract = a new mode**) — they are packs/domains on top of
+the existing modes and environment profiles.
 
-Принципы всех планов:
+Principles of all plans:
 
-1. **Пять осей**: mode = проверка; pack = упаковка; environment =
-   условия; style = внешний язык; tier = free/certified/pro.
-2. **Printables-тест**: платно только то, что сложно повторить обычным
-   STL (families, системы, отчёты, workflow).
-3. **Honest claims**: каждый план фиксирует, каких заявлений домен НЕ
-   делает.
-4. **Канон волн**: первая волна каждого домена обязана иметь именованный
-   golden-артефакт; фича без validator-backed геометрии = галлюцинация.
-5. **Карта реюза честная**: план ссылается только на существующие
-   ops/архетипы/интерфейсы; отсутствующие building blocks помечены ⬜.
+1. **Five axes**: mode = verification; pack = packaging; environment =
+   conditions; style = visual language; tier = free/certified/pro.
+2. **The Printables test**: paid only what is hard to replicate with an
+   ordinary STL (families, systems, reports, workflows).
+3. **Honest claims**: every plan pins down which claims the domain does NOT
+   make.
+4. **Wave canon**: the first wave of every domain must have a named
+   golden artifact; a feature without validator-backed geometry = a hallucination.
+5. **An honest reuse map**: a plan references only existing
+   ops/archetypes/interfaces; missing building blocks are marked ⬜.
 
-Общие capability-gaps доменов централизованы в
-[CAPABILITIES.md](CAPABILITIES.md) — матрица «gap → домены-клиенты →
-owner wave»; домен не реализует общий блок локально, он его клиент.
+The domains' shared capability gaps are centralized in
+[CAPABILITIES.md](CAPABILITIES.md) — the matrix "gap → client domains →
+owner wave"; a domain does not implement a shared block locally, it is its
+client.
 
-**Статус доменных волн** в таблице = реализованы ли СОБСТВЕННЫЕ
-waves/goldens домена. Не путать с ✅ внутри PLAN.md — там это уже
-существующие building blocks движка, которые домен реюзает.
+**Domain wave status** in the table = whether the domain's OWN
+waves/goldens are implemented. Not to be confused with ✅ inside PLAN.md —
+there it marks already existing engine building blocks that the domain reuses.
 
-| Домен | Slug | Scope одной строкой | Приоритет | Статус доменных волн |
+| Domain | Slug | Scope in one line | Priority | Domain wave status |
 |---|---|---|---|---|
-| Repair / Spare Parts | [repair](repair/PLAN.md) | right-to-repair: ручки, защёлки, адаптеры, fit-шаблоны | **P1** | ⬜ |
-| Jigs / Fixtures | [jigs](jigs/PLAN.md) | production aids: кондукторы, упоры, калибры, B2B-отчёты | **P1** | ⬜ |
-| Music / Studio | [studio](studio/PLAN.md) | creator-витрина: маунты, кабель-менеджмент, стенды | **P1** | ⬜ |
-| Electronics / IoT | [electronics](electronics/PLAN.md) | корпуса плат, sensor mounts, DIN/гланды | P2 | ⬜ |
-| Mobility / Bike / Vehicle | [mobility](mobility/PLAN.md) | руль/салон/кемпер-аксессуары с env-гейтами | P2 | ⬜ |
-| Education / FabLab | [education](education/PLAN.md) | учебные наборы, printable validators demo | P2 | ⬜ |
+| Repair / Spare Parts | [repair](repair/PLAN.md) | right-to-repair: knobs, latches, adapters, fit templates | **P1** | 🔶 first free-pack wave shipped (R1-Showcase) |
+| Jigs / Fixtures | [jigs](jigs/PLAN.md) | production aids: jigs, stops, gauges, B2B reports | **P1** | 🔶 first free-pack wave shipped (R1-Showcase) |
+| Music / Studio | [studio](studio/PLAN.md) | creator showcase: mounts, cable management, stands | **P1** | 🔶 first free-pack wave shipped (R1-Showcase) |
+| Electronics / IoT | [electronics](electronics/PLAN.md) | board enclosures, sensor mounts, DIN/glands | P2 | ⬜ |
+| Mobility / Bike / Vehicle | [mobility](mobility/PLAN.md) | handlebar/interior/camper accessories with env gates | P2 | ⬜ |
+| Education / FabLab | [education](education/PLAN.md) | teaching kits, printable validators demo | P2 | 🔶 first free-pack wave shipped (R1-Showcase) |
 | Accessibility / Adaptive | [accessibility](accessibility/PLAN.md) | daily-living grips/aids, no medical claims | P3 | ⬜ |
-| Craft / Mold / Ceramics | [craft](craft/PLAN.md) | параметрические формы: draft, усадка, ключи | P3 | ⬜ |
-| Pet / Aquarium / Terrarium | [pet](pet/PLAN.md) | wet/humid крепёж и системы с toxicity-warnings | P3 | ⬜ |
-| Medical / Dental | [medical](medical/EXCLUDED.md) | **explicitly excluded** до внешнего certification path | — | ⛔ |
+| Craft / Mold / Ceramics | [craft](craft/PLAN.md) | parametric molds: draft, shrinkage, keys | P3 | ⬜ |
+| Pet / Aquarium / Terrarium | [pet](pet/PLAN.md) | wet/humid mounts and systems with toxicity warnings | P3 | ⬜ |
+| Medical / Dental | [medical](medical/EXCLUDED.md) | **explicitly excluded** until an external certification path | — | ⛔ |
 
-Приоритет P1 — дешёвая витрина и быстрый B2B: repair и jigs почти
-целиком собираются из готовых ops, studio — из готовых архетипов
-пресетами.
+Priority P1 means a cheap showcase and fast B2B: repair and jigs are built
+almost entirely from existing ops, studio — from existing archetypes via
+presets.
 
-Единый шаблон PLAN.md: 1 Scope и позиционирование · 2 Mode/Env/Tier ·
-3 Что уже есть в движке (+ gaps ⬜) · 4 Волны с golden-артефактом ·
-5 Интерфейсы и стандарты домена · 6 Валидаторы-кандидаты · 7 Free/Pro
-граница · 8 Риски и claims · 9 Связи с линиями A/E/M/P/VF/PK/CP.
+The unified PLAN.md template: 1 Scope and positioning · 2 Mode/Env/Tier ·
+3 What the engine already has (+ gaps ⬜) · 4 Waves with a golden artifact ·
+5 Domain interfaces and standards · 6 Candidate validators · 7 Free/Pro
+boundary · 8 Risks and claims · 9 Connections to the A/E/M/P/VF/PK/CP lines.
