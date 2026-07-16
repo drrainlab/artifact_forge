@@ -31,7 +31,55 @@
     </nav>
     <div id="topstatus" class="topstatus"></div>
   </header>
-  <main id="screen"></main>
+  <main id="screen">
+    <div id="boot" class="boot" aria-label="loading">
+      <div class="forgeanim">
+        <svg viewBox="0 0 200 120" width="280" height="168" aria-hidden="true">
+          <g class="gear-pos" transform="translate(78,64)">
+            <g class="gear-spin cw">
+              <rect x="-3.75" y="-33" width="7.5" height="9" rx="1" transform="rotate(0.0)"/>
+            <rect x="-3.75" y="-33" width="7.5" height="9" rx="1" transform="rotate(36.0)"/>
+            <rect x="-3.75" y="-33" width="7.5" height="9" rx="1" transform="rotate(72.0)"/>
+            <rect x="-3.75" y="-33" width="7.5" height="9" rx="1" transform="rotate(108.0)"/>
+            <rect x="-3.75" y="-33" width="7.5" height="9" rx="1" transform="rotate(144.0)"/>
+            <rect x="-3.75" y="-33" width="7.5" height="9" rx="1" transform="rotate(180.0)"/>
+            <rect x="-3.75" y="-33" width="7.5" height="9" rx="1" transform="rotate(216.0)"/>
+            <rect x="-3.75" y="-33" width="7.5" height="9" rx="1" transform="rotate(252.0)"/>
+            <rect x="-3.75" y="-33" width="7.5" height="9" rx="1" transform="rotate(288.0)"/>
+            <rect x="-3.75" y="-33" width="7.5" height="9" rx="1" transform="rotate(324.0)"/>
+              <circle r="27" class="gear-body"/>
+              <circle r="10" class="gear-hole"/>
+              <circle r="4.5" class="gear-axle"/>
+            </g>
+          </g>
+          <g class="gear-pos" transform="translate(126,40)">
+            <g class="gear-spin ccw">
+              <rect x="-3.0" y="-22" width="6" height="8" rx="1" transform="rotate(0.0)"/>
+            <rect x="-3.0" y="-22" width="6" height="8" rx="1" transform="rotate(45.0)"/>
+            <rect x="-3.0" y="-22" width="6" height="8" rx="1" transform="rotate(90.0)"/>
+            <rect x="-3.0" y="-22" width="6" height="8" rx="1" transform="rotate(135.0)"/>
+            <rect x="-3.0" y="-22" width="6" height="8" rx="1" transform="rotate(180.0)"/>
+            <rect x="-3.0" y="-22" width="6" height="8" rx="1" transform="rotate(225.0)"/>
+            <rect x="-3.0" y="-22" width="6" height="8" rx="1" transform="rotate(270.0)"/>
+            <rect x="-3.0" y="-22" width="6" height="8" rx="1" transform="rotate(315.0)"/>
+              <circle r="17" class="gear-body"/>
+              <circle r="6.5" class="gear-hole"/>
+              <circle r="3" class="gear-axle"/>
+            </g>
+          </g>
+        </svg>
+        <span class="spark" style="--dx:42px;  --dy:-30px; --d:0ms"></span>
+        <span class="spark" style="--dx:54px;  --dy:-6px;  --d:140ms"></span>
+        <span class="spark" style="--dx:30px;  --dy:-48px; --d:280ms"></span>
+        <span class="spark" style="--dx:60px;  --dy:-20px; --d:430ms"></span>
+        <span class="spark" style="--dx:24px;  --dy:-14px; --d:560ms"></span>
+        <span class="spark" style="--dx:46px;  --dy:-42px; --d:700ms"></span>
+        <span class="spark" style="--dx:36px;  --dy:6px;   --d:840ms"></span>
+      </div>
+      <div class="boot-title">FIRING UP THE FORGE</div>
+      <div class="boot-sub">loading the catalog, packs and validators<span class="dots"></span></div>
+    </div>
+  </main>
 </div>
 <script type="module" src="/static/js/main.js?v=__V__"></script>
 </body>

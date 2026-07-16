@@ -1305,5 +1305,17 @@ function go(name) {
 document.querySelectorAll("#nav button").forEach((b) =>
   b.addEventListener("click", () => go(b.dataset.screen)));
 
-await refreshTop();
-renderHome();
+// the boot loader (index.html #boot) spins until the first /api/status
+// answers — a cold start loads the whole catalog server-side. If the API
+// never answers, say so honestly instead of spinning forever.
+try {
+  await refreshTop();
+  renderHome();
+} catch (err) {
+  screenEl.innerHTML = `<div class="home"><div class="panel">
+    <h3>FORGE OFFLINE</h3>
+    <p class="dim">the cockpit API did not answer: ${esc(String(err?.message || err))}</p>
+    <div class="row mt"><button class="forge" id="boot-retry">Retry</button></div>
+  </div></div>`;
+  $("#boot-retry").addEventListener("click", () => location.reload());
+}
