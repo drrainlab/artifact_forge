@@ -192,6 +192,58 @@ def test_drift_reports_cad_env_separately(tmp_path, monkeypatch):
     assert not d["inputs_changed"]          # axes stay independent
 
 
+def test_live_lock_holder_is_never_evicted(tmp_path):
+    """Regression: the old waiter-side deadline unlinked a LIVE holder's
+    lock under CPU starvation (caught as a full-suite lost-update flake).
+    A slow-but-alive holder must serialize every waiter."""
+    import threading
+    import time as _time
+
+    lib = tmp_path / "lib"
+    inside, worst = 0, 0
+    guard = threading.Lock()
+
+    def worker(hold_s: float) -> None:
+        nonlocal inside, worst
+        with registry._locked(lib):
+            with guard:
+                inside += 1
+                worst = max(worst, inside)
+            _time.sleep(hold_s)
+            with guard:
+                inside -= 1
+
+    holder = threading.Thread(target=worker, args=(0.6,))
+    waiters = [threading.Thread(target=worker, args=(0.05,))
+               for _ in range(3)]
+    holder.start()
+    _time.sleep(0.05)
+    for t in waiters:
+        t.start()
+    for t in [holder, *waiters]:
+        t.join()
+    assert worst == 1
+    assert not (lib / "registry.lock").exists()
+
+
+def test_stale_lock_of_crashed_holder_is_stolen(tmp_path, monkeypatch):
+    """A crashed holder leaves an old lockfile; the next writer must
+    steal it (atomically) instead of waiting forever."""
+    import os
+    import time as _time
+
+    lib = tmp_path / "lib"
+    lib.mkdir(parents=True)
+    orphan = lib / "registry.lock"
+    orphan.write_text("")
+    past = _time.time() - 3600.0
+    os.utime(orphan, (past, past))
+    start = _time.time()
+    with registry._locked(lib):
+        assert _time.time() - start < 5.0   # stolen, not waited out
+    assert not orphan.exists()
+
+
 def _archive_in_proc(args) -> str:
     lib_str, device, out_str = args
     return registry.archive_build(

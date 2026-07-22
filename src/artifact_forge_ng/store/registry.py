@@ -48,8 +48,12 @@ LIBRARY_ROOT = REPO_ROOT / ".artifact-forge" / "library"
 _PRODUCT_EXPORTS = {"stl": "part.stl", "step": "part.step"}
 _ASSEMBLY_EXPORTS = {"assembled_step": "assembled.step", "bom": "bom.yaml"}
 
+#: A lockfile older than this belongs to a crashed holder and may be
+#: stolen. Live critical sections are milliseconds; there is deliberately
+#: NO waiter-side deadline — a deadline measured from the waiter's entry
+#: fires spuriously under CPU starvation and evicts a LIVE holder (a
+#: real lost-update flake caught under full-suite load).
 _LOCK_STALE_S = 30.0
-_LOCK_WAIT_S = 10.0
 
 
 
@@ -106,12 +110,16 @@ _CAD_ENV_KEYS = ("python", "cadquery", "cadquery_ocp", "platform")
 
 @contextmanager
 def _locked(library_root: Path) -> Iterator[None]:
-    """Cross-process create-exclusive lockfile with stale-steal. The
-    registry is a rebuildable index, so after the wait deadline we steal
-    rather than fail the build."""
+    """Cross-process create-exclusive lockfile.
+
+    A holder is presumed ALIVE while its lockfile is fresh — the only
+    lock we ever steal is one whose mtime crossed the stale window (a
+    crashed holder), and the steal goes through an atomic rename so
+    exactly one waiter wins it (unlink-by-name lets two stealers each
+    remove the other's fresh lock and both enter). Release verifies the
+    inode so a holder never unlinks a lock it no longer owns."""
     library_root.mkdir(parents=True, exist_ok=True)
     lock = library_root / "registry.lock"
-    deadline = time.time() + _LOCK_WAIT_S
     fd = None
     while fd is None:
         try:
@@ -120,16 +128,27 @@ def _locked(library_root: Path) -> Iterator[None]:
             try:
                 stale = time.time() - lock.stat().st_mtime > _LOCK_STALE_S
             except OSError:
-                stale = False
-            if stale or time.time() > deadline:
-                lock.unlink(missing_ok=True)
+                continue  # holder just released — retry the open at once
+            if stale:
+                grave = lock.with_name(
+                    f"registry.lock.stale-{os.getpid()}-{time.time_ns()}")
+                try:
+                    lock.rename(grave)     # atomic: one stealer wins
+                    grave.unlink(missing_ok=True)
+                except OSError:
+                    pass                   # somebody else won the steal
                 continue
             time.sleep(0.05)
+    my_ino = os.fstat(fd).st_ino
     try:
         yield
     finally:
         os.close(fd)
-        lock.unlink(missing_ok=True)
+        try:
+            if lock.stat().st_ino == my_ino:
+                lock.unlink()
+        except OSError:
+            pass  # already stolen as stale (we held it >30s) or gone
 
 
 def _registry_path(library_root: Path) -> Path:
