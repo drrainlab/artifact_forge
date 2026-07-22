@@ -4,6 +4,8 @@ critical product-identity gate (that's contract/topology/region territory).
 
 from __future__ import annotations
 
+import math
+
 from ..cad.geometry import Geometry
 from ..core.findings import Finding, Level, Status
 from ..form.part import PartForm
@@ -158,6 +160,168 @@ def overhang(geometry: Geometry, form: PartForm) -> Finding:
         measured=span if span > 0 else None,
         suggestion=suggestion,
     )
+
+
+#: Layer-overlap self-support model. A downward face sloped alpha degrees
+#: from VERTICAL steps every new layer out by h*tan(alpha); the fresh
+#: track keeps f = 1 - h*tan(alpha)/w of its width bonded to the layer
+#: below (w = extruded line width ~ nozzle). Under ~40-50% bonded width
+#: the strand has nothing to sit on and sags/curls. The folklore "45 deg
+#: rule" is exactly f = 0.5 at h0.2/w0.4 — this check derives the limit
+#: from the instance's REAL print profile instead: 0.1 mm layers earn
+#: ~63 deg, 0.3 mm layers only ~34 deg.
+F_SAFE = 0.50
+F_CRIT = 0.40
+#: Faces steeper than this from vertical are near-horizontal undersides —
+#: bridge/cantilever territory (macro beam physics, judged by span checks),
+#: NOT the micro overlap regime. Gating them here would double-punish
+#: legitimate short bridges.
+FLAT_ALPHA = 80.0
+#: Sag needs ROOM to develop: what fails is a CONTIGUOUS under-overlapped
+#: surface, not the sum of scattered slivers. A connected at-risk patch no
+#: bigger than a perforation-cell roof (hex/voronoi field openings — a
+#: strip one wall deep, anchored on both cell walls) prints in the
+#: cooling-dominated micro regime and is reported, never gated. Bounded
+#: v1: area is the scale proxy; strip depth would be sharper.
+MICRO_ROOF_AREA = 120.0
+#: A contiguous unsafe region beyond this is support territory (FAIL);
+#: smaller contiguous regions and marginal-band regions WARN.
+OVERLAP_FAIL_AREA = 300.0
+
+
+def alpha_crit(h: float, w: float) -> float:
+    """The angle from vertical where the overlap fraction crosses F_CRIT
+    for a given layer height / line width."""
+    return math.degrees(math.atan(w * (1.0 - F_CRIT) / h))
+
+
+def _surface_patches(V, tris):
+    """Group triangles into connected surface patches (shared welded
+    edges — the same 1-micron weld the manifold check uses). Returns
+    lists of indices INTO the passed ``tris`` array."""
+    import numpy as np
+
+    q = np.round(np.asarray(V) * 1000.0).astype(np.int64)
+    _, inv = np.unique(q, axis=0, return_inverse=True)
+    welded = inv[np.asarray(tris)]
+    parent = list(range(len(welded)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    edge_owner: dict[tuple[int, int], int] = {}
+    for k, t in enumerate(welded):
+        for e in ((t[0], t[1]), (t[1], t[2]), (t[2], t[0])):
+            e = (min(e), max(e))
+            if e in edge_owner:
+                a, b = find(edge_owner[e]), find(k)
+                if a != b:
+                    parent[a] = b
+            else:
+                edge_owner[e] = k
+    groups: dict[int, list[int]] = {}
+    for k in range(len(welded)):
+        groups.setdefault(find(k), []).append(k)
+    return list(groups.values())
+
+
+def _print_pose(A, orientation: str):
+    """Rotate (n,3) points or normals from the part frame into the PRINT
+    pose — the same bake orient_for_print applies to exports (validators
+    measure in the part frame; gravity acts in the print frame). Pure
+    rotation, so one function serves both points and normals."""
+    if orientation == "side_profile":     # -90 deg about Y: X points up
+        return A[:, [2, 1, 0]] * (-1, 1, 1)
+    if orientation == "saddle_up":        # 180 deg about X
+        return A * (1, -1, -1)
+    return A
+
+
+@register_probe("manufacturing.overhang_overlap")
+def overhang_overlap(geometry: Geometry, form: PartForm) -> Finding:
+    """Micro-scale self-support: every sloped downward face of the real
+    tessellated solid must keep enough fresh-layer overlap to print. The
+    check measures in the print pose, buckets area by overlap fraction and
+    honestly hands near-horizontal undersides to the span checks."""
+    import numpy as np
+
+    check = "manufacturing.overhang_overlap"
+    h = float(form.params.get("layer_height", 0.2))
+    w = float(form.params.get("nozzle_d", 0.4))
+    alpha_safe = math.degrees(math.atan(w * (1.0 - F_SAFE) / h))
+    profile = f"h{h:g}/w{w:g} -> self-support limit {alpha_safe:.0f}deg from vertical"
+    try:
+        V, T = geometry.mesh(0.2)
+    except Exception as exc:  # pragma: no cover - tooling guard
+        return _finding(check, Status.WARN, f"could not tessellate: {exc}")
+    if len(T) == 0:
+        return _finding(check, Status.WARN, "empty tessellation")
+
+    p = V[T]
+    n = np.cross(p[:, 1] - p[:, 0], p[:, 2] - p[:, 0])
+    area2 = np.linalg.norm(n, axis=1)
+    keep = area2 > 1e-9
+    unit = _print_pose(n[keep] / area2[keep, None], form.print_orientation)
+    area = 0.5 * area2[keep]
+    cz = _print_pose(p[keep].mean(axis=1), form.print_orientation)[:, 2]
+    zmin = _print_pose(V, form.print_orientation)[:, 2].min()
+
+    hang = (unit[:, 2] < -0.03) & (cz > zmin + 1e-3)
+    if not hang.any():
+        return Finding(
+            check=check, status=Status.PASS, level=Level.MANUFACTURING,
+            message=f"no downward faces above the bed — self-supporting by "
+                    f"construction ({profile})",
+            measured=0.0, limit=alpha_safe, unit="deg")
+
+    alpha = np.degrees(np.arcsin(np.clip(-unit[:, 2], 0.0, 1.0)))
+    sloped = hang & (alpha <= FLAT_ALPHA)
+    flat_area = float(area[hang & (alpha > FLAT_ALPHA)].sum())
+    f = 1.0 - h * np.tan(np.radians(np.minimum(alpha, 89.9))) / w
+    risk = sloped & (f < F_SAFE - 1e-9)
+    safe_area = float(area[sloped & ~risk].sum())
+
+    micro = 0.0
+    regions: list[tuple[float, float]] = []  # (area, worst alpha) per patch
+    if risk.any():
+        for tris in _surface_patches(V, T[keep][risk]):
+            patch_area = float(area[np.nonzero(risk)[0][tris]].sum())
+            patch_worst = float(alpha[np.nonzero(risk)[0][tris]].max())
+            if patch_area <= MICRO_ROOF_AREA:
+                micro += patch_area
+            else:
+                regions.append((patch_area, patch_worst))
+
+    unsafe_regions = [(pa, pw) for pa, pw in regions if pw > alpha_crit(h, w)]
+    status = Status.PASS
+    if any(pa > OVERLAP_FAIL_AREA for pa, _ in unsafe_regions):
+        status = Status.FAIL
+    elif regions:
+        status = Status.WARN
+    worst = float(alpha[risk].max()) if risk.any() else (
+        float(alpha[sloped].max()) if sloped.any() else 0.0)
+
+    msg = f"sloped undersides ({profile}): {safe_area:.0f} mm2 self-supporting"
+    if regions:
+        big_a, big_w = max(regions)
+        msg += (f"; {len(regions)} contiguous at-risk region(s), largest "
+                f"{big_a:.0f} mm2 at {big_w:.0f}deg")
+    if micro > 0.0:
+        msg += (f"; {micro:.0f} mm2 in micro roofs (<= {MICRO_ROOF_AREA:g} "
+                "mm2 each — perforation-scale, anchored and cooling-"
+                "dominated, not gated)")
+    if flat_area > 0.0:
+        msg += (f"; {flat_area:.0f} mm2 near-horizontal underside — "
+                "bridge/support domain, judged by span checks")
+    return Finding(
+        check=check, status=status, level=Level.MANUFACTURING, message=msg,
+        measured=worst, limit=alpha_safe, unit="deg",
+        suggestion="" if status is Status.PASS else
+        "steepen/chamfer the underside past the overlap limit, print "
+        "thinner layers (they earn steeper faces), or accept supports")
 
 
 @register_probe("manufacturing.max_opening_span")

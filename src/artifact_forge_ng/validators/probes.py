@@ -270,6 +270,7 @@ KNOWN_CHECKS: dict[str, CheckDecl] = dict(
         _decl("manufacturing.min_wall", Level.MANUFACTURING, "measured minimum wall >= printer minimum"),
         _decl("manufacturing.bed_fit", Level.MANUFACTURING, "bounding box fits the print bed"),
         _decl("manufacturing.overhang", Level.MANUFACTURING, "overhang fraction acceptable for the support policy"),
+        _decl("manufacturing.overhang_overlap", Level.MANUFACTURING, "every sloped downward face keeps enough layer overlap (f = 1 - h*tan(alpha)/w) to self-support at the instance's layer height and line width"),
         _decl("manufacturing.max_opening_span", Level.MANUFACTURING, "widest through-wall opening bridges without support"),
         _decl("manufacturing.mesh_manifold", Level.MANUFACTURING, "the exported STL of a field-bearing part is edge-manifold watertight — a holey face that out-runs OCC tessellation (torn/solid mesh cells) FAILs here"),
         _decl("manufacturing.reference_geometry", Level.MANUFACTURING, "honesty note: this part is external hardware reference — manufacturability unverified by design"),
